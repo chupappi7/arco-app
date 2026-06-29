@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARCO — Support</title>
+<style>
+  :root { color-scheme: dark; --amber: #F5C518; --bg: #0E0E0E; --fg: #F2F0EB; --muted: #8A8A8A; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 120px; }
+  .back { color: var(--muted); text-decoration: none; font-size: 13px; }
+  .back:hover { color: var(--fg); }
+  h1 { font-size: 38px; letter-spacing: -.5px; margin: 24px 0 16px; }
+  h2 { font-size: 13px; font-weight: 900; letter-spacing: .22em; text-transform: uppercase; color: var(--amber); margin: 48px 0 12px; }
+  h3 { font-size: 17px; margin: 24px 0 6px; }
+  p, li { color: #C6C6C2; }
+  a { color: var(--amber); }
+  .lede { color: var(--muted); font-size: 18px; }
+  .contact-card { padding: 24px; border-radius: 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); margin: 32px 0; }
+  .contact-card h3 { margin-top: 0; }
+  .contact-card a { font-size: 18px; font-weight: 800; }
+  details { margin: 12px 0; padding: 16px 20px; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); cursor: pointer; }
+  details summary { font-weight: 700; outline: none; }
+  details[open] summary { color: var(--amber); margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="./">← ARCO</a>
+  <h1>Support</h1>
+  <p class="lede">Need help? Found a bug? Suggesting a feature? Get in touch.</p>
+
+  <div class="contact-card">
+    <h3>Email</h3>
+    <p>The fastest way to reach me is email — usually a reply within 24 hours.</p>
+    <a href="mailto:thinht7110@gmail.com?subject=ARCO%20support">thinht7110@gmail.com</a>
+  </div>
+
+  <h2>Common questions</h2>
+
+  <details>
+    <summary>How does the app blocker work?</summary>
+    <p>ARCO uses Apple's Screen Time API (Family Controls + Managed Settings) to enforce blocks. You pick which apps to block, then start a focus session — those apps will be shielded until you stop. ARCO never sees what you actually do inside the blocked apps — Apple keeps that private. Just the blocking is enforced.</p>
+  </details>
+
+  <details>
+    <summary>Why does the app ask for Screen Time permission?</summary>
+    <p>To block apps during focus sessions, iOS requires you to grant Screen Time access. This is a one-time permission. You can revoke it anytime in iOS Settings → Screen Time → Family Controls.</p>
+  </details>
+
+  <details>
+    <summary>Does ARCO collect my data?</summary>
+    <p>No. ARCO stores all your habits, tasks, and focus sessions locally on your device. There's no cloud backend, no analytics, no tracking. See the <a href="privacy.html">privacy policy</a> for details.</p>
+  </details>
+
+  <details>
+    <summary>Will my data sync across devices?</summary>
+    <p>Not yet. iCloud sync is on the roadmap. Today all data is local to the device.</p>
+  </details>
+
+  <details>
+    <summary>How do I cancel my subscription?</summary>
+    <p>iOS Settings → tap your name at the top → Subscriptions → ARCO → Cancel Subscription. The cancellation takes effect at the end of the current billing period.</p>
+  </details>
+
+  <details>
+    <summary>I was charged but the app says I'm not subscribed.</summary>
+    <p>Open ARCO → Settings → Restore Purchases. This re-syncs your subscription from your Apple ID. If that doesn't fix it, email me with your purchase receipt and I'll resolve it within 24 hours.</p>
+  </details>
+
+  <details>
+    <summary>The Focus Live Activity won't appear on my lock screen.</summary>
+    <p>iOS Settings → Notifications → ARCO → Allow Live Activities (must be on). Also check that "Always On Display" or focus mode isn't suppressing widgets.</p>
+  </details>
+
+  <details>
+    <summary>Bug report or feature request?</summary>
+    <p>Email me — I read every message and ship most fixes within a week. Indie dev, one person.</p>
+  </details>
+
+  <h2>Response time</h2>
+  <p>I aim to respond to every email within 24 hours, usually faster. Weekends sometimes take 48 hours.</p>
+</div>
+</body>
+</html>
