@@ -3,43 +3,102 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARCO — Terms of Use</title>
+<title>Terms of Use — ARCO</title>
+<meta name="description" content="ARCO terms of use — subscriptions, strict mode, and acceptable use.">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
 <style>
-  :root { color-scheme: dark; --amber: #F5C518; --bg: #0E0E0E; --fg: #F2F0EB; --muted: #8A8A8A; }
-  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.65 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
-  .wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 120px; }
-  .back { color: var(--muted); text-decoration: none; font-size: 13px; }
-  .back:hover { color: var(--fg); }
-  h1 { font-size: 38px; letter-spacing: -.5px; margin: 24px 0 8px; }
-  .effective { color: var(--muted); font-size: 13px; margin-bottom: 32px; }
-  h2 { font-size: 13px; font-weight: 900; letter-spacing: .22em; text-transform: uppercase; color: var(--amber); margin: 40px 0 12px; }
-  p, li { color: #C6C6C2; }
-  a { color: var(--amber); }
+  :root { color-scheme: dark; --amber:#FFD60A; --bg:#0A0A0B; --card:#101012; --line:rgba(255,255,255,.09); --fg:#F2F0EB; --muted:#8E8E93; --dim:#5A5A5E; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--fg); font:16px/1.65 -apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  ::selection { background:var(--amber); color:#000; }
+  nav { position:sticky; top:0; z-index:50; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); background:rgba(10,10,11,.72); border-bottom:1px solid var(--line); }
+  .nav-in { display:flex; align-items:center; gap:12px; padding:14px 24px; max-width:760px; margin:0 auto; }
+  .nav-in img { width:34px; height:34px; border-radius:8px; }
+  .nav-in .brand { font-weight:900; letter-spacing:.16em; font-size:14px; color:var(--fg); text-decoration:none; }
+  .nav-links { margin-left:auto; display:flex; gap:20px; }
+  .nav-links a { color:var(--muted); text-decoration:none; font-size:13px; font-weight:700; transition:color .2s; }
+  .nav-links a:hover, .nav-links a.on { color:var(--fg); }
+  .wrap { max-width:760px; margin:0 auto; padding:64px 24px 90px; position:relative; }
+  .wrap::before { content:""; position:fixed; inset:-10% -10% auto; height:420px; pointer-events:none; z-index:-1;
+    background:radial-gradient(ellipse 55% 60% at 50% 0%, rgba(255,214,10,.07), transparent 70%); }
+  .eyebrow { font-size:11px; font-weight:900; letter-spacing:.24em; text-transform:uppercase; color:var(--amber); margin-bottom:12px; }
+  h1 { font-size:clamp(30px,5vw,42px); font-weight:900; letter-spacing:-1px; margin-bottom:8px; }
+  .effective { color:var(--dim); font-size:13px; margin-bottom:36px; }
+  h2 { font-size:19px; font-weight:900; margin:38px 0 10px; letter-spacing:-.3px; }
+  p, li { color:#c9c9cd; font-size:15px; }
+  p + p { margin-top: 10px; }
+  ul { padding-left:20px; margin:8px 0; }
+  a { color:var(--amber); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .tldr { background:var(--card); box-shadow:inset 0 0 0 1px rgba(255,214,10,.3); border-radius:16px; padding:20px 22px; margin-bottom:12px; }
+  .tldr b { color:var(--amber); font-size:11px; letter-spacing:.2em; display:block; margin-bottom:6px; }
+  .card { background:var(--card); box-shadow:inset 0 0 0 1px var(--line); border-radius:16px; padding:22px; margin:14px 0; }
+  .card h3 { font-size:16px; font-weight:900; margin-bottom:6px; }
+  .btn { display:inline-block; background:var(--amber); color:#000; font-weight:900; font-size:14px; padding:12px 22px; border-radius:999px; margin-top:8px; }
+  .btn:hover { text-decoration:none; box-shadow:0 8px 28px rgba(255,214,10,.35); }
+  details { border-bottom:1px solid var(--line); }
+  summary { cursor:pointer; padding:16px 4px; font-weight:800; font-size:15px; color:var(--fg); list-style:none; display:flex; justify-content:space-between; }
+  summary::after { content:"+"; color:var(--amber); }
+  details[open] summary::after { content:"–"; }
+  details p { padding:0 4px 16px; }
+  footer { border-top:1px solid var(--line); padding:30px 24px; }
+  .foot-in { max-width:760px; margin:0 auto; display:flex; gap:18px; color:var(--dim); font-size:13px; flex-wrap:wrap; }
+  .foot-in a { color:var(--muted); }
+  .foot-in .right { margin-left:auto; }
 </style>
 </head>
 <body>
+<nav><div class="nav-in">
+  <img src="icon.png" alt="ARCO"><a class="brand" href="index.html">ARCO</a>
+  <div class="nav-links">
+    <a href="support.html">Support</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="terms.html" class="on">Terms</a>
+  </div>
+</div></nav>
 <div class="wrap">
-  <a class="back" href="./">← ARCO</a>
-  <h1>Terms of Use</h1>
-  <p class="effective">Effective: 29 June 2026</p>
 
-  <h2>Use of the app</h2>
-  <p>ARCO is provided "as is" for your personal, non-commercial use on an iPhone you own. You agree not to reverse-engineer, modify, or redistribute the app.</p>
+<div class="eyebrow">Legal</div>
+<h1>Terms of Use</h1>
+<p class="effective">Effective: 5 July 2026</p>
 
-  <h2>Subscriptions and auto-renewal</h2>
-  <p>ARCO offers an auto-renewing subscription. Payment is charged to your Apple ID at confirmation of purchase and renews automatically at the end of each billing period unless cancelled at least 24 hours before the period ends. Manage or cancel any time in iOS Settings → [Your Name] → Subscriptions.</p>
+<h2>1. Agreement</h2>
+<p>By downloading or using ARCO ("the app"), you agree to these terms and to Apple's standard <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener">Licensed Application End User License Agreement</a>. If you don't agree, don't use the app.</p>
 
-  <h2>Refunds</h2>
-  <p>All refund requests are handled by Apple, not by ARCO. Request a refund at <a href="https://reportaproblem.apple.com" target="_blank">reportaproblem.apple.com</a>.</p>
+<h2>2. What ARCO is</h2>
+<p>ARCO is a day planner and app blocker for iOS. The free tier includes the planner, focus timer, limited habits, and current-week insights. ARCO Pro, an optional auto-renewing subscription, adds app blocking, Strict mode, unlimited habits, and extended insights.</p>
 
-  <h2>Limitation of liability</h2>
-  <p>ARCO is provided without warranty of any kind. To the maximum extent permitted by law, ARCO and its developer are not liable for any direct, indirect, incidental, or consequential damages arising from your use of the app.</p>
+<h2>3. Subscriptions</h2>
+<ul>
+  <li>ARCO Pro is offered as a monthly ($3.99/month) or annual ($29.99/year) auto-renewing subscription. Prices in your local currency are shown at purchase and may vary by region.</li>
+  <li>The annual plan includes a 7-day free trial for new subscribers. You can cancel during the trial at no charge.</li>
+  <li>Payment is charged to your Apple ID at confirmation of purchase (or after the trial). Subscriptions renew automatically unless cancelled at least 24 hours before the end of the current period.</li>
+  <li>Manage or cancel anytime in iOS Settings → your name → Subscriptions. Deleting the app does not cancel a subscription.</li>
+  <li>Refunds are handled by Apple under App Store policy: <a href="https://support.apple.com/en-us/118223" target="_blank" rel="noopener">reportaproblem.apple.com</a>.</li>
+</ul>
 
-  <h2>Changes</h2>
-  <p>These terms may change. Material changes will be posted here with an updated effective date.</p>
+<h2>4. Strict mode</h2>
+<p>Strict mode intentionally prevents ending a focus session before its timer completes. By enabling it you accept that the session cannot be ended early. Emergency phone functions, and every app not on your block list, remain available at all times.</p>
 
-  <h2>Contact</h2>
-  <p><a href="mailto:thinht7110@gmail.com">thinht7110@gmail.com</a></p>
+<h2>5. Acceptable use</h2>
+<p>Don't reverse-engineer, resell, or misuse the app, and don't use it to violate anyone else's rights or Apple's terms.</p>
+
+<h2>6. No warranties</h2>
+<p>ARCO is provided "as is". It is a productivity tool, not a medical or safety device. While the blocker is built on Apple's Screen Time framework, no software can guarantee you won't find a way to distract yourself. We are not liable for missed work, missed alarms, or anything you did or didn't do during a focus session, to the maximum extent permitted by law.</p>
+
+<h2>7. Changes</h2>
+<p>Features and prices may change; material changes to these terms will be posted at this URL with an updated effective date. Existing subscribers are notified of price changes per Apple's rules.</p>
+
+<h2>8. Contact</h2>
+<p><a href="mailto:thinht7110@gmail.com">thinht7110@gmail.com</a></p>
 </div>
+<footer><div class="foot-in">
+  <a href="index.html">ARCO</a>
+  <a href="support.html">Support</a>
+  <a href="privacy.html">Privacy</a>
+  <a href="terms.html">Terms</a>
+  <span class="right">© 2026 ARCO · Made by Thinh Tran</span>
+</div></footer>
 </body>
 </html>

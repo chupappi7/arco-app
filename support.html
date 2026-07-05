@@ -3,83 +3,101 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARCO — Support</title>
+<title>Support — ARCO</title>
+<meta name="description" content="ARCO support — blocking, strict mode, subscriptions, and data questions answered.">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
 <style>
-  :root { color-scheme: dark; --amber: #F5C518; --bg: #0E0E0E; --fg: #F2F0EB; --muted: #8A8A8A; }
-  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
-  .wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 120px; }
-  .back { color: var(--muted); text-decoration: none; font-size: 13px; }
-  .back:hover { color: var(--fg); }
-  h1 { font-size: 38px; letter-spacing: -.5px; margin: 24px 0 16px; }
-  h2 { font-size: 13px; font-weight: 900; letter-spacing: .22em; text-transform: uppercase; color: var(--amber); margin: 48px 0 12px; }
-  h3 { font-size: 17px; margin: 24px 0 6px; }
-  p, li { color: #C6C6C2; }
-  a { color: var(--amber); }
-  .lede { color: var(--muted); font-size: 18px; }
-  .contact-card { padding: 24px; border-radius: 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); margin: 32px 0; }
-  .contact-card h3 { margin-top: 0; }
-  .contact-card a { font-size: 18px; font-weight: 800; }
-  details { margin: 12px 0; padding: 16px 20px; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); cursor: pointer; }
-  details summary { font-weight: 700; outline: none; }
-  details[open] summary { color: var(--amber); margin-bottom: 8px; }
+  :root { color-scheme: dark; --amber:#FFD60A; --bg:#0A0A0B; --card:#101012; --line:rgba(255,255,255,.09); --fg:#F2F0EB; --muted:#8E8E93; --dim:#5A5A5E; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--fg); font:16px/1.65 -apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  ::selection { background:var(--amber); color:#000; }
+  nav { position:sticky; top:0; z-index:50; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); background:rgba(10,10,11,.72); border-bottom:1px solid var(--line); }
+  .nav-in { display:flex; align-items:center; gap:12px; padding:14px 24px; max-width:760px; margin:0 auto; }
+  .nav-in img { width:34px; height:34px; border-radius:8px; }
+  .nav-in .brand { font-weight:900; letter-spacing:.16em; font-size:14px; color:var(--fg); text-decoration:none; }
+  .nav-links { margin-left:auto; display:flex; gap:20px; }
+  .nav-links a { color:var(--muted); text-decoration:none; font-size:13px; font-weight:700; transition:color .2s; }
+  .nav-links a:hover, .nav-links a.on { color:var(--fg); }
+  .wrap { max-width:760px; margin:0 auto; padding:64px 24px 90px; position:relative; }
+  .wrap::before { content:""; position:fixed; inset:-10% -10% auto; height:420px; pointer-events:none; z-index:-1;
+    background:radial-gradient(ellipse 55% 60% at 50% 0%, rgba(255,214,10,.07), transparent 70%); }
+  .eyebrow { font-size:11px; font-weight:900; letter-spacing:.24em; text-transform:uppercase; color:var(--amber); margin-bottom:12px; }
+  h1 { font-size:clamp(30px,5vw,42px); font-weight:900; letter-spacing:-1px; margin-bottom:8px; }
+  .effective { color:var(--dim); font-size:13px; margin-bottom:36px; }
+  h2 { font-size:19px; font-weight:900; margin:38px 0 10px; letter-spacing:-.3px; }
+  p, li { color:#c9c9cd; font-size:15px; }
+  p + p { margin-top: 10px; }
+  ul { padding-left:20px; margin:8px 0; }
+  a { color:var(--amber); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .tldr { background:var(--card); box-shadow:inset 0 0 0 1px rgba(255,214,10,.3); border-radius:16px; padding:20px 22px; margin-bottom:12px; }
+  .tldr b { color:var(--amber); font-size:11px; letter-spacing:.2em; display:block; margin-bottom:6px; }
+  .card { background:var(--card); box-shadow:inset 0 0 0 1px var(--line); border-radius:16px; padding:22px; margin:14px 0; }
+  .card h3 { font-size:16px; font-weight:900; margin-bottom:6px; }
+  .btn { display:inline-block; background:var(--amber); color:#000; font-weight:900; font-size:14px; padding:12px 22px; border-radius:999px; margin-top:8px; }
+  .btn:hover { text-decoration:none; box-shadow:0 8px 28px rgba(255,214,10,.35); }
+  details { border-bottom:1px solid var(--line); }
+  summary { cursor:pointer; padding:16px 4px; font-weight:800; font-size:15px; color:var(--fg); list-style:none; display:flex; justify-content:space-between; }
+  summary::after { content:"+"; color:var(--amber); }
+  details[open] summary::after { content:"–"; }
+  details p { padding:0 4px 16px; }
+  footer { border-top:1px solid var(--line); padding:30px 24px; }
+  .foot-in { max-width:760px; margin:0 auto; display:flex; gap:18px; color:var(--dim); font-size:13px; flex-wrap:wrap; }
+  .foot-in a { color:var(--muted); }
+  .foot-in .right { margin-left:auto; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <a class="back" href="./">← ARCO</a>
-  <h1>Support</h1>
-  <p class="lede">Need help? Found a bug? Suggesting a feature? Get in touch.</p>
-
-  <div class="contact-card">
-    <h3>Email</h3>
-    <p>The fastest way to reach me is email — usually a reply within 24 hours.</p>
-    <a href="mailto:thinht7110@gmail.com?subject=ARCO%20support">thinht7110@gmail.com</a>
+<nav><div class="nav-in">
+  <img src="icon.png" alt="ARCO"><a class="brand" href="index.html">ARCO</a>
+  <div class="nav-links">
+    <a href="support.html" class="on">Support</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="terms.html">Terms</a>
   </div>
+</div></nav>
+<div class="wrap">
 
-  <h2>Common questions</h2>
+<div class="eyebrow">Help</div>
+<h1>Support</h1>
+<p class="effective">Usually answered within 24 hours.</p>
 
-  <details>
-    <summary>How does the app blocker work?</summary>
-    <p>ARCO uses Apple's Screen Time API (Family Controls + Managed Settings) to enforce blocks. You pick which apps to block, then start a focus session — those apps will be shielded until you stop. ARCO never sees what you actually do inside the blocked apps — Apple keeps that private. Just the blocking is enforced.</p>
-  </details>
-
-  <details>
-    <summary>Why does the app ask for Screen Time permission?</summary>
-    <p>To block apps during focus sessions, iOS requires you to grant Screen Time access. This is a one-time permission. You can revoke it anytime in iOS Settings → Screen Time → Family Controls.</p>
-  </details>
-
-  <details>
-    <summary>Does ARCO collect my data?</summary>
-    <p>No. ARCO stores all your habits, tasks, and focus sessions locally on your device. There's no cloud backend, no analytics, no tracking. See the <a href="privacy.html">privacy policy</a> for details.</p>
-  </details>
-
-  <details>
-    <summary>Will my data sync across devices?</summary>
-    <p>Not yet. iCloud sync is on the roadmap. Today all data is local to the device.</p>
-  </details>
-
-  <details>
-    <summary>How do I cancel my subscription?</summary>
-    <p>iOS Settings → tap your name at the top → Subscriptions → ARCO → Cancel Subscription. The cancellation takes effect at the end of the current billing period.</p>
-  </details>
-
-  <details>
-    <summary>I was charged but the app says I'm not subscribed.</summary>
-    <p>Open ARCO → Settings → Restore Purchases. This re-syncs your subscription from your Apple ID. If that doesn't fix it, email me with your purchase receipt and I'll resolve it within 24 hours.</p>
-  </details>
-
-  <details>
-    <summary>The Focus Live Activity won't appear on my lock screen.</summary>
-    <p>iOS Settings → Notifications → ARCO → Allow Live Activities (must be on). Also check that "Always On Display" or focus mode isn't suppressing widgets.</p>
-  </details>
-
-  <details>
-    <summary>Bug report or feature request?</summary>
-    <p>Email me — I read every message and ship most fixes within a week. Indie dev, one person.</p>
-  </details>
-
-  <h2>Response time</h2>
-  <p>I aim to respond to every email within 24 hours, usually faster. Weekends sometimes take 48 hours.</p>
+<div class="card">
+  <h3>Email support</h3>
+  <p>Fastest way to reach a human (it's just one human — the developer).</p>
+  <a class="btn" href="mailto:thinht7110@gmail.com?subject=ARCO%20support">Email thinht7110@gmail.com</a>
 </div>
+
+<h2>Common questions</h2>
+
+<details><summary>Blocking isn't working</summary>
+<p>Three things to check: (1) Screen Time permission is granted — Settings → Screen Time → Apps with Screen Time Access → ARCO. (2) You've picked apps to block — Settings tab → Apps to block. (3) App blocking is an ARCO Pro feature — on the free plan the focus timer runs but apps stay open, and the session screen says "BLOCKING OFF" so you always know.</p></details>
+
+<details><summary>I'm stuck in Strict mode</summary>
+<p>Working as designed — a strict session cannot be ended before its timer runs out. Breaks still work (blocking pauses and re-arms automatically), and every app that isn't on your block list works normally. The lock releases the moment the timer finishes; the longest possible session is 90 minutes.</p></details>
+
+<details><summary>My purchase didn't unlock Pro</summary>
+<p>Open any upgrade screen and tap <b>Restore</b>. If that doesn't do it, confirm you're signed into the same Apple ID that made the purchase, then email us with your purchase receipt and we'll sort it.</p></details>
+
+<details><summary>How do I cancel my subscription?</summary>
+<p>Subscriptions are managed by Apple: Settings → your name → Subscriptions → ARCO → Cancel. Pro stays active until the end of the paid period. No email, no hoops.</p></details>
+
+<details><summary>The usage numbers look wrong</summary>
+<p>ARCO shows a rolling last-7-days window read from iOS Screen Time, which can differ from Apple's Mon–Sun calendar week in Settings. Screen Time also counts background audio and picture-in-picture as usage. If a specific app's number differs wildly from Settings → Screen Time for the same day, email us — that's a bug we want.</p></details>
+
+<details><summary>Can I move my data to a new iPhone?</summary>
+<p>Yes — ARCO's data is included in your iPhone backup. Restore the new phone from backup and your habits, history, and settings come along. Screen Time permission needs to be granted once on the new device.</p></details>
+
+<details><summary>Feature request?</summary>
+<p>Genuinely wanted: <a href="mailto:thinht7110@gmail.com?subject=ARCO%20feature%20request">email the developer</a>. Short pitches read fastest.</p></details>
+</div>
+<footer><div class="foot-in">
+  <a href="index.html">ARCO</a>
+  <a href="support.html">Support</a>
+  <a href="privacy.html">Privacy</a>
+  <a href="terms.html">Terms</a>
+  <span class="right">© 2026 ARCO · Made by Thinh Tran</span>
+</div></footer>
 </body>
 </html>

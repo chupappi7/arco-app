@@ -3,70 +3,110 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARCO — Privacy Policy</title>
+<title>Privacy Policy — ARCO</title>
+<meta name="description" content="ARCO privacy policy — no server, no account, no tracking. Everything stays on your iPhone.">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
 <style>
-  :root { color-scheme: dark; --amber: #F5C518; --bg: #0E0E0E; --fg: #F2F0EB; --muted: #8A8A8A; }
-  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.65 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
-  .wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 120px; }
-  .back { color: var(--muted); text-decoration: none; font-size: 13px; }
-  .back:hover { color: var(--fg); }
-  h1 { font-size: 38px; letter-spacing: -.5px; margin: 24px 0 8px; }
-  .effective { color: var(--muted); font-size: 13px; margin-bottom: 32px; }
-  h2 { font-size: 13px; font-weight: 900; letter-spacing: .22em; text-transform: uppercase; color: var(--amber); margin: 40px 0 12px; }
-  p, li { color: #C6C6C2; }
-  a { color: var(--amber); }
-  ul { padding-left: 22px; }
-  li { margin: 6px 0; }
-  .tldr { padding: 20px 24px; border-radius: 14px; background: rgba(245,197,24,.06); box-shadow: inset 0 0 0 1px rgba(245,197,24,.35); margin: 24px 0 32px; }
-  .tldr strong { color: var(--amber); }
+  :root { color-scheme: dark; --amber:#FFD60A; --bg:#0A0A0B; --card:#101012; --line:rgba(255,255,255,.09); --fg:#F2F0EB; --muted:#8E8E93; --dim:#5A5A5E; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--fg); font:16px/1.65 -apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  ::selection { background:var(--amber); color:#000; }
+  nav { position:sticky; top:0; z-index:50; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); background:rgba(10,10,11,.72); border-bottom:1px solid var(--line); }
+  .nav-in { display:flex; align-items:center; gap:12px; padding:14px 24px; max-width:760px; margin:0 auto; }
+  .nav-in img { width:34px; height:34px; border-radius:8px; }
+  .nav-in .brand { font-weight:900; letter-spacing:.16em; font-size:14px; color:var(--fg); text-decoration:none; }
+  .nav-links { margin-left:auto; display:flex; gap:20px; }
+  .nav-links a { color:var(--muted); text-decoration:none; font-size:13px; font-weight:700; transition:color .2s; }
+  .nav-links a:hover, .nav-links a.on { color:var(--fg); }
+  .wrap { max-width:760px; margin:0 auto; padding:64px 24px 90px; position:relative; }
+  .wrap::before { content:""; position:fixed; inset:-10% -10% auto; height:420px; pointer-events:none; z-index:-1;
+    background:radial-gradient(ellipse 55% 60% at 50% 0%, rgba(255,214,10,.07), transparent 70%); }
+  .eyebrow { font-size:11px; font-weight:900; letter-spacing:.24em; text-transform:uppercase; color:var(--amber); margin-bottom:12px; }
+  h1 { font-size:clamp(30px,5vw,42px); font-weight:900; letter-spacing:-1px; margin-bottom:8px; }
+  .effective { color:var(--dim); font-size:13px; margin-bottom:36px; }
+  h2 { font-size:19px; font-weight:900; margin:38px 0 10px; letter-spacing:-.3px; }
+  p, li { color:#c9c9cd; font-size:15px; }
+  p + p { margin-top: 10px; }
+  ul { padding-left:20px; margin:8px 0; }
+  a { color:var(--amber); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .tldr { background:var(--card); box-shadow:inset 0 0 0 1px rgba(255,214,10,.3); border-radius:16px; padding:20px 22px; margin-bottom:12px; }
+  .tldr b { color:var(--amber); font-size:11px; letter-spacing:.2em; display:block; margin-bottom:6px; }
+  .card { background:var(--card); box-shadow:inset 0 0 0 1px var(--line); border-radius:16px; padding:22px; margin:14px 0; }
+  .card h3 { font-size:16px; font-weight:900; margin-bottom:6px; }
+  .btn { display:inline-block; background:var(--amber); color:#000; font-weight:900; font-size:14px; padding:12px 22px; border-radius:999px; margin-top:8px; }
+  .btn:hover { text-decoration:none; box-shadow:0 8px 28px rgba(255,214,10,.35); }
+  details { border-bottom:1px solid var(--line); }
+  summary { cursor:pointer; padding:16px 4px; font-weight:800; font-size:15px; color:var(--fg); list-style:none; display:flex; justify-content:space-between; }
+  summary::after { content:"+"; color:var(--amber); }
+  details[open] summary::after { content:"–"; }
+  details p { padding:0 4px 16px; }
+  footer { border-top:1px solid var(--line); padding:30px 24px; }
+  .foot-in { max-width:760px; margin:0 auto; display:flex; gap:18px; color:var(--dim); font-size:13px; flex-wrap:wrap; }
+  .foot-in a { color:var(--muted); }
+  .foot-in .right { margin-left:auto; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <a class="back" href="./">← ARCO</a>
-  <h1>Privacy Policy</h1>
-  <p class="effective">Effective: 29 June 2026</p>
-
-  <div class="tldr">
-    <strong>TL;DR:</strong> ARCO stores everything locally on your device. There is no server, no analytics, no tracking, no ad networks, no data sold to anyone. Apple handles your payment. That's it.
+<nav><div class="nav-in">
+  <img src="icon.png" alt="ARCO"><a class="brand" href="index.html">ARCO</a>
+  <div class="nav-links">
+    <a href="support.html">Support</a>
+    <a href="privacy.html" class="on">Privacy</a>
+    <a href="terms.html">Terms</a>
   </div>
+</div></nav>
+<div class="wrap">
 
-  <h2>1. Who runs ARCO</h2>
-  <p>ARCO is an independent iOS app built by Thinh Tran. Contact: <a href="mailto:thinht7110@gmail.com">thinht7110@gmail.com</a></p>
+<div class="eyebrow">Legal</div>
+<h1>Privacy Policy</h1>
+<p class="effective">Effective: 5 July 2026</p>
 
-  <h2>2. What data ARCO collects</h2>
-  <p>ARCO does not have a backend server. All data you enter into the app — habits, tasks, focus sessions, schedules, app blocklists, journal entries — is stored locally on your iPhone using Apple's SwiftData framework. The data never leaves your device unless you explicitly back it up via iCloud as part of your iPhone backup, which is managed by Apple under their privacy policy.</p>
+<div class="tldr"><b>TL;DR</b>
+<p>ARCO has no server and no account. Everything stays on your iPhone. Your Screen Time data is read by Apple's framework on-device and physically cannot be exported by the app. We couldn't sell your data if we wanted to — we never have it.</p></div>
 
-  <p>ARCO collects no personally identifiable information. No email, no name, no phone number, no IP address, no device identifiers are sent anywhere by the app.</p>
+<h2>1. Who runs ARCO</h2>
+<p>ARCO is an independent iOS app built by Thinh Tran. Contact: <a href="mailto:thinht7110@gmail.com">thinht7110@gmail.com</a></p>
 
-  <h2>3. Screen Time and Family Controls</h2>
-  <p>ARCO uses Apple's Screen Time API (Family Controls + Managed Settings) to enforce the app blocker. When you grant Screen Time permission, iOS gives ARCO the ability to shield (block) the specific apps you select. ARCO does not see which apps you use, how long you use them, or what you do inside them — Apple keeps that data private. ARCO only knows the opaque tokens for the apps you chose to block.</p>
+<h2>2. What data ARCO collects</h2>
+<p>ARCO does not have a backend server. All data you enter into the app — habits, tasks, focus sessions, schedules, app block lists — is stored locally on your iPhone using Apple's SwiftData framework. The data never leaves your device unless you back up your iPhone via iCloud, which is managed by Apple under their privacy policy.</p>
+<p>ARCO collects no personally identifiable information. No email, no name, no phone number, no IP address, no device identifiers are sent anywhere by the app.</p>
 
-  <p>The Bad Habits / Insights screen displays usage statistics that come directly from iOS Screen Time and are computed on-device by Apple's DeviceActivityReport extension. ARCO never sees or transmits this data.</p>
+<h2>3. Screen Time and Family Controls</h2>
+<p>ARCO uses Apple's Screen Time frameworks (Family Controls + Managed Settings) to power the app blocker. When you grant Screen Time permission, iOS lets ARCO block the specific apps you select. ARCO does not learn which apps you use or what you do in them — it only holds opaque tokens for the apps you picked.</p>
+<p>The usage statistics on the Insights screen are rendered on-device by Apple's DeviceActivityReport system, inside a sandbox that prevents the numbers from ever reaching ARCO's own code or any network. ARCO never sees or transmits this data — by Apple's design, not just our promise.</p>
 
-  <h2>4. Subscriptions and payment</h2>
-  <p>ARCO offers an optional subscription. Payment is handled entirely by Apple through the App Store. ARCO does not receive your credit card number, billing address, or any other payment information. RevenueCat (a subscription analytics service) processes subscription receipts to verify entitlements. RevenueCat receives an anonymous user ID generated by ARCO — no personal information. See <a href="https://www.revenuecat.com/privacy" target="_blank">RevenueCat's privacy policy</a>.</p>
+<h2>4. Subscriptions and payment</h2>
+<p>ARCO offers an optional subscription (ARCO Pro). Payment is handled entirely by Apple through the App Store — ARCO never receives your card number, billing address, or any payment details. RevenueCat, a subscription-management service, processes App Store receipts to verify your entitlement; it receives only an anonymous, randomly generated ID. See <a href="https://www.revenuecat.com/privacy" target="_blank" rel="noopener">RevenueCat's privacy policy</a>.</p>
 
-  <h2>5. Notifications</h2>
-  <p>If you grant notification permission, ARCO schedules local notifications (habit reminders, focus session alerts). These notifications are created and delivered entirely on your device. They are never sent to any server.</p>
+<h2>5. Notifications</h2>
+<p>If you grant notification permission, ARCO schedules local notifications (morning plan, habit and task reminders, focus updates). They are created and delivered entirely on your device and never touch a server.</p>
 
-  <h2>6. Analytics and tracking</h2>
-  <p>ARCO does not use any analytics SDK (no Firebase, no Mixpanel, no Amplitude, etc.). ARCO does not use any advertising network. ARCO does not implement App Tracking Transparency tracking because there is nothing to track.</p>
+<h2>6. Analytics and tracking</h2>
+<p>ARCO uses no analytics SDK (no Firebase, Mixpanel, Amplitude, or similar) and no advertising network. There is nothing to consent to under App Tracking Transparency because no tracking exists.</p>
 
-  <h2>7. Crash reports</h2>
-  <p>ARCO does NOT collect crash reports. If iOS itself prompts you to share diagnostics with developers, Apple may include anonymized crash logs in those reports under their own privacy policy.</p>
+<h2>7. Crash reports</h2>
+<p>ARCO does not collect crash reports. If iOS prompts you to share diagnostics with developers, Apple may include anonymized crash logs under their own privacy policy.</p>
 
-  <h2>8. Children</h2>
-  <p>ARCO is rated 4+ in the App Store and is not directed at children under 13. ARCO does not knowingly collect any data from anyone.</p>
+<h2>8. Children</h2>
+<p>ARCO is rated 4+ and is not directed at children under 13. ARCO does not knowingly collect any data from anyone.</p>
 
-  <h2>9. Your rights</h2>
-  <p>Because ARCO does not collect or store your data on any server, there is no data to request, export, or delete on our side. To remove all ARCO data, delete the app from your iPhone — that wipes the local database completely.</p>
+<h2>9. Your rights</h2>
+<p>Because ARCO stores nothing on any server, there is no data for us to export, correct, or delete. To remove all ARCO data, delete the app — that wipes the local database completely.</p>
 
-  <h2>10. Changes to this policy</h2>
-  <p>If this policy changes materially, the new version will be posted at this URL with an updated effective date. Continued use of ARCO after a change means you accept the updated policy.</p>
+<h2>10. Changes to this policy</h2>
+<p>Material changes will be posted at this URL with an updated effective date. Continued use of ARCO after a change means you accept the updated policy.</p>
 
-  <h2>11. Contact</h2>
-  <p>Questions about privacy? Email <a href="mailto:thinht7110@gmail.com">thinht7110@gmail.com</a> — usually a reply within 24 hours.</p>
+<h2>11. Contact</h2>
+<p>Questions about privacy? Email <a href="mailto:thinht7110@gmail.com">thinht7110@gmail.com</a> — usually answered within 24 hours.</p>
 </div>
+<footer><div class="foot-in">
+  <a href="index.html">ARCO</a>
+  <a href="support.html">Support</a>
+  <a href="privacy.html">Privacy</a>
+  <a href="terms.html">Terms</a>
+  <span class="right">© 2026 ARCO · Made by Thinh Tran</span>
+</div></footer>
 </body>
 </html>
