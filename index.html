@@ -1,407 +1,504 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARCO — Plan your day. Actually do it.</title>
-<meta name="description" content="A day planner with a real app blocker. Plan your day, start focus, and your distraction apps refuse to open. No coins. No games. Just blocked.">
-<meta property="og:title" content="ARCO — Plan your day. Actually do it.">
-<meta property="og:description" content="A day planner with a real app blocker. No coins. No games. Just blocked.">
-<meta property="og:image" content="https://chupappi7.github.io/arco-app/icon.png">
-<link rel="icon" type="image/png" href="icon.png">
-<link rel="apple-touch-icon" href="icon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARCO — Day Planner & App Blocker</title>
+<meta name="description" content="Plan your day in 30 seconds. A real alarm wakes you, your distracting apps stop opening when focus starts. Your plan finally holds.">
+<meta property="og:title" content="ARCO — Day Planner & App Blocker">
+<meta property="og:description" content="Plan a little. Block a lot.">
+<meta property="og:image" content="assets/shot1.jpg">
+<link rel="icon" href="icon.png">
 <style>
   :root {
-    color-scheme: dark;
-    --amber: #FFD60A;
-    --red: #FF453A;
-    --green: #30D158;
-    --bg: #0A0A0B;
-    --card: #101012;
-    --line: rgba(255,255,255,.09);
-    --fg: #F2F0EB;
-    --muted: #8E8E93;
-    --dim: #5A5A5E;
+    --amber: #FFD60A; --amber2: #FFB800;
+    --bg: #070708; --panel: #0e0e10; --card: #131316; --line: #232328;
+    --fg: #f2f0eb; --muted: #8e8e93; --dim: #55555a;
+    --red: #ff453a; --green: #30d158;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
     background: var(--bg); color: var(--fg);
-    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased; overflow-x: hidden;
   }
-  ::selection { background: var(--amber); color: #000; }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
-  .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
-  .eyebrow { font-size: 11px; font-weight: 900; letter-spacing: .24em; text-transform: uppercase; color: var(--amber); }
+  img { display: block; max-width: 100%; }
+  a { color: inherit; text-decoration: none; }
 
-  /* ---------- nav ---------- */
   nav {
-    position: sticky; top: 0; z-index: 50;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 5vw;
+    background: rgba(7,7,8,.55);
     backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-    background: rgba(10,10,11,.72); border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid rgba(255,255,255,.05);
   }
-  .nav-in { display: flex; align-items: center; gap: 12px; padding: 14px 24px; max-width: 1040px; margin: 0 auto; }
-  .nav-in img { width: 34px; height: 34px; border-radius: 8px; }
-  .nav-in .brand { font-weight: 900; letter-spacing: .16em; font-size: 14px; }
-  .nav-links { margin-left: auto; display: flex; gap: 22px; align-items: center; }
-  .nav-links a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 700; transition: color .2s; }
+  .nav-logo { display: flex; align-items: center; gap: 10px; font-weight: 900; letter-spacing: 3px; font-size: 14px; }
+  .nav-logo img { width: 28px; height: 28px; border-radius: 7px; }
+  .nav-links { display: flex; gap: 26px; font-size: 13px; font-weight: 600; color: var(--muted); }
   .nav-links a:hover { color: var(--fg); }
   .nav-cta {
-    background: var(--amber); color: #000 !important; font-weight: 900 !important;
-    padding: 9px 16px; border-radius: 999px; transition: transform .2s, box-shadow .2s;
+    background: var(--amber); color: #000; font-weight: 800; font-size: 13px;
+    padding: 9px 18px; border-radius: 20px; transition: transform .15s, box-shadow .3s;
   }
-  .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(255,214,10,.35); }
+  .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(255,184,0,.35); }
+  @media (max-width: 760px) { .nav-links { display: none; } }
 
-  /* ---------- hero ---------- */
-  .hero { position: relative; padding: 96px 0 80px; overflow: hidden; }
-  .hero::before {
-    content: ""; position: absolute; inset: -20% -10% auto;
-    height: 720px; pointer-events: none;
-    background: radial-gradient(ellipse 60% 50% at 50% 18%, rgba(255,214,10,.10), rgba(255,214,10,.03) 45%, transparent 70%);
+  .hero {
+    min-height: 100svh; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; position: relative;
+    padding: 120px 6vw 40px; overflow: hidden;
   }
-  .hero-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 56px; align-items: center; position: relative; }
-  .hero h1 { font-size: clamp(40px, 6vw, 62px); line-height: 1.04; letter-spacing: -1.8px; font-weight: 900; margin: 18px 0 20px; }
+  .hero-glow {
+    position: absolute; top: -20%; left: 50%; transform: translateX(-50%);
+    width: 900px; height: 900px; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(255,214,10,.13), transparent 70%);
+    pointer-events: none; will-change: transform;
+  }
+  .hero .eyebrow { color: var(--amber); font-size: 12px; font-weight: 900; letter-spacing: 4px; margin-bottom: 22px; }
+  .hero h1 { font-size: clamp(42px, 7.5vw, 96px); font-weight: 900; line-height: 1.02; letter-spacing: -0.03em; }
+  .hero h1 .line { display: block; overflow: hidden; }
+  .hero h1 .w { display: inline-block; transform: translateY(110%); animation: rise .8s cubic-bezier(.2,.7,.2,1) forwards; }
+  .hero h1 .line:nth-child(2) .w { animation-delay: .12s; }
   .hero h1 .amber { color: var(--amber); }
-  .lede { color: var(--muted); font-size: 18px; max-width: 480px; margin-bottom: 34px; }
-  .cta-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-  .cta {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 15px 26px; border-radius: 999px; font-weight: 900; font-size: 15px;
-    text-decoration: none; transition: transform .2s, box-shadow .25s;
+  @keyframes rise { to { transform: translateY(0); } }
+  .hero p.sub {
+    margin-top: 26px; color: var(--muted); font-size: clamp(16px, 2vw, 20px);
+    max-width: 46ch; line-height: 1.5; opacity: 0; animation: fadeUp .8s .35s forwards;
   }
-  .cta.primary { background: var(--amber); color: #000; box-shadow: 0 8px 32px rgba(255,214,10,.25); }
-  .cta.primary:hover { transform: translateY(-2px); box-shadow: 0 14px 44px rgba(255,214,10,.42); }
-  .cta.ghost { color: var(--fg); box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); }
-  .cta.ghost:hover { box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
-  .hero-note { margin-top: 16px; font-size: 12px; color: var(--dim); }
-
-  /* ---------- phone mock ---------- */
-  .phone-col { display: flex; justify-content: center; position: relative; }
-  .phone {
-    width: 300px; border-radius: 46px; background: #000; padding: 10px;
-    box-shadow: 0 0 0 1px rgba(255,255,255,.10), 0 40px 90px rgba(0,0,0,.65), 0 0 120px rgba(255,214,10,.07);
-    animation: float 7s ease-in-out infinite;
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(14px);} to { opacity: 1; transform: none; } }
+  .hero-ctas { display: flex; gap: 14px; margin-top: 36px; opacity: 0; animation: fadeUp .8s .5s forwards; flex-wrap: wrap; justify-content: center; }
+  .btn-primary {
+    background: linear-gradient(90deg, #ffe14d, var(--amber), var(--amber2));
+    color: #000; font-weight: 800; font-size: 15px; padding: 15px 30px; border-radius: 28px;
+    box-shadow: 0 8px 34px rgba(255,184,0,.28); transition: transform .15s, box-shadow .3s;
+    display: inline-block;
   }
-  @keyframes float { 0%,100% { transform: translateY(0) rotate(.4deg);} 50% { transform: translateY(-12px) rotate(-.4deg);} }
-  .screen { border-radius: 38px; background: var(--bg); padding: 20px 16px 24px; overflow: hidden; position: relative; }
-  .island { width: 86px; height: 24px; background: #000; border-radius: 14px; margin: 0 auto 16px; }
-  .p-day { font-size: 21px; font-weight: 900; margin-bottom: 12px; }
-  .p-label { font-size: 8.5px; font-weight: 900; letter-spacing: .18em; color: var(--dim); margin: 12px 0 7px; }
-  .slot { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 11px; background: var(--card); box-shadow: inset 0 0 0 1px var(--line); margin-bottom: 6px; }
-  .slot .t { font-size: 9.5px; font-weight: 800; color: var(--dim); width: 32px; }
-  .slot .bar { width: 3px; height: 26px; border-radius: 2px; }
-  .slot .ic { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; font-size: 11px; }
-  .slot .nm { font-size: 11.5px; font-weight: 800; }
-  .slot .sub { font-size: 8.5px; color: var(--dim); }
-  .focus-live {
-    border-radius: 13px; padding: 12px; margin-top: 12px;
-    background: linear-gradient(160deg, rgba(255,214,10,.10), rgba(255,214,10,.02));
-    box-shadow: inset 0 0 0 1px rgba(255,214,10,.32);
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 44px rgba(255,184,0,.45); }
+  .btn-ghost {
+    border: 1px solid var(--line); color: var(--fg); font-weight: 700; font-size: 15px;
+    padding: 15px 26px; border-radius: 28px; transition: border-color .2s, background .2s;
   }
-  .fl-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .fl-tag { font-size: 8px; font-weight: 900; letter-spacing: .18em; color: var(--amber); }
-  .fl-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); animation: blink 1.6s ease-in-out infinite; }
-  @keyframes blink { 0%,100% {opacity:1;} 50% {opacity:.25;} }
-  .fl-time { font-family: "SF Mono", ui-monospace, monospace; font-size: 26px; font-weight: 800; letter-spacing: 1px; }
-  .fl-sub { font-size: 8.5px; color: var(--muted); margin-top: 3px; }
-  .fl-blocked { display: flex; gap: 6px; margin-top: 10px; }
-  .chip { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; font-size: 10px; font-weight: 900; color: #fff; position: relative; opacity: .82; }
-  .chip::after { content:""; position: absolute; inset: 0; border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(255,69,58,.6); }
-  .chip::before { content:""; position: absolute; left: -2px; right: -2px; top: 50%; height: 1.5px; background: rgba(255,69,58,.85); transform: rotate(-18deg); }
-  .lock-chip { margin-left: auto; font-size: 8px; font-weight: 900; letter-spacing: .1em; color: var(--red); background: rgba(255,69,58,.10); box-shadow: inset 0 0 0 1px rgba(255,69,58,.35); border-radius: 999px; padding: 4px 8px; }
-
-  /* ---------- sections ---------- */
-  section { padding: 84px 0; position: relative; }
-  .sec-head { text-align: center; max-width: 620px; margin: 0 auto 52px; }
-  .sec-head h2 { font-size: clamp(28px, 4vw, 40px); font-weight: 900; letter-spacing: -1px; margin: 14px 0 12px; }
-  .sec-head p { color: var(--muted); font-size: 16px; }
-
-  /* steps */
-  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .step { padding: 30px 26px; border-radius: 20px; background: var(--card); box-shadow: inset 0 0 0 1px var(--line); transition: transform .25s, box-shadow .3s; }
-  .step:hover { transform: translateY(-4px); box-shadow: inset 0 0 0 1px rgba(255,214,10,.35), 0 20px 50px rgba(0,0,0,.4); }
-  .step .n { font-family: "SF Mono", ui-monospace, monospace; font-size: 12px; font-weight: 800; color: var(--amber); margin-bottom: 14px; }
-  .step h3 { font-size: 19px; font-weight: 900; margin-bottom: 8px; }
-  .step p { color: var(--muted); font-size: 14px; }
-
-  /* features */
-  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .f {
-    padding: 28px 24px; border-radius: 20px; background: var(--card);
-    box-shadow: inset 0 0 0 1px var(--line); transition: transform .25s, box-shadow .3s;
+  .btn-ghost:hover { border-color: var(--amber); background: rgba(255,214,10,.06); }
+  .hero-shot {
+    margin-top: 70px; width: min(380px, 78vw); border-radius: 28px;
+    box-shadow: 0 40px 120px rgba(0,0,0,.7), 0 0 80px rgba(255,184,0,.08);
+    will-change: transform; opacity: 0; animation: fadeUp 1s .65s forwards;
   }
-  .f:hover { transform: translateY(-4px); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2), 0 20px 50px rgba(0,0,0,.4); }
-  .f .fi { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 19px; margin-bottom: 16px; }
-  .f h3 { font-size: 17px; font-weight: 900; margin-bottom: 7px; }
-  .f p { color: var(--muted); font-size: 14px; }
-  .f.hero-f { grid-column: span 3; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center;
-    background: linear-gradient(150deg, rgba(255,214,10,.08), var(--card) 55%); box-shadow: inset 0 0 0 1px rgba(255,214,10,.25); }
-  .f.hero-f:hover { box-shadow: inset 0 0 0 1px rgba(255,214,10,.45), 0 20px 60px rgba(0,0,0,.45); }
-  .f.hero-f h3 { font-size: 24px; }
-  .f.hero-f p { font-size: 15px; }
-  .shield-demo { border-radius: 16px; background: #000; padding: 26px 20px; text-align: center; box-shadow: inset 0 0 0 1px var(--line); }
-  .shield-demo .scope { font-size: 40px; color: var(--amber); display: block; margin-bottom: 12px; animation: pulse 2.6s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1;} 50% { transform: scale(1.06); opacity: .82;} }
-  .shield-demo .sd-t { font-size: 18px; font-weight: 900; }
-  .shield-demo .sd-s { font-size: 12px; color: var(--muted); margin: 4px 0 14px; }
-  .shield-demo .sd-b { display: inline-block; background: var(--amber); color: #000; font-size: 12px; font-weight: 900; padding: 9px 18px; border-radius: 999px; }
+  .scroll-hint {
+    position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%);
+    color: var(--dim); font-size: 11px; letter-spacing: 2px; font-weight: 700;
+    animation: bob 2.2s ease-in-out infinite;
+  }
+  @keyframes bob { 0%,100% { transform: translate(-50%, 0);} 50% { transform: translate(-50%, 6px);} }
 
-  /* pricing */
-  .pricing { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; max-width: 780px; margin: 0 auto; }
-  .plan { padding: 34px 30px; border-radius: 24px; background: var(--card); box-shadow: inset 0 0 0 1px var(--line); position: relative; }
-  .plan.pro { box-shadow: inset 0 0 0 1.5px rgba(255,214,10,.55); background: linear-gradient(165deg, rgba(255,214,10,.07), var(--card) 50%); }
-  .plan .badge { position: absolute; top: -11px; left: 30px; background: var(--amber); color: #000; font-size: 10px; font-weight: 900; letter-spacing: .12em; padding: 4px 10px; border-radius: 999px; }
-  .plan h3 { font-size: 13px; font-weight: 900; letter-spacing: .2em; color: var(--muted); margin-bottom: 14px; }
-  .plan .price { font-size: 38px; font-weight: 900; letter-spacing: -1px; }
-  .plan .price span { font-size: 14px; color: var(--muted); font-weight: 700; }
-  .plan .alt { font-size: 12.5px; color: var(--dim); margin: 4px 0 22px; }
+  .strip {
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding: 18px 0; overflow: hidden; white-space: nowrap; background: var(--panel);
+  }
+  .strip-inner { display: inline-block; animation: marquee 28s linear infinite; }
+  .strip span { display: inline-block; margin: 0 34px; color: var(--dim); font-weight: 800; font-size: 13px; letter-spacing: 2.5px; }
+  .strip b { color: var(--amber); font-weight: 800; }
+  @keyframes marquee { from { transform: translateX(0);} to { transform: translateX(-50%);} }
+
+  .show { position: relative; height: 480svh; }
+  .show-sticky {
+    position: sticky; top: 0; height: 100svh; display: flex; align-items: center;
+    justify-content: center; gap: clamp(30px, 6vw, 110px); padding: 0 6vw; overflow: hidden;
+  }
+  .show-phone { position: relative; width: min(360px, 42vw); aspect-ratio: 900/1955; flex-shrink: 0; }
+  .show-phone img {
+    position: absolute; inset: 0; width: 100%; border-radius: 26px;
+    opacity: 0; transform: scale(.94) translateY(24px);
+    transition: opacity .45s ease, transform .6s cubic-bezier(.2,.7,.2,1);
+    box-shadow: 0 40px 100px rgba(0,0,0,.65);
+  }
+  .show-phone img.active { opacity: 1; transform: none; }
+  .show-steps { max-width: 430px; }
+  .show-progress { width: 44px; height: 3px; background: var(--line); border-radius: 2px; margin-bottom: 34px; overflow: hidden; }
+  .show-progress i { display: block; height: 100%; width: 0%; background: var(--amber); border-radius: 2px; }
+  .step { opacity: .22; transition: opacity .4s; padding: 17px 0; }
+  .step.active { opacity: 1; }
+  .step .n { color: var(--amber); font-weight: 900; font-size: 12px; letter-spacing: 2px; }
+  .step h3 { font-size: clamp(20px, 2.4vw, 27px); font-weight: 850; margin: 6px 0 6px; letter-spacing: -.01em; }
+  .step p { color: var(--muted); font-size: 14.5px; line-height: 1.55; max-width: 40ch; }
+  @media (max-width: 820px) {
+    .show { height: 520svh; }
+    .show-sticky { flex-direction: column; justify-content: center; gap: 22px; padding-top: 70px; }
+    .show-phone { width: min(250px, 58vw); }
+    .show-steps { text-align: center; }
+    .step { padding: 8px 0; display: none; }
+    .step.active { display: block; }
+    .show-progress { margin: 0 auto 18px; }
+    .step p { margin: 0 auto; }
+  }
+
+  .wall { position: relative; height: 320svh; background: var(--panel); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .wall-sticky {
+    position: sticky; top: 0; height: 100svh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 0 6vw; overflow: hidden;
+  }
+  .wall h2 { font-size: clamp(34px, 5.4vw, 64px); font-weight: 900; letter-spacing: -.02em; line-height: 1.05; }
+  .wall h2 .amber { color: var(--amber); }
+  .wall p.sub { color: var(--muted); margin-top: 16px; font-size: clamp(15px, 1.8vw, 18px); max-width: 52ch; line-height: 1.5; }
+  .wall-icons { display: flex; gap: clamp(10px, 2.4vw, 22px); margin-top: 54px; }
+  .wapp { position: relative; width: clamp(52px, 8vw, 84px); }
+  .wapp img.app { border-radius: 22%; filter: saturate(.9); box-shadow: 0 16px 40px rgba(0,0,0,.5); }
+  .wapp .slash {
+    position: absolute; left: -10%; right: -10%; top: 50%; height: 9%;
+    background: var(--red); border-radius: 4px;
+    transform: translateY(-50%) rotate(-45deg) scaleX(0);
+    transform-origin: left center;
+    box-shadow: 0 0 14px rgba(255,69,58,.8);
+  }
+  .wall-caption {
+    margin-top: 44px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--amber); font-weight: 700; font-size: clamp(14px, 1.8vw, 18px);
+    min-height: 1.5em; letter-spacing: .5px;
+  }
+
+  .features { padding: 120px 6vw; max-width: 1200px; margin: 0 auto; }
+  .sec-eyebrow { color: var(--amber); font-weight: 900; letter-spacing: 3.5px; font-size: 12px; text-align: center; }
+  .sec-title { text-align: center; font-size: clamp(30px, 4.4vw, 52px); font-weight: 900; letter-spacing: -.02em; margin: 14px 0 60px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+  .fcard {
+    background: var(--card); border: 1px solid var(--line); border-radius: 20px;
+    padding: 28px 26px; position: relative; overflow: hidden;
+    opacity: 0; transform: translateY(34px);
+    transition: opacity .6s ease, transform .7s cubic-bezier(.2,.7,.2,1), border-color .3s;
+  }
+  .fcard.in { opacity: 1; transform: none; }
+  .fcard:hover { border-color: rgba(255,214,10,.35); }
+  .fcard::before {
+    content: ''; position: absolute; top: 0; left: 15%; right: 15%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--c, var(--amber)), transparent);
+    opacity: .6;
+  }
+  .fcard .ic { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 18px; background: rgba(255,214,10,.1); }
+  .fcard h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+  .fcard p { color: var(--muted); font-size: 14px; line-height: 1.55; }
+  .c-red { --c: var(--red); } .c-red .ic { background: rgba(255,69,58,.1); }
+  .c-green { --c: var(--green); } .c-green .ic { background: rgba(48,209,88,.1); }
+  .c-blue { --c: #5ac8fa; } .c-blue .ic { background: rgba(90,200,250,.1); }
+
+  .pricing { padding: 40px 6vw 120px; max-width: 900px; margin: 0 auto; }
+  .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-top: 50px; }
+  .plan {
+    background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 34px 30px;
+    opacity: 0; transform: translateY(34px);
+    transition: opacity .6s ease, transform .7s cubic-bezier(.2,.7,.2,1);
+  }
+  .plan.in { opacity: 1; transform: none; }
+  .plan.pro { border-color: rgba(255,214,10,.5); box-shadow: 0 0 60px rgba(255,214,10,.07); position: relative; }
+  .plan .tier { font-weight: 900; letter-spacing: 2.5px; font-size: 12px; color: var(--muted); }
+  .plan.pro .tier { color: var(--amber); }
+  .plan .price { font-size: 42px; font-weight: 900; margin: 14px 0 2px; letter-spacing: -.02em; }
+  .plan .per { color: var(--dim); font-size: 13px; margin-bottom: 22px; }
   .plan ul { list-style: none; }
-  .plan li { padding: 7px 0; font-size: 14px; color: #cfcfd2; display: flex; gap: 10px; align-items: baseline; }
-  .plan li::before { content: "✓"; color: var(--amber); font-weight: 900; font-size: 12px; }
-  .plan.free li::before { color: var(--green); }
+  .plan li { color: var(--muted); font-size: 14px; padding: 7px 0; display: flex; gap: 10px; align-items: baseline; }
+  .plan li::before { content: '✓'; color: var(--green); font-weight: 900; font-size: 12px; }
+  .plan .badge {
+    position: absolute; top: -12px; left: 30px; background: linear-gradient(90deg, #ffe14d, var(--amber));
+    color: #000; font-size: 10px; font-weight: 900; letter-spacing: 1px; padding: 5px 12px; border-radius: 14px;
+  }
 
-  /* faq */
-  .faq { max-width: 680px; margin: 0 auto; }
-  details { border-bottom: 1px solid var(--line); }
-  summary { cursor: pointer; padding: 20px 4px; font-weight: 800; font-size: 16px; list-style: none; display: flex; justify-content: space-between; align-items: center; }
-  summary::after { content: "+"; color: var(--amber); font-size: 20px; font-weight: 400; transition: transform .25s; }
+  .faq { padding: 0 6vw 120px; max-width: 760px; margin: 0 auto; }
+  details { border-bottom: 1px solid var(--line); padding: 20px 4px; }
+  summary { cursor: pointer; font-weight: 700; font-size: 16px; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  summary::after { content: '+'; color: var(--amber); font-size: 20px; font-weight: 400; transition: transform .25s; }
   details[open] summary::after { transform: rotate(45deg); }
-  details p { color: var(--muted); font-size: 14.5px; padding: 0 4px 20px; max-width: 580px; }
+  details p { color: var(--muted); font-size: 14.5px; line-height: 1.6; padding-top: 12px; max-width: 62ch; }
 
-  /* final cta */
-  .final { text-align: center; padding: 100px 0 110px; position: relative; overflow: hidden; }
-  .final::before { content: ""; position: absolute; inset: auto -10% -60%; height: 600px; pointer-events: none;
-    background: radial-gradient(ellipse 55% 50% at 50% 80%, rgba(255,214,10,.12), transparent 70%); }
-  .final img { width: 88px; height: 88px; border-radius: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.6), 0 0 80px rgba(255,214,10,.15); margin-bottom: 26px; }
-  .final h2 { font-size: clamp(30px, 4.5vw, 46px); font-weight: 900; letter-spacing: -1.2px; margin-bottom: 14px; }
-  .final p { color: var(--muted); margin-bottom: 34px; }
-
-  footer { border-top: 1px solid var(--line); padding: 34px 0; }
-  .foot-in { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; color: var(--dim); font-size: 13px; }
-  .foot-in a { color: var(--muted); text-decoration: none; }
-  .foot-in a:hover { color: var(--fg); }
-  .foot-in .right { margin-left: auto; }
-
-  /* reveal animation */
-  .reveal { opacity: 0; transform: translateY(26px); transition: opacity .7s ease, transform .7s cubic-bezier(.16,1,.3,1); }
-  .reveal.in { opacity: 1; transform: none; }
-  .reveal.d1 { transition-delay: .08s; } .reveal.d2 { transition-delay: .16s; } .reveal.d3 { transition-delay: .24s; }
-
-  @media (max-width: 860px) {
-    .hero-grid { grid-template-columns: 1fr; gap: 44px; }
-    .phone-col { order: -1; }
-    .steps, .features { grid-template-columns: 1fr; }
-    .f.hero-f { grid-column: span 1; grid-template-columns: 1fr; }
-    .pricing { grid-template-columns: 1fr; }
-    .nav-links a:not(.nav-cta) { display: none; }
+  .final {
+    text-align: center; padding: 110px 6vw; background: var(--panel);
+    border-top: 1px solid var(--line); position: relative; overflow: hidden;
   }
-  @media (prefers-reduced-motion: reduce) {
-    .phone, .fl-dot, .shield-demo .scope { animation: none; }
-    .reveal { opacity: 1; transform: none; transition: none; }
+  .final::before {
+    content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 700px; height: 700px; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(255,214,10,.1), transparent 70%);
+    pointer-events: none;
   }
+  .final h2 { font-size: clamp(30px, 4.6vw, 56px); font-weight: 900; letter-spacing: -.02em; position: relative; }
+  .final p { color: var(--muted); margin: 16px 0 34px; position: relative; }
+  footer {
+    display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between;
+    padding: 30px 5vw; border-top: 1px solid var(--line); color: var(--dim); font-size: 13px;
+  }
+  footer .flinks { display: flex; gap: 22px; }
+  footer a:hover { color: var(--fg); }
 </style>
 </head>
 <body>
 
-<nav>
-  <div class="nav-in">
-    <img src="icon.png" alt="ARCO app icon">
-    <div class="brand">ARCO</div>
-    <div class="nav-links">
-      <a href="#how">How it works</a>
-      <a href="#features">Features</a>
-      <a href="#pricing">Pricing</a>
-      <a href="#" class="nav-cta">Get ARCO</a>
-    </div>
+<nav id="nav">
+  <a class="nav-logo" href="#"><img src="icon.png" alt="ARCO">ARCO</a>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
   </div>
+  <a class="nav-cta" id="cta-nav" href="#get">Get ARCO</a>
 </nav>
 
-<div class="hero">
-  <div class="wrap hero-grid">
-    <div>
-      <div class="eyebrow reveal">Day planner · App blocker</div>
-      <h1 class="reveal d1">Plan your day.<br><span class="amber">Actually do it.</span></h1>
-      <p class="lede reveal d2">A day planner with a real app blocker built in. Plan the day, start focus, and your distraction apps refuse to open. No coins. No games. Just blocked.</p>
-      <div class="cta-row reveal d3">
-        <a class="cta primary" href="#">&#63743; Download on the App Store</a>
-        <a class="cta ghost" href="#how">See how it works</a>
-      </div>
-      <div class="hero-note reveal d3">Free to start · Pro from $2.50/mo billed annually</div>
-    </div>
+<header class="hero">
+  <div class="hero-glow"></div>
+  <div class="eyebrow">DAY PLANNER · APP BLOCKER</div>
+  <h1>
+    <span class="line"><span class="w">Willpower folds.</span></span>
+    <span class="line"><span class="w amber">Walls don't.</span></span>
+  </h1>
+  <p class="sub">Plan your day in 30 seconds. A real alarm wakes you, and your distracting apps stop opening when focus starts. Your plan finally holds.</p>
+  <div class="hero-ctas">
+    <a class="btn-primary" id="cta-hero" href="#get">Download free</a>
+    <a class="btn-ghost" href="#how">See how it works</a>
+  </div>
+  <img class="hero-shot" src="assets/shot1.jpg" alt="ARCO timeline">
+  <div class="scroll-hint">SCROLL</div>
+</header>
 
-    <div class="phone-col reveal d2">
-      <div class="phone" aria-hidden="true">
-        <div class="screen">
-          <div class="island"></div>
-          <div class="p-day">Thursday</div>
-
-          <div class="focus-live">
-            <div class="fl-top">
-              <span class="fl-tag">FOCUS · LIVE</span>
-              <span class="fl-dot"></span>
-            </div>
-            <div class="fl-time" id="timer">46:12</div>
-            <div class="fl-sub">of 60:00 · deep work</div>
-            <div class="fl-blocked">
-              <div class="chip" style="background:#000">♪</div>
-              <div class="chip" style="background:linear-gradient(135deg,#feda77,#dd2a7b,#8134af)">◎</div>
-              <div class="chip" style="background:#f00">▶</div>
-              <span class="lock-chip">&#128274; LOCKED · 14:30</span>
-            </div>
-          </div>
-
-          <div class="p-label">TODAY</div>
-          <div class="slot">
-            <span class="t">06:30</span><span class="bar" style="background:#0A84FF"></span>
-            <span class="ic" style="background:rgba(10,132,255,.18);color:#0A84FF">&#128167;</span>
-            <span><span class="nm">Cold shower</span><br><span class="sub">Habit · done</span></span>
-          </div>
-          <div class="slot">
-            <span class="t">09:00</span><span class="bar" style="background:#FF9F0A"></span>
-            <span class="ic" style="background:rgba(255,159,10,.18);color:#FF9F0A">&#128227;</span>
-            <span><span class="nm">Post content</span><br><span class="sub">Task · 45 min</span></span>
-          </div>
-          <div class="slot">
-            <span class="t">12:00</span><span class="bar" style="background:#FF453A"></span>
-            <span class="ic" style="background:rgba(255,69,58,.18);color:#FF453A">&#127947;</span>
-            <span><span class="nm">Gym</span><br><span class="sub">Habit · streak 12</span></span>
-          </div>
-        </div>
-      </div>
-    </div>
+<div class="strip">
+  <div class="strip-inner" id="strip">
+    <span>PLAN IT</span><span>·</span><span>BLOCK IT</span><span>·</span><span><b>DONE</b></span><span>·</span>
+    <span>WAKE UP ON PLAN</span><span>·</span><span>NO ACCOUNT</span><span>·</span><span>100% PRIVATE</span><span>·</span>
   </div>
 </div>
 
-<section id="how">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <div class="eyebrow">How it works</div>
-      <h2>Three moves. Every day.</h2>
-      <p>The plan is the product. Blocking makes it stick.</p>
+<section class="show" id="how">
+  <div class="show-sticky">
+    <div class="show-phone" id="showPhone">
+      <img src="assets/shot1.jpg" alt="Plan your day" class="active">
+      <img src="assets/shot2.jpg" alt="Block your apps">
+      <img src="assets/shot3.jpg" alt="See where time leaks">
+      <img src="assets/shot4.jpg" alt="Watch good hours add up">
+      <img src="assets/shot5.jpg" alt="Run focus from the lock screen">
     </div>
-    <div class="steps">
-      <div class="step reveal"><div class="n">01</div><h3>Plan the day</h3><p>Habits and tasks in one timeline. Sixty seconds in the morning, no blank space to drift into.</p></div>
-      <div class="step reveal d1"><div class="n">02</div><h3>Start focus</h3><p>One tap. Your picked apps are blocked for the session — TikTok, Instagram, whatever pulls you.</p></div>
-      <div class="step reveal d2"><div class="n">03</div><h3>It holds</h3><p>Open a blocked app and hit the wall: “Back to work — 14 min to go.” Strict mode removes the exit entirely.</p></div>
-    </div>
-  </div>
-</section>
-
-<section id="features">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <div class="eyebrow">Features</div>
-      <h2>Built to hold the line.</h2>
-      <p>Everything serves one loop: plan, focus, done.</p>
-    </div>
-    <div class="features">
-      <div class="f hero-f reveal">
-        <div>
-          <div class="fi" style="background:rgba(255,214,10,.16);color:var(--amber)">&#128737;</div>
-          <h3>Real app blocking + Strict mode</h3>
-          <p>Blocked apps refuse to open during focus — powered by Apple’s Screen Time framework, not a nag screen you can dismiss. Turn on Strict mode and the session can’t be ended early: no exit from the app, the Live Activity, or the widget until the timer runs out.</p>
-        </div>
-        <div class="shield-demo">
-          <span class="scope">◎</span>
-          <div class="sd-t">Back to work.</div>
-          <div class="sd-s">14 min to go — then it’s yours.</div>
-          <span class="sd-b">Back to focus</span>
-        </div>
+    <div class="show-steps" id="showSteps">
+      <div class="show-progress"><i id="showBar"></i></div>
+      <div class="step active">
+        <div class="n">01</div>
+        <h3>Plan your day in 30 seconds</h3>
+        <p>Time-block habits, tasks and events onto one clean timeline. Mirror yesterday in one tap. The moment it's mapped, you're halfway done.</p>
       </div>
-      <div class="f reveal"><div class="fi" style="background:rgba(94,191,255,.15);color:#5EBFFF">&#128197;</div><h3>Time-blocked day</h3><p>Habits and one-off tasks side by side in a single timeline. Plan once, follow all day.</p></div>
-      <div class="f reveal d1"><div class="fi" style="background:rgba(255,69,58,.15);color:var(--red)">&#9203;</div><h3>See the leak</h3><p>Your real Screen Time, itemized per app. Hours wasted, converted into workdays lost.</p></div>
-      <div class="f reveal d2"><div class="fi" style="background:rgba(48,209,88,.15);color:var(--green)">&#128293;</div><h3>Streaks that stick</h3><p>Timed, stopwatch, or checkbox habits. Hit the ring daily and the streak grows. Miss, and it resets.</p></div>
-      <div class="f reveal"><div class="fi" style="background:rgba(255,214,10,.15);color:var(--amber)">&#128241;</div><h3>Lock screen control</h3><p>Live Activity on your lock screen and Dynamic Island — pause, break, or end without opening the app.</p></div>
-      <div class="f reveal d1"><div class="fi" style="background:rgba(191,90,242,.15);color:#BF5AF2">&#127760;</div><h3>Private by design</h3><p>No account. No server. Your Screen Time data never leaves the device — Apple’s framework guarantees it.</p></div>
-      <div class="f reveal d2"><div class="fi" style="background:rgba(255,159,10,.15);color:#FF9F0A">&#128200;</div><h3>Weekly receipts</h3><p>Recaps with your focus hours banked, streaks held, and an ARCO score for the week.</p></div>
-    </div>
-  </div>
-</section>
-
-<section id="pricing">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <div class="eyebrow">Pricing</div>
-      <h2>Free to plan. Pro to hold.</h2>
-      <p>The planner is free forever. Pro arms the blocker.</p>
-    </div>
-    <div class="pricing">
-      <div class="plan free reveal">
-        <h3>FREE</h3>
-        <div class="price">$0</div>
-        <div class="alt">forever</div>
-        <ul>
-          <li>Day planner — habits + tasks timeline</li>
-          <li>Focus sessions with Live Activity</li>
-          <li>2 habits with streaks</li>
-          <li>This week’s Screen Time insights</li>
-          <li>Home screen &amp; lock screen widgets</li>
-        </ul>
+      <div class="step">
+        <div class="n">02</div>
+        <h3>Block the apps stealing your day</h3>
+        <p>Start a focus session and your chosen apps simply stop opening. Strict mode has no exit until the timer ends.</p>
       </div>
-      <div class="plan pro reveal d1">
-        <span class="badge">7-DAY FREE TRIAL</span>
-        <h3>PRO</h3>
-        <div class="price">$29.99 <span>/ year</span></div>
-        <div class="alt">≈ $2.50/mo · or $3.99 monthly</div>
-        <ul>
-          <li>App blocking on every focus session</li>
-          <li>Strict mode — no early exit</li>
-          <li>Unlimited habits + tasks</li>
-          <li>Month-scale insights &amp; history</li>
-          <li>Weekly + monthly recaps · ARCO score</li>
-        </ul>
+      <div class="step">
+        <div class="n">03</div>
+        <h3>See exactly where your time leaks</h3>
+        <p>Real numbers from your iPhone. Which apps, how many hours, and how this week compares to the last one.</p>
+      </div>
+      <div class="step">
+        <div class="n">04</div>
+        <h3>Watch the good hours add up</h3>
+        <p>Every focused session tracked and counted. Streaks reward showing up. Proof you're winning, week over week.</p>
+      </div>
+      <div class="step">
+        <div class="n">05</div>
+        <h3>Run it from your lock screen</h3>
+        <p>Pause, take a break, or end the session without opening the app. The plan runs even when your phone is face down.</p>
       </div>
     </div>
   </div>
 </section>
 
-<section>
-  <div class="wrap faq">
-    <div class="sec-head reveal">
-      <div class="eyebrow">FAQ</div>
-      <h2>Fair questions.</h2>
+<section class="wall">
+  <div class="wall-sticky">
+    <h2>Your apps, <span class="amber">locked out.</span></h2>
+    <p class="sub">The moment focus starts, the apps you chose stop opening. Not a polite reminder you can dismiss. A wall.</p>
+    <div class="wall-icons" id="wallIcons">
+      <div class="wapp"><img class="app" src="assets/BrandTikTok.png" alt="TikTok blocked"><div class="slash"></div></div>
+      <div class="wapp"><img class="app" src="assets/BrandInstagram.png" alt="Instagram blocked"><div class="slash"></div></div>
+      <div class="wapp"><img class="app" src="assets/BrandYouTube.png" alt="YouTube blocked"><div class="slash"></div></div>
+      <div class="wapp"><img class="app" src="assets/BrandNetflix.png" alt="Netflix blocked"><div class="slash"></div></div>
     </div>
-    <details class="reveal"><summary>How is this different from Apple’s Screen Time limits?</summary><p>Screen Time limits show a “Remind me in 15 minutes” button — a door you can always open. ARCO blocks apps only during focus sessions you start on purpose, and in Strict mode there is no door: the session can’t be ended until the timer runs out.</p></details>
-    <details class="reveal"><summary>Can I get around the block?</summary><p>In a normal session you can end focus anytime — ending it is a decision, not a reflex. In Strict mode you can’t end early from the app, the lock screen, or the widget. Breaks still work; quitting doesn’t.</p></details>
-    <details class="reveal"><summary>What happens to my data?</summary><p>Nothing leaves your iPhone. There’s no account and no server. Screen Time data is read through Apple’s framework, which physically prevents apps from exporting it.</p></details>
-    <details class="reveal"><summary>Which apps can I block?</summary><p>Any app installed on your iPhone, and whole categories. You pick them once — the same list powers your insights and your blocking.</p></details>
-    <details class="reveal"><summary>Do I need Pro?</summary><p>The planner, focus timer, streaks, and this-week insights are free forever. Pro is for the teeth: actual app blocking, Strict mode, unlimited habits, and deep history.</p></details>
+    <div class="wall-caption" id="wallCaption">scroll to start focus…</div>
   </div>
 </section>
 
-<div class="final">
-  <div class="wrap reveal">
-    <img src="icon.png" alt="ARCO">
-    <h2>The next hour is still yours.</h2>
-    <p>Free to start. Blocking from $2.50/mo.</p>
-    <a class="cta primary" href="#">&#63743; Download on the App Store</a>
+<section class="features" id="features">
+  <div class="sec-eyebrow">EVERYTHING THE PLAN NEEDS</div>
+  <h2 class="sec-title">Built to make discipline automatic.</h2>
+  <div class="grid">
+    <div class="fcard" data-reveal>
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFD60A" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg></div>
+      <h3>Wake up on plan</h3>
+      <p>Schedule Wake up on your timeline and a real alarm rings at that time, even on silent. Tomorrow at a different time? The alarm follows the plan.</p>
+    </div>
+    <div class="fcard c-red" data-reveal>
+      <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="#ff453a"><path d="M12 2a5 5 0 015 5v3h1a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2v-8a2 2 0 012-2h1V7a5 5 0 015-5zm0 2a3 3 0 00-3 3v3h6V7a3 3 0 00-3-3z"/></svg></div>
+      <h3>Strict mode</h3>
+      <p>When you mean it: no exit until the timer ends. The session cannot be cancelled, not from the app, not from the lock screen. Discipline, outsourced.</p>
+    </div>
+    <div class="fcard c-green" data-reveal>
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg></div>
+      <h3>Habits that stick</h3>
+      <p>Checks, timers, or stopwatches. Streaks reward showing up, and every minute you put in pools into your weekly totals.</p>
+    </div>
+    <div class="fcard c-blue" data-reveal>
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5ac8fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16M7 15l4-4 3 2 5-6"/></svg></div>
+      <h3>Honest insights</h3>
+      <p>Good hours and wasted hours, side by side. Straight from your iPhone's Screen Time, never estimated, never judged.</p>
+    </div>
+    <div class="fcard" data-reveal>
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFD60A" stroke-width="2" stroke-linecap="round"><path d="M4 7h11M4 12h16M4 17h13"/></svg></div>
+      <h3>Recurring chores</h3>
+      <p>Laundry every Saturday, trash on Mondays. Recurring tasks handle the chores without polluting your streaks.</p>
+    </div>
+    <div class="fcard c-green" data-reveal>
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg></div>
+      <h3>Private by design</h3>
+      <p>No account. No email. Your data never leaves your iPhone. Screen time is read through Apple's own framework, on device.</p>
+    </div>
   </div>
-</div>
+</section>
+
+<section class="pricing" id="pricing">
+  <div class="sec-eyebrow">SIMPLE PRICING</div>
+  <h2 class="sec-title">Free to plan. Pro makes it hold.</h2>
+  <div class="plans">
+    <div class="plan" data-reveal>
+      <div class="tier">FREE</div>
+      <div class="price">$0</div>
+      <div class="per">forever</div>
+      <ul>
+        <li>Full day planner and timeline</li>
+        <li>Wake up alarm, rings even on silent</li>
+        <li>Focus timer and lock screen controls</li>
+        <li>3 fully blocked sessions every week</li>
+        <li>2 habits with streaks</li>
+        <li>This week's screen time insights</li>
+      </ul>
+    </div>
+    <div class="plan pro" data-reveal>
+      <div class="badge">7 DAYS FREE</div>
+      <div class="tier">PRO</div>
+      <div class="price">$29.99</div>
+      <div class="per">per year, or $3.99 monthly · cancel anytime</div>
+      <ul>
+        <li>Block your apps on every session</li>
+        <li>Strict mode with no exit</li>
+        <li>Unlimited habits</li>
+        <li>Full history and weekly recaps</li>
+        <li>Everything in Free</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="faq" id="faq">
+  <div class="sec-eyebrow">QUESTIONS</div>
+  <h2 class="sec-title">Fair questions.</h2>
+  <details>
+    <summary>How is this different from Apple's Screen Time limits?</summary>
+    <p>Screen Time asks nicely, and you tap "remind me in 15 minutes" a thousand times. ARCO connects a plan for the hour with a lock on the apps that steal it. During a focus session your chosen apps simply do not open, and strict mode removes the exit entirely.</p>
+  </details>
+  <details>
+    <summary>Does the alarm really ring on silent?</summary>
+    <p>Yes. ARCO uses Apple's alarm framework, the same system power the Clock app has. Schedule Wake up on your timeline and a real full-screen alarm rings at that time, silent switch or not. Requires iOS 26.</p>
+  </details>
+  <details>
+    <summary>What can the free version do?</summary>
+    <p>Almost everything: the full planner, the wake up alarm, habits with streaks, focus sessions, and three fully blocked sessions every week. Pro removes the limits: blocking on every session, strict mode, unlimited habits, and your full history.</p>
+  </details>
+  <details>
+    <summary>Can you see my screen time data?</summary>
+    <p>No. There is no account and no server. Usage data is read on your device through Apple's Screen Time framework, which is built so the numbers never leave your iPhone. We couldn't see them if we wanted to.</p>
+  </details>
+  <details>
+    <summary>What if I need a blocked app urgently?</summary>
+    <p>Normal focus sessions can be ended from the app or lock screen at any time. Strict mode is the one you choose when you don't want that door to exist. You always pick which mode you start.</p>
+  </details>
+</section>
+
+<section class="final" id="get">
+  <h2>Plan a little. <span style="color:var(--amber)">Block a lot.</span></h2>
+  <p>Free on the App Store. No account needed.</p>
+  <a class="btn-primary" id="cta-final" href="#">Download ARCO</a>
+</section>
 
 <footer>
-  <div class="wrap foot-in">
-    <a href="support.html">Support</a>
+  <div>© 2026 ARCO</div>
+  <div class="flinks">
     <a href="privacy.html">Privacy</a>
     <a href="terms.html">Terms</a>
-    <span class="right">© 2026 ARCO · Made by Thinh Tran</span>
+    <a href="support.html">Support</a>
   </div>
 </footer>
 
 <script>
-  // Scroll reveal
-  const io = new IntersectionObserver((es) => {
-    es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
-  }, { threshold: 0.12 });
-  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+(() => {
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const glow = document.querySelector('.hero-glow');
+  const heroShot = document.querySelector('.hero-shot');
+  const show = document.getElementById('how');
+  const shots = [...document.querySelectorAll('#showPhone img')];
+  const steps = [...document.querySelectorAll('#showSteps .step')];
+  const bar = document.getElementById('showBar');
+  const wall = document.querySelector('.wall');
+  const slashes = [...document.querySelectorAll('.wapp .slash')];
+  const wallCaption = document.getElementById('wallCaption');
+  const captions = ['scroll to start focus…', 'focus started', 'TikTok blocked', 'Instagram blocked', 'YouTube blocked', 'Netflix blocked', 'back to work.'];
 
-  // Live ticking focus timer in the hero mock
-  let secs = 46 * 60 + 12;
-  const t = document.getElementById('timer');
-  setInterval(() => {
-    secs = Math.max(0, secs - 1);
-    t.textContent = String(Math.floor(secs / 60)).padStart(2, '0') + ':' + String(secs % 60).padStart(2, '0');
-  }, 1000);
+  function onScroll() {
+    const y = window.scrollY;
+    const vh = window.innerHeight;
+
+    if (glow) glow.style.transform = `translateX(-50%) translateY(${y * 0.25}px)`;
+    if (heroShot) {
+      const p = clamp(y / (vh * 0.9), 0, 1);
+      heroShot.style.transform = `translateY(${p * -40}px) scale(${1 - p * 0.06})`;
+      heroShot.style.opacity = String(1 - p * 0.25);
+    }
+    if (show) {
+      const r = show.getBoundingClientRect();
+      const total = r.height - vh;
+      const p = clamp(-r.top / total, 0, 0.9999);
+      const idx = Math.floor(p * shots.length);
+      shots.forEach((img, i) => img.classList.toggle('active', i === idx));
+      steps.forEach((s, i) => s.classList.toggle('active', i === idx));
+      if (bar) bar.style.width = `${p * 100}%`;
+    }
+    if (wall) {
+      const r = wall.getBoundingClientRect();
+      const total = r.height - vh;
+      const p = clamp(-r.top / total, 0, 1);
+      slashes.forEach((sl, i) => {
+        const local = clamp((p - 0.18 - i * 0.16) / 0.12, 0, 1);
+        sl.style.transform = `translateY(-50%) rotate(-45deg) scaleX(${local})`;
+      });
+      const ci = p < 0.1 ? 0 : p < 0.2 ? 1 : p < 0.36 ? 2 : p < 0.52 ? 3 : p < 0.68 ? 4 : p < 0.84 ? 5 : 6;
+      if (wallCaption && wallCaption.textContent !== captions[ci]) wallCaption.textContent = captions[ci];
+    }
+  }
+  let ticking = false;
+  addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(() => { onScroll(); ticking = false; });
+      ticking = true;
+    }
+  }, { passive: true });
+  onScroll();
+
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => e.target.classList.toggle('in', e.isIntersecting));
+  }, { threshold: 0.18 });
+  document.querySelectorAll('[data-reveal]').forEach(el => io.observe(el));
+
+  const strip = document.getElementById('strip');
+  if (strip) strip.innerHTML += strip.innerHTML;
+
+  const APP_URL = 'https://apps.apple.com/app/id6761037446';
+  const LIVE = false; // flip to true on approval
+  if (LIVE) ['cta-nav', 'cta-hero', 'cta-final'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.href = APP_URL;
+  });
+})();
 </script>
 </body>
 </html>
