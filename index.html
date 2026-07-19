@@ -493,7 +493,7 @@
   if (strip) strip.innerHTML += strip.innerHTML;
 
   const APP_URL = 'https://apps.apple.com/app/id6761037446';
-  const LIVE = false; // flip to true on approval
+  const LIVE = true; // LIVE — approved 2026-07-19
   if (LIVE) ['cta-nav', 'cta-hero', 'cta-final'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.href = APP_URL;
