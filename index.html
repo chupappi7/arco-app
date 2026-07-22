@@ -215,7 +215,7 @@
   .as-badge.big { padding: 13px 24px; } .as-badge.big svg { width: 30px; height: 30px; } .as-badge.big b { font-size: 22px; }
 
   /* ---------- HERO ---------- */
-  .hero { padding: 150px 0 60px; position: relative; }
+  .hero { padding: 150px 0 96px; position: relative; }
   .hero-inner { display: grid; grid-template-columns: 1.05fr .95fr; gap: 40px; align-items: center; }
   .hero .eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--amber);
     font-size: 12px; font-weight: 800; letter-spacing: 2.5px; padding: 6px 13px; border-radius: 100px;
@@ -239,7 +239,7 @@
   .hero-trust .sep { width: 1px; height: 26px; background: var(--line); }
   .hero-phone-wrap { display: flex; justify-content: center; position: relative;
     opacity: 0; animation: fadeUp 1s .5s forwards; }
-  .hero-phone-wrap .phone { transform: rotate(2.5deg); }
+  .hero-phone-wrap .phone { transform: none; }
   /* floating chips around phone */
   .float-chip { position: absolute; z-index: 5; display: flex; align-items: center; gap: 8px;
     background: rgba(19,19,23,.85); backdrop-filter: blur(12px); border: 1px solid var(--line2);
@@ -260,8 +260,8 @@
   }
 
   /* ---------- MARQUEE ---------- */
-  .marquee { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
-    padding: 16px 0; overflow: hidden; white-space: nowrap; background: rgba(13,13,16,.6); margin-top: 40px; }
+  .marquee { position: relative; z-index: 20; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding: 16px 0; overflow: hidden; white-space: nowrap; background: var(--bg2); margin-top: 40px; }
   .marquee-in { display: inline-block; animation: scrollx 30s linear infinite; }
   .marquee span { display: inline-block; margin: 0 28px; color: var(--dim); font-weight: 800; font-size: 13px; letter-spacing: 2px; }
   .marquee b { color: var(--amber); }
@@ -274,26 +274,26 @@
   .sec-sub { text-align: center; color: var(--muted); font-size: 16px; margin: 16px auto 0; max-width: 52ch; line-height: 1.5; }
 
   /* ---------- HOW (scrollytelling) ---------- */
-  .how { position: relative; height: 460svh; }
-  .how-sticky { position: sticky; top: 0; height: 100svh; display: flex; align-items: center; }
-  .how-sticky .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; width: 100%; }
+  /* HOW — static interactive tabs (auto-cycling, no scroll hijack) */
+  .how-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; margin-top: 54px; }
   .how-phone { display: flex; justify-content: center; }
-  .how-steps .h-eyebrow { color: var(--amber); font-weight: 800; letter-spacing: 3px; font-size: 12px; }
-  .how-progress { width: 46px; height: 3px; background: var(--line); border-radius: 2px; margin: 18px 0 30px; overflow: hidden; }
-  .how-progress i { display: block; height: 100%; width: 0; background: var(--amber); border-radius: 2px; }
-  .step { padding: 14px 0; opacity: .25; transition: opacity .4s; }
-  .step.active { opacity: 1; }
-  .step .n { color: var(--amber); font-weight: 900; font-size: 12px; letter-spacing: 2px; }
-  .step h3 { font-size: clamp(21px, 2.4vw, 30px); font-weight: 800; margin: 6px 0; letter-spacing: -.02em; }
-  .step p { color: var(--muted); font-size: 15px; line-height: 1.55; max-width: 40ch; }
+  .step { display: flex; gap: 16px; padding: 16px 18px; border-radius: 16px; cursor: pointer; opacity: .5;
+    border: 1px solid transparent; transition: opacity .3s, background .3s, border-color .3s; }
+  .step:hover { opacity: .8; }
+  .step.active { opacity: 1; background: linear-gradient(180deg, var(--card2), var(--card)); border-color: var(--line2); }
+  .step .n { color: var(--dim); font-weight: 900; font-size: 15px; letter-spacing: 1px; flex-shrink: 0; width: 26px;
+    font-variant-numeric: tabular-nums; transition: color .3s; }
+  .step.active .n { color: var(--amber); }
+  .step .stxt h3 { font-size: clamp(18px, 2vw, 23px); font-weight: 800; margin-bottom: 5px; letter-spacing: -.01em; }
+  .step .stxt p { color: var(--muted); font-size: 14.5px; line-height: 1.5; }
+  .step .prog { flex-shrink: 0; width: 3px; border-radius: 3px; background: var(--line); align-self: stretch; overflow: hidden; }
+  .step.active .prog i { display: block; width: 100%; background: var(--amber); border-radius: 3px;
+    height: 0; animation: fillProg 5s linear forwards; }
+  @keyframes fillProg { to { height: 100%; } }
   @media (max-width: 900px) {
-    .how { height: 520svh; }
-    .how-sticky .wrap { grid-template-columns: 1fr; gap: 20px; }
-    .how-phone { order: -1; transform: scale(.82); }
-    .how-steps { text-align: center; }
-    .step { display: none; } .step.active { display: block; }
-    .step p { margin: 0 auto; } .how-progress { margin: 14px auto 18px; }
-    .how-steps .h-eyebrow { text-align: center; }
+    .how-grid { grid-template-columns: 1fr; gap: 30px; }
+    .how-phone { order: -1; }
+    .step .prog { display: none; }
   }
 
   /* ---------- WALL ---------- */
@@ -529,10 +529,12 @@
   </div>
 </div>
 
-<!-- ============ HOW (scrollytelling with native screens) ============ -->
-<section class="how" id="how">
-  <div class="how-sticky">
-    <div class="wrap">
+<!-- ============ HOW (static interactive tabs) ============ -->
+<section class="sec" id="how" style="padding-bottom:60px">
+  <div class="wrap">
+    <div class="sec-eyebrow">HOW IT WORKS</div>
+    <h2 class="sec-title">Four steps. One clean loop.</h2>
+    <div class="how-grid">
       <div class="how-phone">
         <div class="phone">
           <div class="island"></div>
@@ -624,12 +626,10 @@
       </div>
 
       <div class="how-steps">
-        <div class="h-eyebrow">HOW IT WORKS</div>
-        <div class="how-progress"><i id="howBar"></i></div>
-        <div class="step active" data-step="0"><div class="n">01</div><h3>Plan your day in 30 seconds</h3><p>Time-block habits, tasks and events onto one clean timeline. Mirror yesterday in a tap. The moment it's mapped, you're already halfway done.</p></div>
-        <div class="step" data-step="1"><div class="n">02</div><h3>Block the apps stealing your day</h3><p>Start a focus session and your chosen apps simply stop opening. Strict mode has no exit until the timer ends.</p></div>
-        <div class="step" data-step="2"><div class="n">03</div><h3>See exactly where your time leaks</h3><p>Real numbers, straight from your iPhone. Which apps, how many hours, and how this week compares to the last.</p></div>
-        <div class="step" data-step="3"><div class="n">04</div><h3>Run it from your lock screen</h3><p>Take a break or end the session without opening the app. The plan keeps running even when your phone is face down.</p></div>
+        <div class="step active" data-step="0"><div class="n">01</div><div class="stxt"><h3>Plan your day in 30 seconds</h3><p>Time-block habits, tasks and events onto one clean timeline. Mirror yesterday in a tap.</p></div><div class="prog"><i></i></div></div>
+        <div class="step" data-step="1"><div class="n">02</div><div class="stxt"><h3>Block the apps stealing your day</h3><p>Start a focus session and your chosen apps simply stop opening. Strict mode has no exit.</p></div><div class="prog"><i></i></div></div>
+        <div class="step" data-step="2"><div class="n">03</div><div class="stxt"><h3>See exactly where your time leaks</h3><p>Real numbers, straight from your iPhone — which apps, how many hours, week over week.</p></div><div class="prog"><i></i></div></div>
+        <div class="step" data-step="3"><div class="n">04</div><div class="stxt"><h3>Run it from your lock screen</h3><p>Take a break or end the session without opening the app. It runs even face down.</p></div><div class="prog"><i></i></div></div>
       </div>
     </div>
   </div>
@@ -783,10 +783,21 @@
   // marquee duplicate
   const mq = document.getElementById('marquee'); if (mq) mq.innerHTML += mq.innerHTML;
 
-  const how = document.querySelector('.how');
+  // HOW — click tabs + auto-cycle (no scroll hijack)
   const howScreens = [...document.querySelectorAll('#howScreen .app')];
   const howSteps = [...document.querySelectorAll('.how-steps .step')];
-  const howBar = document.getElementById('howBar');
+  let howI = 0, howTimer = null;
+  function setHow(i) {
+    howI = i;
+    howScreens.forEach((s,k) => s.classList.toggle('on', k===i));
+    howSteps.forEach((s,k) => s.classList.toggle('active', k===i));
+  }
+  function cycleHow() { clearInterval(howTimer); howTimer = setInterval(() => setHow((howI+1) % howScreens.length), 5000); }
+  howSteps.forEach((s,i) => s.addEventListener('click', () => { setHow(i); cycleHow(); }));
+  // start cycling only once the section is on screen
+  const howIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) cycleHow(); else clearInterval(howTimer); }), {threshold:.3});
+  const howSec = document.getElementById('how'); if (howSec) howIO.observe(howSec);
+
   const wall = document.querySelector('.wall');
   const wapps = [...document.querySelectorAll('#wallApps .wapp')];
   const wallCap = document.getElementById('wallCap');
@@ -797,14 +808,6 @@
     if (y > lastY && y > 200) nav.classList.add('hide'); else nav.classList.remove('hide');
     lastY = y;
 
-    if (how) {
-      const r = how.getBoundingClientRect(); const total = r.height - vh;
-      const p = clamp(-r.top/total, 0, .9999);
-      const idx = Math.min(howScreens.length-1, Math.floor(p * howScreens.length));
-      howScreens.forEach((s,i) => s.classList.toggle('on', i===idx));
-      howSteps.forEach((s,i) => s.classList.toggle('active', i===idx));
-      if (howBar) howBar.style.width = (p*100)+'%';
-    }
     if (wall) {
       const r = wall.getBoundingClientRect(); const total = r.height - vh;
       const p = clamp(-r.top/total, 0, 1);
