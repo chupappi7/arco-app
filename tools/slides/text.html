@@ -1,0 +1,64 @@
+<!doctype html>
+<!--
+  Text slide template.
+
+  render.js substitutes the SLIDE_DATA placeholder below with a JSON object:
+    { bg: string|null, paragraphs: string[], align: "top"|"center"|"low" }
+  and writes the result next to this file so ./base.css, ./fonts and ./bg
+  all resolve relatively.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="./base.css" />
+  </head>
+  <body>
+    <div class="slide">
+      <div class="slide__bg slide__bg--placeholder" id="bgFallback"></div>
+      <img class="slide__bg" id="bg" alt="" hidden />
+      <div class="slide__scrim" id="scrim"></div>
+      <div class="slide__copy" id="copy"></div>
+    </div>
+
+    <script>
+      const data = __SLIDE_DATA__;
+
+      // align: "top" (default) | "center" | "low"
+      if (data.align === 'low' || data.align === 'center') {
+        document.getElementById('copy').classList.add(`slide__copy--${data.align}`);
+      }
+      if (data.align === 'low') {
+        document.getElementById('scrim').classList.add('slide__scrim--low');
+      }
+
+      if (data.bg) {
+        const img = document.getElementById('bg');
+        img.src = data.bg;
+        img.hidden = false;
+        document.getElementById('bgFallback').remove();
+      }
+
+      const copy = document.getElementById('copy');
+      for (const para of data.paragraphs) {
+        const el = document.createElement('p');
+        el.className = 'slide__para';
+        el.textContent = para;
+        copy.appendChild(el);
+      }
+
+      // render.js waits for this flag before screenshotting.
+      Promise.all([
+        document.fonts.ready,
+        new Promise((resolve) => {
+          const img = document.getElementById('bg');
+          if (!data.bg) return resolve();
+          if (img.complete) return resolve();
+          img.addEventListener('load', resolve, { once: true });
+          img.addEventListener('error', resolve, { once: true });
+        }),
+      ]).then(() => {
+        document.documentElement.dataset.ready = '1';
+      });
+    </script>
+  </body>
+</html>

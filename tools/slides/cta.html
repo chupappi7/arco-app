@@ -1,0 +1,53 @@
+<!doctype html>
+<!--
+  Closing call-to-action slide template.
+
+  render.js substitutes the SLIDE_DATA placeholder below with:
+    { bg: string|null, icon: string, appName: string, subtitle: string }
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="./base.css" />
+  </head>
+  <body>
+    <div class="slide">
+      <div class="slide__bg slide__bg--placeholder" id="bgFallback"></div>
+      <img class="slide__bg" id="bg" alt="" hidden />
+      <div class="slide__scrim"></div>
+      <div class="slide__cta">
+        <img class="slide__icon" id="icon" alt="" />
+        <div class="slide__app-name" id="appName"></div>
+        <div class="slide__app-sub" id="appSub"></div>
+      </div>
+    </div>
+
+    <script>
+      const data = __SLIDE_DATA__;
+
+      if (data.bg) {
+        const img = document.getElementById('bg');
+        img.src = data.bg;
+        img.hidden = false;
+        document.getElementById('bgFallback').remove();
+      }
+
+      const icon = document.getElementById('icon');
+      icon.src = data.icon;
+      document.getElementById('appName').textContent = data.appName;
+      document.getElementById('appSub').textContent = data.subtitle;
+
+      const settled = (img) =>
+        new Promise((resolve) => {
+          if (!img.getAttribute('src')) return resolve();
+          if (img.complete) return resolve();
+          img.addEventListener('load', resolve, { once: true });
+          img.addEventListener('error', resolve, { once: true });
+        });
+
+      Promise.all([document.fonts.ready, settled(icon), settled(document.getElementById('bg'))]).then(() => {
+        document.documentElement.dataset.ready = '1';
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,84 @@
+{
+  "$comment": [
+    "Post definitions for the TikTok slide pipeline.",
+    "",
+    "  node tools/render.js <topic>    -> renders drafts/<topic>/NN.jpg",
+    "  node tools/autopost.js <topic>  -> pushes that folder to the TikTok inbox",
+    "",
+    "Slide shape:",
+    "  { \"bg\": \"file-in-tools/slides/bg\", \"text\": [\"paragraph\", \"paragraph\"], \"align\": \"top|center|low\" }",
+    "  { \"type\": \"cta\", \"bg\": \"...\" }   -> uses defaults.cta unless overridden",
+    "",
+    "Use \"align\": \"low\" when the photo is bright at the top and white copy",
+    "would not hold against it.",
+    "",
+    "Only 'btl' is transcribed here. The other 16 topics already exist as rendered",
+    "JPGs under drafts/ but their source copy was lost with the old pipeline; add",
+    "them back here as you rewrite or re-render them."
+  ],
+
+  "defaults": {
+    "cta": {
+      "icon": "icon.png",
+      "appName": "ARCO: Day Planner & Focus",
+      "subtitle": "Out now, free on the App Store!"
+    }
+  },
+
+  "posts": [
+    {
+      "topic": "btl",
+      "title": "How to block TikTok on iPhone (for real)",
+      "caption": "screen time limits never worked for me. this does. ARCO is free on the App Store. #focus #screentime #productivity #digitaldetox",
+      "slides": [
+        {
+          "bg": "rooftop-city-dusk.jpg",
+          "text": [
+            "how to block tiktok on iphone (for real).",
+            "not screen time limits. those never work."
+          ]
+        },
+        {
+          "bg": "bedroom-phone-night.jpg",
+          "text": [
+            "apple's limits ask nicely.",
+            "one tap on 'ignore limit' and you're back in. every time."
+          ]
+        },
+        {
+          "bg": "desk-lamp-city-window.jpg",
+          "text": [
+            "1) pick your worst apps once.",
+            "tiktok, instagram, whatever eats your day."
+          ]
+        },
+        {
+          "bg": "desk-laptop-lamp.jpg",
+          "text": [
+            "2) put them behind your plan.",
+            "they only lock during the hours you set to focus."
+          ]
+        },
+        {
+          "bg": "living-room-chandelier.jpg",
+          "text": [
+            "3) there is no ignore button.",
+            "the block holds until the block ends. that is the whole point."
+          ]
+        },
+        {
+          "bg": "poolside-sunset.jpg",
+          "align": "low",
+          "text": [
+            "i built the app that does this.",
+            "it is called ARCO and it just went live."
+          ]
+        },
+        {
+          "type": "cta",
+          "bg": "supercars-driveway.jpg"
+        }
+      ]
+    }
+  ]
+}

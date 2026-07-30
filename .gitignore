@@ -1,0 +1,10 @@
+# Secrets never belong in this repo — TikTok credentials live in the environment.
+.env
+.env.*
+*.pem
+
+# Intermediate render artifacts
+tools/slides/.render-*.html
+drafts/**/*.png
+
+.DS_Store
