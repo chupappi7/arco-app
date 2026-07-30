@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @font-face { font-family: 'Inter'; src: url('fonts/inter-600.ttf'); font-weight: 600; }
+  @font-face { font-family: 'Inter'; src: url('fonts/inter-700.ttf'); font-weight: 700; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; }
+  .slide {
+    width: 1080px; height: 1920px; position: relative;
+    background: #0a0a0c url('bg-arco.jpg') center/cover no-repeat;
+    font-family: 'Inter', sans-serif;
+  }
+  .shade {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,.42) 0%, rgba(0,0,0,.15) 50%, rgba(0,0,0,.28) 100%);
+  }
+  .content { position: absolute; left: 72px; right: 72px; top: 380px; }
+  .head { display: flex; align-items: center; gap: 40px; margin-bottom: 56px; }
+  .icon {
+    width: 190px; height: 190px; border-radius: 44px;
+    box-shadow: 0 14px 44px rgba(0,0,0,.55);
+  }
+  .name {
+    color: #fff; font-weight: 700; font-size: 88px; letter-spacing: -1px;
+    text-shadow: 0 2px 14px rgba(0,0,0,.55);
+  }
+  .body {
+    color: #fff; font-weight: 600; font-size: 47px; line-height: 1.38;
+    text-shadow: 0 2px 12px rgba(0,0,0,.6), 0 0 36px rgba(0,0,0,.35);
+    letter-spacing: -0.3px;
+  }
+  .body p + p { margin-top: 44px; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="shade"></div>
+    <div class="content">
+      <div class="head">
+        <img class="icon" src="icon.png">
+        <div class="name">2. ARCO</div>
+      </div>
+      <div class="body">
+        <p>ARCO plans my day and blocks my distracting apps while i focus.</p>
+        <p>a real alarm wakes me up, and tiktok simply stops opening when focus starts.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

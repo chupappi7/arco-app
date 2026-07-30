@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @font-face { font-family: 'Inter'; src: url('fonts/inter-600.ttf'); font-weight: 600; }
+  @font-face { font-family: 'Inter'; src: url('fonts/inter-700.ttf'); font-weight: 700; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; }
+  .slide {
+    width: 1080px; height: 1920px; position: relative;
+    background: #0a0a0c url('bg-hook.jpg') center/cover no-repeat;
+    font-family: 'Inter', sans-serif;
+  }
+  .shade {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,.38) 0%, rgba(0,0,0,.12) 45%, rgba(0,0,0,.25) 100%);
+  }
+  .text {
+    position: absolute; left: 72px; right: 72px; top: 520px;
+    color: #fff; font-weight: 700; font-size: 64px; line-height: 1.32;
+    text-shadow: 0 2px 14px rgba(0,0,0,.55), 0 0 40px rgba(0,0,0,.35);
+    letter-spacing: -0.5px;
+  }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <div class="shade"></div>
+    <div class="text">5 apps i use to actually lock&nbsp;in.</div>
+  </div>
+</body>
+</html>
