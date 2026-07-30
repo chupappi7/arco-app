@@ -66,6 +66,27 @@ Account strategy: new TikTok account targeting US audience via English-only
 content; don't rely on VPN region spoofing. Post at US evening hours
 (early morning Vietnam time).
 
+## Lessons from previous sessions (July 2026 launch)
+
+- **ARCO is LIVE on the App Store**: `apps.apple.com/app/id6761037446`. Website
+  CTAs point there (official badge in hero + closing CTA).
+- The launch-era pipeline had `autopost.js` + `hooks.json` + a TikTok **refresh
+  token** (auto-renewing) — all of it lived only in an ephemeral cloud container
+  and is **lost**. Rebuild it as committed code in `tools/` and keep tokens in
+  env vars, never in a container only.
+- TikTok Content Posting API returns transient Akamai 504/503 on publish init —
+  always retry with backoff before assuming failure.
+- Posting cautions learned the hard way: turn the US VPN on **before** posting,
+  and space posts a few hours apart — publishing several at once triggered a
+  TikTok review hold.
+- The three launch batches (`drafts/launch-*`) use "native text post" style:
+  hook slides are plain text on black (intentional, mimics TikTok text posts),
+  with app-screenshot slides after. The user prefers photo backgrounds — use the
+  photo-bg template in `tools/slides/` for new batches.
+- iOS app open items from that era: Blocked Hours timeline band (Phase 2 — a
+  read-only shaded band on the Today timeline showing blocked windows), and an
+  on-device shield test for Blocked Hours (simulator can't test shields).
+
 ## Marketing site
 
 `index.html` (landing), `support.html`, `privacy.html`, `terms.html`, `press.html`
