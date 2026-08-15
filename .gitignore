@@ -8,3 +8,6 @@ tools/slides/.render-*.html
 drafts/**/*.png
 
 .DS_Store
+
+# Pending OAuth state (single-use)
+tools/.auth-state.json
