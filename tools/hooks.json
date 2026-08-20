@@ -16,7 +16,6 @@
     "JPGs under drafts/ but their source copy was lost with the old pipeline; add",
     "them back here as you rewrite or re-render them."
   ],
-
   "defaults": {
     "cta": {
       "icon": "icon.png",
@@ -24,7 +23,6 @@
       "subtitle": "Out now, free on the App Store!"
     }
   },
-
   "posts": [
     {
       "topic": "btl",
@@ -79,6 +77,12 @@
           "bg": "supercars-driveway.jpg"
         }
       ]
+    },
+    {
+      "topic": "47-minutes",
+      "title": "my screen time is 47 minutes a day",
+      "caption": "47 minutes a day. not discipline — a system: every hour has a job, and the feed apps stay blocked until i say so. the planner and the blocker are one app. it's called ARCO, free on the App Store. #screentime #digitaldetox #productivity #focus #appblocker",
+      "_note": "slides transcribed from rendered JPGs 2026-08-20; source definitions were lost with the old pipeline, so no slides[] — re-render not possible from this entry"
     }
   ]
 }
