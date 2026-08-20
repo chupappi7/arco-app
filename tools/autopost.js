@@ -55,6 +55,7 @@ function parseArgs(argv) {
     privacy: 'SELF_ONLY',
     wait: false,
     dryRun: false,
+    account: 'vn',
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -68,6 +69,8 @@ function parseArgs(argv) {
       case '--privacy': opts.privacy = argv[++i]; break;
       case '--wait': opts.wait = true; break;
       case '--dry-run': opts.dryRun = true; break;
+      case '--us': opts.account = 'us'; break;
+      case '--account': opts.account = argv[++i]; break;
       case '-h':
       case '--help': opts.help = true; break;
       default:
@@ -91,8 +94,11 @@ Usage: node tools/autopost.js <topic> [options]
   --privacy LEVEL      privacy for --direct-post (default SELF_ONLY)
   --wait               poll publish status until processing finishes
   --dry-run            validate and print the payload without posting
+  --us                 post to the US account (getarcoapp) instead of arco.app
+  --account NAME       vn (default, arco.app) or us (getarcoapp)
 
-Env: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_REFRESH_TOKEN
+Env: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_REFRESH_TOKEN (vn),
+     TIKTOK_REFRESH_TOKEN_US (us)
 `);
 }
 
@@ -238,12 +244,17 @@ async function main() {
 
   // Fail on missing credentials before spending time on network preflight.
   // --dry-run deliberately needs no secrets.
+  if (opts.account !== 'vn' && opts.account !== 'us') {
+    throw new Error(`--account must be "vn" or "us", got: ${opts.account}`);
+  }
+  const tokenVar = opts.account === 'us' ? 'TIKTOK_REFRESH_TOKEN_US' : 'TIKTOK_REFRESH_TOKEN';
+  console.log(`  account: ${opts.account === 'us' ? 'getarcoapp (US)' : 'arco.app (VN)'}`);
   const creds = opts.dryRun
     ? null
     : {
         clientKey: requireEnv('TIKTOK_CLIENT_KEY'),
         clientSecret: requireEnv('TIKTOK_CLIENT_SECRET'),
-        refreshToken: requireEnv('TIKTOK_REFRESH_TOKEN'),
+        refreshToken: requireEnv(tokenVar),
       };
 
   await preflight(urls);
@@ -278,7 +289,7 @@ async function main() {
   // run fails with an expired-token error that looks like a config problem.
   if (tokens.refreshToken && tokens.refreshToken !== creds.refreshToken) {
     console.warn(
-      '\n  ! TikTok rotated your refresh token. Update TIKTOK_REFRESH_TOKEN in your env to:\n' +
+      `\n  ! TikTok rotated your refresh token. Update ${tokenVar} in your env to:\n` +
         `    ${tokens.refreshToken}\n`
     );
   }
