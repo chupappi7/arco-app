@@ -14,13 +14,18 @@
     "",
     "Only 'btl' is transcribed here. The other 16 topics already exist as rendered",
     "JPGs under drafts/ but their source copy was lost with the old pipeline; add",
-    "them back here as you rewrite or re-render them."
+    "them back here as you rewrite or re-render them.",
+    "",
+    "Promo funnel (2026-08-21): CTA slides ask viewers to comment ARCO; reply to",
+    "roughly the first 50 with the ARCOEARLY redemption link (1 month Pro free,",
+    "500 redemptions, expires 2026-11-19):",
+    "https://apps.apple.com/redeem?ctx=offercodes&id=6761037446&code=ARCOEARLY"
   ],
   "defaults": {
     "cta": {
       "icon": "icon.png",
       "appName": "ARCO: Day Planner & Focus",
-      "subtitle": "Out now, free on the App Store!"
+      "subtitle": "Comment “ARCO” — I’ll send you the promo code. First 50 only: first month of Pro free."
     }
   },
   "posts": [
