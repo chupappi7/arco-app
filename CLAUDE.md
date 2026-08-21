@@ -79,10 +79,13 @@ content; don't rely on VPN region spoofing. Post at US evening hours
 - Posting cautions learned the hard way: turn the US VPN on **before** posting,
   and space posts a few hours apart — publishing several at once triggered a
   TikTok review hold.
-- Inbox-draft sends are capped at **5 per account per rolling 24h**
-  (`spam_risk_too_many_pending_share`). Deleting drafts in the app does NOT
-  free the quota — it counts sends. So never send intermediate versions:
-  finish and verify all slides locally first, send once.
+- Inbox-draft sends are capped at **5 UNRESOLVED deliveries per account**
+  (`spam_risk_too_many_pending_share`) — no time component. A delivery stays
+  "pending" until its inbox notification (Inbox → System notifications →
+  "your photo is ready") is opened/cleared; deleting the resulting draft alone
+  does NOT free it. Fix when blocked: clear ALL such notifications, however
+  old, then resend. And never send intermediate versions — finish and verify
+  all slides locally first, send once.
 - The three launch batches (`drafts/launch-*`) use "native text post" style:
   hook slides are plain text on black (intentional, mimics TikTok text posts),
   with app-screenshot slides after. The user prefers photo backgrounds — use the
