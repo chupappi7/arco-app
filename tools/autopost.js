@@ -244,11 +244,16 @@ async function main() {
 
   // Fail on missing credentials before spending time on network preflight.
   // --dry-run deliberately needs no secrets.
-  if (opts.account !== 'vn' && opts.account !== 'us') {
-    throw new Error(`--account must be "vn" or "us", got: ${opts.account}`);
+  const ACCOUNTS = {
+    vn: { env: 'TIKTOK_REFRESH_TOKEN', label: 'arco.app (VN)' },
+    us: { env: 'TIKTOK_REFRESH_TOKEN_US', label: 'emiliagonzalez389 (US)' },
+    getarco: { env: 'TIKTOK_REFRESH_TOKEN_GETARCO', label: 'getarcoapp' },
+  };
+  if (!ACCOUNTS[opts.account]) {
+    throw new Error(`--account must be one of ${Object.keys(ACCOUNTS).join('/')}, got: ${opts.account}`);
   }
-  const tokenVar = opts.account === 'us' ? 'TIKTOK_REFRESH_TOKEN_US' : 'TIKTOK_REFRESH_TOKEN';
-  console.log(`  account: ${opts.account === 'us' ? 'getarcoapp (US)' : 'arco.app (VN)'}`);
+  const tokenVar = ACCOUNTS[opts.account].env;
+  console.log(`  account: ${ACCOUNTS[opts.account].label}`);
   const creds = opts.dryRun
     ? null
     : {
