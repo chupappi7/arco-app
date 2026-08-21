@@ -112,6 +112,30 @@
       "title": "5 apps i use to actually lock in",
       "caption": "none of these are a secret. together they're the reason i finish things. claude explains whatever i'm stuck on — half my study time used to be searching, now i just ask. arco plans the day and physically blocks tiktok during focus blocks, so the plan actually happens (full name on the app store: app blocker & focus — arco). google calendar holds the schedule — if it's not in there, it doesn't exist. notion remembers everything so my head doesn't have to. endel plays focus sound with no lyrics and no decisions. plan the hours, block the noise, start. #lockin #focus #productivity #studytok #screentime",
       "_note": "app-stack listicle per July CLAUDE.md spec (ARCO #2 among famous apps); composited 2026-08-20"
+    },
+    {
+      "topic": "plan-week",
+      "title": "the 5 tools i use to plan my week",
+      "caption": "planning only works if it survives contact with the phone. clickup holds the work, arco plans the day and runs focus sessions with the feeds locked, obsidian is for private thinking, notion is for structure, google calendar makes time real. plan on sunday, run the week on rails. #productivity #planning #focus #studytok",
+      "_note": "batch2 listicle; composited 2026-08-22, lowkey ARCO, no store CTA"
+    },
+    {
+      "topic": "ai-stack",
+      "title": "the ai tools i actually use every day",
+      "caption": "the stack i actually open every day. claude for thinking and writing, codex for code that writes and fixes itself, higgsfield for visuals from a prompt, openclaw for a self hosted assistant that texts you on whatsapp, and arco to keep the feeds locked while the tools get used for real work. #ai #aitools #productivity #tech",
+      "_note": "batch2 listicle; composited 2026-08-22"
+    },
+    {
+      "topic": "builder-tools",
+      "title": "5 tools i would use to start an online business in 2026",
+      "caption": "starting an online business in 2026 is mostly assembling the right stack. shopify for the store, github for every line of code, higgsfield for the marketing visuals, clickup to run the operation, and arco to protect the hours that build it. the tools are cheap, the focus is not. #business #onlinebusiness #entrepreneur #buildinpublic",
+      "_note": "batch2 listicle; composited 2026-08-22"
+    },
+    {
+      "topic": "stay-productive",
+      "title": "how i actually stay productive",
+      "caption": "no morning routine, just a system. the day gets planned in 60 seconds the night before, everything lands on one timeline, the distracting apps lock on a schedule and focus runs from the lock screen. the app is arco. #productivity #screentime #focus #dayplanner",
+      "_note": "app demo slideshow from App Store screenshots; composited 2026-08-22"
     }
   ]
 }
