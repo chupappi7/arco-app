@@ -99,7 +99,7 @@ def draw_text_block(im, items, shadow_alpha=170):
         d.text((x, y), txt, font=f, fill=fill, anchor=anchor)
 
 BANDS = {
-    'src-hook.jpg': (350, 730), 'src-claude.jpg': (370, 660), 'src-lamp.jpg': (370, 660),
+    'src-hook.jpg': (350, 730), 'src-claude.jpg': (370, 660), 'src-lamp.jpg': (370, 745),
     'src-bed.jpg': (370, 650), 'src-notion.jpg': (470, 690), 'src-pool.jpg': (1140, 1430),
     'src-pool2.jpg': (1130, 1520), 'src-rc.jpg': (370, 650), 'src-cars.jpg': (670, 1120),
     'src-higgs.jpg': (375, 1055),
@@ -107,8 +107,15 @@ BANDS = {
     **{f'bg-d{i:02d}.jpg': (0, 1) for i in range(1, 15)},
 }
 
+# Backgrounds must be true 1080x1920. The bg-dNN pool was built by upscaling
+# small desktop images 3x-6.7x and reads visibly soft on a phone screen; it is
+# retired from full-bleed use. Anything below MIN_BG_PX of real pixels raises.
+MIN_BG_PX = (1000, 1700)
+
 def base_photo(name, grad):
     im = Image.open(f'{SP}/{name}').convert('RGB')
+    if im.width < MIN_BG_PX[0] or im.height < MIN_BG_PX[1]:
+        raise SystemExit(f'background {name} is {im.size}, below {MIN_BG_PX}: too soft for full bleed')
     inpaint_band(im, *BANDS[name])
     gradient_darken(im, *grad)
     return im
