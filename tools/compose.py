@@ -77,7 +77,7 @@ def rounded_icon(path, size=210, radius=48):
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, size - 1, size - 1), radius=radius, fill=255)
     return ic, mask
 
-def fit_font(text, variation, start, max_width=925, floor=44):
+def fit_font(text, variation, start, max_width=860, floor=44):
     size = start
     probe = ImageDraw.Draw(Image.new('RGB', (1, 1)))
     while size > floor:
@@ -121,23 +121,42 @@ def base_photo(name, grad):
     gradient_darken(im, *grad)
     return im
 
-def hook_slide(bg, lines, out, grad=(0.55, 0.80, 700, 1200)):
+def hook_slide(bg, lines, out, grad=(0.62, 0.62, 300, 1300)):
     im = base_photo(bg, grad)
+    text_scrim(im, 700, 990, strength=0.55)
     hf = font(74, 'Bold')
-    items = [(540, 445, lines[0], hf, 'mm', (255, 255, 255)),
-             (540, 550, lines[1], hf, 'mm', (255, 255, 255))]
+    items = [(540, 790, lines[0], hf, 'mm', (255, 255, 255)),
+             (540, 895, lines[1], hf, 'mm', (255, 255, 255))]
     draw_text_block(im, items)
     im.save(out, quality=92)
     print('wrote', out)
 
-def app_slide(bg, icon, title, body_lines, out, grad=(0.55, 0.78, 1000, 1550)):
+# TikTok overlays its own UI on a photo post: search bar across the top ~12%,
+# caption and username across the bottom ~28%, action buttons down the right
+# ~15%. Copy therefore lives in the middle band, left of x=945.
+def text_scrim(im, y0, y1, strength=0.62, feather=120):
+    """Local darkening behind the copy band only, so text always reads while
+    the rest of the photo stays visible."""
+    band = Image.new('L', (1, im.height), 0)
+    bp = band.load()
+    for y in range(im.height):
+        if y0 <= y <= y1:
+            bp[0, y] = int(255 * strength)
+        elif y0 - feather < y < y0:
+            bp[0, y] = int(255 * strength * (y - (y0 - feather)) / feather)
+        elif y1 < y < y1 + feather:
+            bp[0, y] = int(255 * strength * (1 - (y - y1) / feather))
+    im.paste(Image.new('RGB', im.size, (0, 0, 0)), (0, 0), band.resize(im.size))
+
+def app_slide(bg, icon, title, body_lines, out, grad=(0.72, 0.55, 300, 1250)):
     im = base_photo(bg, grad)
+    text_scrim(im, 600, 1300)
     ic, mask = rounded_icon(f'{ICONS}/{icon}')
-    im.paste(ic, (88, 335), mask)
+    im.paste(ic, (88, 610), mask)
     tf = fit_font(title, 'Black', 84)
-    items = [(85, 585, title, tf, 'la', (255, 255, 255))]
+    items = [(85, 865, title, tf, 'la', (255, 255, 255))]
     body_f = font(50, 'Semibold')
-    y = 713
+    y = 995
     for ln in body_lines:
         if ln == '':
             y += 26
