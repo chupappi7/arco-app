@@ -164,7 +164,7 @@
     {
       "topic": "4x-productivity",
       "title": "the tools i used to 4x my productivity",
-      "caption": "five tools, and the honest reason i use each one. claude answers before i can finish searching. codex writes the code while i review it. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. github holds every project with its full history. notion keeps the roadmap and every 2am idea so my head does not have to. none of this is complicated, it just compounds. #productivity #tools #aitools #buildinpublic #focus",
+      "caption": "five tools and the part of each one most people never turn on. claude: skip the chat box, claude code runs in your terminal, reads the whole project and edits real files, and skills save a workflow so it runs the same way every time. codex writes the feature and fixes what breaks while i review the diff. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. github actions runs my tests and builds on every push, on their machines. notion is databases not pages, so one entry shows up in five views. the tools are not the trick, using the deep half of them is. #productivity #aitools #claudecode #tools #buildinpublic",
       "_note": "listicle, batch 2026-08-23; first post on the new safe-band layout and true-res bg-nNN backgrounds"
     }
   ]
