@@ -18,6 +18,44 @@ from PIL import Image
 BG = os.path.join(os.path.dirname(__file__), 'slides', 'bg')
 MIN_CROP_W = 1000        # real pixels across after the 9:16 crop
 
+# Auto-quality gate. A background only has to do one job: hold white text in
+# the copy band (y 600-1300) after the scrim. These thresholds reject the two
+# ways that fails — a band so bright the scrim cannot save it, and a band so
+# busy that glyph edges compete with detail.
+BAND = (600, 1300)
+MAX_BAND_LUMA = 180      # mean brightness of the copy band, 0-255
+MAX_BAND_DETAIL = 46     # mean abs. gradient in the band: texture/busyness
+MIN_GLOBAL_STD = 12      # reject flat/empty frames (grey walls, blank sky)
+
+
+def quality(im):
+    """Return (ok, reason, metrics) for a 1080x1920 candidate."""
+    g = im.convert('L')
+    band = g.crop((0, BAND[0], 1080, BAND[1]))
+    px = list(band.getdata())
+    n = len(px)
+    luma = sum(px) / n
+    w, h = band.size
+    # mean absolute horizontal gradient, sampled every other row for speed
+    detail, count = 0, 0
+    for y in range(0, h, 2):
+        row = px[y * w:(y + 1) * w]
+        for x in range(0, w - 4, 4):
+            detail += abs(row[x] - row[x + 4])
+            count += 1
+    detail /= max(1, count)
+    gp = list(g.getdata())
+    mean = sum(gp) / len(gp)
+    std = (sum((v - mean) ** 2 for v in gp) / len(gp)) ** 0.5
+    m = f'luma={luma:.0f} detail={detail:.0f} std={std:.0f}'
+    if luma > MAX_BAND_LUMA:
+        return False, 'copy band too bright for white text', m
+    if detail > MAX_BAND_DETAIL:
+        return False, 'copy band too busy behind text', m
+    if std < MIN_GLOBAL_STD:
+        return False, 'image too flat/empty', m
+    return True, '', m
+
 
 def existing_hashes():
     out = {}
@@ -68,6 +106,11 @@ def main(sources):
             top = max(0, (h - ch) // 2)
             im = im.crop((0, top, w, min(h, top + ch)))
         im = im.resize((1080, 1920), Image.LANCZOS)
+        ok, why, metrics = quality(im)
+        if not ok:
+            print(f'  REJECT {src[-28:]}: {why}  [{metrics}]')
+            skipped += 1
+            continue
         buf = io.BytesIO()
         im.save(buf, 'JPEG', quality=94)
         digest = hashlib.md5(buf.getvalue()).hexdigest()
