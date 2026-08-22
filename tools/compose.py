@@ -104,7 +104,8 @@ BANDS = {
     'src-pool2.jpg': (1130, 1520), 'src-rc.jpg': (370, 650), 'src-cars.jpg': (670, 1120),
     'src-higgs.jpg': (375, 1055),
     'src-cars-clean.jpg': (0, 1),
-    **{f'bg-d{i:02d}.jpg': (0, 1) for i in range(1, 15)},
+    # bg-nNN: true 1440x2560+ sources, downscaled to 1080x1920. No captions.
+    **{f'bg-n{i:02d}.jpg': (0, 1) for i in range(1, 11)},
 }
 
 # Backgrounds must be true 1080x1920. The bg-dNN pool was built by upscaling
