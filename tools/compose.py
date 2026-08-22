@@ -106,6 +106,8 @@ BANDS = {
     'src-cars-clean.jpg': (0, 1),
     # bg-nNN: true 1440x2560+ sources, downscaled to 1080x1920. No captions.
     **{f'bg-n{i:02d}.jpg': (0, 1) for i in range(1, 11)},
+    # bg-hNN: pulled straight from Higgsfield via tools/ingest_bg.py
+    **{f'bg-h{i:02d}.jpg': (0, 1) for i in range(1, 13)},
 }
 
 # Backgrounds must be true 1080x1920. The bg-dNN pool was built by upscaling
