@@ -98,15 +98,13 @@ def draw_text_block(im, items, shadow_alpha=170):
     for x, y, txt, f, anchor, fill in items:
         d.text((x, y), txt, font=f, fill=fill, anchor=anchor)
 
+# Only clean, caption-free photos remain in the pool. The old src-*.jpg set
+# had marketing text baked in; removing it with inpaint_band flattens a wide
+# strip right above the copy, which is what produced "text on dead black".
+# Those files are retired under bg/_captioned_retired/ rather than patched.
 BANDS = {
-    'src-hook.jpg': (350, 730), 'src-claude.jpg': (370, 660), 'src-lamp.jpg': (370, 745),
-    'src-bed.jpg': (370, 650), 'src-notion.jpg': (470, 690), 'src-pool.jpg': (1140, 1430),
-    'src-pool2.jpg': (1130, 1520), 'src-rc.jpg': (370, 650), 'src-cars.jpg': (670, 1120),
-    'src-higgs.jpg': (375, 1055),
     'src-cars-clean.jpg': (0, 1),
-    # bg-nNN: true 1440x2560+ sources, downscaled to 1080x1920. No captions.
     **{f'bg-n{i:02d}.jpg': (0, 1) for i in range(1, 11)},
-    # bg-hNN: pulled straight from Higgsfield via tools/ingest_bg.py
     **{f'bg-h{i:02d}.jpg': (0, 1) for i in range(1, 13)},
 }
 
