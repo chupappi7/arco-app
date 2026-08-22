@@ -136,6 +136,30 @@
       "title": "how i actually stay productive",
       "caption": "no morning routine, just a system. the day gets planned in 60 seconds the night before, everything lands on one timeline, the distracting apps lock on a schedule and focus runs from the lock screen. the app is arco. #productivity #screentime #focus #dayplanner",
       "_note": "app demo slideshow from App Store screenshots; composited 2026-08-22"
+    },
+    {
+      "topic": "phone-another-room",
+      "title": "i left my phone in another room. it lasted two days.",
+      "caption": "distance was never the fix. the phone came back to the desk by tuesday, because nothing actually stopped the first tap. what worked was scheduling the block instead: 9 to 12 every weekday, the feeds simply do not open, and there is no decision to make at 9am. three weeks later the mornings are quiet. planner and app blocker in one app, arco. #screentime #focus #digitaldetox #productivity #deepwork",
+      "_note": "story post, batch 2026-08-23; carries promo CTA slide"
+    },
+    {
+      "topic": "study-tools",
+      "title": "the 5 tools that got me through exam season",
+      "caption": "exam season is a logistics problem before it is a knowledge problem. claude explains what the textbook would not. arco keeps class times and study blocks on one timeline and locks the social apps during revision. obsidian holds notes that actually link. google calendar owns every deadline. endel plays focus sound with no decisions. the studying still hurts, the chaos does not. #studytok #exams #studytips #productivity #focus",
+      "_note": "listicle, batch 2026-08-23"
+    },
+    {
+      "topic": "one-app-day",
+      "title": "a full day, planned and protected by one app",
+      "caption": "the night before takes a minute: habits picked, tasks typed, times set. the day then runs on one timeline instead of six lists. distracting apps lock on their own schedule, so the plan survives contact with the phone. projects and priorities catch whatever is left. the app is arco, on the app store. #productivity #dayplanner #screentime #focus #adhd",
+      "_note": "app demo from redesign screenshots, batch 2026-08-23"
+    },
+    {
+      "topic": "deep-work-stack",
+      "title": "the stack that finally made deep work stick",
+      "caption": "deep work failed for years because every session depended on willpower at the wrong moment. endel removes the sound decision. obsidian holds the thinking. arco runs the timer, the day plan and the app blocking together, so the session starts and the exits close. claude gets me unstuck in minutes. clickup catches the output. five tools, one habit that finally holds. #deepwork #focus #productivity #tools",
+      "_note": "listicle, batch 2026-08-23"
     }
   ]
 }

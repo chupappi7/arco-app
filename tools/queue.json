@@ -1,5 +1,10 @@
 {
-  "date": "2026-08-22",
-  "slots": { "09": "plan-week", "12": "ai-stack", "18": "builder-tools", "21": "stay-productive" },
-  "note": "written by the 5am generation job; send jobs read their slot's topic and deliver to vn+us+getarco"
+  "date": "2026-08-23",
+  "slots": {
+    "09": "phone-another-room",
+    "12": "study-tools",
+    "18": "one-app-day",
+    "21": "deep-work-stack"
+  },
+  "note": "written by the 5am generation job"
 }
