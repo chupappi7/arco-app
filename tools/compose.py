@@ -123,12 +123,16 @@ def base_photo(name, grad):
     gradient_darken(im, *grad)
     return im
 
-def hook_slide(bg, lines, out, grad=(0.62, 0.62, 300, 1300)):
+def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300)):
+    """Hook text is UPPERCASE: the first slide has to stop a thumb, and
+    lowercase at this size reads as a caption rather than a headline."""
     im = base_photo(bg, grad)
-    text_scrim(im, 700, 990, strength=0.55)
-    hf = font(74, 'Bold')
+    im = frame_for_band(im, 690, 1000)
+    adaptive_scrim(im, 690, 1000)
+    lines = [l.upper() for l in lines]
+    hf = fit_font(max(lines, key=len), 'Black', 80, max_width=900)
     items = [(540, 790, lines[0], hf, 'mm', (255, 255, 255)),
-             (540, 895, lines[1], hf, 'mm', (255, 255, 255))]
+             (540, 900, lines[1], hf, 'mm', (255, 255, 255))]
     draw_text_block(im, items)
     im.save(out, quality=92)
     print('wrote', out)
@@ -136,6 +140,66 @@ def hook_slide(bg, lines, out, grad=(0.62, 0.62, 300, 1300)):
 # TikTok overlays its own UI on a photo post: search bar across the top ~12%,
 # caption and username across the bottom ~28%, action buttons down the right
 # ~15%. Copy therefore lives in the middle band, left of x=945.
+def band_interest(im, y0, y1):
+    """Std-dev of the copy band: how much is actually visible there."""
+    g = im.convert('L').crop((0, y0, im.width, y1))
+    px = list(g.getdata())
+    m = sum(px) / len(px)
+    return (sum((v - m) ** 2 for v in px) / len(px)) ** 0.5
+
+
+# Above the copy band there is a large visible zone. Some photos put all
+# their content in the lower third, leaving that zone flat black — the slide
+# then looks like text floating on nothing, which is what "bad dark bg" means
+# in practice. Detect a dead top zone and pan the photo down into frame.
+TOP_ZONE = (200, 690)
+MIN_TOP_INTEREST = 12
+
+
+def frame_for_band(im, y0, y1, zoom=1.35):
+    top_now = band_interest(im, *TOP_ZONE)
+    if top_now >= MIN_TOP_INTEREST:
+        return im
+    w, h = im.size
+    big = im.resize((int(w * zoom), int(h * zoom)), Image.LANCZOS)
+    x0 = int((big.width - w) / 2)
+    span = big.height - h
+
+    def score(c):
+        # both zones must carry something; the weaker one decides
+        return min(band_interest(c, *TOP_ZONE), band_interest(c, y0, y1))
+
+    best, best_score = im, score(im)
+    for frac in (0.35, 0.5, 0.65, 0.8, 0.92, 1.0):
+        off = min(span, int(span * frac))
+        cand = big.crop((x0, off, x0 + w, off + h))
+        sc = score(cand)
+        if sc > best_score:
+            best, best_score = cand, sc
+    return best
+
+
+def band_luma(im, y0, y1):
+    g = im.convert('L').crop((0, y0, im.width, y1))
+    px = list(g.getdata())
+    return sum(px) / len(px)
+
+
+def adaptive_scrim(im, y0, y1, target=96, feather=140):
+    """Darken the copy band only as much as this photo needs.
+
+    A fixed scrim ruins already-dark photos: the band goes to pure black and
+    the slide reads as text on nothing. Measure first, then apply only the
+    deficit, and skip entirely when the photo is dark enough on its own.
+    """
+    luma = band_luma(im, y0, y1)
+    if luma <= target:
+        return 0.0
+    strength = min(0.55, 1 - (target / luma))
+    text_scrim(im, y0, y1, strength=strength, feather=feather)
+    return strength
+
+
 def text_scrim(im, y0, y1, strength=0.62, feather=120):
     """Local darkening behind the copy band only, so text always reads while
     the rest of the photo stays visible."""
@@ -150,9 +214,10 @@ def text_scrim(im, y0, y1, strength=0.62, feather=120):
             bp[0, y] = int(255 * strength * (1 - (y - y1) / feather))
     im.paste(Image.new('RGB', im.size, (0, 0, 0)), (0, 0), band.resize(im.size))
 
-def app_slide(bg, icon, title, body_lines, out, grad=(0.72, 0.55, 300, 1250)):
+def app_slide(bg, icon, title, body_lines, out, grad=(0.85, 0.68, 300, 1250)):
     im = base_photo(bg, grad)
-    text_scrim(im, 600, 1300)
+    im = frame_for_band(im, 600, 1300)
+    adaptive_scrim(im, 600, 1300)
     ic, mask = rounded_icon(f'{ICONS}/{icon}')
     im.paste(ic, (88, 610), mask)
     tf = fit_font(title, 'Black', 84)
