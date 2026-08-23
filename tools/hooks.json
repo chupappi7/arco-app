@@ -133,9 +133,9 @@
     },
     {
       "topic": "stay-productive",
-      "title": "how i actually stay productive",
-      "caption": "no morning routine, just a system. the day gets planned in 60 seconds the night before, everything lands on one timeline, the distracting apps lock on a schedule and focus runs from the lock screen. the app is arco. #productivity #screentime #focus #dayplanner",
-      "_note": "app demo slideshow from App Store screenshots; composited 2026-08-22"
+      "title": "5 tools to stay productive, i saved the best for last",
+      "caption": "five tools, and the honest reason each one stays on my phone. claude code runs in my terminal, reads the whole project and edits files directly, and skills save a workflow so it repeats exactly. notion stores everything as a database so one entry shows up in several views. google calendar working hours stop people booking over my deep work. endel plays focus sound with no decisions. and the one i saved for last, arco, manages my tasks, plans the day in 30 seconds and puts every distraction away while i work. my holy grail. #productivity #tools #aitools #focus",
+      "_note": "listicle, best-for-last variant; rebuilt 2026-08-23 (was app-demo)"
     },
     {
       "topic": "phone-another-room",

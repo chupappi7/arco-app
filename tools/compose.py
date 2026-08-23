@@ -197,20 +197,40 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
     # Compressed display type, set large: the subject fills the width, the
     # qualifier is roughly 40% of its height.
     if style == 'stack':
-        fb = _fit(big, 'Compressed Black', 260, max_width=1000, floor=110)
-        fs = _fit(small.upper(), 'Condensed Bold', int(fb.size * 0.36), max_width=980)
-        _shadowed(im, (540, 840), big, fb, WHITE, 'ms')
-        _shadowed(im, (540, 862), small.upper(), fs, WHITE, 'ma')
+        fb = _fit(big, 'Compressed Black', 250, max_width=940, floor=100)
+        sm = small.upper()
+        fs = display_font(max(40, int(fb.size * 0.34)), 'Condensed Bold')
+        probe = ImageDraw.Draw(Image.new('RGB', (1, 1)))
+        if probe.textlength(sm, font=fs) > 900:
+            # wrap the qualifier at the midpoint word break instead of shrinking
+            words = sm.split()
+            best, bd = 1, 1e9
+            for i in range(1, len(words)):
+                dl = abs(probe.textlength(' '.join(words[:i]), font=fs) -
+                         probe.textlength(' '.join(words[i:]), font=fs))
+                # a sentence boundary is always the right place to break
+                if words[i - 1].endswith(('.', ',', '!', '?')):
+                    dl -= 250
+                if dl < bd: best, bd = i, dl
+            l1, l2 = ' '.join(words[:best]), ' '.join(words[best:])
+            while (probe.textlength(l1, font=fs) > 900 or probe.textlength(l2, font=fs) > 900) and fs.size > 40:
+                fs = display_font(fs.size - 3, 'Condensed Bold')
+            _shadowed(im, (540, 810), big, fb, WHITE, 'ms')
+            _shadowed(im, (540, 832), l1, fs, WHITE, 'ma')
+            _shadowed(im, (540, 832 + int(fs.size * 1.28)), l2, fs, WHITE, 'ma')
+        else:
+            _shadowed(im, (540, 840), big, fb, WHITE, 'ms')
+            _shadowed(im, (540, 862), sm, fs, WHITE, 'ma')
 
     elif style == 'highlight':
-        fb = _fit(big, 'Compressed Black', 250, max_width=1010, floor=104)
+        fb = _fit(big, 'Compressed Black', 245, max_width=940, floor=96)
         fs = _fit(small.upper(), 'Compressed Black', int(fb.size * 0.92),
-                  max_width=1010, floor=96)
+                  max_width=940, floor=88)
         _shadowed(im, (540, 800), big, fb, WHITE, 'ms')
         _shadowed(im, (540, 812), small.upper(), fs, accent, 'ma')
 
     elif style == 'boxed':
-        fb = _fit(big, 'Compressed Black', 260, max_width=1000, floor=110)
+        fb = _fit(big, 'Compressed Black', 250, max_width=940, floor=100)
         fs = _fit(small, 'Condensed Bold', int(fb.size * 0.32), max_width=860)
         w = d.textlength(small, font=fs)
         _shadowed(im, (540, 828), big, fb, WHITE, 'ms')
@@ -220,8 +240,8 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
         d.text((540, 856 + h / 2), small, font=fs, fill=(10, 10, 10), anchor='mm')
 
     else:  # serif — compressed sans subject over an elegant Didot qualifier
-        fb = _fit(big, 'Compressed Black', 265, max_width=1000, floor=112)
-        fs = _fit(small, None, int(fb.size * 0.42), max_width=950,
+        fb = _fit(big, 'Compressed Black', 255, max_width=940, floor=102)
+        fs = _fit(small, None, int(fb.size * 0.42), max_width=900,
                   maker=lambda sz: serif_font(sz))
         _shadowed(im, (540, 815), big, fb, WHITE, 'ms')
         _shadowed(im, (540, 838), small, fs, WHITE, 'ma')
