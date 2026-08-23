@@ -29,9 +29,14 @@ MIN_GLOBAL_STD = 12      # reject flat/empty frames (grey walls, blank sky)
 
 
 def quality(im):
-    """Return (ok, reason, metrics) for a 1080x1920 candidate."""
-    g = im.convert('L')
-    band = g.crop((0, BAND[0], 1080, BAND[1]))
+    """Return (ok, reason, metrics) for a 1080x1920 candidate.
+
+    Scores a 270x480 thumbnail, not the full frame: brightness and texture
+    survive downsampling, and the full-resolution loop took ~40s per image,
+    which timed the daily ingest out.
+    """
+    g = im.convert('L').resize((270, 480), Image.BILINEAR)
+    band = g.crop((0, int(BAND[0] / 4), 270, int(BAND[1] / 4)))
     px = list(band.getdata())
     n = len(px)
     luma = sum(px) / n

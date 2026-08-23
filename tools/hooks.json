@@ -166,6 +166,30 @@
       "title": "the tools i used to 4x my productivity",
       "caption": "five tools i use every day and what each one actually does. claude code runs in my terminal, reads the whole project and edits the files directly, and skills let me save a workflow and reuse it. codex writes the code from a description, runs it and fixes what breaks while i review the changes. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. github backs up every project with its full history and actions runs my tests and builds on every push. notion stores everything as a database so one entry shows up in several views and i filter by project, date or status. #productivity #aitools #claudecode #tools #buildinpublic",
       "_note": "listicle, batch 2026-08-23; first post on the new safe-band layout and true-res bg-nNN backgrounds"
+    },
+    {
+      "topic": "ship-alone",
+      "title": "the tools i use to ship an app completely alone",
+      "caption": "no team, no office, five tools. codex writes the feature from a description, runs it and fixes what breaks before i look at the diff. github actions runs my tests and builds on every push and branch protection stops me merging anything that failed. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. revenuecat handles receipts, renewals and refunds so i never built a payment server. notion keeps the roadmap and content calendar as one database with different views. #buildinpublic #indiedev #solofounder #aitools",
+      "_note": "listicle 2026-08-23"
+    },
+    {
+      "topic": "underrated-settings",
+      "title": "the settings nobody turns on in these apps",
+      "caption": "most people use ten percent of the tools they already pay for. claude skills save a workflow once so it runs the same way every time, and claude code edits real files in your terminal. obsidian backlinks show what links to a note so connections appear without filing anything. google calendar working hours and appointment schedules stop people booking over your deep work. arco blocked hours locks apps on a schedule you set once, so there is no decision left to make later. clickup custom views show the same tasks as a list, board or calendar without moving anything. #productivity #tools #tips #aitools",
+      "_note": "listicle 2026-08-23, teaching-first"
+    },
+    {
+      "topic": "inside-the-app",
+      "title": "what the app looks like when the day runs itself",
+      "caption": "the night before takes a minute. habits, tasks and events land on one timeline. the distracting apps lock on their own schedule so the plan survives contact with the phone. at the end of the week the insights show where the hours actually went. it is one app, arco: day planner & focus. #productivity #dayplanner #screentime #focus",
+      "_note": "app demo 2026-08-23"
+    },
+    {
+      "topic": "study-block",
+      "title": "how i study for four hours without checking my phone",
+      "caption": "not willpower, a schedule. arco keeps study blocks in the plan and locks the social apps while they run, so at 6pm there is nothing to decide. claude explains the part of the textbook that lost me and gives worked examples. obsidian keeps one note per concept, linked, so revision is faster every week. endel plays focus sound with no lyrics and no playlist to pick. google calendar holds every deadline so nothing surprises me on a sunday night. #studytok #studytips #exams #focus",
+      "_note": "listicle 2026-08-23, students"
     }
   ]
 }
