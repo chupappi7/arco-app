@@ -2,10 +2,19 @@
 """Ingest background photos into tools/slides/bg from URLs or local paths.
 
   python3 tools/ingest_bg.py <url-or-path> [...]
+  python3 tools/ingest_bg.py --ledger            # show what has been ingested
 
 Crops to 9:16, downscales to 1080x1920 (never upscales), skips anything whose
-real resolution is too low, and skips images already in the pool (content hash
-of the processed result). Prints what landed.
+real resolution is too low or whose copy band cannot hold white text, and skips
+images already in the pool (content hash of the processed result).
+
+Higgsfield note: the MCP does not expose the web app's like/favourite state
+(checked show_generations, job_display, show_medias — no such field, and no
+folder listing). The daily job therefore selects candidates by intent instead:
+only 9:16 image generations, which is the aspect ratio backgrounds are always
+made in, and everything else Thinh generates (UGC actors, thumbnails, covers)
+is skipped. The quality gate then drops anything unusable. A source ledger is
+kept so the same generation is never fetched twice.
 """
 import hashlib
 import io
@@ -84,7 +93,31 @@ def next_index():
     return max(nums, default=0) + 1
 
 
+LEDGER = os.path.join(os.path.dirname(__file__), 'slides', 'bg', '.ingested.txt')
+
+
+def ledger_seen():
+    if not os.path.exists(LEDGER):
+        return set()
+    return {l.strip() for l in open(LEDGER) if l.strip()}
+
+
+def ledger_add(src):
+    with open(LEDGER, 'a') as fh:
+        fh.write(src + '\n')
+
+
 def main(sources):
+    if sources and sources[0] == '--ledger':
+        for line in sorted(ledger_seen()):
+            print(' ', line[-60:])
+        print(f'{len(ledger_seen())} sources ingested')
+        return
+    done = ledger_seen()
+    sources = [s for s in sources if s not in done]
+    if not sources:
+        print('nothing new')
+        return
     seen = existing_hashes()
     idx = next_index()
     added = skipped = 0
@@ -114,6 +147,7 @@ def main(sources):
         ok, why, metrics = quality(im)
         if not ok:
             print(f'  REJECT {src[-28:]}: {why}  [{metrics}]')
+            ledger_add(src)
             skipped += 1
             continue
         buf = io.BytesIO()
@@ -127,6 +161,7 @@ def main(sources):
         open(os.path.join(BG, name), 'wb').write(buf.getvalue())
         seen[digest] = name
         print(f'  ADD   {name}  <- {src[-40:]}')
+        ledger_add(src)
         idx += 1
         added += 1
     print(f'\n{added} added, {skipped} skipped')
