@@ -134,9 +134,20 @@ def base_photo(name, grad):
 HOOK_STYLES = ('stack', 'highlight', 'boxed', 'serif')
 
 
-def _stroked(d, xy, text, f, fill, anchor, stroke=14, stroke_fill=(0, 0, 0)):
-    d.text(xy, text, font=f, fill=fill, anchor=anchor,
-           stroke_width=stroke, stroke_fill=stroke_fill)
+def _shadowed(im, xy, text, f, fill, anchor, offset=(0, 10), blur=18, alpha=200):
+    """Soft drop shadow, not an outline.
+
+    A stroke rings every glyph and reads as clip-art; the hooks that look
+    professional sit on a blurred dark shadow offset downward, which lifts
+    the text off the photo without drawing a border around it.
+    """
+    layer = Image.new('RGBA', im.size, (0, 0, 0, 0))
+    ld = ImageDraw.Draw(layer)
+    ld.text((xy[0] + offset[0], xy[1] + offset[1]), text, font=f,
+            fill=(0, 0, 0, alpha), anchor=anchor)
+    layer = layer.filter(ImageFilter.GaussianBlur(blur))
+    im.paste(Image.new('RGB', im.size, (0, 0, 0)), (0, 0), layer.split()[3])
+    ImageDraw.Draw(im).text(xy, text, font=f, fill=fill, anchor=anchor)
 
 
 DIDOT = '/System/Library/Fonts/Supplemental/Didot.ttc'
@@ -188,21 +199,21 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
     if style == 'stack':
         fb = _fit(big, 'Compressed Black', 260, max_width=1000, floor=110)
         fs = _fit(small.upper(), 'Condensed Bold', int(fb.size * 0.36), max_width=980)
-        _stroked(d, (540, 840), big, fb, WHITE, 'ms', stroke=20)
-        _stroked(d, (540, 862), small.upper(), fs, WHITE, 'ma', stroke=12)
+        _shadowed(im, (540, 840), big, fb, WHITE, 'ms')
+        _shadowed(im, (540, 862), small.upper(), fs, WHITE, 'ma')
 
     elif style == 'highlight':
         fb = _fit(big, 'Compressed Black', 250, max_width=1010, floor=104)
         fs = _fit(small.upper(), 'Compressed Black', int(fb.size * 0.92),
                   max_width=1010, floor=96)
-        _stroked(d, (540, 800), big, fb, WHITE, 'ms', stroke=20)
-        _stroked(d, (540, 812), small.upper(), fs, accent, 'ma', stroke=20)
+        _shadowed(im, (540, 800), big, fb, WHITE, 'ms')
+        _shadowed(im, (540, 812), small.upper(), fs, accent, 'ma')
 
     elif style == 'boxed':
         fb = _fit(big, 'Compressed Black', 260, max_width=1000, floor=110)
         fs = _fit(small, 'Condensed Bold', int(fb.size * 0.32), max_width=860)
         w = d.textlength(small, font=fs)
-        _stroked(d, (540, 828), big, fb, WHITE, 'ms', stroke=20)
+        _shadowed(im, (540, 828), big, fb, WHITE, 'ms')
         pad, h = 32, int(fs.size * 1.5)
         d.rounded_rectangle((540 - w / 2 - pad, 856, 540 + w / 2 + pad, 856 + h),
                             radius=14, fill=accent)
@@ -212,8 +223,8 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
         fb = _fit(big, 'Compressed Black', 265, max_width=1000, floor=112)
         fs = _fit(small, None, int(fb.size * 0.42), max_width=950,
                   maker=lambda sz: serif_font(sz))
-        _stroked(d, (540, 815), big, fb, WHITE, 'ms', stroke=20)
-        _stroked(d, (540, 838), small, fs, WHITE, 'ma', stroke=9)
+        _shadowed(im, (540, 815), big, fb, WHITE, 'ms')
+        _shadowed(im, (540, 838), small, fs, WHITE, 'ma')
 
     im.save(out, quality=92)
     print('wrote', out, f'[{style}]')
