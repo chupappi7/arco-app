@@ -1,3 +1,5 @@
+YELLOW = (255, 214, 10)
+WHITE = (255, 255, 255)
 #!/usr/bin/env python3
 """Slide-composition helpers for the TikTok pipeline (see the tiktok-pipeline skill).
 Backgrounds in tools/slides/bg (BANDS maps caption zones needing inpainting;
@@ -121,23 +123,102 @@ def base_photo(name, grad):
     gradient_darken(im, *grad)
     return im
 
-def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300)):
-    """Hook text is UPPERCASE: the first slide has to stop a thumb, and
-    lowercase at this size reads as a caption rather than a headline."""
-    im = base_photo(bg, grad)
-    im = frame_for_band(im, 690, 1000)
-    adaptive_scrim(im, 690, 1000)
-    lines = [l.upper() for l in lines]
-    hf = fit_font(max(lines, key=len), 'Black', 80, max_width=900)
-    items = [(540, 790, lines[0], hf, 'mm', (255, 255, 255)),
-             (540, 900, lines[1], hf, 'mm', (255, 255, 255))]
-    draw_text_block(im, items)
-    im.save(out, quality=92)
-    print('wrote', out)
+# ---------------------------------------------------------------- hook slides
+#
+# The first slide has one job: stop a thumb. Flat one-size centred text does
+# not do that. Every style here uses the three things the best-performing
+# hooks share: a size jump between the subject and its qualifier, a heavy
+# black stroke so the words read on any photo, and a colour accent on the
+# part that carries the promise.
 
-# TikTok overlays its own UI on a photo post: search bar across the top ~12%,
-# caption and username across the bottom ~28%, action buttons down the right
-# ~15%. Copy therefore lives in the middle band, left of x=945.
+HOOK_STYLES = ('stack', 'highlight', 'boxed', 'serif')
+
+
+def _stroked(d, xy, text, f, fill, anchor, stroke=14, stroke_fill=(0, 0, 0)):
+    d.text(xy, text, font=f, fill=fill, anchor=anchor,
+           stroke_width=stroke, stroke_fill=stroke_fill)
+
+
+DIDOT = '/System/Library/Fonts/Supplemental/Didot.ttc'
+
+
+def display_font(size, variation='Compressed Black'):
+    """Heavy compressed display type.
+
+    SF's default Black is a UI weight: wide, evenly spaced, and it reads as a
+    system label blown up. The compressed cuts are the ones that look like
+    display type on a photo, which is what every high-performing hook uses.
+    """
+    f = ImageFont.truetype(SF, size)
+    f.set_variation_by_name(variation)
+    return f
+
+
+def serif_font(size, index=1):
+    return ImageFont.truetype(DIDOT, size, index=index)
+
+
+def _fit(text, variation, start, max_width=930, floor=40, maker=None):
+    maker = maker or (lambda sz: display_font(sz, variation))
+    size = start
+    probe = ImageDraw.Draw(Image.new('RGB', (1, 1)))
+    while size > floor:
+        f = maker(size)
+        if probe.textlength(text, font=f) <= max_width:
+            return f
+        size -= 3
+    return maker(floor)
+
+
+def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
+               accent=YELLOW):
+    """lines[0] = the big subject, lines[1] = the smaller qualifier."""
+    im = base_photo(bg, grad)
+    im = frame_for_band(im, 690, 1060)
+    adaptive_scrim(im, 660, 1080, target=104)
+    if style is None:
+        style = HOOK_STYLES[sum(ord(c) for c in bg) % len(HOOK_STYLES)]
+    big, small = lines[0].upper(), lines[1]
+    d = ImageDraw.Draw(im)
+
+    # The subject runs edge to edge; the qualifier is roughly 40% of its
+    # height. That ratio is what makes the hook readable at thumb speed.
+    # Compressed display type, set large: the subject fills the width, the
+    # qualifier is roughly 40% of its height.
+    if style == 'stack':
+        fb = _fit(big, 'Compressed Black', 260, max_width=1000, floor=110)
+        fs = _fit(small.upper(), 'Condensed Bold', int(fb.size * 0.36), max_width=980)
+        _stroked(d, (540, 840), big, fb, WHITE, 'ms', stroke=20)
+        _stroked(d, (540, 862), small.upper(), fs, WHITE, 'ma', stroke=12)
+
+    elif style == 'highlight':
+        fb = _fit(big, 'Compressed Black', 250, max_width=1010, floor=104)
+        fs = _fit(small.upper(), 'Compressed Black', int(fb.size * 0.92),
+                  max_width=1010, floor=96)
+        _stroked(d, (540, 800), big, fb, WHITE, 'ms', stroke=20)
+        _stroked(d, (540, 812), small.upper(), fs, accent, 'ma', stroke=20)
+
+    elif style == 'boxed':
+        fb = _fit(big, 'Compressed Black', 260, max_width=1000, floor=110)
+        fs = _fit(small, 'Condensed Bold', int(fb.size * 0.32), max_width=860)
+        w = d.textlength(small, font=fs)
+        _stroked(d, (540, 828), big, fb, WHITE, 'ms', stroke=20)
+        pad, h = 32, int(fs.size * 1.5)
+        d.rounded_rectangle((540 - w / 2 - pad, 856, 540 + w / 2 + pad, 856 + h),
+                            radius=14, fill=accent)
+        d.text((540, 856 + h / 2), small, font=fs, fill=(10, 10, 10), anchor='mm')
+
+    else:  # serif — compressed sans subject over an elegant Didot qualifier
+        fb = _fit(big, 'Compressed Black', 265, max_width=1000, floor=112)
+        fs = _fit(small, None, int(fb.size * 0.42), max_width=950,
+                  maker=lambda sz: serif_font(sz))
+        _stroked(d, (540, 815), big, fb, WHITE, 'ms', stroke=20)
+        _stroked(d, (540, 838), small, fs, WHITE, 'ma', stroke=9)
+
+    im.save(out, quality=92)
+    print('wrote', out, f'[{style}]')
+
+
 def band_interest(im, y0, y1):
     """Std-dev of the copy band: how much is actually visible there."""
     g = im.convert('L').crop((0, y0, im.width, y1))
