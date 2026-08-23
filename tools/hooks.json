@@ -202,6 +202,30 @@
       "title": "the tools i used to 4x my productivity",
       "caption": "part two, five different tools. obsidian links every note to the others so the graph organises itself. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. granola listens to a meeting and the notes write themselves. cleanshot x captures scrolling pages and lets you copy text straight out of the image. endel generates focus sound live with no playlist to pick. #productivity #tools #aitools #mac #focus",
       "_note": "sequel to the performing 4x-productivity: same hook + bg, fresh roster with Granola/CleanShot as niche picks; built 2026-08-24"
+    },
+    {
+      "topic": "90-days-lost",
+      "title": "4 hours a day is 60 full days a year",
+      "caption": "i did the math once and could not unsee it. 4 hours of scrolling a day is 28 hours a week, 60 waking days a year. grayscale and app limits never held because every fix asked me to decide again at the worst moment. now the feeds lock on a schedule, 9 to 12 and 7 to 10 on weekdays, and the block does not ask how i feel. three weeks in my screen time is under 90 minutes. the app is arco, planner and app blocker in one. #screentime #digitaldetox #focus #productivity",
+      "_note": "story, numbers-led; batch 2026-08-24"
+    },
+    {
+      "topic": "study-secrets",
+      "title": "the study apps toppers do not share",
+      "caption": "anki schedules each card the day before you would forget it, medical students run on it. arco keeps my tasks, plans the day in 30 seconds and locks every distraction while i study, my holy grail. zotero saves a paper with its citation in one browser click and writes the bibliography for you. wolfram alpha shows the steps, not just the answer. endel plays focus sound with no playlist to pick. #studytok #studytips #exams #university",
+      "_note": "student listicle; Anki/Zotero/Wolfram niche picks; batch 2026-08-24"
+    },
+    {
+      "topic": "launch-weekend",
+      "title": "launch an app in one weekend",
+      "caption": "the stack that makes a weekend launch real. claude code runs in the terminal, reads the whole project and edits files directly. arco keeps the weekend on rails, tasks, plan and app blocking in one place, my holy grail. supabase gives you a real database with auth in an afternoon and the free tier covers an mvp. vercel puts the site live seconds after you push. revenuecat handles subscriptions without a payment server. #buildinpublic #indiedev #appdevelopment #coding",
+      "_note": "builder listicle; Supabase/Vercel niche picks; batch 2026-08-24"
+    },
+    {
+      "topic": "type-less",
+      "title": "i barely type anymore, these 5 tools do it for me",
+      "caption": "superwhisper turns speech into clean text in any app at speaking speed. arco plans my day in 30 seconds instead of a journaling session, tasks and app blocking included, my holy grail. granola listens to meetings and the notes write themselves. claude turns a dictated rough idea into a finished draft, editing beats writing from zero. cleanshot x copies text straight out of any screenshot. #productivity #aitools #tools #mac",
+      "_note": "voice/capture listicle; Superwhisper/Granola/CleanShot niche picks; batch 2026-08-24"
     }
   ]
 }
