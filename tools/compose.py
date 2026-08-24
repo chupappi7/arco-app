@@ -197,9 +197,9 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
     # Compressed display type, set large: the subject fills the width, the
     # qualifier is roughly 40% of its height.
     if style == 'stack':
-        fb = _fit(big, 'Compressed Black', 250, max_width=940, floor=100)
+        fb = _fit(big, 'Compressed Black', 175, max_width=940, floor=88)
         sm = small.upper()
-        fs = display_font(max(40, int(fb.size * 0.34)), 'Condensed Bold')
+        fs = display_font(max(40, int(fb.size * 0.62)), 'Condensed Bold')
         probe = ImageDraw.Draw(Image.new('RGB', (1, 1)))
         if probe.textlength(sm, font=fs) > 900:
             # wrap the qualifier at the midpoint word break instead of shrinking
@@ -223,9 +223,9 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
             _shadowed(im, (540, 862), sm, fs, WHITE, 'ma')
 
     elif style == 'highlight':
-        fb = _fit(big, 'Compressed Black', 245, max_width=940, floor=96)
-        fs = _fit(small.upper(), 'Compressed Black', int(fb.size * 0.92),
-                  max_width=940, floor=88)
+        fb = _fit(big, 'Compressed Black', 170, max_width=940, floor=86)
+        fs = _fit(small.upper(), 'Compressed Black', int(fb.size * 0.85),
+                  max_width=940, floor=78)
         _shadowed(im, (540, 800), big, fb, WHITE, 'ms')
         _shadowed(im, (540, 812), small.upper(), fs, accent, 'ma')
 
@@ -240,8 +240,8 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
         d.text((540, 856 + h / 2), small, font=fs, fill=(10, 10, 10), anchor='mm')
 
     else:  # serif — compressed sans subject over an elegant Didot qualifier
-        fb = _fit(big, 'Compressed Black', 255, max_width=940, floor=102)
-        fs = _fit(small, None, int(fb.size * 0.42), max_width=900,
+        fb = _fit(big, 'Compressed Black', 180, max_width=940, floor=90)
+        fs = _fit(small, None, int(fb.size * 0.62), max_width=900,
                   maker=lambda sz: serif_font(sz))
         _shadowed(im, (540, 815), big, fb, WHITE, 'ms')
         _shadowed(im, (540, 838), small, fs, WHITE, 'ma')
