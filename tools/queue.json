@@ -1,10 +1,10 @@
 {
-  "date": "2026-08-24",
+  "date": "2026-08-25",
   "slots": {
-    "09": "90-days-lost",
-    "12": "study-secrets",
-    "18": "launch-weekend",
-    "21": "type-less"
+    "09": "business-at-19",
+    "12": "evenings-back",
+    "18": "underpriced-apps",
+    "21": "post-daily-faceless"
   },
-  "note": "approval-first: nothing sends until Thinh approves"
+  "note": "approval-first"
 }

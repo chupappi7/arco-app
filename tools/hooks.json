@@ -226,6 +226,30 @@
       "title": "i barely type anymore, these 5 tools do it for me",
       "caption": "superwhisper turns speech into clean text in any app at speaking speed. arco plans my day in 30 seconds instead of a journaling session, tasks and app blocking included, my holy grail. granola listens to meetings and the notes write themselves. claude turns a dictated rough idea into a finished draft, editing beats writing from zero. cleanshot x copies text straight out of any screenshot. #productivity #aitools #tools #mac",
       "_note": "voice/capture listicle; Superwhisper/Granola/CleanShot niche picks; batch 2026-08-24"
+    },
+    {
+      "topic": "business-at-19",
+      "title": "the tools i run my business with at 19",
+      "caption": "no office, no team, and the whole thing runs on five tools. claude code lives in my terminal, reads the project and edits the files, most of my code ships that way. arco is my own app and my whole operating system, tasks, day plan and app blocking in one, my holy grail. revenuecat runs subscriptions without a payment server. higgsfield generates every visual i post from a prompt. notion holds the roadmap and content calendar as one database. #buildinpublic #youngentrepreneur #indiedev #tools",
+      "_note": "backlog hook, first-person stack only; batch 2026-08-25"
+    },
+    {
+      "topic": "evenings-back",
+      "title": "my screen time after 7pm is zero minutes",
+      "caption": "my evenings used to vanish, dinner then a quick scroll then midnight. willpower lost the argument every night at 9pm. now the evening locks itself, 7 to 10 every day the feed apps do not open, and i never argue with an app that cannot hear me. a month in, two books finished, gym three nights a week, asleep before midnight. the app is arco, planner and app blocker in one. #screentime #digitaldetox #eveningroutine #focus",
+      "_note": "story with cta_slide close; batch 2026-08-25"
+    },
+    {
+      "topic": "underpriced-apps",
+      "title": "5 apps that should cost 10x more",
+      "caption": "raycast replaces the mac search bar with clipboard history, window snapping and calculators, and costs nothing. arco manages my tasks, plans the day in 30 seconds and locks every distraction, my holy grail. anki schedules each card the day before you would forget it. wolfram alpha shows the steps, not just the answer. cleanshot x captures scrolling pages and copies text out of screenshots. #apps #productivity #tools #mac",
+      "_note": "value listicle; batch 2026-08-25"
+    },
+    {
+      "topic": "post-daily-faceless",
+      "title": "i post every day without filming anything",
+      "caption": "no camera, no face, a post every day. claude drafts the hooks and captions with me. arco keeps a daily focus block where the content happens with the feeds locked, posting daily is a schedule not a mood. higgsfield generates every background from a prompt. capcut adds word level auto captions. canva applies the brand kit to every template automatically. #contentcreator #faceless #aitools #creator",
+      "_note": "creator listicle, honest first-person; batch 2026-08-25"
     }
   ]
 }
