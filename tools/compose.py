@@ -369,3 +369,29 @@ def shot_slide(src, crop_top, lines, out, dark_text=False):
 def closing_slide(bg, lines, out):
     hook_slide(bg, lines, out)
 
+
+
+def cta_slide(bg, out, subtitle='Planner and app blocker in one.'):
+    """Closing card for story posts: app icon, full store name, one line.
+
+    No promo copy and never the word free; the promo CTA returns only when
+    the in-app Redeem flow ships (2.0.2)."""
+    im = base_photo(bg, (0.72, 0.5, 300, 1250))
+    im = frame_for_band(im, 600, 1300)
+    adaptive_scrim(im, 560, 1340, target=88)
+    ic, mask = rounded_icon(f'{ICONS}/icon-arco.png', size=250, radius=56)
+    sh = Image.new('RGBA', im.size, (0, 0, 0, 0))
+    ImageDraw.Draw(sh).rounded_rectangle((415, 625, 665, 875), radius=56, fill=(0, 0, 0, 170))
+    sh = sh.filter(ImageFilter.GaussianBlur(20))
+    im.paste(Image.new('RGB', im.size, (0, 0, 0)), (0, 0), sh.split()[3])
+    im.paste(ic, (415, 610), mask)
+    name_f = font(58, 'Bold')
+    sub_f = font(42, 'Semibold')
+    store_f = font(36, 'Medium')
+    draw_text_block(im, [
+        (540, 940, 'ARCO: Day Planner & Focus', name_f, 'ma', (255, 255, 255)),
+        (540, 1035, subtitle, sub_f, 'ma', (235, 235, 235)),
+        (540, 1115, 'On the App Store', store_f, 'ma', (255, 214, 10)),
+    ])
+    im.save(out, quality=92)
+    print('wrote', out)
