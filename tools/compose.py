@@ -115,6 +115,25 @@ BANDS = {
 # retired from full-bleed use. Anything below MIN_BG_PX of real pixels raises.
 MIN_BG_PX = (1000, 1700)
 
+# Backgrounds containing a person. At most ONE of these may appear in a
+# single post: two photos of a man at a desk in one carousel reads as stock
+# imagery. `assert_one_person(list_of_bgs)` enforces it at build time.
+import json as _json
+try:
+    HAS_PERSON = set(_json.load(open(f'{SP}/manifest.json'))['has_person'])
+except Exception:
+    HAS_PERSON = set()
+
+
+def assert_one_person(bgs):
+    """Raise if a post uses more than one person-containing background."""
+    used = [b for b in bgs if b in HAS_PERSON]
+    if len(used) > 1:
+        raise SystemExit(
+            f'post uses {len(used)} backgrounds with a person ({", ".join(used)}); '
+            'at most one is allowed')
+    return True
+
 def base_photo(name, grad):
     im = Image.open(f'{SP}/{name}').convert('RGB')
     if im.width < MIN_BG_PX[0] or im.height < MIN_BG_PX[1]:

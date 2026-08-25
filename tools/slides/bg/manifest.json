@@ -1,0 +1,12 @@
+{
+  "has_person": [
+    "bg-h12.jpg",
+    "bg-h14.jpg",
+    "bg-h15.jpg",
+    "bg-h16.jpg",
+    "bg-h17.jpg",
+    "bg-h18.jpg",
+    "bg-n10.jpg"
+  ],
+  "rule": "at most one of these per post; verified by eye 2026-08-25"
+}
