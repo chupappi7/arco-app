@@ -1,0 +1,92 @@
+[
+ {
+  "topic": "4x-productivity",
+  "tools": [
+   "Claude",
+   "ARCO",
+   "Codex",
+   "GitHub",
+   "Notion"
+  ]
+ },
+ {
+  "topic": "tools-nobody-posts",
+  "tools": [
+   "Raycast",
+   "ARCO",
+   "Superwhisper",
+   "Readwise Reader",
+   "Endel"
+  ]
+ },
+ {
+  "topic": "4x-productivity-2",
+  "tools": [
+   "Obsidian",
+   "ARCO",
+   "Granola",
+   "CleanShot X",
+   "Endel"
+  ]
+ },
+ {
+  "topic": "study-secrets",
+  "tools": [
+   "Anki",
+   "ARCO",
+   "Zotero",
+   "Wolfram Alpha",
+   "Endel"
+  ]
+ },
+ {
+  "topic": "launch-weekend",
+  "tools": [
+   "Claude",
+   "ARCO",
+   "Supabase",
+   "Vercel",
+   "RevenueCat"
+  ]
+ },
+ {
+  "topic": "type-less",
+  "tools": [
+   "Superwhisper",
+   "ARCO",
+   "Granola",
+   "Claude",
+   "CleanShot X"
+  ]
+ },
+ {
+  "topic": "business-at-19",
+  "tools": [
+   "Claude",
+   "ARCO",
+   "RevenueCat",
+   "Higgsfield",
+   "Notion"
+  ]
+ },
+ {
+  "topic": "underpriced-apps",
+  "tools": [
+   "Raycast",
+   "ARCO",
+   "Anki",
+   "Wolfram Alpha",
+   "CleanShot X"
+  ]
+ },
+ {
+  "topic": "post-daily-faceless",
+  "tools": [
+   "Claude",
+   "ARCO",
+   "Higgsfield",
+   "CapCut",
+   "Canva"
+  ]
+ }
+]

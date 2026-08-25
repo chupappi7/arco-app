@@ -142,6 +142,46 @@ def assert_one_person(bgs):
 
 
 HOOK_LOG = f'{SP}/hook_usage.json'
+TOOL_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tool_usage.json')
+TOOL_COOLDOWN = 6          # posts a tool must sit out before it can return
+
+
+def tool_history():
+    try:
+        return _json.load(open(TOOL_LOG))
+    except Exception:
+        return []
+
+
+def tools_on_cooldown():
+    """Tools used in the last TOOL_COOLDOWN posts — do not use these."""
+    recent = tool_history()[-TOOL_COOLDOWN:]
+    return {t for post in recent for t in post['tools']}
+
+
+def record_post_tools(topic, tools):
+    h = tool_history()
+    h.append({'topic': topic, 'tools': tools})
+    _json.dump(h, open(TOOL_LOG, 'w'), indent=1)
+
+
+# ARCO is the deliberate constant: it appears in every listicle at #2 and is
+# exempt from the cooldown. Everything AROUND it must be new — a feed where
+# Claude, Codex and ClickUp show up every time teaches nothing after the
+# first post, and that is what costs followers.
+ALWAYS_ALLOWED = {'ARCO', 'ARCO: Day Planner & Focus'}
+
+
+def assert_fresh_tools(tools, allow=()):
+    """Raise if a post reuses a non-ARCO tool that is still on cooldown."""
+    hot = tools_on_cooldown() - set(allow) - ALWAYS_ALLOWED
+    clash = [t for t in tools if t in hot]
+    if clash:
+        raise SystemExit(
+            f'tools used within the last {TOOL_COOLDOWN} posts: {", ".join(clash)}. '
+            'Pick different ones; the audience follows to learn.')
+    return True
+
 
 
 def pick_hook_bg(prefer=None):
