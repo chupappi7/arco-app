@@ -30,7 +30,11 @@ import sys
 from PIL import Image
 
 BG = os.path.join(os.path.dirname(__file__), 'slides', 'bg')
-MIN_CROP_W = 1000        # real pixels across after the 9:16 crop
+# Real pixels across after the 9:16 crop. 760 allows natively-9:16 AI output
+# (768px wide) through at a 1.41x upscale, which holds up; the old 1000 floor
+# existed to stop 3-6.7x upscales of small landscape stock, and a 9:16 source
+# never pays that penalty because nothing is lost to cropping.
+MIN_CROP_W = 760
 
 # Auto-quality gate. A background only has to do one job: hold white text in
 # the copy band (y 600-1300) after the scrim. These thresholds reject the two

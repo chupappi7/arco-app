@@ -107,7 +107,7 @@ def draw_text_block(im, items, shadow_alpha=170):
 BANDS = {
     'src-cars-clean.jpg': (0, 1),
     **{f'bg-n{i:02d}.jpg': (0, 1) for i in range(1, 11)},
-    **{f'bg-h{i:02d}.jpg': (0, 1) for i in range(1, 29) if i != 23},
+    **{f'bg-h{i:02d}.jpg': (0, 1) for i in range(1, 64) if i != 23},
 }
 
 # Backgrounds must be true 1080x1920. The bg-dNN pool was built by upscaling
@@ -125,6 +125,12 @@ except Exception:
     HAS_PERSON = set()
 
 
+try:
+    VIBES = _json.load(open(f'{SP}/manifest.json'))['vibes']
+except Exception:
+    VIBES = {}
+
+
 def assert_one_person(bgs):
     """Raise if a post uses more than one person-containing background."""
     used = [b for b in bgs if b in HAS_PERSON]
@@ -132,6 +138,23 @@ def assert_one_person(bgs):
         raise SystemExit(
             f'post uses {len(used)} backgrounds with a person ({", ".join(used)}); '
             'at most one is allowed')
+    return True
+
+
+def assert_varied(bgs):
+    """Raise if two adjacent slides share a vibe.
+
+    A night LED desk followed by another night LED desk reads as one long
+    slide; the eye needs a change of scene between cards. Vibes are tagged
+    in bg/manifest.json.
+    """
+    assert_one_person(bgs)
+    for a, b in zip(bgs, bgs[1:]):
+        va, vb = VIBES.get(a), VIBES.get(b)
+        if va and va == vb:
+            raise SystemExit(
+                f'adjacent slides share vibe "{va}": {a} then {b}. '
+                'Pick a different scene for one of them.')
     return True
 
 def base_photo(name, grad):
