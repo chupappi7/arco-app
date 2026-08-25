@@ -108,5 +108,15 @@
    "Figma",
    "Zapier"
   ]
+ },
+ {
+  "topic": "pay-double",
+  "tools": [
+   "Gemini",
+   "ARCO",
+   "Loom",
+   "Airtable",
+   "Framer"
+  ]
  }
 ]

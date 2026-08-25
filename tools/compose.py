@@ -378,51 +378,62 @@ def _fit(text, variation, start, max_width=930, floor=40, maker=None):
     return maker(floor)
 
 
-# Hook typography. The SIZE is measured off the approved lowercase posts
-# (66px glyph height, 72px side margins); the POSITION is the vertical centre
-# of the frame, which is what the user approved and what reads best in the
-# TikTok viewer. The old reference posts happen to sit high at y 420-590, but
-# that is a legacy of an earlier template, not the target: only the size was
-# ever wrong.
-HOOK_SIZE = 74
-HOOK_BAND = (700, 1000)
-HOOK_Y = 790              # block centres on y 849, matching the published post
-HOOK_PITCH = 104
-HOOK_MAX_W = 936          # 1080 minus the 72px side margins
+# Hook typography, measured off the posts that performed: the stacked
+# uppercase style from tools-nobody-posts and ship-alone. Line 1 is a short
+# punchy headline in Compressed Black, line 2 is the rest in Condensed Bold
+# underneath it. Numbers come from measuring those renders, not from taste:
+# line 1 glyph height 181 spanning y 662-842, line 2 height 63 at y 883-945,
+# both centred, both fitted to a 930px safe width.
+HOOK_L1_SIZE = 250        # Compressed Black ceiling, shrinks to fit
+HOOK_L2_SIZE = 86         # Condensed Bold ceiling, shrinks to fit
+HOOK_L1_TOP = 655         # glyph top, not baseline
+HOOK_L2_TOP = 881
+HOOK_MAX_W = 930
+HOOK_BAND = (620, 990)
+
+
+def _fit_display(text, variation, start, max_w):
+    size = start
+    probe = ImageDraw.Draw(Image.new('RGB', (1, 1)))
+    while size > 40:
+        f = display_font(size, variation)
+        if probe.textlength(text, font=f) <= max_w:
+            return f
+        size -= 2
+    return display_font(40, variation)
 
 
 def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
                accent=YELLOW):
-    """Quiet hook: lowercase, one fixed size, positioned like the reference.
+    """Stacked uppercase hook: big headline, smaller line under it.
 
-    The size is FIXED at HOOK_SIZE and the block sits at HOOK_BAND, measured
-    off the posts that actually performed (ai-stack, 5-apps, study-tools and
-    friends all render a 66px glyph height in a block spanning y 420-590).
-    Nothing auto-shrinks: a hook that does not fit at this size is too long,
-    and the fix is shorter copy, not smaller type. The old fitter measured
-    ' '.join(lines) -- a string that never appears on the slide -- so long
-    hooks silently collapsed to the 44px floor and shipped undersized.
+    `lines[0]` is the headline and should be SHORT (two or three words); it
+    is the thing that stops the scroll. `lines[1]` carries the rest. Both are
+    uppercased here, so callers can pass either case.
 
-    `style` is accepted and ignored so existing callers keep working.
+    Sizes shrink to fit the safe width but never grow past the ceilings, so a
+    long headline gets smaller rather than running off the slide. If line 1
+    lands far under its ceiling the headline is too long: shorten it.
     """
     im = base_photo(bg, grad)
     im = frame_for_band(im, HOOK_BAND[0], HOOK_BAND[1])
     adaptive_scrim(im, HOOK_BAND[0], HOOK_BAND[1], target=88, strength_cap=0.62)
-    f = font(HOOK_SIZE, 'Bold')
+
+    l1, l2 = lines[0].upper(), lines[1].upper()
+    f1 = _fit_display(l1, 'Compressed Black', HOOK_L1_SIZE, HOOK_MAX_W)
+    f2 = _fit_display(l2, 'Condensed Bold', HOOK_L2_SIZE, HOOK_MAX_W)
+
     probe = ImageDraw.Draw(Image.new('RGB', (1, 1)))
-    too_wide = [(l, int(probe.textlength(l, font=f))) for l in lines
-                if probe.textlength(l, font=f) > HOOK_MAX_W]
-    if too_wide:
-        detail = '; '.join(f'"{l}" is {w}px' for l, w in too_wide)
-        raise SystemExit(
-            f'hook line over {HOOK_MAX_W}px at the reference size: {detail}. '
-            'Shorten the line; the type does not shrink.')
+    b1 = probe.textbbox((0, 0), l1, font=f1)
+    b2 = probe.textbbox((0, 0), l2, font=f2)
+
     draw_text_block(im, [
-        (540, HOOK_Y, lines[0], f, 'mm', WHITE),
-        (540, HOOK_Y + HOOK_PITCH, lines[1], f, 'mm', WHITE),
+        # anchor 'mm' centres the glyph box on y, so glyph top = y - h/2
+        (540, HOOK_L1_TOP + (b1[3] - b1[1]) / 2, l1, f1, 'mm', WHITE),
+        (540, HOOK_L2_TOP + (b2[3] - b2[1]) / 2, l2, f2, 'mm', WHITE),
     ])
     im.save(out, quality=92)
-    print('wrote', out, '[quiet]')
+    print('wrote', out, '[stacked]')
 
 
 def band_interest(im, y0, y1):
