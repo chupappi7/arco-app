@@ -18,10 +18,12 @@ Then open Claude Code in your project and say `/tiktok-pipeline calibrate`.
 
 ## What happens on first run
 
-1. **Calibration** (`calibration.md`), it asks you for your app's approved
-   line, three hooks in your own words, one hook you would never post, one
-   example slide body, your tool pool and your content pillars. That becomes
-   `examples.md`.
+1. **Calibration** (`calibration.md`), an interview. Settings come as normal
+   multiple-choice prompts (app slot, repeat policy, pillars, cadence, image
+   source), each with an "Other" escape. Anything that is *your voice*, three
+   hooks in your own words, one hook you would never post, your app's line, an
+   example slide body, is asked as an open question, because a menu cannot
+   teach it your register. The answers become `examples.md`.
 2. **Setup** (`setup.md`), TikTok developer app, sandbox, target users, OAuth
    token minting, GitHub Pages hosting.
 3. **Backgrounds** (`backgrounds.md`), generate or supply images, ingest them

@@ -28,7 +28,11 @@ it is the difference between this working and not.
 
 ## Supporting guides
 
-- `calibration.md`: the first-run interview. Run once, before anything else.
+- `calibration.md`: the first-run interview, run once before anything
+  else. Choice questions go through `AskUserQuestion` with the literal
+  option sets written out there; copy (hooks, slide bodies, the app's
+  line) is asked in plain text, because you cannot learn someone's voice
+  from which of four options they click.
 - `examples.md`: **read before writing any copy.** The hooks and slide bodies
   this user approved and rejected, verbatim, with reasons.
 - `setup.md`: developer-portal walkthrough, OAuth handoff, multi-account

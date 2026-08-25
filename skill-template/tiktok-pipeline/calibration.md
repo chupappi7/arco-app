@@ -8,32 +8,66 @@ and the user will reject every one of them without being able to say why.
 Write the answers into `examples.md` as you go. That file becomes the
 calibration set, and it is read before every draft from then on.
 
-Use `AskUserQuestion` where the answer is a choice; ask in plain text where
-the answer is copy the user has to write.
+## How to ask
+
+Two kinds of question, and using the wrong tool for each is why calibration
+interviews fail:
+
+- **Choices** go through `AskUserQuestion` with real options. The literal
+  option sets are written out below: use them, do not improvise a prose
+  version. Every question also gets a free-text "Other" automatically, so a
+  user who wants something not listed is never boxed in.
+- **Copy** cannot be multiple choice. Ask for it in plain text and wait. You
+  cannot offer a user four hooks and learn their voice from which one they
+  pick; you learn it from what they write unprompted.
+
+Batch the choice questions: `AskUserQuestion` accepts up to four at a time,
+so steps 1, 5, 6 and 7 below can go out together rather than as eight
+separate interruptions.
 
 ---
 
-## 1. The app and the constant
+## Step 1: the app and its constant
+
+**Ask** (choice, can be batched):
+
+```
+question: "Where should your own app sit in a listicle?"
+header:   "App slot"
+options:
+  - label: "Slide 2 (recommended)"
+    description: "Slide 1 is a famous tool that buys credibility, then yours
+      lands while people are still watching. Viewers read two or three slides
+      and scroll, so this is where it actually gets seen."
+  - label: "Last slide"
+    description: "Builds to it as the payoff. Works with a hook that promises
+      a best-for-last, but most viewers never reach slide 5."
+  - label: "Varies per post"
+    description: "Rotate the position. More natural across a feed, harder to
+      keep consistent."
+```
+
+**Write** (free text, ask and wait):
 
 > What is your app called, and what is its full App Store name?
 
-Write both into `compose.ALWAYS_ALLOWED`. The app is exempt from every roster
-rule and always appears at slide 2.
+Put both into `compose.ALWAYS_ALLOWED`. The app is exempt from every roster
+rule.
 
 > In one or two sentences, in the voice of a real user and not a marketer,
 > what does your app do for you personally?
 
 This becomes the approved line. Push back if it sounds like App Store copy.
-The test: would a friend say this sentence out loud? Then ask:
+The test: would a friend say this sentence out loud?
 
 > Give me a short closing line for the app slide. Something you would
 > actually say, not a slogan.
 
-Write the line and its closer into `tools/app_angles.json` as `v1`, then
-generate 9 variations that keep the register identical and rotate which
-feature is named. Show all ten and get them approved before use.
+Write the line and closer into `tools/app_angles.json` as `v1`, generate 9
+variations that keep the register identical and rotate which feature is
+named, then show all ten and get them approved before use.
 
-**Worked example** (from the pipeline this template came from):
+**Worked example** from the pipeline this template came from:
 
 ```
 I manage all my tasks here and plan
@@ -45,45 +79,44 @@ away.
 My holy grail.
 ```
 
-The closer `My holy grail.` repeats on about 75% of variations; the rest use
-same-register alternates. That consistency is what makes it read as a person
-rather than a rotating ad.
+The closer repeats on about 75% of variations; the rest use same-register
+alternates. That consistency is what makes it read as a person rather than a
+rotating ad.
 
-## 2. Hooks: ask the user to write three
+## Step 2: hooks, in the user's own words
 
-Do not write hooks for the user at this stage. Ask:
+**Write** (free text). Do not generate hooks first, and do not offer a menu.
 
 > Write me three hooks in your own words, the way you would say them out
 > loud. Two lines each, and do not try to make them clever.
 
-Then ask for the opposite, which is more informative:
+Then the more informative half:
 
 > Now give me one hook you would never post, so I know what to avoid.
 
-Record all four in `examples.md` under approved and rejected. Only after that
-should you generate new hooks; show 10-15 and ask which land. Record the
-misses too, with the user's reason if they give one.
+Record all four in `examples.md`. Only then generate 10 to 15 new hooks in
+that register and ask which land. Record the misses with the user's reason.
 
-**What the register looked like for the source pipeline** (yours will
-differ, this is the shape not the content):
+**The shape** it took for the source pipeline (yours will differ; this is
+register, not content):
 
 - `the tools i used to / 4x my productivity`
 - `the tools i use to run my business at 19 years old`
-- `the 5 apps i would keep / if i deleted everything else`
 - `i pay for 12 apps, these 5 do all the work`
 
-Rejected there: anything corny, anything with an exclamation mark, and
-anything that says "i built this app". The app earns attention at slide 2 by
-being useful, never by being announced in the hook.
+Rejected there: anything corny, anything exclamation-marked, and anything
+saying "i built this app". The app earns attention at slide 2 by being
+useful, never by being announced in the hook.
 
-## 3. Teaching contexts: ask for one, then calibrate
+## Step 3: one teaching context, then calibrate
+
+**Write** (free text):
 
 > Pick one tool you actually use. Write the two lines you would put on its
 > slide: what the feature is, and what it lets you do.
 
-This single answer tells you the depth the user wants. Then check it against
-the two failure modes and show them both, because most people have to see
-the failures to recognise the target:
+That single answer tells you the depth the user wants. Then show both failure
+modes, because most people need to see them to recognise the target:
 
 | Failure | Example | Why it fails |
 |---|---|---|
@@ -101,53 +134,120 @@ One builds, one reviews, each with
 its own clean context window.
 ```
 
-`compose.assert_teaches()` runs inside `app_slide` and fails the build on
-verdict phrasing. It cannot catch "too obvious" -- that stays your judgment.
+`compose.assert_teaches()` fails the build on verdict phrasing. It cannot
+catch "too obvious", which stays your judgment. That is what `examples.md`
+is for.
 
-## 4. The tool pool
+## Step 4: the tool pool
+
+**Write** (free text):
 
 > Which apps do you actually use and would happily recommend?
 
-Then calibrate the tier, because this is where most drafts go wrong:
+Then calibrate the tier out loud, because this is where drafts go wrong:
 
 - **Too small** (Raindrop.io, Soulver, Proxyman): naming them is free
   promotion for someone else, and the viewer stops to work out what the thing
-  even is instead of learning the slide.
+  is instead of learning the slide.
 - **Too default** (Apple Notes, Google Sheets, Shortcuts): everyone has them,
   so being named teaches nothing.
-- **Right** (Canva, CapCut, Notion, GitHub, Raycast, Figma): known and wanted,
-  where the *feature* is the surprise.
+- **Right** (Canva, CapCut, Notion, GitHub, Raycast, Figma): known and
+  wanted, where the *feature* is the surprise.
 
-Ask whether the user wants the reuse cooldown on. Default is off
-(`TOOL_COOLDOWN = 0`) because a stack that changes completely every post reads
-as invented; what has to stay fresh is the teaching point. Set it to 3 if they
-want more variety enforced.
+Write the approved list into `tools/tool_pool.json` by category, with a
+verified icon filename for each. Sourcing rules are in `backgrounds.md`.
 
-Write the approved list into `tools/tool_pool.json` grouped by category, with
-the verified icon filename for each.
+## Step 5: repetition policy
 
-## 5. Content pillars
+**Ask** (choice, can be batched):
 
-> What are the three to five things your audience wants to become?
+```
+question: "Can the same tool appear in more than one post?"
+header:   "Repeats"
+options:
+  - label: "Yes, freely (recommended)"
+    description: "TOOL_COOLDOWN = 0. Nobody reads every post, and a stack that
+      changes completely each time reads as invented. What stays fresh is the
+      teaching point, not the logo."
+  - label: "Not within 3 posts"
+    description: "TOOL_COOLDOWN = 3. Forces variety. Workable if your pool is
+      large."
+  - label: "Not within 6 posts"
+    description: "TOOL_COOLDOWN = 6. Strictest. Warning: this starves a small
+      pool and pushes posts toward whatever is left, which is how filler gets
+      in."
+```
 
-Each pillar owns a different want and keeps the feed from being one long tool
-list. Write them into `content.md`. Every post belongs to exactly one, and the
-user names the pillar when asking for a draft.
+## Step 6: pillars
 
-## 6. Accounts and cadence
+**Ask** (multi-select, can be batched):
 
-> How many TikTok accounts, and which region is each aimed at?
-> How many posts per day do you want?
+```
+question: "Which of these does your audience want to become?"
+header:   "Pillars"
+multiSelect: true
+options:
+  - label: "More productive"
+    description: "Tool stacks, workflows, doing more in less time."
+  - label: "Off their phone"
+    description: "Screen time, doomscrolling, focus. Story-shaped."
+  - label: "More disciplined"
+    description: "Locking in, systems that survive low motivation. Method-led."
+  - label: "A builder / founder"
+    description: "Shipping, launching, running something solo."
+```
 
-Then state the constraint plainly before they answer the second one: **five
-pending drafts per account per rolling 24h**, and the only thing that frees a
-slot is publishing. At four posts a day the user must claim and publish daily
-or the pipeline jams.
+Add "study and exams" as a fifth if the audience is students; the user can
+also type their own. Every post belongs to exactly one pillar, and the user
+names it when asking for a draft ("draft a screentime one").
 
-## 7. Backgrounds
+## Step 7: accounts and cadence
 
-Walk `backgrounds.md`. Ask whether they will generate images or supply their
-own, and get one approved look before building a pool.
+**Ask** (choice, can be batched). State the constraint in the option text so
+the answer is informed:
+
+```
+question: "How many posts per day do you want to draft?"
+header:   "Cadence"
+options:
+  - label: "1 per day (recommended to start)"
+    description: "Leaves plenty of headroom under the 5-pending cap and gives
+      you time to actually judge what works."
+  - label: "2 per day"
+    description: "Comfortable. Claim and publish daily and you will never hit
+      the cap."
+  - label: "4 per day"
+    description: "The cap becomes a daily chore: 5 pending drafts per account
+      per rolling 24h, and ONLY publishing frees a slot. Deleting a draft does
+      not. Miss a day and the pipeline jams."
+```
+
+**Write** (free text):
+
+> How many TikTok accounts, and which country is each aimed at?
+
+Region is set by the IP at signup and is sticky. See `operations.md`.
+
+## Step 8: backgrounds
+
+**Ask** (choice):
+
+```
+question: "Where will the slide backgrounds come from?"
+header:   "Images"
+options:
+  - label: "Generate them"
+    description: "Any 9:16 image model. Generate in the web app if you have an
+      unlimited plan: an MCP integration usually bills credits per image even
+      when the web app does not."
+  - label: "My own photos"
+    description: "Same pipeline and same rules. Needs enough dark, uncluttered
+      frames to hold white text."
+  - label: "Both"
+    description: "Generated for volume, your own where it matters."
+```
+
+Then walk `backgrounds.md` and get one look approved before building a pool.
 
 ---
 
