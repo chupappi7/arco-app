@@ -248,8 +248,8 @@
   {
    "topic": "open-every-day",
    "title": "the apps i actually open every day, not the ones i pretend to use",
-   "caption": "obsidian dataview turns notes into a live query, so \"every unfinished task tagged uni, sorted by date\" writes itself and stays current. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. raindrop.io saves a copy of the page and not just the link, so the article still opens years later after the site has gone down. readwise reader brings every highlight back on a spaced schedule right before you would have forgotten it. excalidraw with the obsidian plugin keeps the drawing inside the note, so the diagram lives with the notes it explains. #productivity #apps #secondbrain #studytok",
-   "_note": "tools pillar, desk niche: everyday productivity, broad audience"
+   "caption": "shortcuts automations can fire on arrival and not just at a time, so you walk into the library and the phone goes silent on its own. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. wispr flow types into any app and strips the ums while you talk, so a long message takes about a quarter of the time. google sheets importhtml pulls a table straight off a web page and updates itself when the page changes. apple notes search reads the words inside your photos and scanned pages, so a whiteboard you shot in march is findable by what it said. #productivity #apps #iphonetips #studytok",
+   "_note": "tools pillar, desk niche, big apps only: ARCO is the only discovery in the post"
   }
  ]
 }

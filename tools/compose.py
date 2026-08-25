@@ -216,8 +216,34 @@ TOOL_NICHE = {
     'Notion': 'desk', 'ClickUp': 'desk', 'Endel': 'desk',
     'Obsidian': 'desk', 'Google Calendar': 'desk',
     'Raindrop.io': 'desk', 'Excalidraw': 'desk', 'Fastlane': 'build',
-    'Proxyman': 'build',
+    'Proxyman': 'build', 'Apple Shortcuts': 'desk', 'Wispr Flow': 'desk',
+    'Google Sheets': 'desk', 'Apple Notes': 'desk', 'Gmail': 'desk',
+    'Google Drive': 'desk', 'Figma': 'content', 'Descript': 'content',
+    'Quizlet': 'study', 'Duolingo': 'study', 'Grammarly': 'study',
 }
+
+
+# Only apps the audience already knows. Naming a small app is free promotion
+# for it and costs a slot: the viewer stops to work out what it is instead of
+# learning the one thing the slide teaches. Big names are context, and ARCO is
+# the only app in the post anyone is meant to discover.
+SMALL_APPS = {
+    'Obsidian', 'Raindrop.io', 'Readwise Reader', 'Excalidraw', 'Soulver',
+    'Proxyman', 'Fastlane', 'Granola', 'CleanShot X', 'Superwhisper',
+    'Raycast', 'Endel', 'Zotero', 'OpenClaw', 'Supabase', 'RevenueCat',
+    'Vercel', 'ClickUp', 'Codex',
+}
+
+
+def assert_big_apps(tools):
+    """Raise if a post recommends an app the audience has to look up."""
+    small = [t for t in tools if t in SMALL_APPS and t not in ALWAYS_ALLOWED]
+    if small:
+        raise SystemExit(
+            f'small apps in the roster: {", ".join(small)}. '
+            'Supporting tools must be names the viewer already knows; '
+            'ARCO is the only discovery in the post.')
+    return True
 
 
 def assert_same_niche(tools):
