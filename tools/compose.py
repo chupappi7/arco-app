@@ -171,6 +171,26 @@ def record_post_tools(topic, tools):
 # first post, and that is what costs followers.
 ALWAYS_ALLOWED = {'ARCO', 'ARCO: Day Planner & Focus'}
 
+ARCO_ANGLES = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           'arco_angles.json')
+
+
+def next_arco_angle():
+    """Return the next unused ARCO body copy, cycling through all angles.
+
+    ARCO appears in every listicle, which makes its slide the most repeated
+    text in the feed. Rotating the angle means a returning viewer learns a
+    different feature each time instead of rereading the same three lines.
+    """
+    d = _json.load(open(ARCO_ANGLES))
+    unused = [a for a in d['angles'] if a['id'] not in d['used']]
+    if not unused:
+        d['used'], unused = [], d['angles']
+    pick = unused[0]
+    d['used'].append(pick['id'])
+    _json.dump(d, open(ARCO_ANGLES, 'w'), indent=1)
+    return pick['lines']
+
 
 def assert_fresh_tools(tools, allow=()):
     """Raise if a post reuses a non-ARCO tool that is still on cooldown."""

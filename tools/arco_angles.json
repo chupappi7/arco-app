@@ -1,0 +1,103 @@
+{
+ "angles": [
+  {
+   "id": "blocked-hours",
+   "lines": [
+    "Blocked Hours locks the apps on a",
+    "schedule I set once.",
+    "",
+    "At 9am there is no decision left",
+    "to make."
+   ]
+  },
+  {
+   "id": "strict-focus",
+   "lines": [
+    "Focus sessions have a strict mode",
+    "that cannot be ended early.",
+    "",
+    "The session decides, not my mood",
+    "at minute twelve."
+   ]
+  },
+  {
+   "id": "plan-30s",
+   "lines": [
+    "The whole day gets planned in 30",
+    "seconds the night before.",
+    "",
+    "Habits, tasks and events land on",
+    "one timeline."
+   ]
+  },
+  {
+   "id": "break-budget",
+   "lines": [
+    "Breaks come out of a budget, not",
+    "out of nowhere.",
+    "",
+    "85 minutes for the day, and the",
+    "app keeps count."
+   ]
+  },
+  {
+   "id": "projects",
+   "lines": [
+    "Tasks sit in projects with priority",
+    "flags, and urgent ones show a count",
+    "on the project itself.",
+    "",
+    "Nothing loose, nothing forgotten."
+   ]
+  },
+  {
+   "id": "live-activity",
+   "lines": [
+    "The countdown runs on the lock",
+    "screen and in the Dynamic Island.",
+    "",
+    "I can end a break without opening",
+    "the app."
+   ]
+  },
+  {
+   "id": "habit-streak",
+   "lines": [
+    "A habit locks in at 66 days, the",
+    "number the research actually uses.",
+    "",
+    "The streak is the whole point."
+   ]
+  },
+  {
+   "id": "insights",
+   "lines": [
+    "Weekly recaps show where the hours",
+    "went, focus time against habit time.",
+    "",
+    "It is uncomfortable and useful."
+   ]
+  },
+  {
+   "id": "timeline-band",
+   "lines": [
+    "Blocked windows show as bands on",
+    "the day timeline.",
+    "",
+    "I can see the locked hours before",
+    "I plan anything into them."
+   ]
+  },
+  {
+   "id": "no-ignore",
+   "lines": [
+    "Apple's limits have an ignore",
+    "button. This does not.",
+    "",
+    "The block holds until the block",
+    "ends."
+   ]
+  }
+ ],
+ "used": []
+}
