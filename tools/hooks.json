@@ -274,6 +274,36 @@
    "title": "discipline is a schedule, not a personality",
    "caption": "write tomorrow's first task before you go to sleep, so you wake into an instruction instead of a decision you have to win. arco manages all my tasks and the day takes 30 seconds to plan, and blocked hours closes the apps on a schedule so 9am needs no decision. keep the same two hours daily even on the days you sit there and do almost nothing, because a slot you never move stops being a thing you talk yourself into. give the task an end time and not just a start, since work stops expanding once the clock decides how much fits. and anything you do weekly goes on a recurring slot, never on a list, because a list asks you to choose again every week and a repeat never asks. #discipline #focus #productivity #lockin",
    "_note": "discipline pillar. every slide argues the hook's claim: all five are scheduling mechanics"
+  },
+  {
+   "topic": "before-nine",
+   "title": "5 tools i open before 9am",
+   "caption": "chatgpt tasks run a prompt on a schedule and message you the result, so a morning brief writes itself before you are awake. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. raycast clipboard history searches everything you copied weeks back, so the link you lost on tuesday is two keystrokes away. cleanshot x scrolling capture takes the whole page and not just the screen. endel shifts the soundscape with the time of day instead of a playlist, so nothing ends and nothing pulls you out to pick the next track. #productivity #apps #mac #aitools",
+   "_note": "daily batch, tools pillar, one LLM, guards via compose.preflight"
+  },
+  {
+   "topic": "ship-with",
+   "title": "5 tools i ship with",
+   "caption": "codex takes a task, works in its own sandbox and opens a pull request, so you review a diff instead of watching it type. arco keeps every task in one place and the day gets planned in 30 seconds, with focus mode closing everything else while i work. linear cycles carry unfinished issues into the next one on their own, so nothing gets quietly dropped. every vercel pull request gets its own live preview url, so you send a link instead of a build. sentry session replay shows the exact clicks before the crash. #indiedev #buildinpublic #tools #shipping",
+   "_note": "daily batch, tools pillar, one LLM, guards via compose.preflight"
+  },
+  {
+   "topic": "posting-daily",
+   "title": "5 tools for posting every day",
+   "caption": "a claude project holds your files and rules for every chat inside it, so you stop pasting the same context at the top of each one. arco manages all my tasks and the day takes 30 seconds to plan, and blocked hours closes the apps on a schedule. descript lets you edit the video by deleting words from the transcript, so cutting a sentence cuts the footage with it. opusclip scores each clip before you post and not after. buffer gives you one queue with its own posting times per platform. #contentcreator #creator #tools #faceless",
+   "_note": "daily batch, tools pillar, one LLM, guards via compose.preflight"
+  },
+  {
+   "topic": "saved-hours",
+   "title": "5 tools that saved me hours this week",
+   "caption": "perplexity lets you aim a search at academic papers or reddit alone, so the answer stops averaging the whole internet. all my tasks live in arco and i plan the whole day in 30 seconds, with focus mode putting every distraction away. a make scenario shows the data moving through every step, so you watch where it breaks instead of reading a log. photoroom cuts the background from a whole folder in one pass. elevenlabs clones a voice from about a minute of clean audio and reads anything you write in it. #productivity #aitools #apps #automation",
+   "_note": "daily batch, tools pillar, one LLM, guards via compose.preflight"
+  },
+  {
+   "topic": "selling-online",
+   "title": "5 tools to sell something online",
+   "caption": "a gemini gem is a saved version with its own instructions and files, so you build the assistant once and open it like an app. i keep every task in arco and plan tomorrow in 30 seconds, and focus mode puts every distraction away the moment it starts. a stripe payment link sells a product with no website at all. gumroad handles the vat and delivers the file after purchase. beehiiv has the referral program built in, so readers bring readers without you wiring anything up. #buildinpublic #ecommerce #tools #sidehustle",
+   "_note": "daily batch, tools pillar, one LLM, guards via compose.preflight"
   }
  ]
 }

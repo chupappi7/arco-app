@@ -8,7 +8,7 @@ the tip: those belong to a different hook.
 import os
 import sys
 sys.path.insert(0, '/Users/thinh/SIXSIX/arco-app/tools')
-from compose import (app_slide, rule_slide, hook_slide, preflight,
+from compose import (rule_slide, hook_slide, preflight,
                      record_post_tools, record_post_bgs, pick_hook_bg)
 
 TOPIC = 'schedule-rules'
@@ -37,10 +37,11 @@ rule_slide(BGS[1], 1, 'Decide the night before', [
     'decision you have to win.',
 ], f'{OUT}/02.jpg')
 
-# The app's own slide keeps its logo instead of a numbered badge; the badge
-# and the icon sit in the same box, so the format stays uniform and no slide
-# carries the number twice.
-app_slide(BGS[2], 'icon-arco.png', 'ARCO', [
+# In a method pillar the app takes a numbered badge like every other slide.
+# An app icon here would be the ONLY icon in the post, which marks that slide
+# as the advert and undoes the point of putting the app among the rules. In a
+# tools post the icon is correct, because every slide carries one.
+rule_slide(BGS[2], 2, 'ARCO', [
     'I manage all my tasks here and the',
     'day takes 30 seconds to plan.',
     '',

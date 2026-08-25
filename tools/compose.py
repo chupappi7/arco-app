@@ -280,7 +280,11 @@ def hook_bg_status():
 # monitors and LED strips fight the text instead, and a carousel of them looks
 # like one long slide. Use them at index 0 and nowhere else.
 HOOK_ONLY_VIBES = {'desk-led-neon', 'desk-led-warm', 'desk-person-night',
-                   'desk-lamp-night'}
+                   'desk-lamp-night',
+                   # jet-mountain passes the luma gate (the sky is dark) but
+                   # the copy lands across bright snow and a dark suit, so the
+                   # dashes and thin strokes break up. Hook only.
+                   'jet-mountain'}
 
 
 def assert_bg_roles(bgs):
@@ -331,6 +335,25 @@ def assert_bg_fresh(bgs, topic=None):
             'Pick different photos; the feed is what the viewer sees, not '
             'the single post.')
     return True
+
+
+BAND_MAX_LUMA = 70        # mean luma of the copy band after the scrim
+
+
+def copy_band_luma(bg):
+    """Mean luma where the body copy lands, measured after the scrim.
+
+    Brightness alone does not decide legibility, but past about 70 the dashes
+    and the thinner strokes start dissolving into the photo. Cheap enough to
+    run on every candidate, so the picker never offers one that will not hold
+    five lines of white text.
+    """
+    im = base_photo(bg, (0.85, 0.68, 300, 1250))
+    im = frame_for_band(im, 600, 1300)
+    adaptive_scrim(im, 600, 1300)
+    g = im.convert('L').crop((85, 980, 1000, 1310))
+    px = list(g.getdata())
+    return sum(px) / len(px)
 
 
 def preflight(topic, tools, bgs, pillar='tools'):

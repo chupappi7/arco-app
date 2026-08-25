@@ -1,10 +1,10 @@
 {
-  "date": "2026-08-25",
-  "slots": {
-    "09": "business-at-19",
-    "12": "evenings-back",
-    "18": "underpriced-apps",
-    "21": "post-daily-faceless"
-  },
-  "note": "approval-first"
+ "date": "2026-08-26",
+ "slots": {
+  "09": "before-nine",
+  "12": "ship-with",
+  "15": "posting-daily",
+  "18": "saved-hours",
+  "21": "selling-online"
+ }
 }
