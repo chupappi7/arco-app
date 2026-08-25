@@ -183,71 +183,26 @@ def _fit(text, variation, start, max_width=930, floor=40, maker=None):
 
 def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
                accent=YELLOW):
-    """lines[0] = the big subject, lines[1] = the smaller qualifier."""
+    """Quiet hook: lowercase, regular weight, one size, centred in the safe band.
+
+    This is the treatment that actually performed. Heavy compressed uppercase
+    was borrowed from talking-head references where the text has to compete
+    with a person on screen; on a photo carousel the photo IS the composition
+    and shouting over it reads as a template. `style` is accepted and ignored
+    so existing callers keep working.
+    """
     im = base_photo(bg, grad)
-    im = frame_for_band(im, 690, 1060)
-    adaptive_scrim(im, 660, 1080, target=104)
-    if style is None:
-        style = HOOK_STYLES[sum(ord(c) for c in bg) % len(HOOK_STYLES)]
-    big, small = lines[0].upper(), lines[1]
-    d = ImageDraw.Draw(im)
-
-    # The subject runs edge to edge; the qualifier is roughly 40% of its
-    # height. That ratio is what makes the hook readable at thumb speed.
-    # Compressed display type, set large: the subject fills the width, the
-    # qualifier is roughly 40% of its height.
-    if style == 'stack':
-        fb = _fit(big, 'Compressed Black', 175, max_width=940, floor=88)
-        sm = small.upper()
-        fs = display_font(max(40, int(fb.size * 0.62)), 'Condensed Bold')
-        probe = ImageDraw.Draw(Image.new('RGB', (1, 1)))
-        if probe.textlength(sm, font=fs) > 900:
-            # wrap the qualifier at the midpoint word break instead of shrinking
-            words = sm.split()
-            best, bd = 1, 1e9
-            for i in range(1, len(words)):
-                dl = abs(probe.textlength(' '.join(words[:i]), font=fs) -
-                         probe.textlength(' '.join(words[i:]), font=fs))
-                # a sentence boundary is always the right place to break
-                if words[i - 1].endswith(('.', ',', '!', '?')):
-                    dl -= 250
-                if dl < bd: best, bd = i, dl
-            l1, l2 = ' '.join(words[:best]), ' '.join(words[best:])
-            while (probe.textlength(l1, font=fs) > 900 or probe.textlength(l2, font=fs) > 900) and fs.size > 40:
-                fs = display_font(fs.size - 3, 'Condensed Bold')
-            _shadowed(im, (540, 810), big, fb, WHITE, 'ms')
-            _shadowed(im, (540, 832), l1, fs, WHITE, 'ma')
-            _shadowed(im, (540, 832 + int(fs.size * 1.28)), l2, fs, WHITE, 'ma')
-        else:
-            _shadowed(im, (540, 840), big, fb, WHITE, 'ms')
-            _shadowed(im, (540, 862), sm, fs, WHITE, 'ma')
-
-    elif style == 'highlight':
-        fb = _fit(big, 'Compressed Black', 170, max_width=940, floor=86)
-        fs = _fit(small.upper(), 'Compressed Black', int(fb.size * 0.85),
-                  max_width=940, floor=78)
-        _shadowed(im, (540, 800), big, fb, WHITE, 'ms')
-        _shadowed(im, (540, 812), small.upper(), fs, accent, 'ma')
-
-    elif style == 'boxed':
-        fb = _fit(big, 'Compressed Black', 250, max_width=940, floor=100)
-        fs = _fit(small, 'Condensed Bold', int(fb.size * 0.32), max_width=860)
-        w = d.textlength(small, font=fs)
-        _shadowed(im, (540, 828), big, fb, WHITE, 'ms')
-        pad, h = 32, int(fs.size * 1.5)
-        d.rounded_rectangle((540 - w / 2 - pad, 856, 540 + w / 2 + pad, 856 + h),
-                            radius=14, fill=accent)
-        d.text((540, 856 + h / 2), small, font=fs, fill=(10, 10, 10), anchor='mm')
-
-    else:  # serif — compressed sans subject over an elegant Didot qualifier
-        fb = _fit(big, 'Compressed Black', 180, max_width=940, floor=90)
-        fs = _fit(small, None, int(fb.size * 0.62), max_width=900,
-                  maker=lambda sz: serif_font(sz))
-        _shadowed(im, (540, 815), big, fb, WHITE, 'ms')
-        _shadowed(im, (540, 838), small, fs, WHITE, 'ma')
-
+    im = frame_for_band(im, 690, 1000)
+    adaptive_scrim(im, 690, 1000, strength_cap=0.42)
+    f = _fit(' '.join(lines), 'Bold', 64, max_width=900, floor=44,
+             maker=lambda sz: font(sz, 'Bold'))
+    # one size for both lines, generous line gap, sitting mid-frame
+    draw_text_block(im, [
+        (540, 790, lines[0], f, 'mm', WHITE),
+        (540, 790 + int(f.size * 1.42), lines[1], f, 'mm', WHITE),
+    ])
     im.save(out, quality=92)
-    print('wrote', out, f'[{style}]')
+    print('wrote', out, '[quiet]')
 
 
 def band_interest(im, y0, y1):
@@ -295,7 +250,7 @@ def band_luma(im, y0, y1):
     return sum(px) / len(px)
 
 
-def adaptive_scrim(im, y0, y1, target=96, feather=140):
+def adaptive_scrim(im, y0, y1, target=96, feather=140, strength_cap=0.55):
     """Darken the copy band only as much as this photo needs.
 
     A fixed scrim ruins already-dark photos: the band goes to pure black and
@@ -305,7 +260,7 @@ def adaptive_scrim(im, y0, y1, target=96, feather=140):
     luma = band_luma(im, y0, y1)
     if luma <= target:
         return 0.0
-    strength = min(0.55, 1 - (target / luma))
+    strength = min(strength_cap, 1 - (target / luma))
     text_scrim(im, y0, y1, strength=strength, feather=feather)
     return strength
 
