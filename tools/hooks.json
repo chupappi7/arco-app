@@ -254,8 +254,8 @@
   {
    "topic": "keep-five",
    "title": "the 5 apps i would keep if i had to delete everything else",
-   "caption": "claude code edits the project files in the terminal instead of handing you text to paste, which is the whole reason it stays. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. one notion synced block can sit in many pages and stay the same block, so nothing quietly goes out of date. github actions runs on a schedule and not only when you push, so it is my backup and my server at once. capcut auto captions stay editable text, so one fix keeps the timing, and everything i post goes through it. #productivity #apps #tools #buildinpublic",
-   "_note": "tools pillar. every slide answers the hook: first line is the specific mechanism, second is why the app survives the cull"
+   "caption": "in claude code you can define your own agents and run them at the same time, one building and one reviewing, each with its own clean context window. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. a notion database automation fires when a property changes and not on a timer, so flipping status to done stamps the date and files the page itself. github actions can run on a schedule and not only when you push, so a nightly scraper or weekly report runs on their machines. capcut can read your auto captions out loud with text to speech, so a faceless video gets a voiceover without recording anything. #productivity #apps #aitools #buildinpublic",
+   "_note": "tools pillar. both paragraphs teach; the hook picks which capability, never adds filler"
   }
  ]
 }

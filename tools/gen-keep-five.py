@@ -33,37 +33,37 @@ hook_slide(BGS[0], ['the 5 apps i would keep',
                     'if i had to delete everything else'], f'{OUT}/01.jpg')
 
 app_slide(BGS[1], 'icon-claude.jpg', '1. Claude', [
-    'Claude Code edits the project files',
-    'in the terminal, not in a chat.',
+    'You can define your own agents and',
+    'run them at the same time.',
     '',
-    'Everything else hands me text to',
-    'paste. This one does the work.',
+    'One builds, one reviews, each with',
+    'its own clean context window.',
 ], f'{OUT}/02.jpg')
 
 app_slide(BGS[2], 'icon-arco.png', '2. ARCO', next_arco_angle(), f'{OUT}/03.jpg')
 
 app_slide(BGS[3], 'icon-notion.jpg', '3. Notion', [
-    'One synced block can sit in many',
-    'pages and stay the same block.',
+    'A database automation fires when a',
+    'property changes, not on a timer.',
     '',
-    'I keep it for that alone. Nothing',
-    'quietly goes out of date.',
+    'Flip status to done and it stamps',
+    'the date and files the page itself.',
 ], f'{OUT}/04.jpg')
 
 app_slide(BGS[4], 'icon-github.jpg', '4. GitHub', [
-    'Actions runs on a schedule, not',
+    'Actions can run on a schedule, not',
     'only when you push.',
     '',
-    'It is my backup and my server at',
-    'once, so it counts as one app.',
+    'A nightly scraper or weekly report',
+    'runs on their machines, not yours.',
 ], f'{OUT}/05.jpg')
 
 app_slide(BGS[5], 'icon-capcut.png', '5. CapCut', [
-    'Auto captions stay editable text,',
-    'so one fix keeps the timing.',
+    'Auto captions can be read out loud',
+    'with text to speech in one tap.',
     '',
-    'Everything i post goes through it.',
-    'It survives any cull.',
+    'A faceless video gets a voiceover',
+    'without recording anything.',
 ], f'{OUT}/06.jpg')
 
 record_post_tools('keep-five', TOOLS)
