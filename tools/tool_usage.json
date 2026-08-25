@@ -90,12 +90,12 @@
   ]
  },
  {
-  "topic": "ship-alone",
+  "topic": "open-every-day",
   "tools": [
-   "GitHub",
+   "Obsidian",
    "ARCO",
-   "Proxyman",
-   "Fastlane",
+   "Raindrop.io",
+   "Readwise Reader",
    "Excalidraw"
   ]
  }

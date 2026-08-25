@@ -202,8 +202,8 @@ def next_arco_angle():
 TOOL_NICHE = {
     'ARCO': None, 'ARCO: Day Planner & Focus': None, 'Claude': None,
     # build: shipping software
-    'GitHub': 'build', 'Proxyman': 'build', 'Fastlane': 'build',
-    'Excalidraw': 'build', 'Supabase': 'build', 'Vercel': 'build',
+    'GitHub': 'build',
+    'Supabase': 'build', 'Vercel': 'build',
     'RevenueCat': 'build', 'Codex': 'build', 'OpenClaw': 'build',
     # study: coursework and revision
     'Anki': 'study', 'Zotero': 'study', 'Wolfram Alpha': 'study',
@@ -215,6 +215,8 @@ TOOL_NICHE = {
     'Granola': 'desk', 'Readwise Reader': 'desk', 'Soulver': 'desk',
     'Notion': 'desk', 'ClickUp': 'desk', 'Endel': 'desk',
     'Obsidian': 'desk', 'Google Calendar': 'desk',
+    'Raindrop.io': 'desk', 'Excalidraw': 'desk', 'Fastlane': 'build',
+    'Proxyman': 'build',
 }
 
 

@@ -168,12 +168,6 @@
    "_note": "listicle, batch 2026-08-23; first post on the new safe-band layout and true-res bg-nNN backgrounds"
   },
   {
-   "topic": "ship-alone",
-   "title": "5 tools that replace a whole team",
-   "caption": "no team, no office, five tools. codex writes the feature from a description, runs it and fixes what breaks before i look at the diff. github actions runs my tests and builds on every push and branch protection stops me merging anything that failed. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. revenuecat handles receipts, renewals and refunds so i never built a payment server. notion keeps the roadmap and content calendar as one database with different views. #buildinpublic #indiedev #solofounder #aitools",
-   "_note": "listicle 2026-08-23"
-  },
-  {
    "topic": "underrated-settings",
    "title": "you use 10% of the apps you pay for",
    "caption": "most people use ten percent of the tools they already pay for. claude skills save a workflow once so it runs the same way every time, and claude code edits real files in your terminal. arco blocked hours locks apps on a schedule you set once, so there is no decision left to make later. obsidian backlinks show what links to a note so connections appear without filing anything. google calendar working hours and appointment schedules stop people booking over your deep work. clickup custom views show the same tasks as a list, board or calendar without moving anything. #productivity #tools #tips #aitools",
@@ -252,10 +246,10 @@
    "_note": "creator listicle, honest first-person; batch 2026-08-25"
   },
   {
-   "topic": "ship-alone",
-   "title": "the tools i use to ship an ios app without a team",
-   "caption": "github actions runs on a cron, not just on push, so a nightly build or a weekly report runs on their machines with no server of your own. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. proxyman map local swaps a live api response for a file on your mac, so you can test every paywall error state without touching the server. fastlane snapshot drives your ui tests to shoot the app store screenshots for every device and every language from one command. excalidraw with the obsidian plugin keeps the drawing inside the note, so screen flows version in git next to the code they describe. #ios #indiedev #buildinpublic #apps",
-   "_note": "tools pillar, one niche (building and shipping an app) per the niche rule"
+   "topic": "open-every-day",
+   "title": "the apps i actually open every day, not the ones i pretend to use",
+   "caption": "obsidian dataview turns notes into a live query, so \"every unfinished task tagged uni, sorted by date\" writes itself and stays current. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. raindrop.io saves a copy of the page and not just the link, so the article still opens years later after the site has gone down. readwise reader brings every highlight back on a spaced schedule right before you would have forgotten it. excalidraw with the obsidian plugin keeps the drawing inside the note, so the diagram lives with the notes it explains. #productivity #apps #secondbrain #studytok",
+   "_note": "tools pillar, desk niche: everyday productivity, broad audience"
   }
  ]
 }
