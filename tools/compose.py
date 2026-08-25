@@ -295,6 +295,59 @@ def assert_bg_roles(bgs):
     return True
 
 
+BG_HISTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'bg_history.json')
+BG_COOLDOWN = 3           # posts a background sits out before it can return
+
+
+def bg_history():
+    try:
+        return _json.load(open(BG_HISTORY))
+    except Exception:
+        return []
+
+
+def record_post_bgs(topic, bgs):
+    h = [e for e in bg_history() if e['topic'] != topic]
+    h.append({'topic': topic, 'bgs': list(bgs)})
+    _json.dump(h, open(BG_HISTORY, 'w'), indent=1)
+
+
+def assert_bg_fresh(bgs, topic=None):
+    """Raise if a background appeared in any of the last BG_COOLDOWN posts.
+
+    assert_varied only looks inside one post, so three posts in a row can use
+    the same five photos in the same order and each one passes. Across a feed
+    that reads as one templated post repeated, which is the thing the vibe
+    rule exists to prevent.
+    """
+    recent = [e for e in bg_history() if e['topic'] != topic][-BG_COOLDOWN:]
+    seen = {b: e['topic'] for e in recent for b in e['bgs']}
+    clash = [(b, seen[b]) for b in bgs if b in seen]
+    if clash:
+        detail = '; '.join(f'{b} was in "{t}"' for b, t in clash)
+        raise SystemExit(
+            f'backgrounds reused within {BG_COOLDOWN} posts: {detail}. '
+            'Pick different photos; the feed is what the viewer sees, not '
+            'the single post.')
+    return True
+
+
+def preflight(topic, tools, bgs, pillar='tools'):
+    """Every guard, in one call, before anything renders.
+
+    assert_one_llm used to be opt-in and a generator could simply forget it,
+    which is how a post shipped with no LLM at all. Generators call this and
+    get the whole set.
+    """
+    if pillar == 'tools':
+        assert_one_llm(tools)
+        assert_fresh_tools(tools)
+    assert_varied(bgs)
+    assert_bg_fresh(bgs, topic)
+    return True
+
+
 def assert_varied(bgs):
     """Raise if two adjacent slides share a vibe.
 

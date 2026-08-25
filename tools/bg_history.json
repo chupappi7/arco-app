@@ -1,0 +1,35 @@
+[
+ {
+  "topic": "twelve-apps",
+  "bgs": [
+   "bg-h02.jpg",
+   "bg-h35.jpg",
+   "bg-h24.jpg",
+   "bg-h45.jpg",
+   "bg-h36.jpg",
+   "bg-h21.jpg"
+  ]
+ },
+ {
+  "topic": "pay-double",
+  "bgs": [
+   "bg-h03.jpg",
+   "bg-h50.jpg",
+   "bg-h24.jpg",
+   "bg-h45.jpg",
+   "bg-h35.jpg",
+   "bg-h34.jpg"
+  ]
+ },
+ {
+  "topic": "schedule-rules",
+  "bgs": [
+   "bg-h05.jpg",
+   "bg-h37.jpg",
+   "bg-h31.jpg",
+   "bg-h44.jpg",
+   "bg-h38.jpg",
+   "bg-h48.jpg"
+  ]
+ }
+]
