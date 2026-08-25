@@ -368,13 +368,21 @@ def app_slide(bg, icon, title, body_lines, out, grad=(0.85, 0.68, 300, 1250)):
     im.paste(ic, (88, 610), mask)
     tf = fit_font(title, 'Black', 84)
     items = [(85, 865, title, tf, 'la', (255, 255, 255))]
+    # Body lines are dashed like the title's "1. Claude" numbering: a leading
+    # dash on the first line of each paragraph gives the block structure and
+    # stops it reading as a wall of sentences.
     body_f = font(50, 'Semibold')
     y = 995
+    new_para = True
     for ln in body_lines:
         if ln == '':
             y += 26
+            new_para = True
             continue
-        items.append((85, y, ln, body_f, 'la', (255, 255, 255)))
+        if new_para:
+            items.append((85, y, '-', body_f, 'la', (150, 150, 150)))
+            new_para = False
+        items.append((125, y, ln, body_f, 'la', (255, 255, 255)))
         y += 72
     draw_text_block(im, items)
     im.save(out, quality=92)
