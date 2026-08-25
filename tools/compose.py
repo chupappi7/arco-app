@@ -127,6 +127,9 @@ except Exception:
 
 try:
     VIBES = _json.load(open(f'{SP}/manifest.json'))['vibes']
+    # A background the user removed from the pool must never come back, even
+    # if its file lingers. Only files actually present count.
+    VIBES = {k: v for k, v in VIBES.items() if os.path.exists(f'{SP}/{k}')}
 except Exception:
     VIBES = {}
 
