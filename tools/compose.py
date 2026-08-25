@@ -351,11 +351,15 @@ def _fit(text, variation, start, max_width=930, floor=40, maker=None):
     return maker(floor)
 
 
-# Hook typography, measured off the approved lowercase posts rather than
-# chosen: 66px glyph height, block spanning y 420-590, centred, 72px margins.
+# Hook typography. The SIZE is measured off the approved lowercase posts
+# (66px glyph height, 72px side margins); the POSITION is the vertical centre
+# of the frame, which is what the user approved and what reads best in the
+# TikTok viewer. The old reference posts happen to sit high at y 420-590, but
+# that is a legacy of an earlier template, not the target: only the size was
+# ever wrong.
 HOOK_SIZE = 74
-HOOK_BAND = (380, 640)
-HOOK_Y = 446
+HOOK_BAND = (830, 1110)
+HOOK_Y = 901              # two lines straddle the 960 centre line
 HOOK_PITCH = 104
 HOOK_MAX_W = 936          # 1080 minus the 72px side margins
 
