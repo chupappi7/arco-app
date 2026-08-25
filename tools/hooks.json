@@ -256,6 +256,12 @@
    "title": "the 5 apps i would keep if i deleted everything else",
    "caption": "in claude code you can define your own agents and run them at the same time, one building and one reviewing, each with its own clean context window. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. a notion database automation fires when a property changes and not on a timer, so flipping status to done stamps the date and files the page itself. github actions can run on a schedule and not only when you push, so a nightly scraper or weekly report runs on their machines. capcut can read your auto captions out loud with text to speech, so a faceless video gets a voiceover without recording anything. #productivity #apps #aitools #buildinpublic",
    "_note": "tools pillar. both paragraphs teach; the hook picks which capability, never adds filler"
+  },
+  {
+   "topic": "twelve-apps",
+   "title": "i pay for 12 apps, these 5 do all the work",
+   "caption": "canva magic resize rebuilds one design into every other size, so a post becomes a story and a thumbnail without redrawing it. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. in figma you make one element a component and every copy stays linked, so changing the master updates it across every page. a zapier zap can run on a schedule and not only when something triggers it, so every monday it pulls your numbers into a sheet while you sleep. elevenlabs clones a voice from about a minute of clean audio and reads anything you write in it after that. #productivity #apps #aitools #creator",
+   "_note": "tools pillar, approved hook from examples.md, paid-tools angle"
   }
  ]
 }
