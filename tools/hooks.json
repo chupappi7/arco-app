@@ -1,261 +1,261 @@
 {
-  "$comment": [
-    "Post definitions for the TikTok slide pipeline.",
-    "",
-    "  node tools/render.js <topic>    -> renders drafts/<topic>/NN.jpg",
-    "  node tools/autopost.js <topic>  -> pushes that folder to the TikTok inbox",
-    "",
-    "Slide shape:",
-    "  { \"bg\": \"file-in-tools/slides/bg\", \"text\": [\"paragraph\", \"paragraph\"], \"align\": \"top|center|low\" }",
-    "  { \"type\": \"cta\", \"bg\": \"...\" }   -> uses defaults.cta unless overridden",
-    "",
-    "Use \"align\": \"low\" when the photo is bright at the top and white copy",
-    "would not hold against it.",
-    "",
-    "Only 'btl' is transcribed here. The other 16 topics already exist as rendered",
-    "JPGs under drafts/ but their source copy was lost with the old pipeline; add",
-    "them back here as you rewrite or re-render them.",
-    "",
-    "Promo funnel (2026-08-21): CTA slides ask viewers to comment ARCO; reply to",
-    "roughly the first 50 with the ARCOEARLY redemption link (1 month Pro free,",
-    "500 redemptions, expires 2026-11-19):",
-    "https://apps.apple.com/redeem?ctx=offercodes&id=6761037446&code=ARCOEARLY"
-  ],
-  "defaults": {
-    "cta": {
-      "icon": "icon.png",
-      "appName": "ARCO: Day Planner & Focus",
-      "subtitle": "Comment “ARCO” — I’ll send you the promo code. First 50 only: first month of Pro free."
+ "$comment": [
+  "Post definitions for the TikTok slide pipeline.",
+  "",
+  "  node tools/render.js <topic>    -> renders drafts/<topic>/NN.jpg",
+  "  node tools/autopost.js <topic>  -> pushes that folder to the TikTok inbox",
+  "",
+  "Slide shape:",
+  "  { \"bg\": \"file-in-tools/slides/bg\", \"text\": [\"paragraph\", \"paragraph\"], \"align\": \"top|center|low\" }",
+  "  { \"type\": \"cta\", \"bg\": \"...\" }   -> uses defaults.cta unless overridden",
+  "",
+  "Use \"align\": \"low\" when the photo is bright at the top and white copy",
+  "would not hold against it.",
+  "",
+  "Only 'btl' is transcribed here. The other 16 topics already exist as rendered",
+  "JPGs under drafts/ but their source copy was lost with the old pipeline; add",
+  "them back here as you rewrite or re-render them.",
+  "",
+  "Promo funnel (2026-08-21): CTA slides ask viewers to comment ARCO; reply to",
+  "roughly the first 50 with the ARCOEARLY redemption link (1 month Pro free,",
+  "500 redemptions, expires 2026-11-19):",
+  "https://apps.apple.com/redeem?ctx=offercodes&id=6761037446&code=ARCOEARLY"
+ ],
+ "defaults": {
+  "cta": {
+   "icon": "icon.png",
+   "appName": "ARCO: Day Planner & Focus",
+   "subtitle": "Comment “ARCO” — I’ll send you the promo code. First 50 only: first month of Pro free."
+  }
+ },
+ "posts": [
+  {
+   "topic": "btl",
+   "title": "How to block TikTok on iPhone (for real)",
+   "caption": "screen time limits never worked for me. this does. ARCO is free on the App Store. #focus #screentime #productivity #digitaldetox",
+   "slides": [
+    {
+     "bg": "rooftop-city-dusk.jpg",
+     "text": [
+      "how to block tiktok on iphone (for real).",
+      "not screen time limits. those never work."
+     ]
+    },
+    {
+     "bg": "bedroom-phone-night.jpg",
+     "text": [
+      "apple's limits ask nicely.",
+      "one tap on 'ignore limit' and you're back in. every time."
+     ]
+    },
+    {
+     "bg": "desk-lamp-city-window.jpg",
+     "text": [
+      "1) pick your worst apps once.",
+      "tiktok, instagram, whatever eats your day."
+     ]
+    },
+    {
+     "bg": "desk-laptop-lamp.jpg",
+     "text": [
+      "2) put them behind your plan.",
+      "they only lock during the hours you set to focus."
+     ]
+    },
+    {
+     "bg": "living-room-chandelier.jpg",
+     "text": [
+      "3) there is no ignore button.",
+      "the block holds until the block ends. that is the whole point."
+     ]
+    },
+    {
+     "bg": "poolside-sunset.jpg",
+     "align": "low",
+     "text": [
+      "i built the app that does this.",
+      "it is called ARCO and it just went live."
+     ]
+    },
+    {
+     "type": "cta",
+     "bg": "supercars-driveway.jpg"
     }
+   ]
   },
-  "posts": [
-    {
-      "topic": "btl",
-      "title": "How to block TikTok on iPhone (for real)",
-      "caption": "screen time limits never worked for me. this does. ARCO is free on the App Store. #focus #screentime #productivity #digitaldetox",
-      "slides": [
-        {
-          "bg": "rooftop-city-dusk.jpg",
-          "text": [
-            "how to block tiktok on iphone (for real).",
-            "not screen time limits. those never work."
-          ]
-        },
-        {
-          "bg": "bedroom-phone-night.jpg",
-          "text": [
-            "apple's limits ask nicely.",
-            "one tap on 'ignore limit' and you're back in. every time."
-          ]
-        },
-        {
-          "bg": "desk-lamp-city-window.jpg",
-          "text": [
-            "1) pick your worst apps once.",
-            "tiktok, instagram, whatever eats your day."
-          ]
-        },
-        {
-          "bg": "desk-laptop-lamp.jpg",
-          "text": [
-            "2) put them behind your plan.",
-            "they only lock during the hours you set to focus."
-          ]
-        },
-        {
-          "bg": "living-room-chandelier.jpg",
-          "text": [
-            "3) there is no ignore button.",
-            "the block holds until the block ends. that is the whole point."
-          ]
-        },
-        {
-          "bg": "poolside-sunset.jpg",
-          "align": "low",
-          "text": [
-            "i built the app that does this.",
-            "it is called ARCO and it just went live."
-          ]
-        },
-        {
-          "type": "cta",
-          "bg": "supercars-driveway.jpg"
-        }
-      ]
-    },
-    {
-      "topic": "47-minutes",
-      "title": "my screen time is 47 minutes a day",
-      "caption": "47 minutes a day. not discipline — a system: every hour has a job, and the feed apps stay blocked until i say so. the planner and the blocker are one app. it's called ARCO, free on the App Store. #screentime #digitaldetox #productivity #focus #appblocker",
-      "_note": "slides transcribed from rendered JPGs 2026-08-20; source definitions were lost with the old pipeline, so no slides[] — re-render not possible from this entry"
-    },
-    {
-      "topic": "6h-to-2h",
-      "title": "i cut my screen time from 6 hours to 2",
-      "caption": "6 hours a day is 8 full workdays a month. i did the math once and couldn't unsee it. no willpower involved — every hour got a job, and tiktok just won't open during my blocks. 3 weeks later: 2 hours, most of it useful. the planner and blocker are one app — ARCO, free on the App Store. #screentime #digitaldetox #appblocker #productivity #focus",
-      "_note": "slides transcribed from rendered JPGs 2026-08-20; source definitions lost with old pipeline, no slides[]"
-    },
-    {
-      "topic": "5-apps",
-      "title": "5 apps i use to run my one-person app business",
-      "caption": "I build and ship iOS apps completely alone — no team, no office. These 5 make that possible. Claude writes most of my code now; Claude Code ships whole features while I review. ARCO is my operating system: every hour of the day gets a job, and TikTok stays blocked during focus blocks — planner and app blocker in one (full name on the App Store: App Blocker & Focus — ARCO). Higgsfield generates every visual I post, including this one. RevenueCat runs my subscriptions so I've never touched a payment server. And Notion holds the roadmap, the content calendar, and every 2am idea. The tools aren't the point — the hours of uninterrupted focus they buy are. #aitools #appdevelopment #buildinpublic #indiedev #founder",
-      "_note": "CheckVibe-style listicle; slides composited 2026-08-20 from existing draft bgs + 1 generated; sources in scratchpad/5apps"
-    },
-    {
-      "topic": "productivity-tools",
-      "title": "the 5 tools i actually use to stay productive",
-      "caption": "none of these are hacks, just the five tools that survived daily use. claude answers before google can. arco plans my day, runs focus sessions and blocks the feeds while i work (full name on the app store: ARCO: Day Planner & Focus). notion remembers everything so my head does not have to. google calendar makes plans real. endel plays focus sound with zero decisions. #productivity #focus #tools #screentime #studytok",
-      "_note": "app-stack listicle, productivity angle; composited 2026-08-21 from src photos (captions inpainted); ARCO slide uses full store name, no em dashes"
-    },
-    {
-      "topic": "lockin-apps",
-      "title": "5 apps i use to actually lock in",
-      "caption": "none of these are a secret. together they're the reason i finish things. claude explains whatever i'm stuck on — half my study time used to be searching, now i just ask. arco plans the day and physically blocks tiktok during focus blocks, so the plan actually happens (full name on the app store: app blocker & focus — arco). google calendar holds the schedule — if it's not in there, it doesn't exist. notion remembers everything so my head doesn't have to. endel plays focus sound with no lyrics and no decisions. plan the hours, block the noise, start. #lockin #focus #productivity #studytok #screentime",
-      "_note": "app-stack listicle per July CLAUDE.md spec (ARCO #2 among famous apps); composited 2026-08-20"
-    },
-    {
-      "topic": "plan-week",
-      "title": "the 5 tools i use to plan my week",
-      "caption": "planning only works if it survives contact with the phone. clickup holds the work, arco plans the day and runs focus sessions with the feeds locked, obsidian is for private thinking, notion is for structure, google calendar makes time real. plan on sunday, run the week on rails. #productivity #planning #focus #studytok",
-      "_note": "batch2 listicle; composited 2026-08-22, lowkey ARCO, no store CTA"
-    },
-    {
-      "topic": "ai-stack",
-      "title": "the ai tools i actually use every day",
-      "caption": "the stack i actually open every day. claude for thinking and writing, codex for code that writes and fixes itself, higgsfield for visuals from a prompt, openclaw for a self hosted assistant that texts you on whatsapp, and arco to keep the feeds locked while the tools get used for real work. #ai #aitools #productivity #tech",
-      "_note": "batch2 listicle; composited 2026-08-22"
-    },
-    {
-      "topic": "builder-tools",
-      "title": "5 tools i would use to start an online business in 2026",
-      "caption": "starting an online business in 2026 is mostly assembling the right stack. shopify for the store, github for every line of code, higgsfield for the marketing visuals, clickup to run the operation, and arco to protect the hours that build it. the tools are cheap, the focus is not. #business #onlinebusiness #entrepreneur #buildinpublic",
-      "_note": "batch2 listicle; composited 2026-08-22"
-    },
-    {
-      "topic": "stay-productive",
-      "title": "5 tools to stay productive, i saved the best for last",
-      "caption": "five tools, and the honest reason each one stays on my phone. claude code runs in my terminal, reads the whole project and edits files directly, and skills save a workflow so it repeats exactly. notion stores everything as a database so one entry shows up in several views. google calendar working hours stop people booking over my deep work. endel plays focus sound with no decisions. and the one i saved for last, arco, manages my tasks, plans the day in 30 seconds and puts every distraction away while i work. my holy grail. #productivity #tools #aitools #focus",
-      "_note": "listicle, best-for-last variant; rebuilt 2026-08-23 (was app-demo)"
-    },
-    {
-      "topic": "phone-another-room",
-      "title": "i left my phone in another room. it lasted two days.",
-      "caption": "distance was never the fix. the phone came back to the desk by tuesday, because nothing actually stopped the first tap. what worked was scheduling the block instead: 9 to 12 every weekday, the feeds simply do not open, and there is no decision to make at 9am. three weeks later the mornings are quiet. planner and app blocker in one app, arco. #screentime #focus #digitaldetox #productivity #deepwork",
-      "_note": "story post, batch 2026-08-23; carries promo CTA slide"
-    },
-    {
-      "topic": "study-tools",
-      "title": "the 5 tools that got me through exam season",
-      "caption": "exam season is a logistics problem before it is a knowledge problem. claude explains what the textbook would not. arco keeps class times and study blocks on one timeline and locks the social apps during revision. obsidian holds notes that actually link. google calendar owns every deadline. endel plays focus sound with no decisions. the studying still hurts, the chaos does not. #studytok #exams #studytips #productivity #focus",
-      "_note": "listicle, batch 2026-08-23"
-    },
-    {
-      "topic": "one-app-day",
-      "title": "a full day, planned and protected by one app",
-      "caption": "the night before takes a minute: habits picked, tasks typed, times set. the day then runs on one timeline instead of six lists. distracting apps lock on their own schedule, so the plan survives contact with the phone. projects and priorities catch whatever is left. the app is arco, on the app store. #productivity #dayplanner #screentime #focus #adhd",
-      "_note": "app demo from redesign screenshots, batch 2026-08-23"
-    },
-    {
-      "topic": "deep-work-stack",
-      "title": "the stack that finally made deep work stick",
-      "caption": "deep work failed for years because every session depended on willpower at the wrong moment. endel removes the sound decision. obsidian holds the thinking. arco runs the timer, the day plan and the app blocking together, so the session starts and the exits close. claude gets me unstuck in minutes. clickup catches the output. five tools, one habit that finally holds. #deepwork #focus #productivity #tools",
-      "_note": "listicle, batch 2026-08-23"
-    },
-    {
-      "topic": "4x-productivity",
-      "title": "the tools i used to 4x my productivity",
-      "caption": "five tools i use every day and what each one actually does. claude code runs in my terminal, reads the whole project and edits the files directly, and skills let me save a workflow and reuse it. codex writes the code from a description, runs it and fixes what breaks while i review the changes. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. github backs up every project with its full history and actions runs my tests and builds on every push. notion stores everything as a database so one entry shows up in several views and i filter by project, date or status. #productivity #aitools #claudecode #tools #buildinpublic",
-      "_note": "listicle, batch 2026-08-23; first post on the new safe-band layout and true-res bg-nNN backgrounds"
-    },
-    {
-      "topic": "ship-alone",
-      "title": "5 tools that replace a whole team",
-      "caption": "no team, no office, five tools. codex writes the feature from a description, runs it and fixes what breaks before i look at the diff. github actions runs my tests and builds on every push and branch protection stops me merging anything that failed. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. revenuecat handles receipts, renewals and refunds so i never built a payment server. notion keeps the roadmap and content calendar as one database with different views. #buildinpublic #indiedev #solofounder #aitools",
-      "_note": "listicle 2026-08-23"
-    },
-    {
-      "topic": "underrated-settings",
-      "title": "you use 10% of the apps you pay for",
-      "caption": "most people use ten percent of the tools they already pay for. claude skills save a workflow once so it runs the same way every time, and claude code edits real files in your terminal. arco blocked hours locks apps on a schedule you set once, so there is no decision left to make later. obsidian backlinks show what links to a note so connections appear without filing anything. google calendar working hours and appointment schedules stop people booking over your deep work. clickup custom views show the same tasks as a list, board or calendar without moving anything. #productivity #tools #tips #aitools",
-      "_note": "listicle 2026-08-23, teaching-first"
-    },
-    {
-      "topic": "inside-the-app",
-      "title": "my entire day runs on one app",
-      "caption": "the night before takes a minute. habits, tasks and events land on one timeline. the distracting apps lock on their own schedule so the plan survives contact with the phone. at the end of the week the insights show where the hours actually went. it is one app, arco: day planner & focus. #productivity #dayplanner #screentime #focus",
-      "_note": "app demo 2026-08-23"
-    },
-    {
-      "topic": "study-block",
-      "title": "4 hours of study without touching my phone",
-      "caption": "not willpower, a schedule. arco keeps study blocks in the plan and locks the social apps while they run, so at 6pm there is nothing to decide. claude explains the part of the textbook that lost me and gives worked examples. obsidian keeps one note per concept, linked, so revision is faster every week. endel plays focus sound with no lyrics and no playlist to pick. google calendar holds every deadline so nothing surprises me on a sunday night. #studytok #studytips #exams #focus",
-      "_note": "listicle 2026-08-23, students"
-    },
-    {
-      "topic": "tools-nobody-posts",
-      "title": "5 tools too good to gatekeep",
-      "caption": "the two nobody posts about: raycast replaces the mac search bar with clipboard history, window snapping and calculators two keystrokes away, and it is free. superwhisper turns speech into clean text in any app, so notes and emails happen at speaking speed. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. readwise reader brings every highlight back on a schedule right before you would forget it. endel generates focus sound live with no playlist to pick. #productivity #tools #mac #apps",
-      "_note": "niche-mix listicle 2026-08-23: Raycast + Superwhisper + Readwise as the insider picks; neutral voice on niche tools"
-    },
-    {
-      "topic": "4x-productivity-2",
-      "title": "the tools i used to 4x my productivity",
-      "caption": "part two, five different tools. obsidian links every note to the others so the graph organises itself. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. granola listens to a meeting and the notes write themselves. cleanshot x captures scrolling pages and lets you copy text straight out of the image. endel generates focus sound live with no playlist to pick. #productivity #tools #aitools #mac #focus",
-      "_note": "sequel to the performing 4x-productivity: same hook + bg, fresh roster with Granola/CleanShot as niche picks; built 2026-08-24"
-    },
-    {
-      "topic": "90-days-lost",
-      "title": "4 hours a day is 60 full days a year",
-      "caption": "i did the math once and could not unsee it. 4 hours of scrolling a day is 28 hours a week, 60 waking days a year. grayscale and app limits never held because every fix asked me to decide again at the worst moment. now the feeds lock on a schedule, 9 to 12 and 7 to 10 on weekdays, and the block does not ask how i feel. three weeks in my screen time is under 90 minutes. the app is arco, planner and app blocker in one. #screentime #digitaldetox #focus #productivity",
-      "_note": "story, numbers-led; batch 2026-08-24"
-    },
-    {
-      "topic": "study-secrets",
-      "title": "the study apps toppers do not share",
-      "caption": "anki schedules each card the day before you would forget it, medical students run on it. arco keeps my tasks, plans the day in 30 seconds and locks every distraction while i study, my holy grail. zotero saves a paper with its citation in one browser click and writes the bibliography for you. wolfram alpha shows the steps, not just the answer. endel plays focus sound with no playlist to pick. #studytok #studytips #exams #university",
-      "_note": "student listicle; Anki/Zotero/Wolfram niche picks; batch 2026-08-24"
-    },
-    {
-      "topic": "launch-weekend",
-      "title": "launch an app in one weekend",
-      "caption": "the stack that makes a weekend launch real. claude code runs in the terminal, reads the whole project and edits files directly. arco keeps the weekend on rails, tasks, plan and app blocking in one place, my holy grail. supabase gives you a real database with auth in an afternoon and the free tier covers an mvp. vercel puts the site live seconds after you push. revenuecat handles subscriptions without a payment server. #buildinpublic #indiedev #appdevelopment #coding",
-      "_note": "builder listicle; Supabase/Vercel niche picks; batch 2026-08-24"
-    },
-    {
-      "topic": "type-less",
-      "title": "i barely type anymore, these 5 tools do it for me",
-      "caption": "superwhisper turns speech into clean text in any app at speaking speed. arco plans my day in 30 seconds instead of a journaling session, tasks and app blocking included, my holy grail. granola listens to meetings and the notes write themselves. claude turns a dictated rough idea into a finished draft, editing beats writing from zero. cleanshot x copies text straight out of any screenshot. #productivity #aitools #tools #mac",
-      "_note": "voice/capture listicle; Superwhisper/Granola/CleanShot niche picks; batch 2026-08-24"
-    },
-    {
-      "topic": "business-at-19",
-      "title": "the tools i run my business with at 19",
-      "caption": "no office, no team, and the whole thing runs on five tools. claude code lives in my terminal, reads the project and edits the files, most of my code ships that way. arco is my own app and my whole operating system, tasks, day plan and app blocking in one, my holy grail. revenuecat runs subscriptions without a payment server. higgsfield generates every visual i post from a prompt. notion holds the roadmap and content calendar as one database. #buildinpublic #youngentrepreneur #indiedev #tools",
-      "_note": "backlog hook, first-person stack only; batch 2026-08-25"
-    },
-    {
-      "topic": "evenings-back",
-      "title": "my screen time after 7pm is zero minutes",
-      "caption": "my evenings used to vanish, dinner then a quick scroll then midnight. willpower lost the argument every night at 9pm. now the evening locks itself, 7 to 10 every day the feed apps do not open, and i never argue with an app that cannot hear me. a month in, two books finished, gym three nights a week, asleep before midnight. the app is arco, planner and app blocker in one. #screentime #digitaldetox #eveningroutine #focus",
-      "_note": "story with cta_slide close; batch 2026-08-25"
-    },
-    {
-      "topic": "underpriced-apps",
-      "title": "5 apps that should cost 10x more",
-      "caption": "raycast replaces the mac search bar with clipboard history, window snapping and calculators, and costs nothing. arco manages my tasks, plans the day in 30 seconds and locks every distraction, my holy grail. anki schedules each card the day before you would forget it. wolfram alpha shows the steps, not just the answer. cleanshot x captures scrolling pages and copies text out of screenshots. #apps #productivity #tools #mac",
-      "_note": "value listicle; batch 2026-08-25"
-    },
-    {
-      "topic": "post-daily-faceless",
-      "title": "i post every day without filming anything",
-      "caption": "no camera, no face, a post every day. claude drafts the hooks and captions with me. arco keeps a daily focus block where the content happens with the feeds locked, posting daily is a schedule not a mood. higgsfield generates every background from a prompt. capcut adds word level auto captions. canva applies the brand kit to every template automatically. #contentcreator #faceless #aitools #creator",
-      "_note": "creator listicle, honest first-person; batch 2026-08-25"
-    },
-    {
-      "topic": "keep-five",
-      "title": "the 5 apps i would keep if i had to delete everything else",
-      "caption": "obsidian dataview turns notes into a live query, so \"every unfinished task tagged uni, sorted by date\" writes itself and stays current. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. soulver calculates as you type and lets you name a value in plain english then reference it by line number, so changing one number updates the whole estimate. github actions runs on a cron, so a scheduled scraper or weekly report runs on their machines with no server. readwise reader brings every highlight back on a spaced schedule right before you would have forgotten it. #productivity #apps #tools #mac",
-      "_note": "tools pillar, first post under full ruleset: quiet hook, dashed body, ARCO #2 rotated copy, fresh tools, varied vibes"
-    }
-  ]
+  {
+   "topic": "47-minutes",
+   "title": "my screen time is 47 minutes a day",
+   "caption": "47 minutes a day. not discipline — a system: every hour has a job, and the feed apps stay blocked until i say so. the planner and the blocker are one app. it's called ARCO, free on the App Store. #screentime #digitaldetox #productivity #focus #appblocker",
+   "_note": "slides transcribed from rendered JPGs 2026-08-20; source definitions were lost with the old pipeline, so no slides[] — re-render not possible from this entry"
+  },
+  {
+   "topic": "6h-to-2h",
+   "title": "i cut my screen time from 6 hours to 2",
+   "caption": "6 hours a day is 8 full workdays a month. i did the math once and couldn't unsee it. no willpower involved — every hour got a job, and tiktok just won't open during my blocks. 3 weeks later: 2 hours, most of it useful. the planner and blocker are one app — ARCO, free on the App Store. #screentime #digitaldetox #appblocker #productivity #focus",
+   "_note": "slides transcribed from rendered JPGs 2026-08-20; source definitions lost with old pipeline, no slides[]"
+  },
+  {
+   "topic": "5-apps",
+   "title": "5 apps i use to run my one-person app business",
+   "caption": "I build and ship iOS apps completely alone — no team, no office. These 5 make that possible. Claude writes most of my code now; Claude Code ships whole features while I review. ARCO is my operating system: every hour of the day gets a job, and TikTok stays blocked during focus blocks — planner and app blocker in one (full name on the App Store: App Blocker & Focus — ARCO). Higgsfield generates every visual I post, including this one. RevenueCat runs my subscriptions so I've never touched a payment server. And Notion holds the roadmap, the content calendar, and every 2am idea. The tools aren't the point — the hours of uninterrupted focus they buy are. #aitools #appdevelopment #buildinpublic #indiedev #founder",
+   "_note": "CheckVibe-style listicle; slides composited 2026-08-20 from existing draft bgs + 1 generated; sources in scratchpad/5apps"
+  },
+  {
+   "topic": "productivity-tools",
+   "title": "the 5 tools i actually use to stay productive",
+   "caption": "none of these are hacks, just the five tools that survived daily use. claude answers before google can. arco plans my day, runs focus sessions and blocks the feeds while i work (full name on the app store: ARCO: Day Planner & Focus). notion remembers everything so my head does not have to. google calendar makes plans real. endel plays focus sound with zero decisions. #productivity #focus #tools #screentime #studytok",
+   "_note": "app-stack listicle, productivity angle; composited 2026-08-21 from src photos (captions inpainted); ARCO slide uses full store name, no em dashes"
+  },
+  {
+   "topic": "lockin-apps",
+   "title": "5 apps i use to actually lock in",
+   "caption": "none of these are a secret. together they're the reason i finish things. claude explains whatever i'm stuck on — half my study time used to be searching, now i just ask. arco plans the day and physically blocks tiktok during focus blocks, so the plan actually happens (full name on the app store: app blocker & focus — arco). google calendar holds the schedule — if it's not in there, it doesn't exist. notion remembers everything so my head doesn't have to. endel plays focus sound with no lyrics and no decisions. plan the hours, block the noise, start. #lockin #focus #productivity #studytok #screentime",
+   "_note": "app-stack listicle per July CLAUDE.md spec (ARCO #2 among famous apps); composited 2026-08-20"
+  },
+  {
+   "topic": "plan-week",
+   "title": "the 5 tools i use to plan my week",
+   "caption": "planning only works if it survives contact with the phone. clickup holds the work, arco plans the day and runs focus sessions with the feeds locked, obsidian is for private thinking, notion is for structure, google calendar makes time real. plan on sunday, run the week on rails. #productivity #planning #focus #studytok",
+   "_note": "batch2 listicle; composited 2026-08-22, lowkey ARCO, no store CTA"
+  },
+  {
+   "topic": "ai-stack",
+   "title": "the ai tools i actually use every day",
+   "caption": "the stack i actually open every day. claude for thinking and writing, codex for code that writes and fixes itself, higgsfield for visuals from a prompt, openclaw for a self hosted assistant that texts you on whatsapp, and arco to keep the feeds locked while the tools get used for real work. #ai #aitools #productivity #tech",
+   "_note": "batch2 listicle; composited 2026-08-22"
+  },
+  {
+   "topic": "builder-tools",
+   "title": "5 tools i would use to start an online business in 2026",
+   "caption": "starting an online business in 2026 is mostly assembling the right stack. shopify for the store, github for every line of code, higgsfield for the marketing visuals, clickup to run the operation, and arco to protect the hours that build it. the tools are cheap, the focus is not. #business #onlinebusiness #entrepreneur #buildinpublic",
+   "_note": "batch2 listicle; composited 2026-08-22"
+  },
+  {
+   "topic": "stay-productive",
+   "title": "5 tools to stay productive, i saved the best for last",
+   "caption": "five tools, and the honest reason each one stays on my phone. claude code runs in my terminal, reads the whole project and edits files directly, and skills save a workflow so it repeats exactly. notion stores everything as a database so one entry shows up in several views. google calendar working hours stop people booking over my deep work. endel plays focus sound with no decisions. and the one i saved for last, arco, manages my tasks, plans the day in 30 seconds and puts every distraction away while i work. my holy grail. #productivity #tools #aitools #focus",
+   "_note": "listicle, best-for-last variant; rebuilt 2026-08-23 (was app-demo)"
+  },
+  {
+   "topic": "phone-another-room",
+   "title": "i left my phone in another room. it lasted two days.",
+   "caption": "distance was never the fix. the phone came back to the desk by tuesday, because nothing actually stopped the first tap. what worked was scheduling the block instead: 9 to 12 every weekday, the feeds simply do not open, and there is no decision to make at 9am. three weeks later the mornings are quiet. planner and app blocker in one app, arco. #screentime #focus #digitaldetox #productivity #deepwork",
+   "_note": "story post, batch 2026-08-23; carries promo CTA slide"
+  },
+  {
+   "topic": "study-tools",
+   "title": "the 5 tools that got me through exam season",
+   "caption": "exam season is a logistics problem before it is a knowledge problem. claude explains what the textbook would not. arco keeps class times and study blocks on one timeline and locks the social apps during revision. obsidian holds notes that actually link. google calendar owns every deadline. endel plays focus sound with no decisions. the studying still hurts, the chaos does not. #studytok #exams #studytips #productivity #focus",
+   "_note": "listicle, batch 2026-08-23"
+  },
+  {
+   "topic": "one-app-day",
+   "title": "a full day, planned and protected by one app",
+   "caption": "the night before takes a minute: habits picked, tasks typed, times set. the day then runs on one timeline instead of six lists. distracting apps lock on their own schedule, so the plan survives contact with the phone. projects and priorities catch whatever is left. the app is arco, on the app store. #productivity #dayplanner #screentime #focus #adhd",
+   "_note": "app demo from redesign screenshots, batch 2026-08-23"
+  },
+  {
+   "topic": "deep-work-stack",
+   "title": "the stack that finally made deep work stick",
+   "caption": "deep work failed for years because every session depended on willpower at the wrong moment. endel removes the sound decision. obsidian holds the thinking. arco runs the timer, the day plan and the app blocking together, so the session starts and the exits close. claude gets me unstuck in minutes. clickup catches the output. five tools, one habit that finally holds. #deepwork #focus #productivity #tools",
+   "_note": "listicle, batch 2026-08-23"
+  },
+  {
+   "topic": "4x-productivity",
+   "title": "the tools i used to 4x my productivity",
+   "caption": "five tools i use every day and what each one actually does. claude code runs in my terminal, reads the whole project and edits the files directly, and skills let me save a workflow and reuse it. codex writes the code from a description, runs it and fixes what breaks while i review the changes. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. github backs up every project with its full history and actions runs my tests and builds on every push. notion stores everything as a database so one entry shows up in several views and i filter by project, date or status. #productivity #aitools #claudecode #tools #buildinpublic",
+   "_note": "listicle, batch 2026-08-23; first post on the new safe-band layout and true-res bg-nNN backgrounds"
+  },
+  {
+   "topic": "ship-alone",
+   "title": "5 tools that replace a whole team",
+   "caption": "no team, no office, five tools. codex writes the feature from a description, runs it and fixes what breaks before i look at the diff. github actions runs my tests and builds on every push and branch protection stops me merging anything that failed. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. revenuecat handles receipts, renewals and refunds so i never built a payment server. notion keeps the roadmap and content calendar as one database with different views. #buildinpublic #indiedev #solofounder #aitools",
+   "_note": "listicle 2026-08-23"
+  },
+  {
+   "topic": "underrated-settings",
+   "title": "you use 10% of the apps you pay for",
+   "caption": "most people use ten percent of the tools they already pay for. claude skills save a workflow once so it runs the same way every time, and claude code edits real files in your terminal. arco blocked hours locks apps on a schedule you set once, so there is no decision left to make later. obsidian backlinks show what links to a note so connections appear without filing anything. google calendar working hours and appointment schedules stop people booking over your deep work. clickup custom views show the same tasks as a list, board or calendar without moving anything. #productivity #tools #tips #aitools",
+   "_note": "listicle 2026-08-23, teaching-first"
+  },
+  {
+   "topic": "inside-the-app",
+   "title": "my entire day runs on one app",
+   "caption": "the night before takes a minute. habits, tasks and events land on one timeline. the distracting apps lock on their own schedule so the plan survives contact with the phone. at the end of the week the insights show where the hours actually went. it is one app, arco: day planner & focus. #productivity #dayplanner #screentime #focus",
+   "_note": "app demo 2026-08-23"
+  },
+  {
+   "topic": "study-block",
+   "title": "4 hours of study without touching my phone",
+   "caption": "not willpower, a schedule. arco keeps study blocks in the plan and locks the social apps while they run, so at 6pm there is nothing to decide. claude explains the part of the textbook that lost me and gives worked examples. obsidian keeps one note per concept, linked, so revision is faster every week. endel plays focus sound with no lyrics and no playlist to pick. google calendar holds every deadline so nothing surprises me on a sunday night. #studytok #studytips #exams #focus",
+   "_note": "listicle 2026-08-23, students"
+  },
+  {
+   "topic": "tools-nobody-posts",
+   "title": "5 tools too good to gatekeep",
+   "caption": "the two nobody posts about: raycast replaces the mac search bar with clipboard history, window snapping and calculators two keystrokes away, and it is free. superwhisper turns speech into clean text in any app, so notes and emails happen at speaking speed. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. readwise reader brings every highlight back on a schedule right before you would forget it. endel generates focus sound live with no playlist to pick. #productivity #tools #mac #apps",
+   "_note": "niche-mix listicle 2026-08-23: Raycast + Superwhisper + Readwise as the insider picks; neutral voice on niche tools"
+  },
+  {
+   "topic": "4x-productivity-2",
+   "title": "the tools i used to 4x my productivity",
+   "caption": "part two, five different tools. obsidian links every note to the others so the graph organises itself. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. granola listens to a meeting and the notes write themselves. cleanshot x captures scrolling pages and lets you copy text straight out of the image. endel generates focus sound live with no playlist to pick. #productivity #tools #aitools #mac #focus",
+   "_note": "sequel to the performing 4x-productivity: same hook + bg, fresh roster with Granola/CleanShot as niche picks; built 2026-08-24"
+  },
+  {
+   "topic": "90-days-lost",
+   "title": "4 hours a day is 60 full days a year",
+   "caption": "i did the math once and could not unsee it. 4 hours of scrolling a day is 28 hours a week, 60 waking days a year. grayscale and app limits never held because every fix asked me to decide again at the worst moment. now the feeds lock on a schedule, 9 to 12 and 7 to 10 on weekdays, and the block does not ask how i feel. three weeks in my screen time is under 90 minutes. the app is arco, planner and app blocker in one. #screentime #digitaldetox #focus #productivity",
+   "_note": "story, numbers-led; batch 2026-08-24"
+  },
+  {
+   "topic": "study-secrets",
+   "title": "the study apps toppers do not share",
+   "caption": "anki schedules each card the day before you would forget it, medical students run on it. arco keeps my tasks, plans the day in 30 seconds and locks every distraction while i study, my holy grail. zotero saves a paper with its citation in one browser click and writes the bibliography for you. wolfram alpha shows the steps, not just the answer. endel plays focus sound with no playlist to pick. #studytok #studytips #exams #university",
+   "_note": "student listicle; Anki/Zotero/Wolfram niche picks; batch 2026-08-24"
+  },
+  {
+   "topic": "launch-weekend",
+   "title": "launch an app in one weekend",
+   "caption": "the stack that makes a weekend launch real. claude code runs in the terminal, reads the whole project and edits files directly. arco keeps the weekend on rails, tasks, plan and app blocking in one place, my holy grail. supabase gives you a real database with auth in an afternoon and the free tier covers an mvp. vercel puts the site live seconds after you push. revenuecat handles subscriptions without a payment server. #buildinpublic #indiedev #appdevelopment #coding",
+   "_note": "builder listicle; Supabase/Vercel niche picks; batch 2026-08-24"
+  },
+  {
+   "topic": "type-less",
+   "title": "i barely type anymore, these 5 tools do it for me",
+   "caption": "superwhisper turns speech into clean text in any app at speaking speed. arco plans my day in 30 seconds instead of a journaling session, tasks and app blocking included, my holy grail. granola listens to meetings and the notes write themselves. claude turns a dictated rough idea into a finished draft, editing beats writing from zero. cleanshot x copies text straight out of any screenshot. #productivity #aitools #tools #mac",
+   "_note": "voice/capture listicle; Superwhisper/Granola/CleanShot niche picks; batch 2026-08-24"
+  },
+  {
+   "topic": "business-at-19",
+   "title": "the tools i run my business with at 19",
+   "caption": "no office, no team, and the whole thing runs on five tools. claude code lives in my terminal, reads the project and edits the files, most of my code ships that way. arco is my own app and my whole operating system, tasks, day plan and app blocking in one, my holy grail. revenuecat runs subscriptions without a payment server. higgsfield generates every visual i post from a prompt. notion holds the roadmap and content calendar as one database. #buildinpublic #youngentrepreneur #indiedev #tools",
+   "_note": "backlog hook, first-person stack only; batch 2026-08-25"
+  },
+  {
+   "topic": "evenings-back",
+   "title": "my screen time after 7pm is zero minutes",
+   "caption": "my evenings used to vanish, dinner then a quick scroll then midnight. willpower lost the argument every night at 9pm. now the evening locks itself, 7 to 10 every day the feed apps do not open, and i never argue with an app that cannot hear me. a month in, two books finished, gym three nights a week, asleep before midnight. the app is arco, planner and app blocker in one. #screentime #digitaldetox #eveningroutine #focus",
+   "_note": "story with cta_slide close; batch 2026-08-25"
+  },
+  {
+   "topic": "underpriced-apps",
+   "title": "5 apps that should cost 10x more",
+   "caption": "raycast replaces the mac search bar with clipboard history, window snapping and calculators, and costs nothing. arco manages my tasks, plans the day in 30 seconds and locks every distraction, my holy grail. anki schedules each card the day before you would forget it. wolfram alpha shows the steps, not just the answer. cleanshot x captures scrolling pages and copies text out of screenshots. #apps #productivity #tools #mac",
+   "_note": "value listicle; batch 2026-08-25"
+  },
+  {
+   "topic": "post-daily-faceless",
+   "title": "i post every day without filming anything",
+   "caption": "no camera, no face, a post every day. claude drafts the hooks and captions with me. arco keeps a daily focus block where the content happens with the feeds locked, posting daily is a schedule not a mood. higgsfield generates every background from a prompt. capcut adds word level auto captions. canva applies the brand kit to every template automatically. #contentcreator #faceless #aitools #creator",
+   "_note": "creator listicle, honest first-person; batch 2026-08-25"
+  },
+  {
+   "topic": "keep-five",
+   "title": "the 5 apps i would keep if i had to delete everything else",
+   "caption": "obsidian dataview turns notes into a live query, so \"every unfinished task tagged uni, sorted by date\" writes itself and stays current. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. excalidraw with the obsidian plugin keeps the drawing inside the note as a file, so diagrams version in git next to the text they explain. github actions runs on a cron, so a scheduled scraper or weekly report runs on their machines with no server. readwise reader brings every highlight back on a spaced schedule right before you would have forgotten it. #productivity #apps #tools #mac",
+   "_note": "tools pillar, rebuilt after the Higgsfield resync: soulver dropped per user, excalidraw at #3, all app slides on dark backgrounds"
+  }
+ ]
 }
