@@ -168,6 +168,12 @@
    "_note": "listicle, batch 2026-08-23; first post on the new safe-band layout and true-res bg-nNN backgrounds"
   },
   {
+   "topic": "ship-alone",
+   "title": "5 tools that replace a whole team",
+   "caption": "no team, no office, five tools. codex writes the feature from a description, runs it and fixes what breaks before i look at the diff. github actions runs my tests and builds on every push and branch protection stops me merging anything that failed. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. revenuecat handles receipts, renewals and refunds so i never built a payment server. notion keeps the roadmap and content calendar as one database with different views. #buildinpublic #indiedev #solofounder #aitools",
+   "_note": "listicle 2026-08-23"
+  },
+  {
    "topic": "underrated-settings",
    "title": "you use 10% of the apps you pay for",
    "caption": "most people use ten percent of the tools they already pay for. claude skills save a workflow once so it runs the same way every time, and claude code edits real files in your terminal. arco blocked hours locks apps on a schedule you set once, so there is no decision left to make later. obsidian backlinks show what links to a note so connections appear without filing anything. google calendar working hours and appointment schedules stop people booking over your deep work. clickup custom views show the same tasks as a list, board or calendar without moving anything. #productivity #tools #tips #aitools",
@@ -246,10 +252,10 @@
    "_note": "creator listicle, honest first-person; batch 2026-08-25"
   },
   {
-   "topic": "open-every-day",
-   "title": "the apps i actually open every day, not the ones i pretend to use",
-   "caption": "shortcuts automations can fire on arrival and not just at a time, so you walk into the library and the phone goes silent on its own. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. wispr flow types into any app and strips the ums while you talk, so a long message takes about a quarter of the time. google sheets importhtml pulls a table straight off a web page and updates itself when the page changes. apple notes search reads the words inside your photos and scanned pages, so a whiteboard you shot in march is findable by what it said. #productivity #apps #iphonetips #studytok",
-   "_note": "tools pillar, desk niche, big apps only: ARCO is the only discovery in the post"
+   "topic": "keep-five",
+   "title": "the 5 apps i would keep if i had to delete everything else",
+   "caption": "obsidian dataview turns notes into a live query, so \"every unfinished task tagged uni, sorted by date\" writes itself and stays current. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. excalidraw with the obsidian plugin keeps the drawing inside the note as a file, so diagrams version in git next to the text they explain. github actions runs on a cron, so a scheduled scraper or weekly report runs on their machines with no server. readwise reader brings every highlight back on a spaced schedule right before you would have forgotten it. #productivity #apps #tools #mac",
+   "_note": "tools pillar, rebuilt after the Higgsfield resync: soulver dropped per user, excalidraw at #3, all app slides on dark backgrounds"
   }
  ]
 }

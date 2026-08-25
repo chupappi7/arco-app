@@ -90,13 +90,13 @@
   ]
  },
  {
-  "topic": "open-every-day",
+  "topic": "keep-five",
   "tools": [
-   "Apple Shortcuts",
+   "Obsidian",
    "ARCO",
-   "Wispr Flow",
-   "Google Sheets",
-   "Apple Notes"
+   "Excalidraw",
+   "GitHub",
+   "Readwise Reader"
   ]
  }
 ]
