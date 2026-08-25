@@ -358,8 +358,8 @@ def _fit(text, variation, start, max_width=930, floor=40, maker=None):
 # that is a legacy of an earlier template, not the target: only the size was
 # ever wrong.
 HOOK_SIZE = 74
-HOOK_BAND = (830, 1110)
-HOOK_Y = 901              # two lines straddle the 960 centre line
+HOOK_BAND = (700, 1000)
+HOOK_Y = 790              # block centres on y 849, matching the published post
 HOOK_PITCH = 104
 HOOK_MAX_W = 936          # 1080 minus the 72px side margins
 
