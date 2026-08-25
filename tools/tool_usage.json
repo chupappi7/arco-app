@@ -118,5 +118,11 @@
    "Airtable",
    "Framer"
   ]
+ },
+ {
+  "topic": "schedule-not-personality",
+  "tools": [
+   "ARCO"
+  ]
  }
 ]

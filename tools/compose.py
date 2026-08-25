@@ -567,6 +567,51 @@ def app_slide(bg, icon, title, body_lines, out, grad=(0.85, 0.68, 300, 1250)):
     im.save(out, quality=92)
     print('wrote', out)
 
+def rule_slide(bg, number, title, body_lines, out, grad=(0.85, 0.68, 300, 1250)):
+    """A tool slide with a numbered badge where the app icon would be.
+
+    Method-led pillars (discipline, screentime) have no app to show, and
+    earlier posts in those pillars dropped the icon, the numbered title AND
+    the dashes, which left a wall of sentences that read nothing like the
+    tools posts. This keeps the exact tools layout: same badge box, same
+    title position, same dashed body, so a viewer moving between pillars
+    sees one format.
+    """
+    im = base_photo(bg, grad)
+    im = frame_for_band(im, 600, 1300)
+    adaptive_scrim(im, 600, 1300)
+
+    # Badge in the icon slot: rounded square, big number, matching 210px box.
+    badge = Image.new('RGBA', (210, 210), (0, 0, 0, 0))
+    ImageDraw.Draw(badge).rounded_rectangle((0, 0, 209, 209), radius=48,
+                                            fill=(255, 255, 255, 235))
+    bd = ImageDraw.Draw(badge)
+    nf = display_font(150, 'Compressed Black')
+    # anchor 'mm' already centres the glyph box; do not offset by the bbox too
+    bd.text((105, 105), str(number), font=nf, fill=(18, 18, 20), anchor='mm')
+    im.paste(badge, (88, 610), badge)
+
+    assert_teaches(title, body_lines)
+    tf = fit_font(title, 'Black', 84)
+    items = [(85, 865, title, tf, 'la', (255, 255, 255))]
+    body_f = font(50, 'Semibold')
+    y = 995
+    new_para = True
+    for ln in body_lines:
+        if ln == '':
+            y += 26
+            new_para = True
+            continue
+        if new_para:
+            items.append((85, y, '-', body_f, 'la', (150, 150, 150)))
+            new_para = False
+        items.append((125, y, ln, body_f, 'la', (255, 255, 255)))
+        y += 72
+    draw_text_block(im, items)
+    im.save(out, quality=92)
+    print('wrote', out, '[rule]')
+
+
 def shot_slide(src, crop_top, lines, out, dark_text=False):
     shot = Image.open(src).convert('RGB')
     w, h = shot.size
