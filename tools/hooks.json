@@ -254,8 +254,8 @@
   {
    "topic": "keep-five",
    "title": "the 5 apps i would keep if i had to delete everything else",
-   "caption": "obsidian dataview turns notes into a live query, so \"every unfinished task tagged uni, sorted by date\" writes itself and stays current. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. excalidraw with the obsidian plugin keeps the drawing inside the note as a file, so diagrams version in git next to the text they explain. github actions runs on a cron, so a scheduled scraper or weekly report runs on their machines with no server. readwise reader brings every highlight back on a spaced schedule right before you would have forgotten it. #productivity #apps #tools #mac",
-   "_note": "tools pillar, rebuilt after the Higgsfield resync: soulver dropped per user, excalidraw at #3, all app slides on dark backgrounds"
+   "caption": "a claude.md in the project root is read at the start of every session, so it stops relearning your setup and your rules on every new chat. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. a notion synced block is one block shown in many pages, edit it once and every page that uses it changes with it. github actions runs on a cron and not just on push, so a nightly job or weekly report runs on their machines with no server. capcut auto captions stay editable as text after they are generated, fix the one word it misheard and the timing holds. #productivity #apps #tools #buildinpublic",
+   "_note": "tools pillar, mainstream roster, one LLM; duplicates across posts allowed"
   }
  ]
 }

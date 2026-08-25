@@ -146,7 +146,11 @@ def assert_one_person(bgs):
 
 HOOK_LOG = f'{SP}/hook_usage.json'
 TOOL_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tool_usage.json')
-TOOL_COOLDOWN = 6          # posts a tool must sit out before it can return
+# Off. Reusing a tool is fine: the audience is not reading every post, and a
+# stack that changes completely each time reads as made up. What actually
+# annoyed people was the same five names in the same order, which the format
+# rotation and fresh teaching points handle. Set above 0 to switch it back on.
+TOOL_COOLDOWN = 0          # posts a tool must sit out before it can return
 
 
 def tool_history():
@@ -158,6 +162,8 @@ def tool_history():
 
 def tools_on_cooldown():
     """Tools used in the last TOOL_COOLDOWN posts — do not use these."""
+    if TOOL_COOLDOWN <= 0:
+        return set()
     recent = tool_history()[-TOOL_COOLDOWN:]
     return {t for post in recent for t in post['tools']}
 
@@ -193,6 +199,25 @@ def next_arco_angle():
     d['used'].append(pick['id'])
     _json.dump(d, open(ARCO_ANGLES, 'w'), indent=1)
     return pick['lines']
+
+
+# One LLM per post. Two of them is the same slide twice: the viewer cannot
+# tell the models apart from a one line description, and it burns a slot that
+# could teach something else. Which one varies by post.
+LLMS = {
+    'Claude', 'Codex', 'ChatGPT', 'Gemini', 'Perplexity', 'Manus',
+    'Antigravity', 'Cursor', 'Copilot', 'Grok', 'DeepSeek', 'v0', 'Lovable',
+}
+
+
+def assert_one_llm(tools):
+    """Raise if a post names more than one LLM or AI coding agent."""
+    used = [t for t in tools if t in LLMS]
+    if len(used) > 1:
+        raise SystemExit(
+            f'{len(used)} LLMs in one post: {", ".join(used)}. '
+            'Pick one; the second is the same slide twice.')
+    return True
 
 
 def assert_fresh_tools(tools, allow=()):

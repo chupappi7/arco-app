@@ -92,11 +92,11 @@
  {
   "topic": "keep-five",
   "tools": [
-   "Obsidian",
+   "Claude",
    "ARCO",
-   "Excalidraw",
+   "Notion",
    "GitHub",
-   "Readwise Reader"
+   "CapCut"
   ]
  }
 ]
