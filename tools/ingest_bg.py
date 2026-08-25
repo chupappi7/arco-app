@@ -4,6 +4,11 @@
   python3 tools/ingest_bg.py <url-or-path> [...]
   python3 tools/ingest_bg.py --ledger            # show what has been ingested
 
+Backfill note: the daily job reads only the 24 most recent generations, so a
+first run against an old account leaves earlier material untouched. Page back
+through show_generations with `cursor` and feed the older 9:16 rawUrls in the
+same way; the ledger makes repeat passes free.
+
 Crops to 9:16, downscales to 1080x1920 (never upscales), skips anything whose
 real resolution is too low or whose copy band cannot hold white text, and skips
 images already in the pool (content hash of the processed result).
