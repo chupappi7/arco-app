@@ -250,6 +250,12 @@
       "title": "i post every day without filming anything",
       "caption": "no camera, no face, a post every day. claude drafts the hooks and captions with me. arco keeps a daily focus block where the content happens with the feeds locked, posting daily is a schedule not a mood. higgsfield generates every background from a prompt. capcut adds word level auto captions. canva applies the brand kit to every template automatically. #contentcreator #faceless #aitools #creator",
       "_note": "creator listicle, honest first-person; batch 2026-08-25"
+    },
+    {
+      "topic": "keep-five",
+      "title": "the 5 apps i would keep if i had to delete everything else",
+      "caption": "obsidian dataview turns notes into a live query, so \"every unfinished task tagged uni, sorted by date\" writes itself and stays current. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. soulver calculates as you type and lets you name a value in plain english then reference it by line number, so changing one number updates the whole estimate. github actions runs on a cron, so a scheduled scraper or weekly report runs on their machines with no server. readwise reader brings every highlight back on a spaced schedule right before you would have forgotten it. #productivity #apps #tools #mac",
+      "_note": "tools pillar, first post under full ruleset: quiet hook, dashed body, ARCO #2 rotated copy, fresh tools, varied vibes"
     }
   ]
 }

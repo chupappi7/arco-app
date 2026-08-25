@@ -334,7 +334,7 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
     """
     im = base_photo(bg, grad)
     im = frame_for_band(im, 690, 1000)
-    adaptive_scrim(im, 690, 1000, strength_cap=0.42)
+    adaptive_scrim(im, 690, 1000, target=88, strength_cap=0.62)
     f = _fit(' '.join(lines), 'Bold', 64, max_width=900, floor=44,
              maker=lambda sz: font(sz, 'Bold'))
     # one size for both lines, generous line gap, sitting mid-frame

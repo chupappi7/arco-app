@@ -1,103 +1,127 @@
 {
  "angles": [
   {
-   "id": "blocked-hours",
+   "id": "v1",
    "lines": [
-    "Blocked Hours locks the apps on a",
-    "schedule I set once.",
+    "I manage all my tasks here and plan",
+    "the day in 30 seconds.",
     "",
-    "At 9am there is no decision left",
-    "to make."
+    "Focus mode puts every distraction",
+    "away.",
+    "",
+    "My holy grail."
    ]
   },
   {
-   "id": "strict-focus",
+   "id": "v2",
    "lines": [
-    "Focus sessions have a strict mode",
-    "that cannot be ended early.",
+    "Every task I have is in here and the",
+    "day gets planned in 30 seconds.",
     "",
-    "The session decides, not my mood",
-    "at minute twelve."
+    "Focus mode puts every distraction",
+    "away while I work.",
+    "",
+    "My holy grail."
    ]
   },
   {
-   "id": "plan-30s",
+   "id": "v3",
    "lines": [
-    "The whole day gets planned in 30",
-    "seconds the night before.",
+    "I manage all my tasks here and the",
+    "day takes 30 seconds to plan.",
     "",
-    "Habits, tasks and events land on",
-    "one timeline."
+    "Focus mode puts every distraction",
+    "away, and Blocked Hours does it on",
+    "a schedule."
    ]
   },
   {
-   "id": "break-budget",
+   "id": "v4",
    "lines": [
-    "Breaks come out of a budget, not",
-    "out of nowhere.",
+    "All my tasks live here and I plan the",
+    "whole day in 30 seconds.",
     "",
-    "85 minutes for the day, and the",
-    "app keeps count."
+    "Focus mode puts every distraction",
+    "away.",
+    "",
+    "My holy grail."
    ]
   },
   {
-   "id": "projects",
+   "id": "v5",
    "lines": [
-    "Tasks sit in projects with priority",
-    "flags, and urgent ones show a count",
-    "on the project itself.",
+    "I keep every task in here and plan",
+    "tomorrow in 30 seconds.",
     "",
-    "Nothing loose, nothing forgotten."
+    "Focus mode puts every distraction",
+    "away the moment it starts.",
+    "",
+    "The one I would not delete."
    ]
   },
   {
-   "id": "live-activity",
+   "id": "v6",
    "lines": [
-    "The countdown runs on the lock",
-    "screen and in the Dynamic Island.",
+    "I manage all my tasks here and plan",
+    "the day in 30 seconds.",
     "",
-    "I can end a break without opening",
-    "the app."
+    "Focus mode puts every distraction",
+    "away, Blocked Hours keeps them",
+    "away on its own."
    ]
   },
   {
-   "id": "habit-streak",
+   "id": "v7",
    "lines": [
-    "A habit locks in at 66 days, the",
-    "number the research actually uses.",
+    "Every task, every habit, planned in",
+    "30 seconds.",
     "",
-    "The streak is the whole point."
+    "Focus mode puts every distraction",
+    "away.",
+    "",
+    "My holy grail."
    ]
   },
   {
-   "id": "insights",
+   "id": "v8",
    "lines": [
-    "Weekly recaps show where the hours",
-    "went, focus time against habit time.",
+    "I manage all my tasks here and the",
+    "day is planned in half a minute.",
     "",
-    "It is uncomfortable and useful."
+    "Focus mode puts every distraction",
+    "away until I am done.",
+    "",
+    "My holy grail."
    ]
   },
   {
-   "id": "timeline-band",
+   "id": "v9",
    "lines": [
-    "Blocked windows show as bands on",
-    "the day timeline.",
+    "All of my tasks sit here and planning",
+    "the day takes 30 seconds.",
     "",
-    "I can see the locked hours before",
-    "I plan anything into them."
+    "Focus mode puts every distraction",
+    "away, and Blocked Hours repeats it",
+    "every weekday.",
+    "",
+    "My holy grail."
    ]
   },
   {
-   "id": "no-ignore",
+   "id": "v10",
    "lines": [
-    "Apple's limits have an ignore",
-    "button. This does not.",
+    "I manage all my tasks here and plan",
+    "the day in 30 seconds.",
     "",
-    "The block holds until the block",
-    "ends."
+    "Focus mode puts every distraction",
+    "away.",
+    "",
+    "The one I actually open every day."
    ]
   }
  ],
- "used": []
+ "used": [
+  "v1"
+ ],
+ "rule": "Variations of the approved line. Closer on 7 of 10 angles; 'My holy grail.' is 5 of those 7 (~75%), the rest use same-register alternates: 'The one I would not delete.' / 'The one I actually open every day.' Blocked Hours on alternating angles."
 }
