@@ -5,6 +5,7 @@ WHITE = (255, 255, 255)
 Backgrounds in tools/slides/bg (BANDS maps caption zones needing inpainting;
 bg-dNN.jpg files are clean). Icons in tools/slides/icons."""
 import os
+import re
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 SF = '/System/Library/Fonts/SFNS.ttf'
@@ -448,7 +449,36 @@ def text_scrim(im, y0, y1, strength=0.62, feather=120):
             bp[0, y] = int(255 * strength * (1 - (y - y1) / feather))
     im.paste(Image.new('RGB', im.size, (0, 0, 0)), (0, 0), band.resize(im.size))
 
+# Both lines of an app slide teach. The second paragraph extends the first
+# with the concrete consequence; it is never a verdict about the app. A
+# verdict spends a slide the viewer gave you and hands back nothing they can
+# act on, and it is the easiest thing to write, so it needs a guard.
+# ARCO is exempt: its closing line is deliberate brand copy.
+FILLER = [
+    r'\bdoes the work\b', r'\bkeep it for that\b', r'\bsurvives?\b',
+    r'\bnothing else (comes|does|touches|compares)', r'\bgame ?changer\b',
+    r'\bchanged my life\b', r'\bbest app\b', r'\bworth every\b',
+    r'\bcannot live without\b', r"\bcan't live without\b",
+    r'\bi use it every day\b', r'\bgoes hard\b', r'\bunderrated\b',
+]
+
+
+def assert_teaches(title, body_lines, allow=False):
+    """Raise if an app slide's copy is a verdict instead of a teaching point."""
+    if allow or any(a.split(':')[0].lower() in title.lower() for a in ALWAYS_ALLOWED):
+        return True
+    text = ' '.join(body_lines).lower()
+    hits = [p for p in FILLER if re.search(p, text)]
+    if hits:
+        raise SystemExit(
+            f'{title}: copy reads as a verdict, not a teaching point '
+            f'({", ".join(h.strip(chr(92) + "b") for h in hits)}). '
+            'Say what the feature does and what it lets the viewer go and do.')
+    return True
+
+
 def app_slide(bg, icon, title, body_lines, out, grad=(0.85, 0.68, 300, 1250)):
+    assert_teaches(title, body_lines)
     im = base_photo(bg, grad)
     im = frame_for_band(im, 600, 1300)
     adaptive_scrim(im, 600, 1300)
