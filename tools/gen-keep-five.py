@@ -30,7 +30,7 @@ assert_fresh_tools(TOOLS)
 assert_varied(BGS)
 
 hook_slide(BGS[0], ['the 5 apps i would keep',
-                    'if i had to delete everything else'], f'{OUT}/01.jpg')
+                    'if i deleted everything else'], f'{OUT}/01.jpg')
 
 app_slide(BGS[1], 'icon-claude.jpg', '1. Claude', [
     'You can define your own agents and',

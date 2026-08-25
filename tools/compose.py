@@ -351,32 +351,44 @@ def _fit(text, variation, start, max_width=930, floor=40, maker=None):
     return maker(floor)
 
 
+# Hook typography, measured off the approved lowercase posts rather than
+# chosen: 66px glyph height, block spanning y 420-590, centred, 72px margins.
+HOOK_SIZE = 74
+HOOK_BAND = (380, 640)
+HOOK_Y = 446
+HOOK_PITCH = 104
+HOOK_MAX_W = 936          # 1080 minus the 72px side margins
+
+
 def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
                accent=YELLOW):
-    """Quiet hook: lowercase, regular weight, one size, centred in the safe band.
+    """Quiet hook: lowercase, one fixed size, positioned like the reference.
 
-    This is the treatment that actually performed. Heavy compressed uppercase
-    was borrowed from talking-head references where the text has to compete
-    with a person on screen; on a photo carousel the photo IS the composition
-    and shouting over it reads as a template. `style` is accepted and ignored
-    so existing callers keep working.
+    The size is FIXED at HOOK_SIZE and the block sits at HOOK_BAND, measured
+    off the posts that actually performed (ai-stack, 5-apps, study-tools and
+    friends all render a 66px glyph height in a block spanning y 420-590).
+    Nothing auto-shrinks: a hook that does not fit at this size is too long,
+    and the fix is shorter copy, not smaller type. The old fitter measured
+    ' '.join(lines) -- a string that never appears on the slide -- so long
+    hooks silently collapsed to the 44px floor and shipped undersized.
+
+    `style` is accepted and ignored so existing callers keep working.
     """
     im = base_photo(bg, grad)
-    im = frame_for_band(im, 690, 1000)
-    adaptive_scrim(im, 690, 1000, target=88, strength_cap=0.62)
-    # Fit the WIDEST RENDERED LINE, not the two lines joined. Joining them
-    # measures a string that never appears on the slide, so a two line hook
-    # shrank to the floor and came out visibly smaller than the reference.
-    # 84 is the ceiling: above it a two line block clears the top of the
-    # 690-1000 scrim band and the first line loses its backing.
-    widest = max(lines, key=lambda l: ImageDraw.Draw(Image.new('RGB', (1, 1)))
-                 .textlength(l, font=font(64, 'Bold')))
-    f = _fit(widest, 'Bold', 84, max_width=930, floor=44,
-             maker=lambda sz: font(sz, 'Bold'))
-    # one size for both lines, generous line gap, sitting mid-frame
+    im = frame_for_band(im, HOOK_BAND[0], HOOK_BAND[1])
+    adaptive_scrim(im, HOOK_BAND[0], HOOK_BAND[1], target=88, strength_cap=0.62)
+    f = font(HOOK_SIZE, 'Bold')
+    probe = ImageDraw.Draw(Image.new('RGB', (1, 1)))
+    too_wide = [(l, int(probe.textlength(l, font=f))) for l in lines
+                if probe.textlength(l, font=f) > HOOK_MAX_W]
+    if too_wide:
+        detail = '; '.join(f'"{l}" is {w}px' for l, w in too_wide)
+        raise SystemExit(
+            f'hook line over {HOOK_MAX_W}px at the reference size: {detail}. '
+            'Shorten the line; the type does not shrink.')
     draw_text_block(im, [
-        (540, 790, lines[0], f, 'mm', WHITE),
-        (540, 790 + int(f.size * 1.42), lines[1], f, 'mm', WHITE),
+        (540, HOOK_Y, lines[0], f, 'mm', WHITE),
+        (540, HOOK_Y + HOOK_PITCH, lines[1], f, 'mm', WHITE),
     ])
     im.save(out, quality=92)
     print('wrote', out, '[quiet]')

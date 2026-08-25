@@ -253,7 +253,7 @@
   },
   {
    "topic": "keep-five",
-   "title": "the 5 apps i would keep if i had to delete everything else",
+   "title": "the 5 apps i would keep if i deleted everything else",
    "caption": "in claude code you can define your own agents and run them at the same time, one building and one reviewing, each with its own clean context window. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. a notion database automation fires when a property changes and not on a timer, so flipping status to done stamps the date and files the page itself. github actions can run on a schedule and not only when you push, so a nightly scraper or weekly report runs on their machines. capcut can read your auto captions out loud with text to speech, so a faceless video gets a voiceover without recording anything. #productivity #apps #aitools #buildinpublic",
    "_note": "tools pillar. both paragraphs teach; the hook picks which capability, never adds filler"
   }
