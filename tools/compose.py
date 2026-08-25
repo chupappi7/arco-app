@@ -141,6 +141,45 @@ def assert_one_person(bgs):
     return True
 
 
+HOOK_LOG = f'{SP}/hook_usage.json'
+
+
+def pick_hook_bg(prefer=None):
+    """Return a background not yet used on a hook slide.
+
+    The hook is the slide that decides the scroll, so it must never look
+    familiar. Usage is tracked in bg/hook_usage.json; every background is
+    used once before any repeats, and when the pool is exhausted the log
+    resets and the least-recently-used comes back first.
+    """
+    import os
+    pool = sorted(b for b in VIBES if os.path.exists(f'{SP}/{b}'))
+    try:
+        used = _json.load(open(HOOK_LOG))
+    except Exception:
+        used = []
+    unused = [b for b in pool if b not in used]
+    if not unused:                      # full cycle done: start over
+        used, unused = [], pool
+    if prefer and prefer in unused:
+        choice = prefer
+    else:
+        choice = unused[0]
+    used.append(choice)
+    _json.dump(used, open(HOOK_LOG, 'w'), indent=1)
+    return choice
+
+
+def hook_bg_status():
+    import os
+    pool = sorted(b for b in VIBES if os.path.exists(f'{SP}/{b}'))
+    try:
+        used = _json.load(open(HOOK_LOG))
+    except Exception:
+        used = []
+    return len(used), len(pool)
+
+
 def assert_varied(bgs):
     """Raise if two adjacent slides share a vibe.
 
