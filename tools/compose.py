@@ -202,9 +202,10 @@ def next_arco_angle():
     return pick['lines']
 
 
-# One LLM per post. Two of them is the same slide twice: the viewer cannot
-# tell the models apart from a one line description, and it burns a slot that
-# could teach something else. Which one varies by post.
+# Exactly one LLM per post, never zero and never two. Zero reads as a post
+# that missed the thing everyone is actually curious about; two is the same
+# slide twice, because nobody can tell two models apart from a one line
+# description. Which model appears rotates between posts.
 LLMS = {
     'Claude', 'Codex', 'ChatGPT', 'Gemini', 'Perplexity', 'Manus',
     'Antigravity', 'Cursor', 'Copilot', 'Grok', 'DeepSeek', 'v0', 'Lovable',
@@ -212,12 +213,16 @@ LLMS = {
 
 
 def assert_one_llm(tools):
-    """Raise if a post names more than one LLM or AI coding agent."""
+    """Raise unless a post names exactly one LLM or AI coding agent."""
     used = [t for t in tools if t in LLMS]
     if len(used) > 1:
         raise SystemExit(
             f'{len(used)} LLMs in one post: {", ".join(used)}. '
             'Pick one; the second is the same slide twice.')
+    if not used:
+        raise SystemExit(
+            'no LLM in this post. Every post carries exactly one; rotate '
+            f'which: {", ".join(sorted(LLMS))}.')
     return True
 
 
@@ -269,6 +274,27 @@ def hook_bg_status():
     return len(used), len(pool)
 
 
+# Night desk setups with monitors are HOOK ONLY. They are the strongest
+# images in the pool and they read as "someone's actual setup", which is
+# exactly the note the first slide needs. Behind five lines of body copy the
+# monitors and LED strips fight the text instead, and a carousel of them looks
+# like one long slide. Use them at index 0 and nowhere else.
+HOOK_ONLY_VIBES = {'desk-led-neon', 'desk-led-warm', 'desk-person-night',
+                   'desk-lamp-night'}
+
+
+def assert_bg_roles(bgs):
+    """Raise if a hook-only background is used on anything but the hook."""
+    bad = [(i, b, VIBES.get(b)) for i, b in enumerate(bgs)
+           if i > 0 and VIBES.get(b) in HOOK_ONLY_VIBES]
+    if bad:
+        detail = '; '.join(f'slide {i+1} uses {b} ({v})' for i, b, v in bad)
+        raise SystemExit(
+            f'night desk setups are hook only: {detail}. '
+            'Move it to slide 1 or pick a different scene.')
+    return True
+
+
 def assert_varied(bgs):
     """Raise if two adjacent slides share a vibe.
 
@@ -277,6 +303,7 @@ def assert_varied(bgs):
     in bg/manifest.json.
     """
     assert_one_person(bgs)
+    assert_bg_roles(bgs)
     for a, b in zip(bgs, bgs[1:]):
         va, vb = VIBES.get(a), VIBES.get(b)
         if va and va == vb:
