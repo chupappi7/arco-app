@@ -1,0 +1,24 @@
+{
+ "_note": "Approved tool pool. Fill during calibration. Reuse across posts is fine; max one LLM per post; your app is always slide 2.",
+ "llm": [
+  "Claude",
+  "Codex",
+  "ChatGPT",
+  "Gemini",
+  "Perplexity",
+  "Manus",
+  "Antigravity",
+  "Cursor"
+ ],
+ "building": [],
+ "automation": [],
+ "content": [],
+ "selling": [],
+ "productivity": [],
+ "mine": [
+  "YOURAPP"
+ ],
+ "icons": {
+  "YOURAPP": "icon-yourapp.png"
+ }
+}
