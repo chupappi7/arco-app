@@ -254,8 +254,8 @@
   {
    "topic": "keep-five",
    "title": "the 5 apps i would keep if i had to delete everything else",
-   "caption": "a claude.md in the project root is read at the start of every session, so it stops relearning your setup and your rules on every new chat. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. a notion synced block is one block shown in many pages, edit it once and every page that uses it changes with it. github actions runs on a cron and not just on push, so a nightly job or weekly report runs on their machines with no server. capcut auto captions stay editable as text after they are generated, fix the one word it misheard and the timing holds. #productivity #apps #tools #buildinpublic",
-   "_note": "tools pillar, mainstream roster, one LLM; duplicates across posts allowed"
+   "caption": "claude code edits the project files in the terminal instead of handing you text to paste, which is the whole reason it stays. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. one notion synced block can sit in many pages and stay the same block, so nothing quietly goes out of date. github actions runs on a schedule and not only when you push, so it is my backup and my server at once. capcut auto captions stay editable text, so one fix keeps the timing, and everything i post goes through it. #productivity #apps #tools #buildinpublic",
+   "_note": "tools pillar. every slide answers the hook: first line is the specific mechanism, second is why the app survives the cull"
   }
  ]
 }
