@@ -364,7 +364,14 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
     im = base_photo(bg, grad)
     im = frame_for_band(im, 690, 1000)
     adaptive_scrim(im, 690, 1000, target=88, strength_cap=0.62)
-    f = _fit(' '.join(lines), 'Bold', 64, max_width=900, floor=44,
+    # Fit the WIDEST RENDERED LINE, not the two lines joined. Joining them
+    # measures a string that never appears on the slide, so a two line hook
+    # shrank to the floor and came out visibly smaller than the reference.
+    # 84 is the ceiling: above it a two line block clears the top of the
+    # 690-1000 scrim band and the first line loses its backing.
+    widest = max(lines, key=lambda l: ImageDraw.Draw(Image.new('RGB', (1, 1)))
+                 .textlength(l, font=font(64, 'Bold')))
+    f = _fit(widest, 'Bold', 84, max_width=930, floor=44,
              maker=lambda sz: font(sz, 'Bold'))
     # one size for both lines, generous line gap, sitting mid-frame
     draw_text_block(im, [
