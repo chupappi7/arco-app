@@ -90,13 +90,13 @@
   ]
  },
  {
-  "topic": "keep-five",
+  "topic": "ship-alone",
   "tools": [
-   "Obsidian",
-   "ARCO",
-   "Excalidraw",
    "GitHub",
-   "Readwise Reader"
+   "ARCO",
+   "Proxyman",
+   "Fastlane",
+   "Excalidraw"
   ]
  }
 ]

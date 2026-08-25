@@ -195,6 +195,44 @@ def next_arco_angle():
     return pick['lines']
 
 
+# A post is a set of tools for one job, not a shelf of good apps. Mixing a
+# reading app into an app-building post makes the list read as filler: the
+# viewer came to learn one thing and cannot tell what the post is about.
+# ARCO and Claude are cross-niche and never constrain the set.
+TOOL_NICHE = {
+    'ARCO': None, 'ARCO: Day Planner & Focus': None, 'Claude': None,
+    # build: shipping software
+    'GitHub': 'build', 'Proxyman': 'build', 'Fastlane': 'build',
+    'Excalidraw': 'build', 'Supabase': 'build', 'Vercel': 'build',
+    'RevenueCat': 'build', 'Codex': 'build', 'OpenClaw': 'build',
+    # study: coursework and revision
+    'Anki': 'study', 'Zotero': 'study', 'Wolfram Alpha': 'study',
+    # content: making video and graphics
+    'Higgsfield': 'content', 'CapCut': 'content', 'Canva': 'content',
+    'Shopify': 'content',
+    # desk: everyday computer workflow
+    'Raycast': 'desk', 'Superwhisper': 'desk', 'CleanShot X': 'desk',
+    'Granola': 'desk', 'Readwise Reader': 'desk', 'Soulver': 'desk',
+    'Notion': 'desk', 'ClickUp': 'desk', 'Endel': 'desk',
+    'Obsidian': 'desk', 'Google Calendar': 'desk',
+}
+
+
+def assert_same_niche(tools):
+    """Raise if a post mixes tools from different niches."""
+    unknown = [t for t in tools if t not in TOOL_NICHE]
+    if unknown:
+        raise SystemExit(
+            f'unclassified tools: {", ".join(unknown)}. '
+            'Add them to compose.TOOL_NICHE so the niche rule can hold.')
+    found = {TOOL_NICHE[t] for t in tools if TOOL_NICHE[t]}
+    if len(found) > 1:
+        raise SystemExit(
+            f'post mixes niches {sorted(found)}: pick one job and staff it. '
+            'ARCO and Claude are the only cross-niche entries.')
+    return True
+
+
 def assert_fresh_tools(tools, allow=()):
     """Raise if a post reuses a non-ARCO tool that is still on cooldown."""
     hot = tools_on_cooldown() - set(allow) - ALWAYS_ALLOWED

@@ -252,10 +252,10 @@
    "_note": "creator listicle, honest first-person; batch 2026-08-25"
   },
   {
-   "topic": "keep-five",
-   "title": "the 5 apps i would keep if i had to delete everything else",
-   "caption": "obsidian dataview turns notes into a live query, so \"every unfinished task tagged uni, sorted by date\" writes itself and stays current. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. excalidraw with the obsidian plugin keeps the drawing inside the note as a file, so diagrams version in git next to the text they explain. github actions runs on a cron, so a scheduled scraper or weekly report runs on their machines with no server. readwise reader brings every highlight back on a spaced schedule right before you would have forgotten it. #productivity #apps #tools #mac",
-   "_note": "tools pillar, rebuilt after the Higgsfield resync: soulver dropped per user, excalidraw at #3, all app slides on dark backgrounds"
+   "topic": "ship-alone",
+   "title": "the tools i use to ship an ios app without a team",
+   "caption": "github actions runs on a cron, not just on push, so a nightly build or a weekly report runs on their machines with no server of your own. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. proxyman map local swaps a live api response for a file on your mac, so you can test every paywall error state without touching the server. fastlane snapshot drives your ui tests to shoot the app store screenshots for every device and every language from one command. excalidraw with the obsidian plugin keeps the drawing inside the note, so screen flows version in git next to the code they describe. #ios #indiedev #buildinpublic #apps",
+   "_note": "tools pillar, one niche (building and shipping an app) per the niche rule"
   }
  ]
 }
