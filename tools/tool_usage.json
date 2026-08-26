@@ -292,5 +292,15 @@
    "Gumroad",
    "beehiiv"
   ]
+ },
+ {
+  "topic": "ten-x",
+  "tools": [
+   "Claude",
+   "ARCO",
+   "Raycast",
+   "Notion",
+   "Zapier"
+  ]
  }
 ]

@@ -304,6 +304,12 @@
    "title": "5 tools to sell something online",
    "caption": "a gemini gem is a saved version with its own instructions and files, so you build the assistant once and open it like an app. i keep every task in arco and plan tomorrow in 30 seconds, and focus mode puts every distraction away the moment it starts. a stripe payment link sells a product with no website at all. gumroad handles the vat and delivers the file after purchase. beehiiv has the referral program built in, so readers bring readers without you wiring anything up. #buildinpublic #ecommerce #tools #sidehustle",
    "_note": "daily batch, tools pillar, one LLM, guards via compose.preflight"
+  },
+  {
+   "topic": "ten-x",
+   "title": "how i 10x'd my productivity",
+   "caption": "point claude code at a folder and it does the boring pass for you, renaming, sorting and rewriting files to a rule you describe once. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away while blocked hours keeps them away on its own. a raycast quicklink turns a site's search url into a keyword you type, so two letters and a query land you inside the site instead of its homepage. a notion template button builds the page with its checklist already inside, so recurring work starts filled in. a zapier filter step stops the zap unless the condition is actually true, so one zap handles the exceptions instead of firing on everything. #productivity #aitools #apps #automation",
+   "_note": "tools pillar, roster set by the user: Claude for repetitive work, ARCO planning and focus"
   }
  ]
 }
