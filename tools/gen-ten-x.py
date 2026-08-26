@@ -10,7 +10,10 @@ TOPIC = 'ten-x'
 OUT = f'/Users/thinh/SIXSIX/arco-app/drafts/{TOPIC}'
 os.makedirs(OUT, exist_ok=True)
 
-TOOLS = ['Claude', 'ARCO', 'Raycast', 'Notion', 'Zapier']
+# ARCO leads this one: the hook is a productivity claim and the app is the
+# thing making the claim true, so it earns slide 1 rather than the credibility
+# slot behind a famous name.
+TOOLS = ['ARCO', 'Claude', 'Raycast', 'Notion', 'Zapier']
 
 def pick_bgs(topic, n=5):
     recent = [e for e in c.bg_history() if e['topic'] != topic][-c.BG_COOLDOWN:]
@@ -37,20 +40,20 @@ def pick_bgs(topic, n=5):
         out.append(b); last = c.VIBES[b]
     return [hook] + out
 
-BGS = pick_bgs(TOPIC)
+BGS = ['bg-h21.jpg','bg-h20.jpg','bg-h36.jpg','bg-h49.jpg','bg-h39.jpg','bg-n06.jpg']
 preflight(TOPIC, TOOLS, BGS)
 
 hook_slide(BGS[0], ['how i 10x’d', 'my productivity'], f'{OUT}/01.jpg')
 
-app_slide(BGS[1], 'icon-claude.jpg', '1. Claude', [
+app_slide(BGS[1], 'icon-arco.png', '1. ARCO', next_arco_angle(), f'{OUT}/02.jpg')
+
+app_slide(BGS[2], 'icon-claude.jpg', '2. Claude', [
     'Point Claude Code at a folder and',
     'it does the boring pass for you.',
     '',
     'Renaming, sorting and rewriting',
     'files to a rule you describe once.',
-], f'{OUT}/02.jpg')
-
-app_slide(BGS[2], 'icon-arco.png', '2. ARCO', next_arco_angle(), f'{OUT}/03.jpg')
+], f'{OUT}/03.jpg')
 
 app_slide(BGS[3], 'icon-raycast.png', '3. Raycast', [
     'A Quicklink turns a site’s search',
