@@ -312,5 +312,25 @@
    "Notion",
    "Zapier"
   ]
+ },
+ {
+  "topic": "killed-busywork",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "Figma",
+   "Loom",
+   "Airtable"
+  ]
+ },
+ {
+  "topic": "found-sooner",
+  "tools": [
+   "ARCO",
+   "Cursor",
+   "CleanShot X",
+   "Stripe",
+   "PostHog"
+  ]
  }
 ]

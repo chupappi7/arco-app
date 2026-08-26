@@ -97,5 +97,27 @@
    "bg-h39.jpg",
    "bg-n06.jpg"
   ]
+ },
+ {
+  "topic": "killed-busywork",
+  "bgs": [
+   "bg-h22.jpg",
+   "bg-h24.jpg",
+   "bg-h34.jpg",
+   "bg-h35.jpg",
+   "bg-h45.jpg",
+   "bg-h50.jpg"
+  ]
+ },
+ {
+  "topic": "found-sooner",
+  "bgs": [
+   "bg-h28.jpg",
+   "bg-h31.jpg",
+   "bg-h37.jpg",
+   "bg-h48.jpg",
+   "bg-n03.jpg",
+   "bg-n05.jpg"
+  ]
  }
 ]
