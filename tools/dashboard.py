@@ -23,6 +23,10 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DRAFTS = os.path.join(REPO, 'drafts')
 HOOKS = os.path.join(REPO, 'tools', 'hooks.json')
 LOG = os.path.join(REPO, 'tools', 'delivery_log.json')
+FEEDBACK = os.path.join(REPO, 'tools', 'post_feedback.json')
+REPLICATE = os.path.join(REPO, 'tools', 'replicate_queue.json')
+TOOL_USAGE = os.path.join(REPO, 'tools', 'tool_usage.json')
+TOOL_POOL = os.path.join(REPO, 'tools', 'tool_pool.json')
 PORT = 4500
 
 ACCOUNTS = [
@@ -73,9 +77,48 @@ def pending_counts():
     return counts
 
 
+def roster_for(topic):
+    d = load(TOOL_USAGE, [])
+    entries = d if isinstance(d, list) else d.get('posts', [])
+    for e in entries:
+        if e.get('topic') == topic:
+            return e.get('tools', [])
+    return []
+
+
+def sibling_roster(tools):
+    """Same shape, different names: keep ARCO where it is, keep one LLM, and
+    draw the rest from the same audience tags as the originals, excluding what
+    the source post already used. The concept survives, the roster does not
+    repeat."""
+    pool = load(TOOL_POOL, {})
+    tags = pool.get('audience', {})
+    groups = {k: v for k, v in pool.items() if isinstance(v, list)}
+    used = set(tools)
+    out = []
+    for t in tools:
+        if t == 'ARCO':
+            out.append(t)
+            continue
+        want = tags.get(t)
+        cands = [c for g in groups.values() for c in g
+                 if tags.get(c) == want and c not in used and c != 'ARCO']
+        if want == 'any':                      # the LLM slot
+            cands = [c for c in pool.get('llm', []) if c not in used]
+        out.append(cands[0] if cands else t)
+        used.add(out[-1])
+    return out
+
+
+def replicate_queue():
+    return load(REPLICATE, [])
+
+
 def list_posts():
     idx, _ = hooks_index()
     log = delivery_log()
+    fb = load(FEEDBACK, {})
+    queued = {q['from'] for q in replicate_queue() if not q.get('done')}
     out = []
     for topic in sorted(os.listdir(DRAFTS)):
         d = os.path.join(DRAFTS, topic)
@@ -94,6 +137,9 @@ def list_posts():
             'slides': slides,
             'mtime': os.path.getmtime(os.path.join(d, slides[0])),
             'delivery': log.get(topic, {}),
+            'liked': bool(fb.get(topic, {}).get('liked')),
+            'queued': topic in queued,
+            'roster': roster_for(topic),
         })
     out.sort(key=lambda p: p['mtime'], reverse=True)
     return out
@@ -172,6 +218,34 @@ class Handler(http.server.BaseHTTPRequestHandler):
             keys = body.get('accounts') or [a['key'] for a in ACCOUNTS]
             return self._send(200, {'results': run_draft(topic, keys),
                                     'pending': pending_counts()})
+        if path == '/api/like':
+            with _lock:
+                fb = load(FEEDBACK, {})
+                fb.setdefault(body['topic'], {})['liked'] = bool(body['liked'])
+                fb[body['topic']]['at'] = time.time()
+                with open(FEEDBACK, 'w') as fh:
+                    json.dump(fb, fh, indent=1)
+            return self._send(200, {'ok': True})
+        if path == '/api/replicate':
+            topic = body['topic']
+            idx, _ = hooks_index()
+            src = idx.get(topic, {})
+            tools = roster_for(topic)
+            with _lock:
+                q = replicate_queue()
+                if any(x['from'] == topic and not x.get('done') for x in q):
+                    return self._send(200, {'ok': True, 'already': True})
+                q.append({
+                    'from': topic,
+                    'title': src.get('title', ''),
+                    'source_roster': tools,
+                    'suggested_roster': sibling_roster(tools),
+                    'at': time.time(),
+                    'done': False,
+                })
+                with open(REPLICATE, 'w') as fh:
+                    json.dump(q, fh, indent=1, ensure_ascii=False)
+            return self._send(200, {'ok': True})
         if path == '/api/published':
             # TikTok exposes no way to read how many drafts are still pending,
             # so publishing is recorded here by hand. Clearing an account drops
@@ -265,7 +339,7 @@ async function load(){
     }).join('');
     return `<div class="item ${cur===p.topic?'on':''}" onclick="open_('${p.topic}')">
       <div class="t">${esc(p.topic)}</div>
-      <div class="s">${p.slides.length} slides${p.registered?'':' · unregistered'}</div>
+      <div class="s">${p.liked?'♥ ':''}${p.queued?'⟳ ':''}${p.slides.length} slides${p.registered?'':' · unregistered'}</div>
       <div class="dots">${dots}</div></div>`;
   }).join('') || '<div class="empty" style="padding:20px">No posts built yet.</div>';
 }
@@ -279,7 +353,13 @@ function open_(topic){
       `<img src="/slide/${p.topic}/${s}" onclick="zoom(this.src)">`).join('')}</div>
     <label>Title</label><input id="ti" value="${esc(p.title)}">
     <label>Caption</label><textarea id="ca">${esc(p.caption)}</textarea>
-    <div class="row"><button class="ghost" onclick="save()">Save text</button></div>
+    <div class="row">
+      <button class="ghost" onclick="save()">Save text</button>
+      <button class="ghost" onclick="like(${p.liked?'false':'true'})">${p.liked?'♥ Liked':'♡ Like'}</button>
+      <button class="ghost" onclick="replicate()" ${p.queued?'disabled':''}>
+        ${p.queued?'⟳ Queued to replicate':'Replicate this concept'}</button>
+    </div>
+    <div class="res">${p.roster.length?'Roster: '+esc(p.roster.join(', ')):''}</div>
     <label>Draft to</label>
     <div class="row">
       ${DATA.accounts.map(a=>{
@@ -295,6 +375,21 @@ async function published(key){
   await fetch('/api/published',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({account:key})});
   await load(); if(cur) open_(cur);
+}
+
+async function like(v){
+  await fetch('/api/like',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic:cur,liked:v})});
+  DATA=await(await fetch('/api/posts')).json(); open_(cur);
+}
+
+async function replicate(){
+  await fetch('/api/replicate',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic:cur})});
+  DATA=await(await fetch('/api/posts')).json(); open_(cur);
+  document.getElementById('res').textContent =
+    'Queued. The next batch builds it: same hook shape and roster pattern, different tools, '+
+    'new backgrounds and new teaching points. Say "run replicates" to build it now.';
 }
 
 function zoom(src){document.getElementById('zoomimg').src=src;document.getElementById('zoom').style.display='flex';}

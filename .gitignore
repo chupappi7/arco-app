@@ -12,3 +12,5 @@ drafts/**/*.png
 # Pending OAuth state (single-use)
 tools/.auth-state.json
 tools/delivery_log.json
+tools/post_feedback.json
+tools/replicate_queue.json
