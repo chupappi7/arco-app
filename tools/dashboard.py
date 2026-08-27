@@ -72,7 +72,8 @@ def pending_counts():
     counts = {a['key']: 0 for a in ACCOUNTS}
     for topic, accts in delivery_log().items():
         for key, rec in accts.items():
-            if rec.get('status') == 'SENT' and now - rec.get('at', 0) < 86400:
+            if (rec.get('status') == 'SENT' and not rec.get('published')
+                    and now - rec.get('at', 0) < 86400):
                 counts[key] = counts.get(key, 0) + 1
     return counts
 
@@ -246,6 +247,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 with open(REPLICATE, 'w') as fh:
                     json.dump(q, fh, indent=1, ensure_ascii=False)
             return self._send(200, {'ok': True})
+        if path == '/api/publish':
+            # Publishing happens by hand in the TikTok app and the API cannot
+            # see it, so it is recorded here. A published draft stops counting
+            # against the cap, which is the whole reason this state exists.
+            with _lock:
+                log = delivery_log()
+                rec = log.get(body['topic'], {}).get(body['account'])
+                if rec:
+                    rec['published'] = bool(body['published'])
+                    rec['published_at'] = time.time() if body['published'] else None
+                    save_log(log)
+            return self._send(200, {'pending': pending_counts()})
         if path == '/api/published':
             # TikTok exposes no way to read how many drafts are still pending,
             # so publishing is recorded here by hand. Clearing an account drops
@@ -253,10 +266,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             with _lock:
                 log = delivery_log()
                 key = body['account']
-                for topic in list(log):
-                    log[topic].pop(key, None)
-                    if not log[topic]:
-                        del log[topic]
+                for topic in log:
+                    rec = log[topic].get(key)
+                    if rec and rec.get('status') == 'SENT':
+                        rec['published'] = True
+                        rec['published_at'] = time.time()
                 save_log(log)
             return self._send(200, {'pending': pending_counts()})
         if path == '/api/save':
@@ -299,7 +313,16 @@ main{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - 61px)}
 .item .s{color:#8b8b93;font-size:11px;margin-top:3px}
 .dots{margin-top:6px;display:flex;gap:4px}
 .dot{width:7px;height:7px;border-radius:50%;background:#33333a}
-.dot.sent{background:#3fb950}.dot.capped{background:#d29922}.dot.failed{background:#ff5f56}
+.dot.drafted{background:#4ea1ff}.dot.published{background:#3fb950}
+.dot.capped{background:#d29922}.dot.failed{background:#ff5f56}
+.state{display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid #1b1b1f}
+.state .nm{width:170px;font-size:13px}
+.tag{font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid #2e2e35;color:#8b8b93}
+.tag.drafted{color:#4ea1ff;border-color:#25476b}
+.tag.published{color:#3fb950;border-color:#1f4429}
+.tag.capped{color:#d29922;border-color:#5c4410}
+.tag.failed{color:#ff5f56;border-color:#6b2420}
+.state button{padding:4px 10px;font-size:12px}
 #pane{overflow:auto;padding:22px 26px}
 .slides{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;margin:16px 0 22px}
 .slides img{width:100%;border-radius:9px;border:1px solid #26262b;cursor:zoom-in;display:block}
@@ -334,8 +357,10 @@ async function load(){
   document.getElementById('list').innerHTML = DATA.posts.map(p=>{
     const dots = DATA.accounts.map(a=>{
       const r=(p.delivery||{})[a.key];
-      const c = r? (r.status==='SENT'?'sent':r.status==='CAPPED'?'capped':'failed') : '';
-      return `<span class="dot ${c}" title="${esc(a.label)}: ${r?r.status:'not sent'}"></span>`;
+      const c = !r ? '' : r.published ? 'published'
+              : r.status==='SENT' ? 'drafted'
+              : r.status==='CAPPED' ? 'capped' : 'failed';
+      return `<span class="dot ${c}" title="${esc(a.label)}: ${c||'not sent'}"></span>`;
     }).join('');
     return `<div class="item ${cur===p.topic?'on':''}" onclick="open_('${p.topic}')">
       <div class="t">${esc(p.topic)}</div>
@@ -360,6 +385,19 @@ function open_(topic){
         ${p.queued?'⟳ Queued to replicate':'Replicate this concept'}</button>
     </div>
     <div class="res">${p.roster.length?'Roster: '+esc(p.roster.join(', ')):''}</div>
+    <label>Status</label>
+    ${DATA.accounts.map(a=>{
+      const r=(p.delivery||{})[a.key];
+      const st = !r ? 'not sent' : r.published ? 'published'
+               : r.status==='SENT' ? 'drafted' : r.status.toLowerCase();
+      const cls = st==='not sent' ? '' : st;
+      return `<div class="state">
+        <span class="nm">${esc(a.label)}</span>
+        <span class="tag ${cls}">${st}</span>
+        ${r&&r.status==='SENT' ? `<button class="ghost" onclick="publish('${a.key}',${r.published?'false':'true'})">
+            ${r.published?'mark unpublished':'mark published'}</button>` : ''}
+        ${r&&r.detail?`<span style="color:#6d6d75;font-size:11px">${esc(r.detail)}</span>`:''}
+      </div>`;}).join('')}
     <label>Draft to</label>
     <div class="row">
       ${DATA.accounts.map(a=>{
@@ -375,6 +413,12 @@ async function published(key){
   await fetch('/api/published',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({account:key})});
   await load(); if(cur) open_(cur);
+}
+
+async function publish(key,v){
+  await fetch('/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic:cur,account:key,published:v})});
+  DATA=await(await fetch('/api/posts')).json(); await load(); open_(cur);
 }
 
 async function like(v){

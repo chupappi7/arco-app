@@ -296,8 +296,8 @@
  {
   "topic": "ten-x",
   "tools": [
-   "Claude",
    "ARCO",
+   "Claude",
    "Raycast",
    "Notion",
    "Zapier"
