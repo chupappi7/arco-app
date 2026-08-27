@@ -120,6 +120,10 @@ def list_posts():
     log = delivery_log()
     fb = load(FEEDBACK, {})
     queued = {q['from'] for q in replicate_queue() if not q.get('done')}
+    redos = {}
+    for r in redo_queue():
+        if not r.get('done'):
+            redos.setdefault(r['topic'], []).append(r)
     out = []
     for topic in sorted(os.listdir(DRAFTS)):
         d = os.path.join(DRAFTS, topic)
@@ -136,10 +140,12 @@ def list_posts():
             'note': meta.get('_note', ''),
             'registered': topic in idx,
             'slides': slides,
+            'slide_mtimes': {f: int(os.path.getmtime(os.path.join(d, f))) for f in slides},
             'mtime': os.path.getmtime(os.path.join(d, slides[0])),
             'delivery': log.get(topic, {}),
             'liked': bool(fb.get(topic, {}).get('liked')),
             'queued': topic in queued,
+            'redos': redos.get(topic, []),
             'roster': roster_for(topic),
         })
     out.sort(key=lambda p: p['mtime'], reverse=True)
@@ -176,6 +182,30 @@ def run_draft(topic, keys):
         log.setdefault(topic, {}).update(results)
         save_log(log)
     return results
+
+
+REDO = os.path.join(REPO, 'tools', 'redo_queue.json')
+
+
+def redo_queue():
+    return load(REDO, [])
+
+
+def queue_redo(topic, n, note):
+    """Record a slide that Thinh wants redone, with his reason.
+
+    Redoing a slide means new copy or a new background, which is judgment, so
+    this is a request rather than an action: Claude picks the queue up and does
+    the work with the same guards a fresh build runs through.
+    """
+    with _lock:
+        q = redo_queue()
+        q = [x for x in q if not (x['topic'] == topic and x['slide'] == n and not x.get('done'))]
+        q.append({'topic': topic, 'slide': n, 'note': note.strip(),
+                  'at': time.time(), 'done': False})
+        with open(REDO, 'w') as fh:
+            json.dump(q, fh, indent=1, ensure_ascii=False)
+    return len([x for x in q if not x.get('done')])
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -223,6 +253,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             keys = body.get('accounts') or [a['key'] for a in ACCOUNTS]
             return self._send(200, {'results': run_draft(topic, keys),
                                     'pending': pending_counts()})
+        if path == '/api/redo':
+            n = queue_redo(body['topic'], int(body['slide']), body.get('note', ''))
+            return self._send(200, {'ok': True, 'open': n})
         if path == '/api/like':
             with _lock:
                 fb = load(FEEDBACK, {})
@@ -392,6 +425,16 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .slides img{width:100%;border-radius:9px;border:1px solid var(--line);display:block;cursor:zoom-in;
   transition:border-color .18s}
 .slides img:hover{border-color:var(--accent)}
+.sl{position:relative;cursor:pointer;padding:0;background:none;border:0;display:block;width:100%}
+.sl .num{position:absolute;top:7px;left:7px;background:rgba(2,6,23,.82);color:var(--text);
+  font:500 11px/1 "Fira Code",monospace;padding:4px 7px;border-radius:6px}
+.sl[aria-pressed="true"] img{border-color:var(--accent);box-shadow:0 0 0 2px rgba(56,189,248,.35)}
+.sl[aria-pressed="true"] .num{background:var(--accent);color:#04222f}
+.hint{color:var(--dim);font-size:12px;margin:-14px 0 20px}
+.busy{display:inline-block;width:13px;height:13px;border:2px solid rgba(4,34,47,.35);
+  border-top-color:#04222f;border-radius:50%;animation:spin .7s linear infinite;
+  vertical-align:-2px;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
 .panel h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
   margin:0 0 14px;font-weight:500}
@@ -454,7 +497,7 @@ const ic = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const tk = c => `<svg viewBox="0 0 24 24" fill="${c||'currentColor'}" aria-hidden="true"><path d="${TIKTOK}"/></svg>`;
 const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-let DATA=null, cur=null, filter='review';
+let DATA=null, cur=null, filter='review', sel=0;
 const FILTERS=[['review','Needs review'],['drafted','Drafted'],['published','Published'],
                ['liked','Liked'],['archive','Archive'],['all','All posts']];
 
@@ -516,12 +559,13 @@ function card(p){
       <div class="rs">${esc(p.roster.join(' · ')||'roster not recorded')}</div>
       <div class="pills"><span class="pill ${st}">${st==='review'?'needs review':st}</span>
         ${p.liked?'<span class="pill liked">liked</span>':''}
-        ${p.queued?'<span class="pill">replicating</span>':''}</div>
+        ${p.queued?'<span class="pill">replicating</span>':''}
+        ${(p.redos||[]).length?`<span class="pill">${p.redos.length} redo</span>`:''}</div>
     </div></button>`;
 }
 
-function open_(t){ cur=t; location.hash=t; render(); }
-function back(){ cur=null; location.hash=''; render(); }
+function open_(t){ cur=t; sel=0; location.hash=t; render(); }
+function back(){ cur=null; sel=0; location.hash=''; render(); }
 
 function detail(){
   const p=DATA.posts.find(x=>x.topic===cur);
@@ -532,8 +576,27 @@ function detail(){
       <button class="back" onclick="back()">&larr; Back</button>
       <span class="sub">${esc(p.note||'')}</span></div>
     <div class="slides">${p.slides.map((s,i)=>
-      `<img loading="lazy" src="/slide/${p.topic}/${s}" alt="Slide ${i+1}"
-        onclick="zoom(this.src)">`).join('')}</div>
+      `<button class="sl" aria-pressed="${sel===i+1}" onclick="pick(${i+1})"
+         aria-label="Select slide ${i+1}">
+         <img loading="lazy" src="/slide/${p.topic}/${s}?v=${(p.slide_mtimes||{})[s]||0}"
+              alt="Slide ${i+1}">
+         <span class="num">${i+1}${(p.redos||[]).some(r=>r.slide===i+1)?' redo':''}</span>
+       </button>`).join('')}</div>
+    <p class="hint">Click a slide to select it, then say what is wrong below.</p>
+
+    <div class="panel"><h2>Redo a slide</h2>
+      <div class="field">
+        <label for="note">${sel?`What is wrong with slide ${sel}?`:'Select a slide above first'}</label>
+        <textarea id="note" style="min-height:84px" ${sel?'':'disabled'}
+          placeholder="e.g. background is too bright, the copy is washed out"></textarea>
+      </div>
+      <div class="actions">
+        <button class="btn" id="rgb" onclick="redo()" ${sel?'':'disabled'}>Redo slide ${sel||''}</button>
+        <button class="btn sec" onclick="zoomSel()" ${sel?'':'disabled'}>View full size</button>
+      </div>
+      <div class="log ${(p.redos||[]).length?'on':''}" id="rlog">${
+        (p.redos||[]).map(r=>'slide '+r.slide+': '+esc(r.note)).join('\n')}</div>
+    </div>
 
     <div class="panel"><h2>Delivery</h2>
       ${DATA.accounts.map(a=>{
@@ -572,6 +635,23 @@ function zoom(src){const z=document.getElementById('zoom');
 document.getElementById('zoom').onclick=e=>e.currentTarget.style.display='none';
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){
   document.getElementById('zoom').style.display='none';}});
+
+function pick(n){ sel = (sel===n?0:n); render(); }
+function zoomSel(){
+  const p=DATA.posts.find(x=>x.topic===cur);
+  if(sel) zoom(`/slide/${p.topic}/${p.slides[sel-1]}?v=${Date.now()}`);
+}
+async function redo(){
+  const note=document.getElementById('note').value.trim();
+  if(!note){ document.getElementById('note').focus(); return; }
+  const r = await (await fetch('/api/redo',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic:cur,slide:sel,note})})).json();
+  const keep=sel; await load(); sel=keep; render();
+  const l=document.getElementById('rlog');
+  if(l){ l.classList.add('on');
+    l.textContent='Requested. Tell Claude "do the redos" and it rebuilds this slide with your reason, '
+      +'then the slide updates here. '+r.open+' slide'+(r.open===1?'':'s')+' waiting.'; }
+}
 
 function say(t){const l=document.getElementById('log');if(l){l.textContent=t;l.classList.add('on');}}
 

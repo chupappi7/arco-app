@@ -50,6 +50,8 @@ POSTS = [
         'It follows the change you already','started making.'],
        ['Pin a screenshot and it floats','above every other window.','',
         'You copy from it without switching','back and forth.'],
+       # slide 5 redone on a darker frame: bg-n03 measured 64 on the copy band
+       # and the second paragraph washed out over the pool
        ['Test mode gives you fake cards','that behave like real ones.','',
         'You run the whole checkout before','taking a single payment.'],
        ['Feature flags and session replay','sit in the same tool.','',

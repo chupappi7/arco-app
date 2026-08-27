@@ -14,3 +14,4 @@ tools/.auth-state.json
 tools/delivery_log.json
 tools/post_feedback.json
 tools/replicate_queue.json
+tools/redo_queue.json
