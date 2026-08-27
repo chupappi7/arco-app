@@ -200,6 +200,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == '/api/posts':
             return self._send(200, {'posts': list_posts(), 'accounts': ACCOUNTS,
                                     'pending': pending_counts(), 'cap': CAP})
+        if path == '/icon/arco.png':
+            f = os.path.join(REPO, 'tools', 'slides', 'icons', 'icon-arco.png')
+            with open(f, 'rb') as fh:
+                return self._send(200, fh.read(), 'image/png')
         if path.startswith('/slide/'):
             rel = path[len('/slide/'):]
             f = os.path.normpath(os.path.join(DRAFTS, rel))
@@ -292,172 +296,319 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return self._send(404, {'error': 'not found'})
 
 
-PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
-<title>ARCO pipeline</title><style>
+PAGE = r"""<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARCO pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#020617; --surface:#0F172A; --surface-2:#1E293B; --line:#1E293B; --line-2:#293548;
+  --text:#F8FAFC; --muted:#94A3B8; --dim:#64748B;
+  --accent:#38BDF8; --ok:#22C55E; --warn:#F59E0B; --bad:#F43F5E;
+  --r:10px; --z-modal:50;
+}
 *{box-sizing:border-box}
-body{margin:0;background:#0d0d0f;color:#e8e8ea;font:14px/1.5 -apple-system,system-ui,sans-serif}
-header{padding:18px 24px;border-bottom:1px solid #232327;display:flex;gap:28px;align-items:center;flex-wrap:wrap}
-h1{font-size:15px;margin:0;letter-spacing:.02em}
-.acct{display:flex;gap:14px}
-.chip{background:#17171b;border:1px solid #26262b;border-radius:8px;padding:6px 11px;font-size:12px}
-.chip b{font-weight:600}
-.bar{display:inline-block;width:52px;height:5px;background:#26262b;border-radius:3px;margin-left:7px;vertical-align:middle;overflow:hidden}
-.bar i{display:block;height:100%;background:#4ea1ff}
-.bar.full i{background:#ff5f56}
-main{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - 61px)}
-#list{overflow:auto;border-right:1px solid #232327}
-.item{padding:12px 16px;border-bottom:1px solid #1b1b1f;cursor:pointer}
-.item:hover{background:#141418}
-.item.on{background:#17171d;box-shadow:inset 3px 0 0 #4ea1ff}
-.item .t{font-weight:600;font-size:13px}
-.item .s{color:#8b8b93;font-size:11px;margin-top:3px}
-.dots{margin-top:6px;display:flex;gap:4px}
-.dot{width:7px;height:7px;border-radius:50%;background:#33333a}
-.dot.drafted{background:#4ea1ff}.dot.published{background:#3fb950}
-.dot.capped{background:#d29922}.dot.failed{background:#ff5f56}
-.state{display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid #1b1b1f}
-.state .nm{width:170px;font-size:13px}
-.tag{font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid #2e2e35;color:#8b8b93}
-.tag.drafted{color:#4ea1ff;border-color:#25476b}
-.tag.published{color:#3fb950;border-color:#1f4429}
-.tag.capped{color:#d29922;border-color:#5c4410}
-.tag.failed{color:#ff5f56;border-color:#6b2420}
-.state button{padding:4px 10px;font-size:12px}
-#pane{overflow:auto;padding:22px 26px}
-.slides{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;margin:16px 0 22px}
-.slides img{width:100%;border-radius:9px;border:1px solid #26262b;cursor:zoom-in;display:block}
-label{display:block;color:#8b8b93;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 5px}
-input,textarea{width:100%;background:#131317;color:#e8e8ea;border:1px solid #2a2a30;border-radius:8px;padding:9px 11px;font:inherit}
-textarea{min-height:120px;resize:vertical}
-button{background:#4ea1ff;color:#06121f;border:0;border-radius:8px;padding:9px 15px;font-weight:600;cursor:pointer;font-size:13px}
-button.ghost{background:#1c1c22;color:#e8e8ea;border:1px solid #2e2e35}
-button:disabled{opacity:.45;cursor:not-allowed}
-.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:14px}
-.res{margin-top:12px;font-size:12px;white-space:pre-wrap;color:#a6a6ae}
-#zoom{position:fixed;inset:0;background:#000d;display:none;align-items:center;justify-content:center;z-index:9}
-#zoom img{max-height:94vh;max-width:94vw;border-radius:10px}
-.empty{color:#6d6d75;padding:40px 0}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);
+  font:400 15px/1.6 "Fira Sans",-apple-system,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+code,.mono{font-family:"Fira Code",ui-monospace,monospace}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.app{display:grid;grid-template-columns:232px 1fr;height:100vh}
+
+/* ---------- sidebar ---------- */
+aside{background:var(--surface);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;padding:20px 14px;gap:26px;overflow:auto}
+.brand{display:flex;align-items:center;gap:11px;padding:0 8px}
+.brand img{width:34px;height:34px;border-radius:9px}
+.brand .n{font-weight:600;font-size:15px;letter-spacing:.01em}
+.brand .v{font-size:11px;color:var(--dim)}
+nav{display:flex;flex-direction:column;gap:2px}
+.navlabel{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);
+  padding:0 8px;margin:0 0 8px}
+.nav{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;
+  border:0;color:var(--muted);padding:9px 10px;border-radius:8px;min-height:40px;
+  transition:background .18s,color .18s}
+.nav:hover{background:var(--surface-2);color:var(--text)}
+.nav[aria-current="true"]{background:var(--surface-2);color:var(--text);font-weight:500}
+.nav svg{width:17px;height:17px;flex:none;opacity:.9}
+.nav .ct{margin-left:auto;font-size:11px;color:var(--dim);font-family:"Fira Code",monospace}
+
+/* ---------- accounts ---------- */
+.accounts{margin-top:auto;display:flex;flex-direction:column;gap:9px}
+.acct{background:var(--surface-2);border:1px solid var(--line-2);border-radius:var(--r);padding:11px}
+.acct .top{display:flex;align-items:center;gap:8px}
+.acct svg{width:15px;height:15px;flex:none}
+.acct .h{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct .num{margin-left:auto;font-size:11px;font-family:"Fira Code",monospace;color:var(--muted)}
+.track{height:4px;background:#0b1120;border-radius:3px;margin-top:9px;overflow:hidden}
+.track i{display:block;height:100%;background:var(--accent);transition:width .25s}
+.track.full i{background:var(--bad)}
+.acct button{margin-top:8px;width:100%;background:none;border:1px solid var(--line-2);
+  color:var(--muted);border-radius:7px;padding:5px;font-size:11px;min-height:30px;
+  transition:border-color .18s,color .18s}
+.acct button:hover{border-color:var(--accent);color:var(--text)}
+
+/* ---------- main ---------- */
+main{overflow:auto}
+.bar{position:sticky;top:0;z-index:10;background:rgba(2,6,23,.92);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);padding:18px 28px;display:flex;align-items:center;gap:16px}
+h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
+.sub{color:var(--dim);font-size:12px}
+.wrap{padding:24px 28px 60px}
+
+/* ---------- cards ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  overflow:hidden;cursor:pointer;transition:border-color .18s,background .18s;
+  display:flex;flex-direction:column;text-align:left;padding:0;color:inherit;width:100%}
+.card:hover{border-color:var(--line-2);background:var(--surface-2)}
+.thumb{aspect-ratio:9/16;background:#0b1120;position:relative;max-height:250px;overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.card .meta{padding:11px 12px 13px}
+.card .tt{font-size:13px;font-weight:600;margin-bottom:3px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.card .rs{font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pills{display:flex;gap:5px;margin-top:9px;flex-wrap:wrap}
+
+.pill{font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;
+  border-radius:20px;border:1px solid var(--line-2);color:var(--dim);white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill.review{color:var(--warn);border-color:#5b420f}
+.pill.drafted{color:var(--accent);border-color:#14405a}
+.pill.published{color:var(--ok);border-color:#14532d}
+.pill.failed{color:var(--bad);border-color:#5c1626}
+.pill.liked{color:#F472B6;border-color:#5c2244}
+
+/* ---------- detail ---------- */
+.back{background:none;border:1px solid var(--line-2);color:var(--muted);border-radius:8px;
+  padding:7px 13px;font-size:13px;min-height:36px;transition:border-color .18s,color .18s}
+.back:hover{border-color:var(--accent);color:var(--text)}
+.slides{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:6px 0 26px}
+.slides img{width:100%;border-radius:9px;border:1px solid var(--line);display:block;cursor:zoom-in;
+  transition:border-color .18s}
+.slides img:hover{border-color:var(--accent)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
+.panel h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+  margin:0 0 14px;font-weight:500}
+label{display:block;font-size:12px;color:var(--muted);margin:0 0 6px}
+input,textarea{width:100%;background:#0b1120;color:var(--text);border:1px solid var(--line-2);
+  border-radius:8px;padding:10px 12px;font:inherit;transition:border-color .18s}
+input:focus,textarea:focus{border-color:var(--accent);outline:none}
+textarea{min-height:132px;resize:vertical;line-height:1.65}
+.field{margin-bottom:14px}
+.btn{background:var(--accent);color:#04222f;border:0;border-radius:8px;padding:10px 17px;
+  font-weight:600;font-size:13px;min-height:42px;transition:filter .18s}
+.btn:hover{filter:brightness(1.08)}
+.btn.sec{background:var(--surface-2);color:var(--text);border:1px solid var(--line-2)}
+.btn.sec:hover{border-color:var(--accent);filter:none}
+.btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+.actions{display:flex;gap:9px;flex-wrap:wrap}
+.srow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.srow:last-child{border-bottom:0}
+.srow .nm{width:180px;font-size:13px;display:flex;align-items:center;gap:8px}
+.srow .nm svg{width:14px;height:14px;flex:none;opacity:.75}
+.srow .sp{margin-left:auto;display:flex;gap:8px;align-items:center}
+.log{font-family:"Fira Code",monospace;font-size:12px;color:var(--muted);white-space:pre-wrap;
+  margin-top:14px;padding:12px;background:#0b1120;border-radius:8px;border:1px solid var(--line);display:none}
+.log.on{display:block}
+.empty{color:var(--dim);padding:56px 0;text-align:center}
+#zoom{position:fixed;inset:0;background:rgba(2,6,23,.94);display:none;align-items:center;
+  justify-content:center;z-index:var(--z-modal);padding:24px}
+#zoom img{max-height:92vh;max-width:min(92vw,560px);border-radius:12px}
+@media (max-width:900px){.app{grid-template-columns:1fr}aside{display:none}}
 </style></head><body>
-<header><h1>ARCO pipeline</h1><div class="acct" id="acct"></div></header>
-<main><div id="list"></div><div id="pane"><div class="empty">Select a post.</div></div></main>
-<div id="zoom" onclick="this.style.display='none'"><img id="zoomimg"></div>
+<div class="app">
+<aside>
+  <div class="brand">
+    <img src="/icon/arco.png" alt="ARCO app icon">
+    <div><div class="n">ARCO</div><div class="v">content pipeline</div></div>
+  </div>
+  <nav aria-label="Filter posts">
+    <p class="navlabel">Pipeline</p>
+    <div id="nav"></div>
+  </nav>
+  <div class="accounts" id="accounts"></div>
+</aside>
+<main>
+  <div class="bar"><h1 id="ttl">Needs review</h1><span class="sub" id="cnt"></span></div>
+  <div class="wrap" id="view"></div>
+</main>
+</div>
+<div id="zoom" role="dialog" aria-label="Slide preview"><img id="zoomimg" alt="Slide, full size"></div>
 <script>
-let DATA=null, cur=null;
-const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TIKTOK = 'M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z';
+const ICONS = {
+  review:'<path d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/>',
+  drafted:'<path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/>',
+  published:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
+  liked:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21l7.7-7.6 1.1-1a5.5 5.5 0 0 0 0-7.8Z"/>',
+  all:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>'
+};
+const ic = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
+const tk = c => `<svg viewBox="0 0 24 24" fill="${c||'currentColor'}" aria-hidden="true"><path d="${TIKTOK}"/></svg>`;
+const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+let DATA=null, cur=null, filter='review';
+const FILTERS=[['review','Needs review'],['drafted','Drafted'],['published','Published'],
+               ['liked','Liked'],['archive','Archive'],['all','All posts']];
+
+const DAY=86400;
+function stateOf(p){
+  const rs = DATA.accounts.map(a => (p.delivery||{})[a.key]);
+  if (rs.some(r => r && r.published)) return 'published';
+  if (rs.some(r => r && r.status==='SENT')) return 'drafted';
+  if (rs.some(r => r && r.status==='FAILED')) return 'failed';
+  // Never sent and older than three days: history from before the log existed,
+  // not something waiting on Thinh. Keeping these in Needs review buried the
+  // handful of posts that genuinely need a decision.
+  if ((Date.now()/1000 - p.mtime) > 3*DAY) return 'archive';
+  return 'review';
+}
+const match = p => filter==='all' ? true : filter==='liked' ? p.liked : stateOf(p)===filter;
 
 async function load(){
   DATA = await (await fetch('/api/posts')).json();
-  document.getElementById('acct').innerHTML = DATA.accounts.map(a=>{
-    const n = DATA.pending[a.key]||0, full = n>=DATA.cap;
-    return `<div class="chip"><b>${esc(a.label)}</b> ${n}/${DATA.cap}
-      <span class="bar ${full?'full':''}"><i style="width:${Math.min(100,n/DATA.cap*100)}%"></i></span>
-      <a href="#" onclick="published('${a.key}');return false"
-         style="margin-left:9px;color:#6d8fb8;text-decoration:none">published</a></div>`;
-  }).join('');
-  document.getElementById('list').innerHTML = DATA.posts.map(p=>{
-    const dots = DATA.accounts.map(a=>{
-      const r=(p.delivery||{})[a.key];
-      const c = !r ? '' : r.published ? 'published'
-              : r.status==='SENT' ? 'drafted'
-              : r.status==='CAPPED' ? 'capped' : 'failed';
-      return `<span class="dot ${c}" title="${esc(a.label)}: ${c||'not sent'}"></span>`;
-    }).join('');
-    return `<div class="item ${cur===p.topic?'on':''}" onclick="open_('${p.topic}')">
-      <div class="t">${esc(p.topic)}</div>
-      <div class="s">${p.liked?'♥ ':''}${p.queued?'⟳ ':''}${p.slides.length} slides${p.registered?'':' · unregistered'}</div>
-      <div class="dots">${dots}</div></div>`;
-  }).join('') || '<div class="empty" style="padding:20px">No posts built yet.</div>';
+  const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
+    DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked:stateOf(p)===k).length]));
+  ICONS.archive = ICONS.archive || '<path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>';
+  document.getElementById('nav').innerHTML = FILTERS.map(([k,lab]) =>
+    `<button class="nav" aria-current="${filter===k}" onclick="setFilter('${k}')">
+       ${ic(ICONS[k]?k:'all')}<span>${lab}</span>
+       <span class="ct">${counts[k]}</span></button>`).join('');
+  document.getElementById('accounts').innerHTML =
+    `<p class="navlabel">Accounts</p>` + DATA.accounts.map(a=>{
+      const n=DATA.pending[a.key]||0, full=n>=DATA.cap;
+      return `<div class="acct">
+        <div class="top">${tk('#F8FAFC')}<span class="h">${esc(a.label)}</span>
+          <span class="num">${n}/${DATA.cap}</span></div>
+        <div class="track ${full?'full':''}"><i style="width:${Math.min(100,n/DATA.cap*100)}%"></i></div>
+        <button onclick="publishedAll('${a.key}')" aria-label="Mark all drafts published on ${esc(a.label)}">
+          mark all published</button></div>`;}).join('');
+  render();
 }
 
-function open_(topic){
-  cur = topic; location.hash = topic; const p = DATA.posts.find(x=>x.topic===topic); load();
-  document.getElementById('pane').innerHTML = `
-    <div style="font-size:17px;font-weight:600">${esc(p.topic)}</div>
-    <div style="color:#8b8b93;font-size:12px;margin-top:3px">${esc(p.note)}</div>
-    <div class="slides">${p.slides.map(s=>
-      `<img src="/slide/${p.topic}/${s}" onclick="zoom(this.src)">`).join('')}</div>
-    <label>Title</label><input id="ti" value="${esc(p.title)}">
-    <label>Caption</label><textarea id="ca">${esc(p.caption)}</textarea>
-    <div class="row">
-      <button class="ghost" onclick="save()">Save text</button>
-      <button class="ghost" onclick="like(${p.liked?'false':'true'})">${p.liked?'♥ Liked':'♡ Like'}</button>
-      <button class="ghost" onclick="replicate()" ${p.queued?'disabled':''}>
-        ${p.queued?'⟳ Queued to replicate':'Replicate this concept'}</button>
-    </div>
-    <div class="res">${p.roster.length?'Roster: '+esc(p.roster.join(', ')):''}</div>
-    <label>Status</label>
-    ${DATA.accounts.map(a=>{
-      const r=(p.delivery||{})[a.key];
-      const st = !r ? 'not sent' : r.published ? 'published'
-               : r.status==='SENT' ? 'drafted' : r.status.toLowerCase();
-      const cls = st==='not sent' ? '' : st;
-      return `<div class="state">
-        <span class="nm">${esc(a.label)}</span>
-        <span class="tag ${cls}">${st}</span>
-        ${r&&r.status==='SENT' ? `<button class="ghost" onclick="publish('${a.key}',${r.published?'false':'true'})">
-            ${r.published?'mark unpublished':'mark published'}</button>` : ''}
-        ${r&&r.detail?`<span style="color:#6d6d75;font-size:11px">${esc(r.detail)}</span>`:''}
-      </div>`;}).join('')}
-    <label>Draft to</label>
-    <div class="row">
+function setFilter(k){ filter=k; cur=null; load(); }
+
+function render(){
+  const view=document.getElementById('view');
+  document.getElementById('ttl').textContent =
+    cur ? cur : (FILTERS.find(f=>f[0]===filter)||[])[1];
+  if (cur) return detail();
+  const list = DATA.posts.filter(match);
+  document.getElementById('cnt').textContent = `${list.length} post${list.length===1?'':'s'}`;
+  view.innerHTML = list.length ? `<div class="grid">${list.map(card).join('')}</div>`
+    : `<div class="empty">Nothing here yet.</div>`;
+}
+
+function card(p){
+  const st=stateOf(p);
+  return `<button class="card" onclick="open_('${p.topic}')">
+    <div class="thumb"><img loading="lazy" src="/slide/${p.topic}/${p.slides[0]}"
+      alt="First slide of ${esc(p.topic)}"></div>
+    <div class="meta">
+      <div class="tt">${esc(p.topic)}</div>
+      <div class="rs">${esc(p.roster.join(' · ')||'roster not recorded')}</div>
+      <div class="pills"><span class="pill ${st}">${st==='review'?'needs review':st}</span>
+        ${p.liked?'<span class="pill liked">liked</span>':''}
+        ${p.queued?'<span class="pill">replicating</span>':''}</div>
+    </div></button>`;
+}
+
+function open_(t){ cur=t; location.hash=t; render(); }
+function back(){ cur=null; location.hash=''; render(); }
+
+function detail(){
+  const p=DATA.posts.find(x=>x.topic===cur);
+  if(!p) return back();
+  document.getElementById('cnt').textContent='';
+  document.getElementById('view').innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+      <button class="back" onclick="back()">&larr; Back</button>
+      <span class="sub">${esc(p.note||'')}</span></div>
+    <div class="slides">${p.slides.map((s,i)=>
+      `<img loading="lazy" src="/slide/${p.topic}/${s}" alt="Slide ${i+1}"
+        onclick="zoom(this.src)">`).join('')}</div>
+
+    <div class="panel"><h2>Delivery</h2>
       ${DATA.accounts.map(a=>{
-        const n=DATA.pending[a.key]||0;
-        return `<button class="ghost" onclick="draft(['${a.key}'])" ${n>=DATA.cap?'disabled':''}>
-          ${esc(a.label)}${n>=DATA.cap?' · full':''}</button>`;}).join('')}
-      <button onclick="draft(null)">Draft to all</button>
+        const r=(p.delivery||{})[a.key];
+        const st=!r?'review':r.published?'published':r.status==='SENT'?'drafted':'failed';
+        const lab=st==='review'?'not sent':st;
+        return `<div class="srow">
+          <span class="nm">${tk('#94A3B8')}${esc(a.label)}</span>
+          <span class="pill ${st}">${lab}</span>
+          <span class="sp">
+            ${r&&r.status==='SENT'?`<button class="btn sec" onclick="publish('${a.key}',${r.published?'false':'true'})">
+                ${r.published?'Mark unpublished':'Mark published'}</button>`:''}
+            <button class="btn sec" onclick="draft(['${a.key}'])"
+              ${(DATA.pending[a.key]||0)>=DATA.cap?'disabled':''}>Draft</button>
+          </span></div>`;}).join('')}
+      <div class="actions" style="margin-top:16px">
+        <button class="btn" onclick="draft(null)">Draft to all accounts</button>
+      </div>
+      <div class="log" id="log"></div>
     </div>
-    <div class="res" id="res"></div>`;
+
+    <div class="panel"><h2>Copy</h2>
+      <div class="field"><label for="ti">Title</label><input id="ti" value="${esc(p.title)}"></div>
+      <div class="field"><label for="ca">Caption</label><textarea id="ca">${esc(p.caption)}</textarea></div>
+      <div class="actions">
+        <button class="btn sec" onclick="save()">Save copy</button>
+        <button class="btn sec" onclick="like(${p.liked?'false':'true'})">
+          ${p.liked?'Unlike':'Like'}</button>
+        <button class="btn sec" onclick="replicate()" ${p.queued?'disabled':''}>
+          ${p.queued?'Queued to replicate':'Replicate concept'}</button>
+      </div></div>`;
 }
 
-async function published(key){
-  await fetch('/api/published',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({account:key})});
-  await load(); if(cur) open_(cur);
-}
+function zoom(src){const z=document.getElementById('zoom');
+  document.getElementById('zoomimg').src=src;z.style.display='flex';}
+document.getElementById('zoom').onclick=e=>e.currentTarget.style.display='none';
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){
+  document.getElementById('zoom').style.display='none';}});
 
-async function publish(key,v){
-  await fetch('/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({topic:cur,account:key,published:v})});
-  DATA=await(await fetch('/api/posts')).json(); await load(); open_(cur);
-}
-
-async function like(v){
-  await fetch('/api/like',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({topic:cur,liked:v})});
-  DATA=await(await fetch('/api/posts')).json(); open_(cur);
-}
-
-async function replicate(){
-  await fetch('/api/replicate',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({topic:cur})});
-  DATA=await(await fetch('/api/posts')).json(); open_(cur);
-  document.getElementById('res').textContent =
-    'Queued. The next batch builds it: same hook shape and roster pattern, different tools, '+
-    'new backgrounds and new teaching points. Say "run replicates" to build it now.';
-}
-
-function zoom(src){document.getElementById('zoomimg').src=src;document.getElementById('zoom').style.display='flex';}
+function say(t){const l=document.getElementById('log');if(l){l.textContent=t;l.classList.add('on');}}
 
 async function save(){
   await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({topic:cur,title:ti.value,caption:ca.value})});
-  document.getElementById('res').textContent='Saved to hooks.json. Commit and push before drafting so Pages serves it.';
-  DATA=await(await fetch('/api/posts')).json();
+  await load(); say('Saved to hooks.json. Commit and push before drafting so Pages serves it.');
 }
-
+async function like(v){
+  await fetch('/api/like',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic:cur,liked:v})}); await load();
+}
+async function replicate(){
+  await fetch('/api/replicate',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic:cur})}); await load();
+  say('Queued. The next batch builds it: same hook shape and roster pattern, different tools,\nfresh backgrounds and new teaching points.');
+}
+async function publish(key,v){
+  await fetch('/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic:cur,account:key,published:v})}); await load();
+}
+async function publishedAll(key){
+  await fetch('/api/published',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({account:key})}); await load();
+}
 async function draft(accts){
-  const el=document.getElementById('res');
-  el.textContent='Sending. Each account is polled to SEND_TO_USER_INBOX, so this takes a moment.';
-  document.querySelectorAll('#pane button').forEach(b=>b.disabled=true);
+  document.querySelectorAll('.panel button').forEach(b=>b.disabled=true);
+  say('Sending. Each account polls to SEND_TO_USER_INBOX, so this takes a moment.');
   const r = await (await fetch('/api/draft',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({topic:cur,accounts:accts})})).json();
-  el.textContent = Object.entries(r.results).map(([k,v])=>
-    `${k}: ${v.status}${v.detail?' — '+v.detail:''}`).join('\n');
-  DATA = await (await fetch('/api/posts')).json(); open_(cur);
-  document.getElementById('res').textContent = el.textContent;
+  const txt = Object.entries(r.results).map(([k,v])=>
+    `${k}: ${v.status}${v.detail?'  '+v.detail:''}`).join('\n');
+  await load(); say(txt);
 }
+
 load().then(()=>{const t=decodeURIComponent(location.hash.slice(1));
-  if(t && DATA.posts.some(p=>p.topic===t)) open_(t);});
+  if(t && DATA.posts.some(p=>p.topic===t)){cur=t;render();}});
 </script></body></html>"""
 
 
