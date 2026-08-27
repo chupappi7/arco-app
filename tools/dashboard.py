@@ -126,6 +126,8 @@ def list_posts():
             redos.setdefault(r['topic'], []).append(r)
     out = []
     for topic in sorted(os.listdir(DRAFTS)):
+        if topic.startswith('_'):
+            continue
         d = os.path.join(DRAFTS, topic)
         if not os.path.isdir(d):
             continue
@@ -253,6 +255,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
             keys = body.get('accounts') or [a['key'] for a in ACCOUNTS]
             return self._send(200, {'results': run_draft(topic, keys),
                                     'pending': pending_counts()})
+        if path == '/api/delete':
+            # Move rather than remove: a post that took a render pass and a
+            # review should not vanish because of a misclick.
+            topic = body['topic']
+            src = os.path.join(DRAFTS, topic)
+            if not os.path.isdir(src) or os.path.dirname(os.path.normpath(src)) != DRAFTS:
+                return self._send(400, {'error': 'bad topic'})
+            with _lock:
+                bin_ = os.path.join(DRAFTS, '_deleted')
+                os.makedirs(bin_, exist_ok=True)
+                dest = os.path.join(bin_, topic)
+                if os.path.exists(dest):
+                    dest += '-' + str(int(time.time()))
+                os.rename(src, dest)
+                idx, raw = hooks_index()
+                posts = raw['posts'] if isinstance(raw, dict) else raw
+                posts[:] = [x for x in posts if x.get('topic') != topic]
+                with open(HOOKS, 'w') as fh:
+                    json.dump(raw, fh, indent=1, ensure_ascii=False)
+            return self._send(200, {'ok': True, 'moved_to': dest})
         if path == '/api/redo':
             n = queue_redo(body['topic'], int(body['slide']), body.get('note', ''))
             return self._send(200, {'ok': True, 'open': n})
@@ -430,6 +452,14 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
   font:500 11px/1 "Fira Code",monospace;padding:4px 7px;border-radius:6px}
 .sl[aria-pressed="true"] img{border-color:var(--accent);box-shadow:0 0 0 2px rgba(56,189,248,.35)}
 .sl[aria-pressed="true"] .num{background:var(--accent);color:#04222f}
+.del{position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:8px;
+  background:rgba(2,6,23,.72);border:1px solid var(--line-2);color:var(--muted);
+  display:flex;align-items:center;justify-content:center;opacity:.5;z-index:2;
+  transition:opacity .18s,color .18s,border-color .18s}
+.cardwrap:hover .del{opacity:1}
+.del:hover{color:var(--bad);border-color:var(--bad)}
+.del svg{width:15px;height:15px}
+.cardwrap{position:relative}
 .hint{color:var(--dim);font-size:12px;margin:-14px 0 20px}
 .busy{display:inline-block;width:13px;height:13px;border:2px solid rgba(4,34,47,.35);
   border-top-color:#04222f;border-radius:50%;animation:spin .7s linear infinite;
@@ -559,7 +589,7 @@ async function load(){
       const n=DATA.pending[a.key]||0, full=n>=DATA.cap;
       return `<div class="acct">
         <div class="top">${tk('#F8FAFC')}<span class="h">${esc(a.label)}</span>
-          <span class="num">${n}/${DATA.cap}</span></div>
+          <span class="num">${Math.min(n,DATA.cap)}/${DATA.cap}${n>DATA.cap?'+':''}</span></div>
         <div class="track ${full?'full':''}"><i style="width:${Math.min(100,n/DATA.cap*100)}%"></i></div>
         <button onclick="publishedAll('${a.key}')" aria-label="Mark all drafts published on ${esc(a.label)}">
           mark all published</button></div>`;}).join('');
@@ -579,9 +609,16 @@ function render(){
     : `<div class="empty">Nothing here yet.</div>`;
 }
 
+const TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"'
+  +' stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>'
+  +'<path d="M10 11v6M14 11v6"/></svg>';
+
 function card(p){
   const st=stateOf(p);
-  return `<button class="card" onclick="open_('${p.topic}')">
+  return `<div class="cardwrap">
+    <button class="del" onclick="del(event,'${p.topic}')"
+      aria-label="Delete ${esc(p.topic)}">${TRASH}</button>
+    <button class="card" onclick="open_('${p.topic}')">
     <div class="thumb"><img loading="lazy" src="/slide/${p.topic}/${p.slides[0]}"
       alt="First slide of ${esc(p.topic)}"></div>
     <div class="meta">
@@ -591,7 +628,18 @@ function card(p){
         ${p.liked?'<span class="pill liked">liked</span>':''}
         ${p.queued?'<span class="pill">replicating</span>':''}
         ${(p.redos||[]).length?`<span class="pill">${p.redos.length} redo</span>`:''}</div>
-    </div></button>`;
+    </div></button></div>`;
+}
+
+async function del(e,topic){
+  e.stopPropagation();
+  const p=DATA.posts.find(x=>x.topic===topic);
+  const sent=DATA.accounts.some(a=>(p.delivery||{})[a.key]);
+  if(!confirm(`Delete ${topic}?`+(sent?'\n\nThis post has already been drafted to TikTok. Deleting it here does not remove those drafts.':'')
+    +'\n\nSlides move to drafts/_deleted, so it can be recovered.')) return;
+  await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic})});
+  if(cur===topic) back(); else await load();
 }
 
 function open_(t){ cur=t; sel=0; redoMode=false; location.hash=t; render(); }
@@ -604,7 +652,9 @@ function detail(){
   document.getElementById('view').innerHTML = `
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
       <button class="back" onclick="back()">&larr; Back</button>
-      <span class="sub">${esc(p.note||'')}</span></div>
+      <span class="sub">${esc(p.note||'')}</span>
+      <button class="back" style="margin-left:auto" onclick="del(event,'${p.topic}')"
+        aria-label="Delete this post">Delete post</button></div>
     <div class="toolbar">
       <button class="toggle" aria-pressed="${redoMode}" onclick="toggleRedo()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
@@ -675,8 +725,10 @@ function toggleRedo(){ redoMode=!redoMode; if(!redoMode) sel=0; render(); }
 function zoomAt(i){
   const p=DATA.posts.find(x=>x.topic===cur); if(!p) return;
   location.hash = cur + '/' + (i+1);
+  if(!p.slides || !p.slides.length) return;
   zi=Math.max(0,Math.min(i,p.slides.length-1));
-  const f=p.slides[zi], v=(p.slide_mtimes||{})[f]||0;
+  const f=p.slides[zi]; if(!f) return;
+  const v=(p.slide_mtimes||{})[f]||0;
   const img=document.getElementById('zoomimg');
   img.src=`/slide/${p.topic}/${f}?v=${v}`;
   img.alt=`Slide ${zi+1} of ${p.slides.length}`;
@@ -743,11 +795,19 @@ async function publishedAll(key){
 async function draft(accts){
   document.querySelectorAll('.panel button').forEach(b=>b.disabled=true);
   say('Sending. Each account polls to SEND_TO_USER_INBOX, so this takes a moment.');
-  const r = await (await fetch('/api/draft',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({topic:cur,accounts:accts})})).json();
-  const txt = Object.entries(r.results).map(([k,v])=>
-    `${k}: ${v.status}${v.detail?'  '+v.detail:''}`).join('\n');
-  await load(); say(txt);
+  let txt;
+  try{
+    const res = await fetch('/api/draft',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({topic:cur,accounts:accts})});
+    if(!res.ok) throw new Error('server returned '+res.status);
+    const r = await res.json();
+    txt = Object.entries(r.results||{}).map(([k,v])=>
+      `${k}: ${v.status}${v.detail?'  '+v.detail:''}`).join('\n') || 'no accounts attempted';
+  }catch(err){
+    txt = 'Draft failed: '+err.message+'\nNothing was recorded. The server log has the detail.';
+  }
+  await load();            // always re-render so buttons come back enabled
+  say(txt);
 }
 
 load().then(()=>{
