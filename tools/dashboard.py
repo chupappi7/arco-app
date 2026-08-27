@@ -462,7 +462,25 @@ textarea{min-height:132px;resize:vertical;line-height:1.65}
 .empty{color:var(--dim);padding:56px 0;text-align:center}
 #zoom{position:fixed;inset:0;background:rgba(2,6,23,.94);display:none;align-items:center;
   justify-content:center;z-index:var(--z-modal);padding:24px}
-#zoom img{max-height:92vh;max-width:min(92vw,560px);border-radius:12px}
+#zoom img{max-height:88vh;max-width:min(88vw,520px);border-radius:12px}
+#zoom .nav{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:52px;
+  border-radius:50%;background:rgba(30,41,59,.9);border:1px solid var(--line-2);color:var(--text);
+  display:flex;align-items:center;justify-content:center;transition:background .18s,border-color .18s}
+#zoom .nav:hover{background:var(--surface-2);border-color:var(--accent)}
+#zoom .nav svg{width:22px;height:22px}
+#zoom .prev{left:24px}#zoom .next{right:24px}
+#zoom .count{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);
+  font:500 13px/1 "Fira Code",monospace;color:var(--muted);background:rgba(2,6,23,.8);
+  padding:8px 14px;border-radius:20px;border:1px solid var(--line-2)}
+#zoom .close{position:absolute;top:22px;right:24px;width:42px;height:42px;border-radius:50%;
+  background:rgba(30,41,59,.9);border:1px solid var(--line-2);color:var(--text)}
+.toolbar{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.toggle{background:var(--surface-2);border:1px solid var(--line-2);color:var(--muted);
+  border-radius:8px;padding:9px 15px;font-size:13px;min-height:42px;font-weight:500;
+  display:inline-flex;align-items:center;gap:8px;transition:border-color .18s,color .18s,background .18s}
+.toggle:hover{border-color:var(--accent);color:var(--text)}
+.toggle[aria-pressed="true"]{background:var(--accent);color:#04222f;border-color:var(--accent)}
+.toggle svg{width:16px;height:16px}
 @media (max-width:900px){.app{grid-template-columns:1fr}aside{display:none}}
 </style></head><body>
 <div class="app">
@@ -482,7 +500,19 @@ textarea{min-height:132px;resize:vertical;line-height:1.65}
   <div class="wrap" id="view"></div>
 </main>
 </div>
-<div id="zoom" role="dialog" aria-label="Slide preview"><img id="zoomimg" alt="Slide, full size"></div>
+<div id="zoom" role="dialog" aria-modal="true" aria-label="Slide preview">
+  <button class="nav prev" onclick="step(-1,event)" aria-label="Previous slide">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+  <img id="zoomimg" alt="">
+  <button class="nav next" onclick="step(1,event)" aria-label="Next slide">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+  <button class="close" onclick="closeZoom()" aria-label="Close preview">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  <div class="count" id="zcount"></div>
+</div>
 <script>
 const TIKTOK = 'M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z';
 const ICONS = {
@@ -497,7 +527,7 @@ const ic = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const tk = c => `<svg viewBox="0 0 24 24" fill="${c||'currentColor'}" aria-hidden="true"><path d="${TIKTOK}"/></svg>`;
 const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-let DATA=null, cur=null, filter='review', sel=0;
+let DATA=null, cur=null, filter='review', sel=0, redoMode=false, zi=-1;
 const FILTERS=[['review','Needs review'],['drafted','Drafted'],['published','Published'],
                ['liked','Liked'],['archive','Archive'],['all','All posts']];
 
@@ -564,8 +594,8 @@ function card(p){
     </div></button>`;
 }
 
-function open_(t){ cur=t; sel=0; location.hash=t; render(); }
-function back(){ cur=null; sel=0; location.hash=''; render(); }
+function open_(t){ cur=t; sel=0; redoMode=false; location.hash=t; render(); }
+function back(){ cur=null; sel=0; redoMode=false; location.hash=''; render(); }
 
 function detail(){
   const p=DATA.posts.find(x=>x.topic===cur);
@@ -575,15 +605,25 @@ function detail(){
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
       <button class="back" onclick="back()">&larr; Back</button>
       <span class="sub">${esc(p.note||'')}</span></div>
+    <div class="toolbar">
+      <button class="toggle" aria-pressed="${redoMode}" onclick="toggleRedo()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+          stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/>
+          <path d="M3 13a9 9 0 1 0 3-7.7L3 8"/></svg>
+        ${redoMode?'Done redoing':'Redo a slide'}</button>
+      <span class="sub">${redoMode
+        ? 'Pick the slide that is wrong.'
+        : 'Click a slide to open it. Arrow keys move between slides.'}</span>
+    </div>
     <div class="slides">${p.slides.map((s,i)=>
-      `<button class="sl" aria-pressed="${sel===i+1}" onclick="pick(${i+1})"
-         aria-label="Select slide ${i+1}">
+      `<button class="sl" aria-pressed="${redoMode && sel===i+1}"
+         onclick="${redoMode?`pick(${i+1})`:`zoomAt(${i})`}"
+         aria-label="${redoMode?'Select':'Open'} slide ${i+1}">
          <img loading="lazy" src="/slide/${p.topic}/${s}?v=${(p.slide_mtimes||{})[s]||0}"
               alt="Slide ${i+1}">
          <span class="num">${i+1}${(p.redos||[]).some(r=>r.slide===i+1)?' redo':''}</span>
        </button>`).join('')}</div>
-    <p class="hint">Click a slide to select it, then say what is wrong below.</p>
-
+    ${!redoMode ? '' : `
     <div class="panel"><h2>Redo a slide</h2>
       <div class="field">
         <label for="note">${sel?`What is wrong with slide ${sel}?`:'Select a slide above first'}</label>
@@ -596,7 +636,7 @@ function detail(){
       </div>
       <div class="log ${(p.redos||[]).length?'on':''}" id="rlog">${
         (p.redos||[]).map(r=>'slide '+r.slide+': '+esc(r.note)).join('\n')}</div>
-    </div>
+    </div>`}
 
     <div class="panel"><h2>Delivery</h2>
       ${DATA.accounts.map(a=>{
@@ -630,17 +670,40 @@ function detail(){
       </div></div>`;
 }
 
-function zoom(src){const z=document.getElementById('zoom');
-  document.getElementById('zoomimg').src=src;z.style.display='flex';}
-document.getElementById('zoom').onclick=e=>e.currentTarget.style.display='none';
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){
-  document.getElementById('zoom').style.display='none';}});
+function toggleRedo(){ redoMode=!redoMode; if(!redoMode) sel=0; render(); }
+
+function zoomAt(i){
+  const p=DATA.posts.find(x=>x.topic===cur); if(!p) return;
+  location.hash = cur + '/' + (i+1);
+  zi=Math.max(0,Math.min(i,p.slides.length-1));
+  const f=p.slides[zi], v=(p.slide_mtimes||{})[f]||0;
+  const img=document.getElementById('zoomimg');
+  img.src=`/slide/${p.topic}/${f}?v=${v}`;
+  img.alt=`Slide ${zi+1} of ${p.slides.length}`;
+  document.getElementById('zcount').textContent=`${zi+1} / ${p.slides.length}`;
+  document.getElementById('zoom').style.display='flex';
+}
+function step(d,e){
+  if(e) e.stopPropagation();
+  const p=DATA.posts.find(x=>x.topic===cur); if(!p) return;
+  zoomAt((zi+d+p.slides.length)%p.slides.length);
+}
+function closeZoom(){ document.getElementById('zoom').style.display='none'; zi=-1;
+  if(cur) location.hash = cur; }
+function zoom(src){ const z=document.getElementById('zoom');
+  document.getElementById('zoomimg').src=src; z.style.display='flex'; }
+document.getElementById('zoom').onclick=e=>{ if(e.target.id==='zoom') closeZoom(); };
+document.addEventListener('keydown',e=>{
+  const open = document.getElementById('zoom').style.display==='flex';
+  if(e.key==='Escape'){ closeZoom(); return; }
+  if(!cur) return;
+  if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT') return;
+  if(e.key==='ArrowRight'){ e.preventDefault(); open?step(1):zoomAt(0); }
+  if(e.key==='ArrowLeft'){ e.preventDefault(); open?step(-1):zoomAt(0); }
+});
 
 function pick(n){ sel = (sel===n?0:n); render(); }
-function zoomSel(){
-  const p=DATA.posts.find(x=>x.topic===cur);
-  if(sel) zoom(`/slide/${p.topic}/${p.slides[sel-1]}?v=${Date.now()}`);
-}
+function zoomSel(){ if(sel) zoomAt(sel-1); }
 async function redo(){
   const note=document.getElementById('note').value.trim();
   if(!note){ document.getElementById('note').focus(); return; }
@@ -687,8 +750,16 @@ async function draft(accts){
   await load(); say(txt);
 }
 
-load().then(()=>{const t=decodeURIComponent(location.hash.slice(1));
-  if(t && DATA.posts.some(p=>p.topic===t)){cur=t;render();}});
+load().then(()=>{
+  // hash is <topic> or <topic>/<slide>, so a single slide is linkable
+  const raw = decodeURIComponent(location.hash.slice(1));
+  if(!raw) return;
+  const [t, n] = raw.split('/');
+  if(DATA.posts.some(p=>p.topic===t)){
+    cur=t; render();
+    if(n) zoomAt(parseInt(n,10)-1);
+  }
+});
 </script></body></html>"""
 
 
