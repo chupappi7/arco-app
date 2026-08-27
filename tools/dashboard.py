@@ -120,6 +120,11 @@ def list_posts():
     log = delivery_log()
     fb = load(FEEDBACK, {})
     queued = {q['from'] for q in replicate_queue() if not q.get('done')}
+    st = statuses()
+    sched = {}
+    for x in schedules():
+        if not x.get('done'):
+            sched.setdefault(x['topic'], []).append(x)
     redos = {}
     for r in redo_queue():
         if not r.get('done'):
@@ -148,6 +153,8 @@ def list_posts():
             'liked': bool(fb.get(topic, {}).get('liked')),
             'queued': topic in queued,
             'redos': redos.get(topic, []),
+            'approved': bool(st.get(topic, {}).get('approved')),
+            'schedules': sched.get(topic, []),
             'roster': roster_for(topic),
         })
     out.sort(key=lambda p: p['mtime'], reverse=True)
@@ -187,10 +194,58 @@ def run_draft(topic, keys):
 
 
 REDO = os.path.join(REPO, 'tools', 'redo_queue.json')
+STATUS = os.path.join(REPO, 'tools', 'post_status.json')
+SCHEDULE = os.path.join(REPO, 'tools', 'schedule.json')
 
 
 def redo_queue():
     return load(REDO, [])
+
+
+def statuses():
+    return load(STATUS, {})
+
+
+def schedules():
+    return load(SCHEDULE, [])
+
+
+def save_schedules(sc):
+    with open(SCHEDULE, 'w') as fh:
+        json.dump(sc, fh, indent=1)
+
+
+def scheduler_loop():
+    """Deliver scheduled posts. The dashboard is already long running and
+    already owns the delivery path, so it is the natural place for this; the
+    session cron died with the session.
+
+    A schedule that comes due while the machine is asleep fires late rather
+    than never, which is the honest behaviour for a local server.
+    """
+    while True:
+        try:
+            now = time.time()
+            due = [x for x in schedules() if not x.get('done') and x['at'] <= now]
+            for job in due:
+                accts = job.get('accounts') or [a['key'] for a in ACCOUNTS]
+                gap = int(job.get('stagger_min') or 0) * 60
+                results = {}
+                for i, key in enumerate(accts):
+                    if i and gap:
+                        time.sleep(gap)
+                    results.update(run_draft(job['topic'], [key]))
+                with _lock:
+                    sc = schedules()
+                    for x in sc:
+                        if x['topic'] == job['topic'] and x['at'] == job['at']:
+                            x['done'] = True
+                            x['results'] = {k: v['status'] for k, v in results.items()}
+                            x['ran_at'] = time.time()
+                    save_schedules(sc)
+        except Exception as exc:      # never let the loop die on one bad job
+            print('scheduler error:', exc)
+        time.sleep(30)
 
 
 def queue_redo(topic, n, note):
@@ -255,6 +310,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
             keys = body.get('accounts') or [a['key'] for a in ACCOUNTS]
             return self._send(200, {'results': run_draft(topic, keys),
                                     'pending': pending_counts()})
+        if path == '/api/approve':
+            with _lock:
+                st = statuses()
+                st.setdefault(body['topic'], {})['approved'] = bool(body['approved'])
+                st[body['topic']]['approved_at'] = time.time()
+                with open(STATUS, 'w') as fh:
+                    json.dump(st, fh, indent=1)
+            return self._send(200, {'ok': True})
+        if path == '/api/schedule':
+            with _lock:
+                sc = schedules()
+                if body.get('cancel'):
+                    sc = [x for x in sc if not (x['topic'] == body['topic'] and not x.get('done'))]
+                else:
+                    sc = [x for x in sc if not (x['topic'] == body['topic'] and not x.get('done'))]
+                    sc.append({'topic': body['topic'], 'at': float(body['at']),
+                               'accounts': body.get('accounts') or [],
+                               'stagger_min': int(body.get('stagger_min') or 0),
+                               'done': False})
+                save_schedules(sc)
+            return self._send(200, {'ok': True})
         if path == '/api/delete':
             # Move rather than remove: a post that took a render pass and a
             # review should not vanish because of a misclick.
@@ -433,7 +509,9 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
   border-radius:20px;border:1px solid var(--line-2);color:var(--dim);white-space:nowrap;
   display:inline-flex;align-items:center;gap:5px}
 .pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
-.pill.review{color:var(--warn);border-color:#5b420f}
+.pill.create{color:var(--warn);border-color:#5b420f}
+.pill.ready{color:#A78BFA;border-color:#3b2f63}
+.pill.scheduled{color:#A78BFA;border-color:#3b2f63}
 .pill.drafted{color:var(--accent);border-color:#14405a}
 .pill.published{color:var(--ok);border-color:#14532d}
 .pill.failed{color:var(--bad);border-color:#5c1626}
@@ -490,6 +568,20 @@ textarea{min-height:132px;resize:vertical;line-height:1.65}
   margin-top:14px;padding:12px;background:#0b1120;border-radius:8px;border:1px solid var(--line);display:none}
 .log.on{display:block}
 .empty{color:var(--dim);padding:56px 0;text-align:center}
+#modal{position:fixed;inset:0;background:rgba(2,6,23,.8);display:none;align-items:center;
+  justify-content:center;z-index:60;padding:24px}
+#modal .box{background:var(--surface);border:1px solid var(--line-2);border-radius:14px;
+  padding:24px;max-width:460px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.55)}
+#modal h3{margin:0 0 10px;font-size:16px;font-weight:600}
+#modal p{margin:0 0 18px;color:var(--muted);font-size:13px;line-height:1.6}
+#modal .foot{display:flex;gap:9px;justify-content:flex-end;margin-top:20px}
+#modal .danger{background:var(--bad);color:#fff}
+.sched{display:grid;gap:12px}
+.sched .accts{display:flex;gap:8px;flex-wrap:wrap}
+.chk{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-2);
+  border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;min-height:40px}
+.chk input{width:auto;margin:0}
+.when{color:var(--accent);font-family:"Fira Code",monospace;font-size:12px}
 #zoom{position:fixed;inset:0;background:rgba(2,6,23,.94);display:none;align-items:center;
   justify-content:center;z-index:var(--z-modal);padding:24px}
 #zoom img{max-height:88vh;max-width:min(88vw,520px);border-radius:12px}
@@ -530,6 +622,10 @@ textarea{min-height:132px;resize:vertical;line-height:1.65}
   <div class="wrap" id="view"></div>
 </main>
 </div>
+<div id="modal" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="box">
+  <h3 id="mt"></h3><p id="mb"></p><div id="mx"></div>
+  <div class="foot"><button class="btn sec" onclick="closeModal()">Cancel</button>
+    <button class="btn" id="mok"></button></div></div></div>
 <div id="zoom" role="dialog" aria-modal="true" aria-label="Slide preview">
   <button class="nav prev" onclick="step(-1,event)" aria-label="Previous slide">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -557,9 +653,9 @@ const ic = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const tk = c => `<svg viewBox="0 0 24 24" fill="${c||'currentColor'}" aria-hidden="true"><path d="${TIKTOK}"/></svg>`;
 const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-let DATA=null, cur=null, filter='review', sel=0, redoMode=false, zi=-1;
-const FILTERS=[['review','Needs review'],['drafted','Drafted'],['published','Published'],
-               ['liked','Liked'],['archive','Archive'],['all','All posts']];
+let DATA=null, cur=null, filter='create', sel=0, redoMode=false, zi=-1;
+const FILTERS=[['create','Create posts'],['ready','Ready'],['drafted','Drafted'],
+               ['published','Published'],['liked','Liked'],['archive','Archive'],['all','All posts']];
 
 const DAY=86400;
 function stateOf(p){
@@ -571,7 +667,7 @@ function stateOf(p){
   // not something waiting on Thinh. Keeping these in Needs review buried the
   // handful of posts that genuinely need a decision.
   if ((Date.now()/1000 - p.mtime) > 3*DAY) return 'archive';
-  return 'review';
+  return p.approved ? 'ready' : 'create';
 }
 const match = p => filter==='all' ? true : filter==='liked' ? p.liked : stateOf(p)===filter;
 
@@ -580,6 +676,8 @@ async function load(){
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
     DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked:stateOf(p)===k).length]));
   ICONS.archive = ICONS.archive || '<path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>';
+  ICONS.create = ICONS.create || '<path d="M12 5v14M5 12h14"/>';
+  ICONS.ready = ICONS.ready || '<path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="9"/>';
   document.getElementById('nav').innerHTML = FILTERS.map(([k,lab]) =>
     `<button class="nav" aria-current="${filter===k}" onclick="setFilter('${k}')">
        ${ic(ICONS[k]?k:'all')}<span>${lab}</span>
@@ -624,22 +722,27 @@ function card(p){
     <div class="meta">
       <div class="tt">${esc(p.topic)}</div>
       <div class="rs">${esc(p.roster.join(' · ')||'roster not recorded')}</div>
-      <div class="pills"><span class="pill ${st}">${st==='review'?'needs review':st}</span>
+      <div class="pills"><span class="pill ${st}">${st==='create'?'to review':st}</span>
+        ${(p.schedules||[]).length?`<span class="pill scheduled">${fmt(p.schedules[0].at)}</span>`:''}
         ${p.liked?'<span class="pill liked">liked</span>':''}
         ${p.queued?'<span class="pill">replicating</span>':''}
         ${(p.redos||[]).length?`<span class="pill">${p.redos.length} redo</span>`:''}</div>
     </div></button></div>`;
 }
 
-async function del(e,topic){
+function del(e,topic){
   e.stopPropagation();
   const p=DATA.posts.find(x=>x.topic===topic);
   const sent=DATA.accounts.some(a=>(p.delivery||{})[a.key]);
-  if(!confirm(`Delete ${topic}?`+(sent?'\n\nThis post has already been drafted to TikTok. Deleting it here does not remove those drafts.':'')
-    +'\n\nSlides move to drafts/_deleted, so it can be recovered.')) return;
-  await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({topic})});
-  if(cur===topic) back(); else await load();
+  showModal({
+    title:`Delete ${topic}?`, ok:'Delete', danger:true,
+    body:(sent?'This post has already been drafted to TikTok. Deleting it here does not remove those drafts. ':'')
+      +'Slides move to drafts/_deleted, so it can be recovered.',
+    action: async()=>{
+      await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({topic})});
+      if(cur===topic) back(); else await load();
+    }});
 }
 
 function open_(t){ cur=t; sel=0; redoMode=false; location.hash=t; render(); }
@@ -688,6 +791,28 @@ function detail(){
         (p.redos||[]).map(r=>'slide '+r.slide+': '+esc(r.note)).join('\n')}</div>
     </div>`}
 
+    ${p.approved ? `
+    <div class="panel"><h2>Schedule</h2>
+      ${(p.schedules||[]).length
+        ? `<p style="margin:0 0 14px;color:var(--muted);font-size:13px">Queued for
+             <span class="when">${fmt(p.schedules[0].at)}</span>
+             to ${esc((p.schedules[0].accounts||[]).map(k=>label(k)).join(', ')||'all accounts')}
+             ${p.schedules[0].stagger_min?`, ${p.schedules[0].stagger_min} min apart`:''}.
+             The dashboard must be running when it comes due.</p>
+           <div class="actions">
+             <button class="btn sec" onclick="askSchedule()">Change</button>
+             <button class="btn sec" onclick="cancelSchedule()">Cancel schedule</button></div>`
+        : `<p style="margin:0 0 14px;color:var(--muted);font-size:13px">Approved and ready.
+             Schedule the drafting, or send it now from Delivery below.</p>
+           <div class="actions"><button class="btn" onclick="askSchedule()">Schedule drafting</button>
+             <button class="btn sec" onclick="approve(false)">Move back to Create</button></div>`}
+    </div>` : `
+    <div class="panel"><h2>Review</h2>
+      <p style="margin:0 0 14px;color:var(--muted);font-size:13px">
+        Check the slides and the copy. Approving moves it to Ready, where you can schedule drafting.</p>
+      <div class="actions"><button class="btn" onclick="approve(true)">Approve</button></div>
+    </div>`}
+
     <div class="panel"><h2>Delivery</h2>
       ${DATA.accounts.map(a=>{
         const r=(p.delivery||{})[a.key];
@@ -720,6 +845,60 @@ function detail(){
       </div></div>`;
 }
 
+function label(k){ return (DATA.accounts.find(a=>a.key===k)||{}).label || k; }
+function fmt(ts){ const d=new Date(ts*1000);
+  return d.toLocaleString([], {weekday:'short', day:'numeric', month:'short',
+                               hour:'2-digit', minute:'2-digit'}); }
+
+let onOK=null;
+function showModal({title, body='', extra='', ok='Confirm', danger=false, action}){
+  document.getElementById('mt').textContent=title;
+  document.getElementById('mb').textContent=body;
+  document.getElementById('mx').innerHTML=extra;
+  const b=document.getElementById('mok');
+  b.textContent=ok; b.className='btn'+(danger?' danger':'');
+  onOK=action; document.getElementById('modal').style.display='flex';
+  const f=document.querySelector('#mx input,#mx select'); if(f) f.focus();
+}
+function closeModal(){ document.getElementById('modal').style.display='none'; onOK=null; }
+document.getElementById('mok').onclick=async()=>{ const f=onOK; closeModal(); if(f) await f(); };
+document.getElementById('modal').onclick=e=>{ if(e.target.id==='modal') closeModal(); };
+
+async function approve(v){
+  await fetch('/api/approve',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic:cur,approved:v})});
+  await load(); render();
+}
+
+function askSchedule(){
+  const d=new Date(Date.now()+3600e3); d.setSeconds(0,0);
+  const iso=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  showModal({
+    title:'Schedule drafting',
+    body:'The dashboard delivers these at the chosen time. It has to be running when they come due.',
+    ok:'Schedule',
+    extra:`<div class="sched">
+      <div><label for="sdt">When</label><input type="datetime-local" id="sdt" value="${iso}"></div>
+      <div><label>Accounts</label><div class="accts">${DATA.accounts.map(a=>
+        `<label class="chk"><input type="checkbox" class="sa" value="${a.key}" checked>${esc(a.label)}</label>`
+        ).join('')}</div></div>
+      <div><label for="sg">Minutes between accounts</label>
+        <input type="number" id="sg" min="0" max="720" step="15" value="0"></div></div>`,
+    action: async()=>{
+      const at=new Date(document.getElementById('sdt').value).getTime()/1000;
+      const accounts=[...document.querySelectorAll('.sa')].filter(c=>c.checked).map(c=>c.value);
+      const stagger_min=parseInt(document.getElementById('sg').value||'0',10);
+      await fetch('/api/schedule',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({topic:cur,at,accounts,stagger_min})});
+      await load(); render();
+    }});
+}
+async function cancelSchedule(){
+  await fetch('/api/schedule',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic:cur,cancel:true})});
+  await load(); render();
+}
+
 function toggleRedo(){ redoMode=!redoMode; if(!redoMode) sel=0; render(); }
 
 function zoomAt(i){
@@ -747,7 +926,7 @@ function zoom(src){ const z=document.getElementById('zoom');
 document.getElementById('zoom').onclick=e=>{ if(e.target.id==='zoom') closeZoom(); };
 document.addEventListener('keydown',e=>{
   const open = document.getElementById('zoom').style.display==='flex';
-  if(e.key==='Escape'){ closeZoom(); return; }
+  if(e.key==='Escape'){ closeModal(); closeZoom(); return; }
   if(!cur) return;
   if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT') return;
   if(e.key==='ArrowRight'){ e.preventDefault(); open?step(1):zoomAt(0); }
@@ -824,6 +1003,7 @@ load().then(()=>{
 
 
 if __name__ == '__main__':
+    threading.Thread(target=scheduler_loop, daemon=True).start()
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(('127.0.0.1', PORT), Handler) as srv:
         print(f'dashboard on http://localhost:{PORT}  (ctrl-c to stop)')
