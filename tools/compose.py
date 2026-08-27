@@ -356,6 +356,32 @@ def copy_band_luma(bg):
     return sum(px) / len(px)
 
 
+TOOL_POOL = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         'tool_pool.json')
+LANE_EXCLUDED = {'seller'}
+
+
+def assert_audience(tools):
+    """Raise if a roster drifts off the reader the account is written for.
+
+    A pool is a menu, not a target. Selling tooling is in the pool because it
+    was added deliberately, but a post built around it addresses someone
+    running a store, which is not this audience. That is how a roster ended
+    up pairing a day planner with a payments processor.
+    """
+    pool = _json.load(open(TOOL_POOL))
+    tags = pool.get('audience', {})
+    off = [t for t in tools if tags.get(t) in LANE_EXCLUDED]
+    if off:
+        raise SystemExit(
+            'tools outside the lane: ' + ', '.join(off) + '. ' + pool.get('_lane', ''))
+    unknown = [t for t in tools if t not in tags]
+    if unknown:
+        raise SystemExit('untagged tools: ' + ', '.join(unknown) +
+                         '. Add them to tool_pool.json audience map.')
+    return True
+
+
 def preflight(topic, tools, bgs, pillar='tools'):
     """Every guard, in one call, before anything renders.
 
@@ -366,6 +392,7 @@ def preflight(topic, tools, bgs, pillar='tools'):
     if pillar == 'tools':
         assert_one_llm(tools)
         assert_fresh_tools(tools)
+    assert_audience(tools)
     assert_varied(bgs)
     assert_bg_fresh(bgs, topic)
     return True
@@ -479,6 +506,39 @@ def _fit_display(text, variation, start, max_w):
     return display_font(40, variation)
 
 
+HOOK_POOL = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         'hook_pool.json')
+
+
+def assert_hook_approved(lines):
+    """Raise unless this exact hook is one the user wrote or signed off.
+
+    Hooks written from memory drift out of his voice, and he only finds out
+    after the post has shipped. The pool is the same mechanism as the
+    background rotation: draw from approved items, mark them used, and ask
+    for more when it runs dry rather than inventing one.
+    """
+    pool = _json.load(open(HOOK_POOL))
+    pair = [l.strip().lower() for l in lines]
+    for h in pool['hooks']:
+        if [x.strip().lower() for x in h['lines']] == pair:
+            return True
+    unused = [' / '.join(h['lines']) for h in pool['hooks'] if not h['used']]
+    raise SystemExit(
+        'hook not in the approved pool: "' + ' / '.join(lines) + '". '
+        'Use one of the unused approved hooks or ask for new ones. '
+        'Unused: ' + '; '.join(unused[:6]))
+
+
+def mark_hook_used(lines):
+    pool = _json.load(open(HOOK_POOL))
+    pair = [l.strip().lower() for l in lines]
+    for h in pool['hooks']:
+        if [x.strip().lower() for x in h['lines']] == pair:
+            h['used'] = True
+    _json.dump(pool, open(HOOK_POOL, 'w'), indent=1, ensure_ascii=False)
+
+
 def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
                accent=YELLOW):
     """Stacked uppercase hook: big headline, smaller line under it.
@@ -491,6 +551,7 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
     long headline gets smaller rather than running off the slide. If line 1
     lands far under its ceiling the headline is too long: shorten it.
     """
+    assert_hook_approved(lines)
     im = base_photo(bg, grad)
     im = frame_for_band(im, HOOK_BAND[0], HOOK_BAND[1])
     adaptive_scrim(im, HOOK_BAND[0], HOOK_BAND[1], target=88, strength_cap=0.62)
