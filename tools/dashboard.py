@@ -354,6 +354,10 @@ Rules, all enforced in code, so run them rather than trusting memory:
    until its md5 matches the local file. Pages lags behind the push; a post is
    not finished until it actually serves.
 
+Do NOT ingest new backgrounds and do NOT touch tools/slides/bg. The pool is
+curated by Thinh; a build picks from what is already there. Adding images he
+has not approved puts a look he never chose into his feed.
+
 Do NOT deliver anything to TikTok. Thinh approves and schedules that himself.
 Finish by printing: BUILT <topic> [, <topic>...]
 """

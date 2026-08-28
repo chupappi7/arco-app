@@ -21,8 +21,8 @@ TOOLS = ['ARCO', 'Claude', 'Notion', 'Canva', 'RevenueCat']
 # Slide 2 was on bg-h83, one of the bg-h81..h88 frames a build generated
 # itself when the pool ran short. Thinh retired all eight to bg/_unapproved/:
 # the pool is his to curate, so a build picks from what is already in it.
-BGS = ['bg-h32.jpg', 'bg-h20.jpg', 'bg-h82.jpg', 'bg-h36.jpg',
-       'bg-h85.jpg', 'bg-h39.jpg']
+BGS = ['bg-h12.jpg', 'bg-h21.jpg', 'bg-h22.jpg', 'bg-h24.jpg',
+       'bg-h50.jpg', 'bg-h29.jpg']
 
 BODY = {
  'Claude': [

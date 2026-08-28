@@ -253,6 +253,12 @@ def pick_hook_bg(prefer=None):
     except Exception:
         used = []
     unused = [b for b in pool if b not in used]
+    # Night desk setups are the strongest images in the pool and read as
+    # "someone's actual setup", which is the note the first slide wants. They
+    # are barred from app slides, so the hook is the only place they can go.
+    preferred = [b for b in unused if VIBES.get(b) in HOOK_ONLY_VIBES]
+    if preferred:
+        unused = preferred
     if not unused:                      # full cycle done: start over
         used, unused = [], pool
     if prefer and prefer in unused:
@@ -301,7 +307,11 @@ def assert_bg_roles(bgs):
 
 BG_HISTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'bg_history.json')
-BG_COOLDOWN = 3           # posts a background sits out before it can return
+# Off, at Thinh's call: backgrounds are scenery, not content, and the pool is
+# small enough that forcing a fresh set per post starves it. What still holds
+# is within a post: no adjacent vibe repeat, at most one person, night desks
+# on the hook only.
+BG_COOLDOWN = 0           # posts a background sits out before it can return
 
 
 def bg_history():
@@ -325,6 +335,8 @@ def assert_bg_fresh(bgs, topic=None):
     that reads as one templated post repeated, which is the thing the vibe
     rule exists to prevent.
     """
+    if BG_COOLDOWN <= 0:          # [-0:] is the whole list, not none of it
+        return True
     recent = [e for e in bg_history() if e['topic'] != topic][-BG_COOLDOWN:]
     seen = {b: e['topic'] for e in recent for b in e['bgs']}
     clash = [(b, seen[b]) for b in bgs if b in seen]

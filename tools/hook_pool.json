@@ -83,7 +83,7 @@
     "how i study 4 hours",
     "without touching my phone"
    ],
-   "used": false
+   "used": true
   },
   {
    "lines": [
@@ -104,7 +104,7 @@
     "this is how you lock in",
     "when you don't feel like it"
    ],
-   "used": false
+   "used": true
   }
  ]
 }
