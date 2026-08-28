@@ -17,7 +17,7 @@ os.makedirs(OUT, exist_ok=True)
 HOOK = ['5 apps i wish someone', 'showed me at 17']
 TOOLS = ['ARCO', 'Gemini', 'Obsidian', 'Raycast', 'Endel']
 BGS = ['bg-h33.jpg', 'bg-h35.jpg', 'bg-h24.jpg', 'bg-h22.jpg',
-       'bg-h45.jpg', 'bg-h34.jpg']
+       'bg-h45.jpg', 'bg-h87.jpg']
 
 BODY = {
  'Gemini': [

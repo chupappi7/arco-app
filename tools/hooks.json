@@ -304,6 +304,24 @@
    "title": "the tools i use to do a full day of work by noon",
    "caption": "arco keeps every task in one place and the whole day gets planned in 30 seconds, with focus mode putting every distraction away. a manus task runs on its own cloud machine and keeps going after you close the tab, so you hand off the long job and come back to a finished file. n8n can be hosted on your own machine, so a workflow reaches local files and private apis a cloud tool cannot touch. a cloudflare tunnel puts your local server on a public https url with no port opened, so you send someone the link while the site still runs on your laptop. any past vercel deployment can be promoted back to production in one click, so a bad release is undone in seconds instead of rebuilt and shipped again. #productivity #tools #aitools #buildinpublic",
    "_note": "tools pillar, ARCO at #1; hook from hook_pool, roster is one LLM (Manus) plus three tools whose teaching point had not been used yet"
+  },
+  {
+   "topic": "business-at-19",
+   "title": "the tools i use to run my business at 19 years old",
+   "caption": "i keep every task in arco and plan tomorrow in 30 seconds, and focus mode puts every distraction away the moment it starts. claude connects to your other apps through mcp servers, so it reads and edits inside them from the same chat with no exporting. a notion synced block shows the same content on several pages, so you change the price once and it updates everywhere it appears. a canva brand kit applies your fonts and colours to any template at once, so everything you make matches with no design work each time. revenuecat paywalls are configured in the dashboard and not in the build, so you change a price or a layout without shipping an app update. #buildinpublic #tools #productivity #solofounder",
+   "_note": "tools pillar, ARCO at #1; hook from hook_pool; one LLM (Claude); new dark backgrounds bg-h81+"
+  },
+  {
+   "topic": "showed-me-at-17",
+   "title": "5 apps i wish someone showed me at 17",
+   "caption": "arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away while blocked hours keeps them away on its own. gemini takes a whole textbook as an upload instead of pasted chunks, so you ask about one chapter and it answers from those pages. obsidian notes are plain markdown files sitting in a folder, so they open on any device and keep working with no internet. a raycast snippet expands a keyword into a whole block of text anywhere you type, so your email intro types itself from two letters. endel follows your heart rate through an apple watch, so the sound settles as you settle instead of looping the same track. #productivity #apps #studytok #tools",
+   "_note": "tools pillar, ARCO at #1; hook from hook_pool; one LLM (Gemini)"
+  },
+  {
+   "topic": "weekend-not-month",
+   "title": "how i ship in a weekend what used to take a month",
+   "caption": "every task and every habit gets planned in 30 seconds in arco, and focus mode puts every distraction away, my holy grail. an agents.md file in the repo tells codex how to build and test, so it runs your commands instead of guessing on every new task. in supabase the access rules live in the database itself and not in your app code, so a user only ever sees their own rows whatever calls the api. figma variables hold your colours and a mode swaps the whole set, so every screen switches to dark mode without redrawing anything. a public testflight link puts up to 10,000 testers on your beta, so you post one url instead of collecting emails to invite. #buildinpublic #indiedev #tools #shipping",
+   "_note": "tools pillar, ARCO at #1; hook from hook_pool; one LLM (Codex)"
   }
  ]
 }

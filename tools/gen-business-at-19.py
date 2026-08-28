@@ -18,8 +18,8 @@ os.makedirs(OUT, exist_ok=True)
 
 HOOK = ['the tools i use to run my business', 'at 19 years old']
 TOOLS = ['ARCO', 'Claude', 'Notion', 'Canva', 'RevenueCat']
-BGS = ['bg-h32.jpg', 'src-cars-clean.jpg', 'bg-n06.jpg', 'bg-h36.jpg',
-       'bg-h49.jpg', 'bg-h39.jpg']
+BGS = ['bg-h32.jpg', 'bg-h83.jpg', 'bg-h82.jpg', 'bg-h36.jpg',
+       'bg-h85.jpg', 'bg-h39.jpg']
 
 BODY = {
  'Claude': [

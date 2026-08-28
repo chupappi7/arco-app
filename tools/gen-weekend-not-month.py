@@ -16,8 +16,8 @@ os.makedirs(OUT, exist_ok=True)
 
 HOOK = ['how i ship in a weekend', 'what used to take a month']
 TOOLS = ['ARCO', 'Codex', 'Supabase', 'Figma', 'TestFlight']
-BGS = ['bg-h29.jpg', 'bg-h31.jpg', 'bg-h37.jpg', 'bg-n05.jpg',
-       'bg-h48.jpg', 'bg-h21.jpg']
+BGS = ['bg-h29.jpg', 'bg-h31.jpg', 'bg-h37.jpg', 'bg-h81.jpg',
+       'bg-h84.jpg', 'bg-h21.jpg']
 
 BODY = {
  'Codex': [

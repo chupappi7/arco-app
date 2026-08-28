@@ -372,5 +372,35 @@
    "Figma",
    "TestFlight"
   ]
+ },
+ {
+  "topic": "business-at-19",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "Notion",
+   "Canva",
+   "RevenueCat"
+  ]
+ },
+ {
+  "topic": "showed-me-at-17",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Obsidian",
+   "Raycast",
+   "Endel"
+  ]
+ },
+ {
+  "topic": "weekend-not-month",
+  "tools": [
+   "ARCO",
+   "Codex",
+   "Supabase",
+   "Figma",
+   "TestFlight"
+  ]
  }
 ]
