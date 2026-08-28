@@ -201,24 +201,32 @@ def pages_ready(topic, tries=12, wait=8):
     render, so a post edited after its last push would deliver the old slides.
     """
     import hashlib
+    import ssl
     import urllib.request
+    import certifi
+    # This Python has no usable default trust store, so an unverified fetch
+    # raises and the file reads as stale forever. Swallowing that error is how
+    # every slide looked out of date while Pages was serving the right bytes.
+    ctx = ssl.create_default_context(cafile=certifi.where())
     d = os.path.join(DRAFTS, topic)
     files = sorted(f for f in os.listdir(d) if f.endswith('.jpg'))
+    last_err = None
     for _ in range(tries):
         stale = []
         for f in files:
             local = hashlib.md5(open(os.path.join(d, f), 'rb').read()).hexdigest()
             try:
                 remote = hashlib.md5(urllib.request.urlopen(
-                    f'{PAGES}/{topic}/{f}', timeout=20).read()).hexdigest()
-            except Exception:
-                remote = None
+                    f'{PAGES}/{topic}/{f}', timeout=20, context=ctx).read()).hexdigest()
+            except Exception as exc:
+                remote, last_err = None, exc
             if remote != local:
                 stale.append(f)
         if not stale:
             return True, ''
         time.sleep(wait)
-    return False, 'Pages is still serving old slides for ' + ', '.join(stale)
+    detail = ' (last fetch error: %s)' % last_err if last_err else ''
+    return False, 'Pages is not serving the current ' + ', '.join(stale) + detail
 
 
 def run_draft(topic, keys):
