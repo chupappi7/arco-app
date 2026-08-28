@@ -1518,6 +1518,17 @@ load().then(()=>{
 </script></body></html>"""
 
 
+class Server(socketserver.ThreadingTCPServer):
+    """Threaded, because a delivery takes minutes.
+
+    On the single-threaded server one Draft call blocked every other request,
+    so slides stopped loading and the whole dashboard looked broken until the
+    send finished.
+    """
+    allow_reuse_address = True
+    daemon_threads = True
+
+
 if __name__ == '__main__':
     # A restart orphans any in-flight build: the thread that would mark it done
     # is gone, so the job would read as running forever.
@@ -1531,9 +1542,8 @@ if __name__ == '__main__':
             with open(path_, 'w') as fh:
                 json.dump(items, fh, indent=1, ensure_ascii=False)
     threading.Thread(target=scheduler_loop, daemon=True).start()
-    socketserver.TCPServer.allow_reuse_address = True
     tok = access_token()
-    with socketserver.TCPServer(('0.0.0.0', PORT), Handler) as srv:
+    with Server(('0.0.0.0', PORT), Handler) as srv:
         print(f'this mac   http://localhost:{PORT}')
         try:
             print(f'wifi       http://{lan_ip()}:{PORT}/?k={tok}   (same network)')

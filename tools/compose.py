@@ -108,7 +108,7 @@ def draw_text_block(im, items, shadow_alpha=170):
 BANDS = {
     'src-cars-clean.jpg': (0, 1),
     **{f'bg-n{i:02d}.jpg': (0, 1) for i in range(1, 11)},
-    **{f'bg-h{i:02d}.jpg': (0, 1) for i in range(1, 81) if i != 23},
+    **{f'bg-h{i:02d}.jpg': (0, 1) for i in range(1, 91) if i != 23},
 }
 
 # Backgrounds must be true 1080x1920. The bg-dNN pool was built by upscaling
