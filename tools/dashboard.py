@@ -1083,8 +1083,15 @@ if __name__ == '__main__':
     with socketserver.TCPServer(('0.0.0.0', PORT), Handler) as srv:
         print(f'this mac   http://localhost:{PORT}')
         try:
-            print(f'phone      http://{lan_ip()}:{PORT}/?k={tok}   (same Wi-Fi)')
+            print(f'wifi       http://{lan_ip()}:{PORT}/?k={tok}   (same network)')
         except Exception:
-            print('phone      no LAN address found')
+            print('wifi       no LAN address found')
+        try:
+            ts = subprocess.run(['tailscale', 'ip', '-4'], capture_output=True,
+                                text=True, timeout=5).stdout.strip().split('\n')[0]
+            if ts:
+                print(f'anywhere   http://{ts}:{PORT}/?k={tok}   (tailscale)')
+        except Exception:
+            pass
         print('ctrl-c to stop')
         srv.serve_forever()
