@@ -10,6 +10,11 @@
     "away.",
     "",
     "My holy grail."
+   ],
+   "themes": [
+    "planning",
+    "build",
+    "business"
    ]
   },
   {
@@ -22,6 +27,11 @@
     "away while I work.",
     "",
     "My holy grail."
+   ],
+   "themes": [
+    "planning",
+    "build",
+    "business"
    ]
   },
   {
@@ -33,6 +43,11 @@
     "Focus mode puts every distraction",
     "away, and Blocked Hours does it on",
     "a schedule."
+   ],
+   "themes": [
+    "planning",
+    "build",
+    "business"
    ]
   },
   {
@@ -45,6 +60,11 @@
     "away.",
     "",
     "My holy grail."
+   ],
+   "themes": [
+    "planning",
+    "build",
+    "business"
    ]
   },
   {
@@ -57,6 +77,11 @@
     "away the moment it starts.",
     "",
     "The one I would not delete."
+   ],
+   "themes": [
+    "planning",
+    "build",
+    "business"
    ]
   },
   {
@@ -68,6 +93,11 @@
     "Focus mode puts every distraction",
     "away, Blocked Hours keeps them",
     "away on its own."
+   ],
+   "themes": [
+    "planning",
+    "build",
+    "business"
    ]
   },
   {
@@ -80,6 +110,11 @@
     "away.",
     "",
     "My holy grail."
+   ],
+   "themes": [
+    "planning",
+    "build",
+    "business"
    ]
   },
   {
@@ -92,6 +127,11 @@
     "away until I am done.",
     "",
     "My holy grail."
+   ],
+   "themes": [
+    "planning",
+    "build",
+    "business"
    ]
   },
   {
@@ -105,6 +145,11 @@
     "every weekday.",
     "",
     "My holy grail."
+   ],
+   "themes": [
+    "planning",
+    "build",
+    "business"
    ]
   },
   {
@@ -117,6 +162,109 @@
     "away.",
     "",
     "The one I actually open every day."
+   ],
+   "themes": [
+    "planning",
+    "build",
+    "business"
+   ]
+  },
+  {
+   "id": "f1",
+   "themes": [
+    "focus",
+    "study",
+    "screentime"
+   ],
+   "lines": [
+    "Focus mode blocks every app on my",
+    "list for the whole session.",
+    "",
+    "The phone stops being a decision",
+    "while the timer runs.",
+    "",
+    "My holy grail."
+   ]
+  },
+  {
+   "id": "f2",
+   "themes": [
+    "focus",
+    "study"
+   ],
+   "lines": [
+    "I start a session and every app on",
+    "the list locks itself.",
+    "",
+    "Four hours later the phone has not",
+    "been picked up once.",
+    "",
+    "My holy grail."
+   ]
+  },
+  {
+   "id": "s1",
+   "themes": [
+    "screentime",
+    "discipline",
+    "schedule"
+   ],
+   "lines": [
+    "Blocked Hours closes the apps on a",
+    "schedule I set once.",
+    "",
+    "9am arrives and the feeds simply",
+    "do not open.",
+    "",
+    "The one I would not delete."
+   ]
+  },
+  {
+   "id": "s2",
+   "themes": [
+    "screentime",
+    "discipline"
+   ],
+   "lines": [
+    "The block runs on a timetable, not",
+    "on willpower.",
+    "",
+    "There is no decision left to make",
+    "when the hour starts.",
+    "",
+    "My holy grail."
+   ]
+  },
+  {
+   "id": "i1",
+   "themes": [
+    "insights",
+    "screentime"
+   ],
+   "lines": [
+    "Insights show where the hours went,",
+    "by app and by day.",
+    "",
+    "You stop guessing which one took",
+    "the evening.",
+    "",
+    "My holy grail."
+   ]
+  },
+  {
+   "id": "l1",
+   "themes": [
+    "learn",
+    "study"
+   ],
+   "lines": [
+    "I put the study block in and the",
+    "distracting apps close with it.",
+    "",
+    "The session ends when the timer",
+    "does, not when I give in.",
+    "",
+    "My holy grail."
    ]
   }
  ],
@@ -124,7 +272,10 @@
   "v1",
   "v2",
   "v3",
-  "v4"
+  "v4",
+  "f1",
+  "s1",
+  "v5"
  ],
- "rule": "Variations of the approved line. Closer on 7 of 10 angles; 'My holy grail.' is 5 of those 7 (~75%), the rest use same-register alternates: 'The one I would not delete.' / 'The one I actually open every day.' Blocked Hours on alternating angles."
+ "rule": "Variations of the approved line. Pick by THEME so the slide answers the hook: a study or screentime hook gets a focus or blocking angle, a build or business hook gets the planning angle. Closers stay in register; 'My holy grail.' carries most of them."
 }

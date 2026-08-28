@@ -185,17 +185,33 @@ ARCO_ANGLES = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            'arco_angles.json')
 
 
-def next_arco_angle():
-    """Return the next unused ARCO body copy, cycling through all angles.
+def next_arco_angle(theme=None):
+    """Return ARCO body copy that answers the hook, cycling within that theme.
+
+    Rotating blindly is how a study hook about not touching your phone got a
+    slide that opens on planning the day in 30 seconds. The app slide has to
+    answer the same question the hook asked, so pass the hook's theme
+    (focus, study, screentime, discipline, planning, build, business,
+    insights) and the copy is drawn from angles tagged for it.
 
     ARCO appears in every listicle, which makes its slide the most repeated
     text in the feed. Rotating the angle means a returning viewer learns a
     different feature each time instead of rereading the same three lines.
     """
     d = _json.load(open(ARCO_ANGLES))
-    unused = [a for a in d['angles'] if a['id'] not in d['used']]
+    pool = d['angles']
+    if theme:
+        matching = [a for a in pool if theme in a.get('themes', [])]
+        if matching:
+            pool = matching
+        else:
+            raise SystemExit(
+                f'no ARCO angle for theme "{theme}". Add one to arco_angles.json '
+                'rather than shipping copy that answers a different question.')
+    unused = [a for a in pool if a['id'] not in d['used']]
     if not unused:
-        d['used'], unused = [], d['angles']
+        d['used'] = [x for x in d['used'] if x not in {a['id'] for a in pool}]
+        unused = pool
     pick = unused[0]
     d['used'].append(pick['id'])
     _json.dump(d, open(ARCO_ANGLES, 'w'), indent=1)

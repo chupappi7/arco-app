@@ -341,6 +341,13 @@ Rules, all enforced in code, so run them rather than trusting memory:
    is the concrete consequence. Never a verdict. The claim must be a real
    feature of the product named, and must not repeat any teaching point
    already used in tools/hooks.json captions.
+4b. The slide must ANSWER THE HOOK, and that includes ARCO's. Pass the hook's
+   theme to compose.next_arco_angle(theme) -- focus, study, screentime,
+   discipline, planning, build, business or insights -- so a hook about
+   studying without touching your phone gets the blocking copy, not the
+   "plan the day in 30 seconds" copy. The same applies to every other tool:
+   pick the capability that answers what the hook promised. If a slide would
+   sit unchanged under a different hook, it is not answering this one.
 5. Write a generator script tools/gen-<topic>.py so the post can be rebuilt,
    render the slides to drafts/<topic>/01.jpg through 06.jpg, then READ every
    rendered JPG back and fix anything that looks wrong. A contact sheet per
