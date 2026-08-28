@@ -11,6 +11,8 @@ Stdlib only, no install. Binds to localhost.
 """
 import http.server
 import json
+import secrets
+import socket
 import mimetypes
 import os
 import socketserver
@@ -35,7 +37,33 @@ ACCOUNTS = [
     {'key': 'us', 'label': 'emiliagonzalez389'},
 ]
 CAP = 5                      # pending shares per account per rolling 24h
+TOKEN_FILE = os.path.join(REPO, 'tools', '.dashboard_token')
 _lock = threading.Lock()
+
+
+def access_token():
+    """Shared key for anything that is not localhost.
+
+    Reaching this from a phone means binding to the LAN, and these endpoints
+    delete posts and push drafts to TikTok using real tokens. Anyone on the
+    same Wi-Fi could otherwise hit them, so off-machine access needs the key.
+    """
+    if os.path.exists(TOKEN_FILE):
+        return open(TOKEN_FILE).read().strip()
+    tok = secrets.token_urlsafe(9)
+    with open(TOKEN_FILE, 'w') as fh:
+        fh.write(tok)
+    os.chmod(TOKEN_FILE, 0o600)
+    return tok
+
+
+def lan_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('8.8.8.8', 80))
+        return s.getsockname()[0]
+    finally:
+        s.close()
 
 
 def load(path, default):
@@ -269,18 +297,37 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
+    def authed(self):
+        if self.client_address[0] in ('127.0.0.1', '::1'):
+            return True
+        tok = access_token()
+        if ('k=' + tok) in (urllib.parse.urlparse(self.path).query or ''):
+            self._cookie = tok
+            return True
+        return ('dk=' + tok) in (self.headers.get('Cookie') or '')
+
+    def deny(self):
+        self._send(401, '<body style="font:16px system-ui;background:#020617;color:#94A3B8;'
+                        'padding:40px">Add the access key to the URL.</body>',
+                   'text/html; charset=utf-8')
+
     def _send(self, code, body, ctype='application/json'):
         if isinstance(body, (dict, list)):
             body = json.dumps(body).encode()
         elif isinstance(body, str):
             body = body.encode()
         self.send_response(code)
+        if getattr(self, '_cookie', None):
+            self.send_header('Set-Cookie',
+                             'dk=%s; Path=/; Max-Age=31536000; SameSite=Lax' % self._cookie)
         self.send_header('Content-Type', ctype)
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
     def do_GET(self):
+        if not self.authed():
+            return self.deny()
         path = urllib.parse.urlparse(self.path).path
         if path == '/':
             return self._send(200, PAGE, 'text/html; charset=utf-8')
@@ -302,6 +349,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return self._send(404, {'error': 'not found'})
 
     def do_POST(self):
+        if not self.authed():
+            return self.deny()
         path = urllib.parse.urlparse(self.path).path
         n = int(self.headers.get('Content-Length', 0))
         body = json.loads(self.rfile.read(n) or b'{}')
@@ -603,7 +652,32 @@ textarea{min-height:132px;resize:vertical;line-height:1.65}
 .toggle:hover{border-color:var(--accent);color:var(--text)}
 .toggle[aria-pressed="true"]{background:var(--accent);color:#04222f;border-color:var(--accent)}
 .toggle svg{width:16px;height:16px}
-@media (max-width:900px){.app{grid-template-columns:1fr}aside{display:none}}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr;height:auto;min-height:100vh}
+  /* The sidebar becomes a scrolling strip at the top: hiding it left a phone
+     with no filters and no account state, which is most of the tool. */
+  aside{border-right:0;border-bottom:1px solid var(--line);padding:14px;gap:14px}
+  .brand{padding:0}
+  nav{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #nav{display:flex;gap:8px;min-width:max-content}
+  .nav{width:auto;white-space:nowrap;padding:9px 13px;border:1px solid var(--line-2)}
+  .nav .ct{margin-left:6px}
+  .navlabel{display:none}
+  .accounts{margin-top:0;flex-direction:row;overflow-x:auto;gap:8px}
+  .acct{min-width:172px;flex:none}
+  .bar{padding:14px 16px}
+  .wrap{padding:16px 16px 48px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:11px}
+  .slides{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px}
+  .srow{flex-wrap:wrap}
+  .srow .nm{width:auto}
+  .srow .sp{margin-left:0;width:100%}
+  .srow .sp .btn{flex:1}
+  #zoom .prev{left:8px}#zoom .next{right:8px}
+  #zoom .nav{width:44px;height:44px}
+  #zoom img{max-width:82vw}
+  .toolbar{flex-wrap:wrap}
+}
 </style></head><body>
 <div class="app">
 <aside>
@@ -1005,6 +1079,12 @@ load().then(()=>{
 if __name__ == '__main__':
     threading.Thread(target=scheduler_loop, daemon=True).start()
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(('127.0.0.1', PORT), Handler) as srv:
-        print(f'dashboard on http://localhost:{PORT}  (ctrl-c to stop)')
+    tok = access_token()
+    with socketserver.TCPServer(('0.0.0.0', PORT), Handler) as srv:
+        print(f'this mac   http://localhost:{PORT}')
+        try:
+            print(f'phone      http://{lan_ip()}:{PORT}/?k={tok}   (same Wi-Fi)')
+        except Exception:
+            print('phone      no LAN address found')
+        print('ctrl-c to stop')
         srv.serve_forever()

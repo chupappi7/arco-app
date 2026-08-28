@@ -17,3 +17,4 @@ tools/replicate_queue.json
 tools/redo_queue.json
 tools/post_status.json
 tools/schedule.json
+tools/.dashboard_token
