@@ -330,6 +330,99 @@ Finish by printing: BUILT <topic> [, <topic>...]
 """
 
 
+PUSH_RULE = """
+Commit and push when the slides are final. TikTok pulls the images from GitHub
+Pages, so a post that is only on disk cannot be delivered. After pushing, poll
+https://chupappi7.github.io/arco-app/drafts/<topic>/<nn>.jpg for every slide
+until its md5 matches the local file; Pages lags behind the push.
+Do NOT deliver anything to TikTok.
+"""
+
+REDO_PROMPT = """Fix ONE slide in an existing TikTok carousel. Work in {repo}.
+
+Post: {topic}
+Slide: {slide:02d}.jpg (number {slide} in the carousel)
+What Thinh says is wrong with it:
+{note}
+
+1. Find tools/gen-*.py referencing '{topic}'. That file is the spec.
+2. Change ONLY what slide {slide} needs. Leave the other slides alone.
+3. Re-render just that slide through the same compose helper, writing to
+   drafts/{topic}/{slide:02d}.jpg, and read the JPG back to confirm the
+   complaint is actually fixed.
+4. Keep every guard true: both body lines teach and neither is a verdict, the
+   claim is a real feature of the product named, the background clears
+   compose.copy_band_luma and does not repeat an adjacent vibe, night-desk
+   vibes are hook-only, hooks only from tools/hook_pool.json.
+5. Update the generator so a rebuild produces the fixed slide too.
+""" + PUSH_RULE + """
+Finish by printing: FIXED <what changed>
+"""
+
+REPLICATE_PROMPT = """Replicate a post that worked. Work in {repo}.
+
+Source post: {source}
+Its roster was: {source_roster}
+Suggested roster for the new one: {suggested}
+
+Read ~/.claude/skills/tiktok-pipeline/examples.md for register first.
+
+Keep what made the source work: the hook's shape and the roster pattern.
+Change everything that would make it a repeat: a different hook from
+tools/hook_pool.json, the suggested roster, fresh backgrounds, and teaching
+points that appear nowhere in tools/hooks.json captions.
+
+ARCO leads at slide 1, exactly one LLM, every tool must pass
+compose.assert_audience, and call compose.preflight(topic, tools, bgs) before
+rendering. Write tools/gen-<topic>.py, render six slides, read them back, and
+register the post in tools/hooks.json.
+""" + PUSH_RULE + """
+Finish by printing: BUILT <topic>
+"""
+
+
+def _agent(prompt, mark, ok_token):
+    """Run a headless Claude in the repo and record the outcome."""
+    mark(status='running', started=time.time())
+    try:
+        p = subprocess.run(['claude', '-p', prompt], cwd=REPO,
+                           capture_output=True, text=True, timeout=3600)
+        out = ((p.stdout or '') + (p.stderr or '')).strip()
+        good = ok_token in out
+        mark(status='done' if good else 'failed', done=good,
+             log=out[-1200:] or 'no output', finished=time.time())
+    except Exception as exc:
+        mark(status='failed', log=str(exc))
+
+
+def run_redo(job):
+    def mark(**kw):
+        with _lock:
+            q = redo_queue()
+            for x in q:
+                if x['at'] == job['at']:
+                    x.update(kw)
+            with open(REDO, 'w') as fh:
+                json.dump(q, fh, indent=1, ensure_ascii=False)
+    _agent(REDO_PROMPT.format(repo=REPO, topic=job['topic'], slide=job['slide'],
+                              note=job['note']), mark, 'FIXED')
+
+
+def run_replicate(job):
+    def mark(**kw):
+        with _lock:
+            q = replicate_queue()
+            for x in q:
+                if x['at'] == job['at']:
+                    x.update(kw)
+            with open(REPLICATE, 'w') as fh:
+                json.dump(q, fh, indent=1, ensure_ascii=False)
+    _agent(REPLICATE_PROMPT.format(repo=REPO, source=job['from'],
+                                   source_roster=', '.join(job['source_roster']),
+                                   suggested=', '.join(job['suggested_roster'])),
+           mark, 'BUILT')
+
+
 def run_build(job):
     """Actually build the posts by handing the job to a headless Claude run.
 
@@ -565,6 +658,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._send(200, {'ok': True, 'moved_to': dest})
         if path == '/api/redo':
             n = queue_redo(body['topic'], int(body['slide']), body.get('note', ''))
+            job = [x for x in redo_queue() if not x.get('done')][-1]
+            threading.Thread(target=run_redo, args=(job,), daemon=True).start()
             return self._send(200, {'ok': True, 'open': n})
         if path == '/api/like':
             with _lock:
@@ -593,6 +688,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 })
                 with open(REPLICATE, 'w') as fh:
                     json.dump(q, fh, indent=1, ensure_ascii=False)
+            threading.Thread(target=run_replicate, args=(q[-1],), daemon=True).start()
             return self._send(200, {'ok': True})
         if path == '/api/publish':
             # Publishing happens by hand in the TikTok app and the API cannot
@@ -971,6 +1067,11 @@ function render(){
   if(running) window._poll = setTimeout(()=>load().then(render), 6000);
 }
 
+function poll(){
+  clearTimeout(window._poll2);
+  window._poll2 = setTimeout(()=>load().then(()=>{ render(); poll(); }), 8000);
+}
+
 const TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"'
   +' stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>'
   +'<path d="M10 11v6M14 11v6"/></svg>';
@@ -1260,8 +1361,9 @@ async function redo(){
   const keep=sel; await load(); sel=keep; render();
   const l=document.getElementById('rlog');
   if(l){ l.classList.add('on');
-    l.textContent='Requested. Tell Claude "do the redos" and it rebuilds this slide with your reason, '
-      +'then the slide updates here. '+r.open+' slide'+(r.open===1?'':'s')+' waiting.'; }
+    l.textContent='Rebuilding slide '+keep+' now. It re-renders, checks the result and pushes, '
+      +'so give it a few minutes. This page updates itself.'; }
+  poll();
 }
 
 function say(t){const l=document.getElementById('log');if(l){l.textContent=t;l.classList.add('on');}}
@@ -1278,7 +1380,8 @@ async function like(v){
 async function replicate(){
   await fetch('/api/replicate',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({topic:cur})}); await load();
-  say('Queued. The next batch builds it: same hook shape and roster pattern, different tools,\nfresh backgrounds and new teaching points.');
+  say('Replicating now: same hook shape and roster pattern, different tools,\nfresh backgrounds and new teaching points. It appears in Create posts when done.');
+  poll();
 }
 async function publish(key,v){
   await fetch('/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -1322,13 +1425,15 @@ load().then(()=>{
 if __name__ == '__main__':
     # A restart orphans any in-flight build: the thread that would mark it done
     # is gone, so the job would read as running forever.
-    _q = build_queue()
-    if any(b.get('status') == 'running' for b in _q):
-        for b in _q:
-            if b.get('status') == 'running':
-                b['status'] = 'interrupted'
-                b['log'] = 'the dashboard restarted while this was building; check drafts/'
-        save_builds(_q)
+    for path_, loader in ((BUILD, build_queue), (REDO, redo_queue), (REPLICATE, replicate_queue)):
+        items = loader()
+        if any(b.get('status') == 'running' for b in items):
+            for b in items:
+                if b.get('status') == 'running':
+                    b['status'] = 'interrupted'
+                    b['log'] = 'the dashboard restarted mid-run; check drafts/'
+            with open(path_, 'w') as fh:
+                json.dump(items, fh, indent=1, ensure_ascii=False)
     threading.Thread(target=scheduler_loop, daemon=True).start()
     socketserver.TCPServer.allow_reuse_address = True
     tok = access_token()
