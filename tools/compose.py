@@ -323,11 +323,10 @@ def assert_bg_roles(bgs):
 
 BG_HISTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'bg_history.json')
-# Off, at Thinh's call: backgrounds are scenery, not content, and the pool is
-# small enough that forcing a fresh set per post starves it. What still holds
-# is within a post: no adjacent vibe repeat, at most one person, night desks
-# on the hook only.
-BG_COOLDOWN = 0           # posts a background sits out before it can return
+# One, not three: a background may come back, it just must not appear in the
+# very next post. Forcing a fresh set every time starves a pool this size, but
+# two posts running with the same photo is the thing that reads as templated.
+BG_COOLDOWN = 1           # posts a background sits out before it can return
 
 
 def bg_history():

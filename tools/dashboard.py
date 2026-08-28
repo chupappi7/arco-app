@@ -351,7 +351,8 @@ Rules, all enforced in code, so run them rather than trusting memory:
 5. Write a generator script tools/gen-<topic>.py so the post can be rebuilt,
    render the slides to drafts/<topic>/01.jpg through 06.jpg, then READ every
    rendered JPG back and fix anything that looks wrong. A contact sheet per
-   post is fine.
+   post is fine. Undersized hook text, copy washed out over a bright frame and
+   a wrong icon are all obvious by eye and invisible in the code.
 6. Register each post in tools/hooks.json with topic, title and caption.
    Call compose.record_post_tools and compose.record_post_bgs.
 
