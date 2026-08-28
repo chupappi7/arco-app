@@ -1242,7 +1242,9 @@ function card(p){
       alt="First slide of ${esc(p.topic)}"></div>
     <div class="meta">
       <div class="tt">${esc(p.topic)}</div>
-      <div class="rs">${p.from_replicate?'replicated from '+esc(p.from_replicate)+' · ':''}${esc(p.roster.join(' · ')||'roster not recorded')}</div>
+      <div class="rs">${p.registered?'':'<span style="color:var(--warn)">no caption · </span>'}${
+        p.from_replicate?'replicated from '+esc(p.from_replicate)+' · ':''}${
+        esc(p.roster.join(' · ')||'roster not recorded')}</div>
       <div class="pills"><span class="pill ${p.approved&&st==='create'?'ready':st}">${
           st==='create' ? (p.approved?'ready':'to review') : st}</span>
         ${(p.schedules||[]).length?`<span class="pill scheduled">${fmt(p.schedules[0].at)}</span>`:''}
