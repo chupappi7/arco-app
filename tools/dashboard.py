@@ -1093,9 +1093,12 @@ async function load(){
   DATA = await (await fetch('/api/posts')).json();
   paintRuns();
   // poll whenever anything is running, from any page
+  // Poll fast while work is running, slowly otherwise. Without the slow beat
+  // the last paint sticks: nothing refetches, so a finished run keeps showing
+  // its timer until you reload the page by hand.
   clearTimeout(window._runpoll);
-  if ((DATA.runs||[]).length)
-    window._runpoll = setTimeout(()=>load().then(render), 5000);
+  window._runpoll = setTimeout(()=>load().then(render),
+                               (DATA.runs||[]).length ? 5000 : 20000);
   const unseen = DATA.posts.some(p => !p.seen && stateOf(p)==='create');
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
     DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked:stateOf(p)===k).length]));
