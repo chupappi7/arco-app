@@ -191,8 +191,42 @@ def list_posts():
     return out
 
 
+PAGES = 'https://chupappi7.github.io/arco-app/drafts'
+
+
+def pages_ready(topic, tries=12, wait=8):
+    """True once Pages serves byte-identical slides.
+
+    autopost preflights that the URLs resolve, not that they are the current
+    render, so a post edited after its last push would deliver the old slides.
+    """
+    import hashlib
+    import urllib.request
+    d = os.path.join(DRAFTS, topic)
+    files = sorted(f for f in os.listdir(d) if f.endswith('.jpg'))
+    for _ in range(tries):
+        stale = []
+        for f in files:
+            local = hashlib.md5(open(os.path.join(d, f), 'rb').read()).hexdigest()
+            try:
+                remote = hashlib.md5(urllib.request.urlopen(
+                    f'{PAGES}/{topic}/{f}', timeout=20).read()).hexdigest()
+            except Exception:
+                remote = None
+            if remote != local:
+                stale.append(f)
+        if not stale:
+            return True, ''
+        time.sleep(wait)
+    return False, 'Pages is still serving old slides for ' + ', '.join(stale)
+
+
 def run_draft(topic, keys):
     """Deliver via autopost.js, one attempt per account, and record it."""
+    ok, why = pages_ready(topic)
+    if not ok:
+        return {k: {'status': 'FAILED', 'detail': why + '. Commit and push, then retry.',
+                    'at': time.time()} for k in keys}
     results = {}
     env = dict(os.environ)
     for line in open(os.path.join(REPO, '.env')):
@@ -240,6 +274,88 @@ def statuses():
 
 def build_queue():
     return load(BUILD, [])
+
+
+def save_builds(q):
+    with open(BUILD, 'w') as fh:
+        json.dump(q, fh, indent=1, ensure_ascii=False)
+
+
+BUILD_PROMPT = """Build {count} new {pillar} post(s) for the TikTok pipeline. Work in {repo}.
+
+{note}
+Read ~/.claude/skills/tiktok-pipeline/examples.md FIRST for register, and
+content.md for the rules. Skipping examples.md is how hooks and copy drift out
+of Thinh's voice; it is not optional.
+
+Rules, all enforced in code, so run them rather than trusting memory:
+
+1. Hooks MUST come from tools/hook_pool.json. compose.hook_slide refuses any
+   other hook. Mark each one used with compose.mark_hook_used. If there are
+   not enough unused hooks, build fewer and say so.
+2. Roster from tools/tool_pool.json. ARCO leads at slide 1. Exactly one LLM
+   per post, rotated between posts. Every tool must pass
+   compose.assert_audience.
+3. Call compose.preflight(topic, tools, bgs) before rendering. Pick
+   backgrounds with the same approach as tools/gen-daily-batch.py: skip
+   hook-only vibes on app slides, reject anything whose copy_band_luma is
+   above compose.BAND_MAX_LUMA, no adjacent vibe repeats, at most one person.
+4. Both body lines on a slide must teach. First line is the mechanism, second
+   is the concrete consequence. Never a verdict. The claim must be a real
+   feature of the product named, and must not repeat any teaching point
+   already used in tools/hooks.json captions.
+5. Write a generator script tools/gen-<topic>.py so the post can be rebuilt,
+   render the slides to drafts/<topic>/01.jpg through 06.jpg, then READ every
+   rendered JPG back and fix anything that looks wrong. A contact sheet per
+   post is fine.
+6. Register each post in tools/hooks.json with topic, title and caption.
+   Call compose.record_post_tools and compose.record_post_bgs.
+
+7. Commit and push. TikTok pulls the images from GitHub Pages, so a post that
+   is only on disk cannot be delivered. After pushing, poll
+   https://chupappi7.github.io/arco-app/drafts/<topic>/<nn>.jpg for every slide
+   until its md5 matches the local file. Pages lags behind the push; a post is
+   not finished until it actually serves.
+
+Do NOT deliver anything to TikTok. Thinh approves and schedules that himself.
+Finish by printing: BUILT <topic> [, <topic>...]
+"""
+
+
+def run_build(job):
+    """Actually build the posts by handing the job to a headless Claude run.
+
+    Writing a post is judgment, not a transform: hooks, rosters and teaching
+    points all need choices. So the button starts an agent rather than
+    templating something. It is scoped to writing into drafts/ and hooks.json,
+    and explicitly forbidden from committing or delivering.
+    """
+    note = ('Thinh asked for: ' + job['note'] + '\n') if job.get('note') else ''
+    prompt = BUILD_PROMPT.format(count=job['count'], pillar=job.get('pillar', 'tools'),
+                                 repo=REPO, note=note)
+
+    def mark(**kw):
+        with _lock:
+            q = build_queue()
+            for x in q:
+                if x['at'] == job['at']:
+                    x.update(kw)
+            save_builds(q)
+
+    mark(status='running', started=time.time())
+    try:
+        p = subprocess.run(['claude', '-p', prompt], cwd=REPO,
+                           capture_output=True, text=True, timeout=3600)
+        out = ((p.stdout or '') + (p.stderr or '')).strip()
+        ok = 'BUILT' in out
+        mark(status='done' if ok else 'failed', done=ok,
+             log=out[-1200:] or 'no output', finished=time.time())
+    except subprocess.TimeoutExpired:
+        mark(status='failed', log='timed out after an hour')
+    except FileNotFoundError:
+        mark(status='failed', log='claude CLI not found on PATH')
+    except Exception as exc:
+        mark(status='failed', log=str(exc))
 
 
 def hooks_available():
@@ -350,7 +466,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._send(200, {'posts': list_posts(), 'accounts': ACCOUNTS,
                                     'pending': pending_counts(), 'cap': CAP,
                                     'hooks_left': hooks_available(),
-                                    'builds': [b for b in build_queue() if not b.get('done')]})
+                                    'builds': [b for b in build_queue()
+                                               if not b.get('done') or b.get('status') == 'running']})
         if path == '/icon/arco.png':
             f = os.path.join(REPO, 'tools', 'slides', 'icons', 'icon-arco.png')
             with open(f, 'rb') as fh:
@@ -382,12 +499,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if body.get('cancel'):
                     q = [b for b in q if b.get('done')]
                 else:
-                    q.append({'count': max(1, min(10, int(body.get('count', 1)))),
-                              'pillar': body.get('pillar') or 'tools',
-                              'note': (body.get('note') or '').strip(),
-                              'at': time.time(), 'done': False})
-                with open(BUILD, 'w') as fh:
-                    json.dump(q, fh, indent=1, ensure_ascii=False)
+                    job = {'count': max(1, min(10, int(body.get('count', 1)))),
+                           'pillar': body.get('pillar') or 'tools',
+                           'note': (body.get('note') or '').strip(),
+                           'at': time.time(), 'done': False, 'status': 'queued'}
+                    q.append(job)
+                    threading.Thread(target=run_build, args=(job,), daemon=True).start()
+                save_builds(q)
             return self._send(200, {'ok': True})
         if path == '/api/seen':
             with _lock:
@@ -839,6 +957,10 @@ function render(){
                    : `<div class="empty">Nothing here yet.</div>`);
   const r=document.getElementById('nrange');
   if(r) r.oninput = e => document.getElementById('ncount').textContent = e.target.value;
+  // poll while a build is running so finished posts appear without a refresh
+  const running = (DATA.builds||[]).some(b=>['queued','running'].includes(b.status));
+  clearTimeout(window._poll);
+  if(running) window._poll = setTimeout(()=>load().then(render), 6000);
 }
 
 const TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"'
@@ -1190,6 +1312,15 @@ load().then(()=>{
 
 
 if __name__ == '__main__':
+    # A restart orphans any in-flight build: the thread that would mark it done
+    # is gone, so the job would read as running forever.
+    _q = build_queue()
+    if any(b.get('status') == 'running' for b in _q):
+        for b in _q:
+            if b.get('status') == 'running':
+                b['status'] = 'interrupted'
+                b['log'] = 'the dashboard restarted while this was building; check drafts/'
+        save_builds(_q)
     threading.Thread(target=scheduler_loop, daemon=True).start()
     socketserver.TCPServer.allow_reuse_address = True
     tok = access_token()

@@ -298,6 +298,12 @@
    "title": "5 tools i wish i found sooner",
    "caption": "arco manages all my tasks and the day takes 30 seconds to plan, and blocked hours closes the apps on a schedule. in cursor, tab predicts your next edit across the file rather than the next word, so it follows the change you already started. cleanshot x lets you pin a screenshot so it floats above every other window and you copy from it without switching back and forth. stripe test mode gives you fake cards that behave like real ones, so you run the whole checkout before taking a payment. posthog puts feature flags and session replay in one tool, so you ship to ten percent and watch what they actually did. #tools #indiedev #productivity #buildinpublic",
    "_note": "tools pillar, ARCO at #1"
+  },
+  {
+   "topic": "work-by-noon",
+   "title": "the tools i use to do a full day of work by noon",
+   "caption": "arco keeps every task in one place and the whole day gets planned in 30 seconds, with focus mode putting every distraction away. a manus task runs on its own cloud machine and keeps going after you close the tab, so you hand off the long job and come back to a finished file. n8n can be hosted on your own machine, so a workflow reaches local files and private apis a cloud tool cannot touch. a cloudflare tunnel puts your local server on a public https url with no port opened, so you send someone the link while the site still runs on your laptop. any past vercel deployment can be promoted back to production in one click, so a bad release is undone in seconds instead of rebuilt and shipped again. #productivity #tools #aitools #buildinpublic",
+   "_note": "tools pillar, ARCO at #1; hook from hook_pool, roster is one LLM (Manus) plus three tools whose teaching point had not been used yet"
   }
  ]
 }
