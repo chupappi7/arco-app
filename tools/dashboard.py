@@ -271,6 +271,7 @@ def run_draft(topic, keys):
         if line and not line.startswith('#') and '=' in line:
             k, v = line.split('=', 1)
             env[k] = v
+    print(f'[draft] {topic} -> {", ".join(keys)}', flush=True)
     for key in keys:
         try:
             p = subprocess.run(
@@ -278,7 +279,9 @@ def run_draft(topic, keys):
                 cwd=REPO, env=env, capture_output=True, text=True, timeout=600)
             out = p.stdout + p.stderr
         except subprocess.TimeoutExpired:
-            out = 'timeout'
+            out = 'timeout after 10 minutes'
+        except Exception as exc:
+            out = f'runner error: {exc}'
         if 'SEND_TO_USER_INBOX' in out:
             status, detail = 'SENT', ''
         elif 'spam_risk' in out.lower():
@@ -287,6 +290,7 @@ def run_draft(topic, keys):
             reason = [l.strip() for l in out.splitlines() if 'fail_reason' in l]
             status, detail = 'FAILED', (reason[0] if reason else out.strip()[-160:])
         results[key] = {'status': status, 'detail': detail, 'at': time.time()}
+        print(f'[draft] {topic} {key}: {status} {detail[:80]}', flush=True)
     with _lock:
         log = delivery_log()
         log.setdefault(topic, {}).update(results)
@@ -903,6 +907,17 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
   border-top-color:#04222f;border-radius:50%;animation:spin .7s linear infinite;
   vertical-align:-2px;margin-right:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:20px 22px;margin-bottom:16px;transition:opacity .18s}
+.step.locked{opacity:.5}
+.stephead{display:flex;align-items:center;gap:11px;margin:0 0 16px}
+.stepnum{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font:600 12px/1 "Fira Code",monospace;
+  background:var(--surface-2);color:var(--dim);border:1px solid var(--line-2);flex:none}
+.stephead.now .stepnum{background:var(--accent);color:#04222f;border-color:var(--accent)}
+.stephead.done .stepnum{background:#14532d;color:var(--ok);border-color:#1f4429}
+.steplabel{font-size:14px;font-weight:600}
+.stephead.todo .steplabel{color:var(--muted)}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
 .panel h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
   margin:0 0 14px;font-weight:500}
@@ -1015,7 +1030,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
   <div class="accounts" id="accounts"></div>
 </aside>
 <main>
-  <div class="bar"><h1 id="ttl">Create posts</h1><span class="sub" id="cnt"></span>
+  <div class="bar"><h1 id="ttl">Inbox</h1><span class="sub" id="cnt"></span>
   <div id="runs" style="margin-left:auto"></div></div>
   <div class="wrap" id="view"></div>
 </main>
@@ -1054,8 +1069,8 @@ const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&
 let DATA=null, cur=null, filter='create', sel=0, redoMode=false, zi=-1;
 const PILLARS=[['tools','Tools'],['screentime','Screen time'],['discipline','Discipline'],
                ['build','Building'],['learn','Studying']];
-const FILTERS=[['create','Create posts'],['drafted','Drafted'],['published','Published'],
-               ['liked','Liked'],['archive','Archive'],['all','All posts']];
+const FILTERS=[['create','Inbox'],['drafted','Drafted'],['published','Published'],
+               ['liked','Performing'],['archive','Archive'],['all','All posts']];
 
 const DAY=86400;
 function stateOf(p){
@@ -1112,6 +1127,7 @@ async function load(){
   window._runpoll = setTimeout(()=>load().then(render),
                                (DATA.runs||[]).length ? 5000 : 20000);
   const unseen = DATA.posts.some(p => !p.seen && stateOf(p)==='create');
+  ICONS.liked = '<path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/>';
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
     DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked:stateOf(p)===k).length]));
   ICONS.archive = ICONS.archive || '<path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>';
@@ -1249,7 +1265,7 @@ function card(p){
       <div class="pills"><span class="pill ${p.approved&&st==='create'?'ready':st}">${
           st==='create' ? (p.approved?'ready':'to review') : st}</span>
         ${(p.schedules||[]).length?`<span class="pill scheduled">${fmt(p.schedules[0].at)}</span>`:''}
-        ${p.liked?'<span class="pill liked">liked</span>':''}
+        ${p.liked?'<span class="pill liked">performing</span>':''}
         ${p.queued?'<span class="pill">replicating</span>':''}
         ${(p.redos||[]).length?`<span class="pill">${p.redos.length} redo</span>`:''}</div>
     </div></button></div>`;
@@ -1284,96 +1300,103 @@ function detail(){
   const p=DATA.posts.find(x=>x.topic===cur);
   if(!p) return back();
   document.getElementById('cnt').textContent='';
+  const sent = DATA.accounts.filter(a=>(p.delivery||{})[a.key]);
+  const pub  = DATA.accounts.filter(a=>((p.delivery||{})[a.key]||{}).published);
+  const step = pub.length ? 3 : (p.approved ? 2 : 1);
+  const head = (n,label,note) => `<div class="stephead ${step===n?'now':step>n?'done':'todo'}">
+      <span class="stepnum">${step>n?'✓':n}</span><span class="steplabel">${label}</span>
+      ${note?`<span class="sub">${note}</span>`:''}</div>`;
+
   document.getElementById('view').innerHTML = `
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
       <button class="back" onclick="back()">&larr; Back</button>
       <span class="sub">${esc(p.note||'')}</span>
-      <button class="back" style="margin-left:auto" onclick="del(event,'${p.topic}')"
-        aria-label="Delete this post">Delete post</button></div>
-    <div class="toolbar">
-      <button class="toggle" aria-pressed="${redoMode}" onclick="toggleRedo()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-          stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/>
-          <path d="M3 13a9 9 0 1 0 3-7.7L3 8"/></svg>
-        ${redoMode?'Done redoing':'Redo a slide'}</button>
-      <span class="sub">${redoMode
-        ? 'Pick the slide that is wrong.'
-        : 'Click a slide to open it. Arrow keys move between slides.'}</span>
-    </div>
-    <div class="slides">${p.slides.map((s,i)=>
-      `<button class="sl" aria-pressed="${redoMode && sel===i+1}"
-         onclick="${redoMode?`pick(${i+1})`:`zoomAt(${i})`}"
-         aria-label="${redoMode?'Select':'Open'} slide ${i+1}">
-         <img loading="lazy" src="/slide/${p.topic}/${s}?v=${(p.slide_mtimes||{})[s]||0}"
-              alt="Slide ${i+1}">
-         <span class="num">${i+1}${(p.redos||[]).some(r=>r.slide===i+1)?' redo':''}</span>
-       </button>`).join('')}</div>
-    ${!redoMode ? '' : `
-    <div class="panel"><h2>Redo a slide</h2>
-      <div class="field">
-        <label for="note">${sel?`What is wrong with slide ${sel}?`:'Select a slide above first'}</label>
-        <textarea id="note" style="min-height:84px" ${sel?'':'disabled'}
-          placeholder="e.g. background is too bright, the copy is washed out"></textarea>
-      </div>
-      <div class="actions">
-        <button class="btn" id="rgb" onclick="redo()" ${sel?'':'disabled'}>Redo slide ${sel||''}</button>
-        <button class="btn sec" onclick="zoomSel()" ${sel?'':'disabled'}>View full size</button>
-      </div>
-      <div class="log ${(p.redos||[]).length?'on':''}" id="rlog">${
-        (p.redos||[]).map(r=>'slide '+r.slide+': '+esc(r.note)).join('\n')}</div>
-    </div>`}
-
-    ${p.approved ? `
-    <div class="panel"><h2>Schedule</h2>
-      ${(p.schedules||[]).length
-        ? `<p style="margin:0 0 14px;color:var(--muted);font-size:13px">Queued for
-             <span class="when">${fmt(p.schedules[0].at)}</span>
-             to ${esc((p.schedules[0].accounts||[]).map(k=>label(k)).join(', ')||'all accounts')}
-             ${p.schedules[0].stagger_min?`, ${p.schedules[0].stagger_min} min apart`:''}.
-             The dashboard must be running when it comes due.</p>
-           <div class="actions">
-             <button class="btn sec" onclick="askSchedule()">Change</button>
-             <button class="btn sec" onclick="cancelSchedule()">Cancel schedule</button></div>`
-        : `<p style="margin:0 0 14px;color:var(--muted);font-size:13px">Approved and ready.
-             Schedule the drafting, or send it now from Delivery below.</p>
-           <div class="actions"><button class="btn" onclick="askSchedule()">Schedule drafting</button>
-             <button class="btn sec" onclick="approve(false)">Move back to Create</button></div>`}
-    </div>` : `
-    <div class="panel"><h2>Review</h2>
-      <p style="margin:0 0 14px;color:var(--muted);font-size:13px">
-        Check the slides and the copy. Approving moves it to Ready, where you can schedule drafting.</p>
-      <div class="actions"><button class="btn" onclick="approve(true)">Approve</button></div>
-    </div>`}
-
-    <div class="panel"><h2>Delivery</h2>
-      ${DATA.accounts.map(a=>{
-        const r=(p.delivery||{})[a.key];
-        const st=!r?'review':r.published?'published':r.status==='SENT'?'drafted':'failed';
-        const lab=st==='review'?'not sent':st;
-        return `<div class="srow">
-          <span class="nm">${tk('#94A3B8')}${esc(a.label)}</span>
-          <span class="pill ${st}">${lab}</span>
-          <span class="sp">
-            ${r&&r.status==='SENT'?`<button class="btn sec" onclick="publish('${a.key}',${r.published?'false':'true'})">
-                ${r.published?'Mark unpublished':'Mark published'}</button>`:''}
-            <button class="btn sec" onclick="draft(['${a.key}'])">Draft</button>
-          </span></div>`;}).join('')}
-      <div class="actions" style="margin-top:16px">
-        <button class="btn" onclick="draft(null)">Draft to all accounts</button>
-      </div>
-      <div class="log" id="log"></div>
+      <button class="back" style="margin-left:auto" onclick="del(event,'${p.topic}')">Delete post</button>
     </div>
 
-    <div class="panel"><h2>Copy</h2>
-      <div class="field"><label for="ti">Title</label><input id="ti" value="${esc(p.title)}"></div>
+    <section class="step">
+      ${head(1,'Review','check the slides and the words that go out with them')}
+      <div class="toolbar">
+        <button class="toggle" aria-pressed="${redoMode}" onclick="toggleRedo()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+            stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/>
+            <path d="M3 13a9 9 0 1 0 3-7.7L3 8"/></svg>
+          ${redoMode?'Done redoing':'Redo a slide'}</button>
+        <span class="sub">${redoMode?'Pick the slide that is wrong.'
+          :'Click a slide to open it. Arrow keys move between slides.'}</span>
+      </div>
+      <div class="slides">${p.slides.map((s,i)=>
+        `<button class="sl" aria-pressed="${redoMode && sel===i+1}"
+           onclick="${redoMode?`pick(${i+1})`:`zoomAt(${i})`}"
+           aria-label="${redoMode?'Select':'Open'} slide ${i+1}">
+           <img loading="lazy" src="/slide/${p.topic}/${s}?v=${(p.slide_mtimes||{})[s]||0}"
+                alt="Slide ${i+1}">
+           <span class="num">${i+1}${(p.redos||[]).some(r=>r.slide===i+1)?' redo':''}</span>
+         </button>`).join('')}</div>
+      ${redoMode ? `
+        <div class="field"><label for="note">${sel?`What is wrong with slide ${sel}?`:'Select a slide above'}</label>
+          <textarea id="note" style="min-height:76px" ${sel?'':'disabled'}
+            placeholder="e.g. background is too bright, the copy is washed out"></textarea></div>
+        <div class="actions"><button class="btn" id="rgb" onclick="redo()" ${sel?'':'disabled'}>
+          Redo slide ${sel||''}</button></div>
+        <div class="log ${(p.redos||[]).length?'on':''}" id="rlog">${
+          (p.redos||[]).map(r=>'slide '+r.slide+': '+esc(r.note)).join('\n')}</div>` : ''}
+      <div class="field" style="margin-top:16px"><label for="ti">Title</label>
+        <input id="ti" value="${esc(p.title)}"></div>
       <div class="field"><label for="ca">Caption</label><textarea id="ca">${esc(p.caption)}</textarea></div>
       <div class="actions">
         <button class="btn sec" onclick="save()">Save copy</button>
-        <button class="btn sec" onclick="like(${p.liked?'false':'true'})">
-          ${p.liked?'Unlike':'Like'}</button>
-        <button class="btn sec" onclick="replicate()" ${p.queued?'disabled':''}>
-          ${p.queued?'Queued to replicate':'Replicate concept'}</button>
-      </div></div>`;
+        ${p.approved
+          ? `<button class="btn sec" onclick="approve(false)">Unapprove</button>
+             <span class="sub">Approved. Step 2 is unlocked.</span>`
+          : `<button class="btn" onclick="approve(true)">Approve</button>`}
+      </div>
+    </section>
+
+    <section class="step ${p.approved?'':'locked'}">
+      ${head(2,'Deliver','send it to the accounts, now or at a set time')}
+      ${!p.approved ? `<p class="sub">Approve it first.</p>` : `
+        ${(p.schedules||[]).length
+          ? `<p class="sub" style="margin:0 0 14px">Queued for
+               <span class="when">${fmt(p.schedules[0].at)}</span> to
+               ${esc((p.schedules[0].accounts||[]).map(k=>label(k)).join(', ')||'all accounts')}
+               ${p.schedules[0].stagger_min?`, ${p.schedules[0].stagger_min} min apart`:''}.
+               The dashboard must be running when it comes due.</p>
+             <div class="actions"><button class="btn sec" onclick="askSchedule()">Change</button>
+               <button class="btn sec" onclick="cancelSchedule()">Cancel schedule</button></div>`
+          : `<div class="actions" style="margin-bottom:16px">
+               <button class="btn" onclick="draft(null)">Draft to all accounts</button>
+               <button class="btn sec" onclick="askSchedule()">Schedule instead</button></div>`}
+        ${DATA.accounts.map(a=>{
+          const r=(p.delivery||{})[a.key];
+          const st=!r?'todo':r.published?'published':r.status==='SENT'?'drafted':'failed';
+          return `<div class="srow">
+            <span class="nm">${tk('#94A3B8')}${esc(a.label)}</span>
+            <span class="pill ${st==='todo'?'':st}">${st==='todo'?'not sent':st}</span>
+            <span class="sp"><button class="btn sec" onclick="draft(['${a.key}'])">Draft</button></span>
+            ${r&&r.detail?`<span style="color:var(--dim);font-size:11px;flex-basis:100%">${esc(r.detail)}</span>`:''}
+          </div>`;}).join('')}
+        <div class="log" id="log"></div>`}
+    </section>
+
+    <section class="step ${sent.length?'':'locked'}">
+      ${head(3,'Publish','you publish in TikTok, then mark it here')}
+      ${!sent.length ? `<p class="sub">Nothing drafted yet.</p>` : `
+        ${DATA.accounts.map(a=>{
+          const r=(p.delivery||{})[a.key];
+          if(!r||r.status!=='SENT') return '';
+          return `<div class="srow">
+            <span class="nm">${tk('#94A3B8')}${esc(a.label)}</span>
+            <span class="pill ${r.published?'published':'drafted'}">${r.published?'published':'in your inbox'}</span>
+            <span class="sp"><button class="btn sec" onclick="publish('${a.key}',${r.published?'false':'true'})">
+              ${r.published?'Mark unpublished':'Mark published'}</button></span></div>`;}).join('')}
+        <div class="actions" style="margin-top:16px">
+          <button class="btn sec" onclick="like(${p.liked?'false':'true'})">
+            ${p.liked?'Not performing':'Mark performing (1000+ views)'}</button>
+          <button class="btn sec" onclick="replicate()" ${p.queued?'disabled':''}>
+            ${p.queued?'Replicating':'Replicate concept'}</button>
+        </div>`}
+    </section>`;
 }
 
 function label(k){ return (DATA.accounts.find(a=>a.key===k)||{}).label || k; }
