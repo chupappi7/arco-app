@@ -89,6 +89,35 @@ def save_log(log):
         json.dump(log, fh, indent=1)
 
 
+def published_today():
+    """Drafts marked published since local midnight, per account."""
+    midnight = time.mktime(time.localtime()[:3] + (0, 0, 0, 0, 0, -1))
+    out = {a['key']: 0 for a in ACCOUNTS}
+    for _t, accts in delivery_log().items():
+        for key, rec in accts.items():
+            if rec.get('published') and (rec.get('published_at') or 0) >= midnight:
+                out[key] = out.get(key, 0) + 1
+    return out
+
+
+def active_runs():
+    """Every background job still going, so the header can show all of them."""
+    runs = []
+    for label, items in (('build', build_queue()), ('redo', redo_queue()),
+                         ('replicate', replicate_queue())):
+        for x in items:
+            if x.get('status') in ('queued', 'running'):
+                if label == 'build':
+                    what = '%d post%s' % (x['count'], '' if x['count'] == 1 else 's')
+                elif label == 'redo':
+                    what = '%s slide %s' % (x['topic'], x['slide'])
+                else:
+                    what = 'replicating %s' % x['from']
+                runs.append({'kind': label, 'what': what,
+                             'started': x.get('started') or x.get('at')})
+    return runs
+
+
 def pending_counts():
     """Sends inside the rolling 24h window, which is what the cap counts.
 
@@ -566,6 +595,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == '/api/posts':
             return self._send(200, {'posts': list_posts(), 'accounts': ACCOUNTS,
                                     'pending': pending_counts(), 'cap': CAP,
+                                    'published_today': published_today(),
+                                    'runs': active_runs(),
                                     'hooks_left': hooks_available(),
                                     'builds': [b for b in build_queue()
                                                if not b.get('done') or b.get('status') == 'running']})
@@ -851,6 +882,11 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .nav .badge{margin-left:6px;width:8px;height:8px;border-radius:50%;background:var(--bad);
   display:inline-block}
 .hint{color:var(--dim);font-size:12px;margin:-14px 0 20px}
+.run{display:inline-flex;align-items:center;gap:9px;background:var(--surface-2);
+  border:1px solid var(--line-2);border-radius:20px;padding:7px 14px;font-size:12px;
+  color:var(--muted);margin-left:8px}
+.run b{color:var(--text);font-weight:500}
+.run .el{font-family:"Fira Code",monospace;color:var(--accent)}
 .busy{display:inline-block;width:13px;height:13px;border:2px solid rgba(4,34,47,.35);
   border-top-color:#04222f;border-radius:50%;animation:spin .7s linear infinite;
   vertical-align:-2px;margin-right:8px}
@@ -967,7 +1003,8 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
   <div class="accounts" id="accounts"></div>
 </aside>
 <main>
-  <div class="bar"><h1 id="ttl">Needs review</h1><span class="sub" id="cnt"></span></div>
+  <div class="bar"><h1 id="ttl">Create posts</h1><span class="sub" id="cnt"></span>
+  <div id="runs" style="margin-left:auto"></div></div>
   <div class="wrap" id="view"></div>
 </main>
 </div>
@@ -1024,8 +1061,41 @@ function stateOf(p){
 }
 const match = p => filter==='all' ? true : filter==='liked' ? p.liked : stateOf(p)===filter;
 
+let lastRuns = 0, notifyOK = false;
+
+function elapsed(ts){
+  const s = Math.max(0, Math.round(Date.now()/1000 - ts));
+  return s < 60 ? s+'s' : Math.floor(s/60)+'m '+(s%60)+'s';
+}
+
+function paintRuns(){
+  const runs = DATA.runs||[];
+  document.getElementById('runs').innerHTML = runs.map(r =>
+    `<span class="run"><span class="busy"></span><b>${esc(r.what)}</b>
+       <span class="el" data-t="${r.started}">${elapsed(r.started)}</span></span>`).join('');
+  // A background tab shows the title, so put the state there too.
+  document.title = (runs.length ? '● ' + runs.length + ' running — ' : '') + 'ARCO pipeline';
+  if (runs.length < lastRuns && notifyOK) {
+    new Notification('ARCO pipeline', {body: 'A background run finished.'});
+  }
+  lastRuns = runs.length;
+  if (runs.length && !window._tick) {
+    // tick the elapsed labels every second without refetching
+    window._tick = setInterval(() => {
+      document.querySelectorAll('.run .el').forEach(e =>
+        e.textContent = elapsed(parseFloat(e.dataset.t)));
+    }, 1000);
+  }
+  if (!runs.length && window._tick) { clearInterval(window._tick); window._tick = null; }
+}
+
 async function load(){
   DATA = await (await fetch('/api/posts')).json();
+  paintRuns();
+  // poll whenever anything is running, from any page
+  clearTimeout(window._runpoll);
+  if ((DATA.runs||[]).length)
+    window._runpoll = setTimeout(()=>load().then(render), 5000);
   const unseen = DATA.posts.some(p => !p.seen && stateOf(p)==='create');
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
     DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked:stateOf(p)===k).length]));
@@ -1039,11 +1109,11 @@ async function load(){
        <span class="ct">${counts[k]}</span></button>`).join('');
   document.getElementById('accounts').innerHTML =
     `<p class="navlabel">Accounts</p>` + DATA.accounts.map(a=>{
-      const n=DATA.pending[a.key]||0, full=n>=DATA.cap;
+      const t=(DATA.published_today||{})[a.key]||0;
       return `<div class="acct">
         <div class="top">${tk('#F8FAFC')}<span class="h">${esc(a.label)}</span>
-          <span class="num">${Math.min(n,DATA.cap)}/${DATA.cap}${n>DATA.cap?'+':''}</span></div>
-        <div class="track ${full?'full':''}"><i style="width:${Math.min(100,n/DATA.cap*100)}%"></i></div>
+          <span class="num">${t}</span></div>
+        <div class="sub" style="font-size:11px;margin-top:2px">published today</div>
         <button onclick="publishedAll('${a.key}')" aria-label="Mark all drafts published on ${esc(a.label)}">
           mark all published</button></div>`;}).join('');
   render();
@@ -1131,6 +1201,9 @@ function maker(){
 }
 
 async function requestBuild(){
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().then(p => notifyOK = p === 'granted');
+  } else if ('Notification' in window) { notifyOK = Notification.permission === 'granted'; }
   const count=parseInt(document.getElementById('nrange').value,10);
   const note=document.getElementById('nnote').value;
   const pillar=document.getElementById('npil').value;
@@ -1266,8 +1339,7 @@ function detail(){
           <span class="sp">
             ${r&&r.status==='SENT'?`<button class="btn sec" onclick="publish('${a.key}',${r.published?'false':'true'})">
                 ${r.published?'Mark unpublished':'Mark published'}</button>`:''}
-            <button class="btn sec" onclick="draft(['${a.key}'])"
-              ${(DATA.pending[a.key]||0)>=DATA.cap?'disabled':''}>Draft</button>
+            <button class="btn sec" onclick="draft(['${a.key}'])">Draft</button>
           </span></div>`;}).join('')}
       <div class="actions" style="margin-top:16px">
         <button class="btn" onclick="draft(null)">Draft to all accounts</button>
