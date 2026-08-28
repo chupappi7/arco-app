@@ -182,6 +182,8 @@ def list_posts():
             'queued': topic in queued,
             'redos': redos.get(topic, []),
             'approved': bool(st.get(topic, {}).get('approved')),
+            'seen': bool(st.get(topic, {}).get('seen')),
+            'from_replicate': st.get(topic, {}).get('from_replicate'),
             'schedules': sched.get(topic, []),
             'roster': roster_for(topic),
         })
@@ -223,6 +225,8 @@ def run_draft(topic, keys):
 
 REDO = os.path.join(REPO, 'tools', 'redo_queue.json')
 STATUS = os.path.join(REPO, 'tools', 'post_status.json')
+BUILD = os.path.join(REPO, 'tools', 'build_queue.json')
+HOOK_POOL = os.path.join(REPO, 'tools', 'hook_pool.json')
 SCHEDULE = os.path.join(REPO, 'tools', 'schedule.json')
 
 
@@ -232,6 +236,17 @@ def redo_queue():
 
 def statuses():
     return load(STATUS, {})
+
+
+def build_queue():
+    return load(BUILD, [])
+
+
+def hooks_available():
+    """Unused approved hooks. A post cannot be built without one, so this is
+    the real ceiling on how many can be made right now."""
+    pool = load(HOOK_POOL, {})
+    return sum(1 for h in pool.get('hooks', []) if not h.get('used'))
 
 
 def schedules():
@@ -333,7 +348,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._send(200, PAGE, 'text/html; charset=utf-8')
         if path == '/api/posts':
             return self._send(200, {'posts': list_posts(), 'accounts': ACCOUNTS,
-                                    'pending': pending_counts(), 'cap': CAP})
+                                    'pending': pending_counts(), 'cap': CAP,
+                                    'hooks_left': hooks_available(),
+                                    'builds': [b for b in build_queue() if not b.get('done')]})
         if path == '/icon/arco.png':
             f = os.path.join(REPO, 'tools', 'slides', 'icons', 'icon-arco.png')
             with open(f, 'rb') as fh:
@@ -359,6 +376,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
             keys = body.get('accounts') or [a['key'] for a in ACCOUNTS]
             return self._send(200, {'results': run_draft(topic, keys),
                                     'pending': pending_counts()})
+        if path == '/api/build':
+            with _lock:
+                q = build_queue()
+                if body.get('cancel'):
+                    q = [b for b in q if b.get('done')]
+                else:
+                    q.append({'count': max(1, min(10, int(body.get('count', 1)))),
+                              'pillar': body.get('pillar') or 'tools',
+                              'note': (body.get('note') or '').strip(),
+                              'at': time.time(), 'done': False})
+                with open(BUILD, 'w') as fh:
+                    json.dump(q, fh, indent=1, ensure_ascii=False)
+            return self._send(200, {'ok': True})
+        if path == '/api/seen':
+            with _lock:
+                st = statuses()
+                st.setdefault(body['topic'], {})['seen'] = True
+                with open(STATUS, 'w') as fh:
+                    json.dump(st, fh, indent=1)
+            return self._send(200, {'ok': True})
         if path == '/api/approve':
             with _lock:
                 st = statuses()
@@ -587,6 +624,10 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .del:hover{color:var(--bad);border-color:var(--bad)}
 .del svg{width:15px;height:15px}
 .cardwrap{position:relative}
+.new{position:absolute;top:-5px;left:-5px;width:13px;height:13px;border-radius:50%;
+  background:var(--bad);border:2px solid var(--bg);z-index:3}
+.nav .badge{margin-left:6px;width:8px;height:8px;border-radius:50%;background:var(--bad);
+  display:inline-block}
 .hint{color:var(--dim);font-size:12px;margin:-14px 0 20px}
 .busy{display:inline-block;width:13px;height:13px;border:2px solid rgba(4,34,47,.35);
   border-top-color:#04222f;border-radius:50%;animation:spin .7s linear infinite;
@@ -596,8 +637,9 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .panel h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
   margin:0 0 14px;font-weight:500}
 label{display:block;font-size:12px;color:var(--muted);margin:0 0 6px}
-input,textarea{width:100%;background:#0b1120;color:var(--text);border:1px solid var(--line-2);
+input,textarea,select{width:100%;background:#0b1120;color:var(--text);border:1px solid var(--line-2);
   border-radius:8px;padding:10px 12px;font:inherit;transition:border-color .18s}
+select{min-height:42px;cursor:pointer}
 input:focus,textarea:focus{border-color:var(--accent);outline:none}
 textarea{min-height:132px;resize:vertical;line-height:1.65}
 .field{margin-bottom:14px}
@@ -617,6 +659,17 @@ textarea{min-height:132px;resize:vertical;line-height:1.65}
   margin-top:14px;padding:12px;background:#0b1120;border-radius:8px;border:1px solid var(--line);display:none}
 .log.on{display:block}
 .empty{color:var(--dim);padding:56px 0;text-align:center}
+.maker{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:18px 20px;margin-bottom:20px;display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap}
+.maker .grow{flex:1;min-width:210px}
+.maker .cnt{font:600 30px/1 "Fira Code",monospace;color:var(--accent);min-width:44px;text-align:center}
+input[type=range]{-webkit-appearance:none;appearance:none;background:none;padding:0;
+  height:26px;border:0;width:100%}
+input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:3px;background:var(--line-2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;
+  border-radius:50%;background:var(--accent);margin-top:-8px;cursor:pointer;
+  border:2px solid var(--bg)}
+input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--text);outline-offset:2px}
 #modal{position:fixed;inset:0;background:rgba(2,6,23,.8);display:none;align-items:center;
   justify-content:center;z-index:60;padding:24px}
 #modal .box{background:var(--surface);border:1px solid var(--line-2);border-radius:14px;
@@ -728,6 +781,8 @@ const tk = c => `<svg viewBox="0 0 24 24" fill="${c||'currentColor'}" aria-hidde
 const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 let DATA=null, cur=null, filter='create', sel=0, redoMode=false, zi=-1;
+const PILLARS=[['tools','Tools'],['screentime','Screen time'],['discipline','Discipline'],
+               ['build','Building'],['learn','Studying']];
 const FILTERS=[['create','Create posts'],['ready','Ready'],['drafted','Drafted'],
                ['published','Published'],['liked','Liked'],['archive','Archive'],['all','All posts']];
 
@@ -747,6 +802,7 @@ const match = p => filter==='all' ? true : filter==='liked' ? p.liked : stateOf(
 
 async function load(){
   DATA = await (await fetch('/api/posts')).json();
+  const unseen = DATA.posts.some(p => !p.seen && stateOf(p)==='create');
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
     DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked:stateOf(p)===k).length]));
   ICONS.archive = ICONS.archive || '<path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>';
@@ -755,6 +811,7 @@ async function load(){
   document.getElementById('nav').innerHTML = FILTERS.map(([k,lab]) =>
     `<button class="nav" aria-current="${filter===k}" onclick="setFilter('${k}')">
        ${ic(ICONS[k]?k:'all')}<span>${lab}</span>
+       ${k==='create'&&unseen?'<span class="badge"></span>':''}
        <span class="ct">${counts[k]}</span></button>`).join('');
   document.getElementById('accounts').innerHTML =
     `<p class="navlabel">Accounts</p>` + DATA.accounts.map(a=>{
@@ -777,17 +834,66 @@ function render(){
   if (cur) return detail();
   const list = DATA.posts.filter(match);
   document.getElementById('cnt').textContent = `${list.length} post${list.length===1?'':'s'}`;
-  view.innerHTML = list.length ? `<div class="grid">${list.map(card).join('')}</div>`
-    : `<div class="empty">Nothing here yet.</div>`;
+  view.innerHTML = (filter==='create' ? maker() : '')
+    + (list.length ? `<div class="grid">${list.map(card).join('')}</div>`
+                   : `<div class="empty">Nothing here yet.</div>`);
+  const r=document.getElementById('nrange');
+  if(r) r.oninput = e => document.getElementById('ncount').textContent = e.target.value;
 }
 
 const TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"'
   +' stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>'
   +'<path d="M10 11v6M14 11v6"/></svg>';
 
+function maker(){
+  const left = DATA.hooks_left, open = (DATA.builds||[]);
+  if(open.length){
+    const b=open[0];
+    return `<div class="maker"><div class="grow">
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px">
+        ${b.count} post${b.count===1?'':'s'} requested</div>
+      <div class="sub">${b.note?esc(b.note)+' — ':''}tell Claude "build the queue" and they appear here.</div>
+      </div><button class="btn sec" onclick="cancelBuild()">Cancel request</button></div>`;
+  }
+  const max = Math.min(10, left);
+  if(!max) return `<div class="maker"><div class="grow">
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px">No approved hooks left</div>
+      <div class="sub">Every hook in the pool has been used. Give Claude new ones and they
+        become selectable here.</div></div></div>`;
+  return `<div class="maker">
+    <div class="grow">
+      <label for="nrange">How many posts</label>
+      <input type="range" id="nrange" min="1" max="${max}" value="${Math.min(3,max)}">
+      <div class="sub">${left} approved hook${left===1?'':'s'} left, so ${max} at most.</div>
+    </div>
+    <div class="cnt" id="ncount">${Math.min(3,max)}</div>
+    <div class="grow"><label for="npil">Niche</label>
+      <select id="npil">${PILLARS.map(([v,l])=>
+        `<option value="${v}">${l}</option>`).join('')}</select></div>
+    <div class="grow"><label for="nnote">Anything specific? (optional)</label>
+      <input id="nnote" placeholder="e.g. lean on focus and blocking"></div>
+    <button class="btn" onclick="requestBuild()">Create posts</button>
+  </div>`;
+}
+
+async function requestBuild(){
+  const count=parseInt(document.getElementById('nrange').value,10);
+  const note=document.getElementById('nnote').value;
+  const pillar=document.getElementById('npil').value;
+  await fetch('/api/build',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({count,note,pillar})});
+  await load();
+}
+async function cancelBuild(){
+  await fetch('/api/build',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({cancel:true})});
+  await load();
+}
+
 function card(p){
   const st=stateOf(p);
   return `<div class="cardwrap">
+    ${p.seen?'':`<span class="new" title="${p.from_replicate?'Replicated from '+esc(p.from_replicate):'Not opened yet'}"></span>`}
     <button class="del" onclick="del(event,'${p.topic}')"
       aria-label="Delete ${esc(p.topic)}">${TRASH}</button>
     <button class="card" onclick="open_('${p.topic}')">
@@ -795,7 +901,7 @@ function card(p){
       alt="First slide of ${esc(p.topic)}"></div>
     <div class="meta">
       <div class="tt">${esc(p.topic)}</div>
-      <div class="rs">${esc(p.roster.join(' · ')||'roster not recorded')}</div>
+      <div class="rs">${p.from_replicate?'replicated from '+esc(p.from_replicate)+' · ':''}${esc(p.roster.join(' · ')||'roster not recorded')}</div>
       <div class="pills"><span class="pill ${st}">${st==='create'?'to review':st}</span>
         ${(p.schedules||[]).length?`<span class="pill scheduled">${fmt(p.schedules[0].at)}</span>`:''}
         ${p.liked?'<span class="pill liked">liked</span>':''}
@@ -819,7 +925,14 @@ function del(e,topic){
     }});
 }
 
-function open_(t){ cur=t; sel=0; redoMode=false; location.hash=t; render(); }
+function open_(t){
+  cur=t; sel=0; redoMode=false; location.hash=t; render();
+  const p=DATA.posts.find(x=>x.topic===t);
+  if(p && !p.seen){
+    fetch('/api/seen',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({topic:t})}).then(()=>{ p.seen=true; });
+  }
+}
 function back(){ cur=null; sel=0; redoMode=false; location.hash=''; render(); }
 
 function detail(){

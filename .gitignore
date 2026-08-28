@@ -18,3 +18,4 @@ tools/redo_queue.json
 tools/post_status.json
 tools/schedule.json
 tools/.dashboard_token
+tools/build_queue.json
