@@ -1005,8 +1005,8 @@ const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&
 let DATA=null, cur=null, filter='create', sel=0, redoMode=false, zi=-1;
 const PILLARS=[['tools','Tools'],['screentime','Screen time'],['discipline','Discipline'],
                ['build','Building'],['learn','Studying']];
-const FILTERS=[['create','Create posts'],['ready','Ready'],['drafted','Drafted'],
-               ['published','Published'],['liked','Liked'],['archive','Archive'],['all','All posts']];
+const FILTERS=[['create','Create posts'],['drafted','Drafted'],['published','Published'],
+               ['liked','Liked'],['archive','Archive'],['all','All posts']];
 
 const DAY=86400;
 function stateOf(p){
@@ -1017,8 +1017,10 @@ function stateOf(p){
   // Never sent and older than three days: history from before the log existed,
   // not something waiting on Thinh. Keeping these in Needs review buried the
   // handful of posts that genuinely need a decision.
+  // Approved posts stay on Create rather than moving to a page of their own:
+  // the list is short, and a second page hid work that was one click from going out.
   if ((Date.now()/1000 - p.mtime) > 3*DAY) return 'archive';
-  return p.approved ? 'ready' : 'create';
+  return 'create';
 }
 const match = p => filter==='all' ? true : filter==='liked' ? p.liked : stateOf(p)===filter;
 
@@ -1049,7 +1051,14 @@ async function load(){
 
 function setFilter(k){ filter=k; cur=null; load(); }
 
-function render(){
+function render(){ try{ render_(); }catch(err){
+  // A blank page tells you nothing. Surface the failure where the list goes.
+  document.getElementById('view').innerHTML =
+    '<div class="empty">Something broke while drawing this view.<br><br><code>'+
+    (err && err.message ? err.message : err)+'</code></div>';
+  console.error(err);
+} }
+function render_(){
   const view=document.getElementById('view');
   document.getElementById('ttl').textContent =
     cur ? cur : (FILTERS.find(f=>f[0]===filter)||[])[1];
@@ -1077,21 +1086,35 @@ const TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
   +'<path d="M10 11v6M14 11v6"/></svg>';
 
 function maker(){
-  const left = DATA.hooks_left, open = (DATA.builds||[]);
-  if(open.length){
-    const b=open[0];
+  const left = DATA.hooks_left, jobs = (DATA.builds||[]);
+  const live = jobs.find(x=>['queued','running'].includes(x.status));
+  if(live){
+    const mins = live.started ? Math.round((Date.now()/1000-live.started)/60) : 0;
     return `<div class="maker"><div class="grow">
       <div style="font-size:14px;font-weight:600;margin-bottom:4px">
-        ${b.count} post${b.count===1?'':'s'} requested</div>
-      <div class="sub">${b.note?esc(b.note)+' — ':''}tell Claude "build the queue" and they appear here.</div>
-      </div><button class="btn sec" onclick="cancelBuild()">Cancel request</button></div>`;
+        <span class="busy"></span>Building ${live.count} post${live.count===1?'':'s'}</div>
+      <div class="sub">${esc((PILLARS.find(x=>x[0]===live.pillar)||[])[1]||live.pillar||'tools')}${live.note?' · '+esc(live.note):''}
+        — writing and checking slides${mins?', '+mins+' min so far':''}. This page updates itself.</div>
+      </div><button class="btn sec" onclick="cancelBuild()">Stop tracking</button></div>`;
+  }
+  // A finished or interrupted job is a notice, never a state: it must not sit
+  // where the slider goes or you cannot start another build until you clear it.
+  const dead = jobs.length ? jobs[jobs.length-1] : null;
+  let strip = '';
+  if(dead){
+    const msg = dead.status==='interrupted'
+      ? 'A build was interrupted by a restart. Anything it finished is in the list below.'
+      : dead.status==='failed' ? 'The last build failed.' : 'Last build finished.';
+    strip = `<div class="maker" style="padding:12px 16px"><div class="grow">
+      <div class="sub">${msg}${dead.log?' '+esc(dead.log.slice(0,120)):''}</div></div>
+      <button class="btn sec" onclick="cancelBuild()">Dismiss</button></div>`;
   }
   const max = Math.min(10, left);
-  if(!max) return `<div class="maker"><div class="grow">
+  if(!max) return strip + `<div class="maker"><div class="grow">
       <div style="font-size:14px;font-weight:600;margin-bottom:4px">No approved hooks left</div>
       <div class="sub">Every hook in the pool has been used. Give Claude new ones and they
         become selectable here.</div></div></div>`;
-  return `<div class="maker">
+  return strip + `<div class="maker">
     <div class="grow">
       <label for="nrange">How many posts</label>
       <input type="range" id="nrange" min="1" max="${max}" value="${Math.min(3,max)}">
@@ -1133,7 +1156,8 @@ function card(p){
     <div class="meta">
       <div class="tt">${esc(p.topic)}</div>
       <div class="rs">${p.from_replicate?'replicated from '+esc(p.from_replicate)+' · ':''}${esc(p.roster.join(' · ')||'roster not recorded')}</div>
-      <div class="pills"><span class="pill ${st}">${st==='create'?'to review':st}</span>
+      <div class="pills"><span class="pill ${p.approved&&st==='create'?'ready':st}">${
+          st==='create' ? (p.approved?'ready':'to review') : st}</span>
         ${(p.schedules||[]).length?`<span class="pill scheduled">${fmt(p.schedules[0].at)}</span>`:''}
         ${p.liked?'<span class="pill liked">liked</span>':''}
         ${p.queued?'<span class="pill">replicating</span>':''}
