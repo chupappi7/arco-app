@@ -534,5 +534,25 @@
   "tools": [
    "ARCO"
   ]
+ },
+ {
+  "topic": "4x-productivity-3",
+  "tools": [
+   "Obsidian",
+   "ARCO",
+   "Granola",
+   "CleanShot X",
+   "Endel"
+  ]
+ },
+ {
+  "topic": "do-all-the-work",
+  "tools": [
+   "ARCO",
+   "Superwhisper",
+   "Granola",
+   "Claude",
+   "CleanShot X"
+  ]
  }
 ]

@@ -354,10 +354,10 @@
    "_note": "screentime pillar, method post: five rule_slide steps, ARCO leads at rule 1 on the insights angle. app_slide is barred under a screentime hook (assert_roster_allowed) so there is no roster. rebuild: python3 tools/gen-three-hours-back.py"
   },
   {
-   "topic": "boring-phone",
-   "title": "my phone is boring now and it changed everything",
-   "caption": "a boring phone is built, not willed. arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. put every app in the scheduled summary and hide the previews, so you pick the phone up, see a clock and put it back down. unfollow and mute everything you would not go looking for by name, so the feed reaches the end in a minute instead of never. turn autoplay off so the next video does not start itself. and keep the long watching on a laptop, where sitting down gives the session a start and an end. #screentime #digitaldetox #focus #dopaminedetox #productivity",
-   "_note": "screentime pillar, method post: five rule_slide steps, ARCO leads at rule 1 on the focus-mode angle. slide 6 background swapped from bg-h49 to bg-h37 after the render showed the copy washing out over a bright sky. rebuild: python3 tools/gen-boring-phone.py"
+   "topic": "4x-productivity-3",
+   "title": "the tools i used to 4x my productivity",
+   "caption": "part two, five different tools. obsidian links every note to the others so the graph organises itself. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. granola listens to a meeting and the notes write themselves. cleanshot x captures scrolling pages and lets you copy text straight out of the image. endel generates focus sound live with no playlist to pick. #productivity #tools #aitools #mac #focus",
+   "_note": "re-shoot of 4x-productivity-2: identical words, six new backgrounds (bg-h56/20/21/29/32/34); built 2026-08-30 by gen-4x-productivity-3.py"
   }
  ]
 }
