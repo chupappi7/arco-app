@@ -364,6 +364,12 @@
    "title": "i pay for 12 apps, these 5 do all the work",
    "caption": "arco keeps every task in one place and the day gets planned in 30 seconds, with focus mode putting every distraction away and blocked hours repeating it every weekday. superwhisper turns one shortcut into clean text inside any app, so a message you would type for two minutes takes fifteen seconds. granola records the call and rewrites your rough notes from the audio, so two words typed in the meeting come back as a written summary. claude takes the messy dictated version and hands back the clean draft, so you edit something that exists instead of facing a blank page. cleanshot x reads the text inside a screenshot and copies it out, so an error on a photo of a screen becomes something you can paste. #productivity #apps #aitools #mac",
    "_note": "tools pillar; reword of type-less, same roster and teaching points, hook from the pool. llm this post: claude. superwhisper and granola came back into tool_pool.json for it. rebuild: python3 tools/gen-do-all-the-work.py"
+  },
+  {
+   "topic": "type-less-2",
+   "title": "i barely type anymore, these 5 tools do it for me",
+   "caption": "superwhisper turns speech into clean text in any app at speaking speed. arco plans my day in 30 seconds instead of a journaling session, tasks and app blocking included, my holy grail. granola listens to meetings and the notes write themselves. claude turns a dictated rough idea into a finished draft, editing beats writing from zero. cleanshot x copies text straight out of any screenshot. #productivity #aitools #tools #mac",
+   "_note": "re-shoot of type-less: identical words, six new backgrounds (bg-h58/20/29/32/34/35). bg-h21 was skipped because the source shot its Claude slide on it. built 2026-08-30 by gen-type-less-2.py"
   }
  ]
 }

@@ -554,5 +554,15 @@
    "Claude",
    "CleanShot X"
   ]
+ },
+ {
+  "topic": "type-less-2",
+  "tools": [
+   "Superwhisper",
+   "ARCO",
+   "Granola",
+   "Claude",
+   "CleanShot X"
+  ]
  }
 ]
