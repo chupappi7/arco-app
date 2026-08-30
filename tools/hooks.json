@@ -358,6 +358,12 @@
    "title": "the tools i used to 4x my productivity",
    "caption": "part two, five different tools. obsidian links every note to the others so the graph organises itself. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. granola listens to a meeting and the notes write themselves. cleanshot x captures scrolling pages and lets you copy text straight out of the image. endel generates focus sound live with no playlist to pick. #productivity #tools #aitools #mac #focus",
    "_note": "re-shoot of 4x-productivity-2: identical words, six new backgrounds (bg-h56/20/21/29/32/34); built 2026-08-30 by gen-4x-productivity-3.py"
+  },
+  {
+   "topic": "do-all-the-work",
+   "title": "i pay for 12 apps, these 5 do all the work",
+   "caption": "arco keeps every task in one place and the day gets planned in 30 seconds, with focus mode putting every distraction away and blocked hours repeating it every weekday. superwhisper turns one shortcut into clean text inside any app, so a message you would type for two minutes takes fifteen seconds. granola records the call and rewrites your rough notes from the audio, so two words typed in the meeting come back as a written summary. claude takes the messy dictated version and hands back the clean draft, so you edit something that exists instead of facing a blank page. cleanshot x reads the text inside a screenshot and copies it out, so an error on a photo of a screen becomes something you can paste. #productivity #apps #aitools #mac",
+   "_note": "tools pillar; reword of type-less, same roster and teaching points, hook from the pool. llm this post: claude. superwhisper and granola came back into tool_pool.json for it. rebuild: python3 tools/gen-do-all-the-work.py"
   }
  ]
 }
