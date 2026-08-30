@@ -282,6 +282,12 @@
    "_note": "daily batch, tools pillar, one LLM, guards via compose.preflight"
   },
   {
+   "topic": "saved-hours-2",
+   "title": "5 tools that saved me hours this week",
+   "caption": "perplexity lets you aim a search at academic papers or reddit alone, so the answer stops averaging the whole internet. all my tasks live in arco and i plan the whole day in 30 seconds, with focus mode putting every distraction away. a make scenario shows the data moving through every step, so you watch where it breaks instead of reading a log. photoroom cuts the background from a whole folder in one pass. elevenlabs clones a voice from about a minute of clean audio and reads anything you write in it. #productivity #aitools #apps #automation",
+   "_note": "re-shoot of saved-hours: identical copy, six new backgrounds (tools/gen-saved-hours-2.py)"
+  },
+  {
    "topic": "selling-online",
    "title": "5 tools to sell something online",
    "caption": "a gemini gem is a saved version with its own instructions and files, so you build the assistant once and open it like an app. i keep every task in arco and plan tomorrow in 30 seconds, and focus mode puts every distraction away the moment it starts. a stripe payment link sells a product with no website at all. gumroad handles the vat and delivers the file after purchase. beehiiv has the referral program built in, so readers bring readers without you wiring anything up. #buildinpublic #ecommerce #tools #sidehustle",
@@ -376,6 +382,12 @@
    "title": "i barely type anymore, these 5 tools do it for me",
    "caption": "superwhisper turns speech into clean text in any app at speaking speed. arco plans my day in 30 seconds instead of a journaling session, tasks and app blocking included, my holy grail. granola listens to meetings and the notes write themselves. claude turns a dictated rough idea into a finished draft, editing beats writing from zero. cleanshot x copies text straight out of any screenshot. #productivity #aitools #tools #mac",
    "_note": "re-shoot of type-less: identical words, six new backgrounds (bg-h58/20/29/32/34/35). bg-h21 was skipped because the source shot its Claude slide on it. built 2026-08-30 by gen-type-less-2.py"
+  },
+  {
+   "topic": "work-by-noon-2",
+   "title": "the tools i use to do a full day of work by noon",
+   "caption": "arco keeps every task in one place and the whole day gets planned in 30 seconds, with focus mode putting every distraction away. a manus task runs on its own cloud machine and keeps going after you close the tab, so you hand off the long job and come back to a finished file. n8n can be hosted on your own machine, so a workflow reaches local files and private apis a cloud tool cannot touch. a cloudflare tunnel puts your local server on a public https url with no port opened, so you send someone the link while the site still runs on your laptop. any past vercel deployment can be promoted back to production in one click, so a bad release is undone in seconds instead of rebuilt and shipped again. #productivity #tools #aitools #buildinpublic",
+   "_note": "reshoot of work-by-noon; registration lost to a concurrent agent write"
   }
  ]
 }
