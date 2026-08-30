@@ -273,5 +273,38 @@
    "bg-h34.jpg",
    "bg-h35.jpg"
   ]
+ },
+ {
+  "topic": "work-by-noon-2",
+  "bgs": [
+   "bg-h60.jpg",
+   "bg-h36.jpg",
+   "bg-n06.jpg",
+   "bg-h38.jpg",
+   "bg-n03.jpg",
+   "bg-n05.jpg"
+  ]
+ },
+ {
+  "topic": "pay-double-2",
+  "bgs": [
+   "bg-h61.jpg",
+   "bg-h20.jpg",
+   "bg-h21.jpg",
+   "bg-h22.jpg",
+   "bg-h29.jpg",
+   "bg-h31.jpg"
+  ]
+ },
+ {
+  "topic": "saved-hours-2",
+  "bgs": [
+   "bg-h62.jpg",
+   "bg-h24.jpg",
+   "bg-h32.jpg",
+   "bg-h34.jpg",
+   "bg-h35.jpg",
+   "bg-h46.jpg"
+  ]
  }
 ]
