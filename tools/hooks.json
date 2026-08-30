@@ -388,6 +388,12 @@
    "title": "the tools i use to do a full day of work by noon",
    "caption": "arco keeps every task in one place and the whole day gets planned in 30 seconds, with focus mode putting every distraction away. a manus task runs on its own cloud machine and keeps going after you close the tab, so you hand off the long job and come back to a finished file. n8n can be hosted on your own machine, so a workflow reaches local files and private apis a cloud tool cannot touch. a cloudflare tunnel puts your local server on a public https url with no port opened, so you send someone the link while the site still runs on your laptop. any past vercel deployment can be promoted back to production in one click, so a bad release is undone in seconds instead of rebuilt and shipped again. #productivity #tools #aitools #buildinpublic",
    "_note": "reshoot of work-by-noon; registration lost to a concurrent agent write"
+  },
+  {
+   "topic": "ten-x-2",
+   "title": "how i 10x'd my productivity",
+   "caption": "arco holds every task i have and the day gets planned in 30 seconds, then focus mode puts every distraction away while i work, my holy grail. superwhisper turns one held key into clean text in whatever app is open, so a reply you would type for two minutes is done in fifteen seconds of talking. granola listens to the call and turns the three words you typed into full notes, so nobody writes up the meeting afterwards. claude takes the messy version you talked through and hands back the clean draft, so the morning goes on editing instead of staring at an empty page. cleanshot x reads the words inside an image and copies them to the clipboard, so text you could only look at is text you can paste and search. #productivity #apps #aitools #mac #focus",
+   "_note": "tools pillar; reword of do-all-the-work, same roster and the same five teaching points, new copy. its own hook was inside the cooldown and the cooldown keys on the parent, so a rewording of it was blocked too; this took the eligible pool hook that asks the same question. built as work-by-noon-2 first, renamed after a concurrent agent registered that topic with a different roster. llm this post: claude. backgrounds bg-h60/36/31/38/22/45, frozen after reading every render back: the first pass on the daylight desks and the pool villa passed the luma gate and failed the read. rebuild: python3 tools/gen-ten-x-2.py"
   }
  ]
 }
