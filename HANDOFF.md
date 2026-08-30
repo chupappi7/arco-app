@@ -27,7 +27,9 @@ Post view is three gated steps: Review, Deliver, Publish.
 ## Guards that fail the build (in `tools/compose.py`)
 
 - `assert_hook_approved` — hooks only from `tools/hook_pool.json`
-- `assert_hook_fresh` — a hook sits out 8 posts, 4 if it was marked performing
+- `assert_hook_fresh` — a hook sits out 4 posts, 2 if it was marked performing
+- `assert_hook_pillar` / `assert_roster_allowed` — the hook's pillar decides the
+  post's shape; a screentime hook cannot be answered with a roster of apps
 - `assert_audience` — roster must serve a young solo builder; `tool_pool.json`
 - `assert_one_llm` — exactly one LLM per post, rotated
 - `assert_teaches` — both body lines teach, never a verdict

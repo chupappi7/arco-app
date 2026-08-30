@@ -1,110 +1,125 @@
 {
- "_note": "Hooks Thinh wrote or approved. hook_slide refuses anything not in here. When the unused list runs dry, ask him for more rather than inventing any.",
+ "_note": "Hooks Thinh wrote or approved. hook_slide refuses anything not in here or a close rewording of it. `pillar` is binding: a hook decides the post's shape, so a screentime hook cannot be answered with a tool roster.",
  "hooks": [
   {
    "lines": [
     "the tools i used to",
     "4x my productivity"
    ],
-   "used": true
+   "used": true,
+   "pillar": "tools"
   },
   {
    "lines": [
     "the 5 apps i would keep",
     "if i deleted everything else"
    ],
-   "used": true
+   "used": true,
+   "pillar": "tools"
   },
   {
    "lines": [
     "how i 10x'd",
     "my productivity"
    ],
-   "used": true
+   "used": true,
+   "pillar": "tools"
   },
   {
    "lines": [
     "discipline",
     "is a schedule, not a personality"
    ],
-   "used": true
+   "used": true,
+   "pillar": "discipline"
   },
   {
    "lines": [
     "the tools i use to run my business",
     "at 19 years old"
    ],
-   "used": true
+   "used": true,
+   "pillar": "build"
   },
   {
    "lines": [
     "5 tools to stay productive",
     "i saved the best for last"
    ],
-   "used": false
+   "used": false,
+   "pillar": "tools"
   },
   {
    "lines": [
     "i pay for 12 apps",
     "these 5 do all the work"
    ],
-   "used": false
+   "used": false,
+   "pillar": "tools"
   },
   {
    "lines": [
     "the tools i use to do",
     "a full day of work by noon"
    ],
-   "used": true
+   "used": true,
+   "pillar": "tools"
   },
   {
    "lines": [
     "5 apps i wish someone",
     "showed me at 17"
    ],
-   "used": true
+   "used": true,
+   "pillar": "tools"
   },
   {
    "lines": [
     "how i ship in a weekend",
     "what used to take a month"
    ],
-   "used": true
+   "used": true,
+   "pillar": "build"
   },
   {
    "lines": [
     "everything i run my business on",
     "at 19"
    ],
-   "used": true
+   "used": true,
+   "pillar": "build"
   },
   {
    "lines": [
     "how i study 4 hours",
     "without touching my phone"
    ],
-   "used": true
+   "used": true,
+   "pillar": "learn"
   },
   {
    "lines": [
     "i cut 3 hours of screen time",
     "without deleting a single app"
    ],
-   "used": true
+   "used": true,
+   "pillar": "screentime"
   },
   {
    "lines": [
     "my phone is boring now",
     "and it changed everything"
    ],
-   "used": true
+   "used": true,
+   "pillar": "screentime"
   },
   {
    "lines": [
     "this is how you lock in",
     "when you don't feel like it"
    ],
-   "used": true
+   "used": true,
+   "pillar": "discipline"
   }
  ]
 }

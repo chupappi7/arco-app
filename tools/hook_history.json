@@ -84,20 +84,6 @@
   ]
  },
  {
-  "topic": "three-hours-back",
-  "hook": [
-   "i cut 3 hours of screen time",
-   "without deleting a single app"
-  ]
- },
- {
-  "topic": "boring-phone",
-  "hook": [
-   "my phone is boring now",
-   "and it changed everything"
-  ]
- },
- {
   "topic": "four-x-tools",
   "hook": [
    "the tools i used to",
@@ -109,6 +95,20 @@
   "hook": [
    "the 5 apps i would keep",
    "if i deleted everything else"
+  ]
+ },
+ {
+  "topic": "three-hours-back",
+  "hook": [
+   "i cut 3 hours of screen time",
+   "without deleting a single app"
+  ]
+ },
+ {
+  "topic": "boring-phone",
+  "hook": [
+   "my phone is boring now",
+   "and it changed everything"
   ]
  }
 ]

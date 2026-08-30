@@ -128,13 +128,20 @@ def status(lines, topic=None):
     return True, None
 
 
-def eligible(topic=None):
+def pillar_of(lines):
+    """The pillar this hook belongs to, or None if it was never tagged."""
+    src = parent(lines)
+    return (src or {}).get('pillar')
+
+
+def eligible(topic=None, pillar=None):
     """Approved hooks usable right now, least recently used first."""
     hist = [e for e in history() if e.get('topic') != topic]
     order = {}
     for i, e in enumerate(hist):
         order[key(e['hook'])] = i
-    ok = [h for h in pool() if status(h['lines'], topic)[0]]
+    ok = [h for h in pool() if status(h['lines'], topic)[0]
+          and (not pillar or h.get('pillar') == pillar)]
     return sorted(ok, key=lambda h: order.get(key(h['lines']), -1))
 
 

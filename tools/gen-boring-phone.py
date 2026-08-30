@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
-"""boring-phone: tools pillar. What is left on the phone once the feeds are gone.
+"""boring-phone: screentime pillar, method post.
+
+The hook promises a phone that stopped being interesting, so every slide is
+one thing that was done to it. app_slide is barred under a screentime hook
+(assert_roster_allowed): five products do not explain why the phone got
+boring, five changes do.
 
 Backgrounds picked with the gen-daily-batch algorithm (hook-only vibes skipped
-on app slides, copy band under BAND_MAX_LUMA, no adjacent vibe repeat, at most
-one person) and frozen so the post rebuilds identically.
+on rule slides, copy band under BAND_MAX_LUMA, no adjacent vibe repeat, at
+most one person) and frozen so the post rebuilds identically.
 """
 import json, os, sys
 sys.path.insert(0, '/Users/thinh/SIXSIX/arco-app/tools')
 import compose as c
-from compose import (app_slide, hook_slide, preflight, next_arco_angle,
+from compose import (rule_slide, hook_slide, preflight, next_arco_angle,
                      mark_hook_used, record_post_tools, record_post_bgs)
 
 TOPIC = 'boring-phone'
@@ -16,43 +21,17 @@ OUT = f'/Users/thinh/SIXSIX/arco-app/drafts/{TOPIC}'
 os.makedirs(OUT, exist_ok=True)
 
 HOOK = ['my phone is boring now', 'and it changed everything']
-THEME = 'focus'
-TOOLS = ['ARCO', 'Claude', 'CapCut', 'Higgsfield', 'Descript']
-BGS = ['bg-h59.jpg', 'bg-h37.jpg', 'bg-h45.jpg', 'bg-h29.jpg',
-       'bg-h24.jpg', 'bg-h34.jpg']
+THEME = 'screentime'
+BGS = ['bg-h31.jpg',   # hook   lounge-night
+       'bg-h22.jpg',   # ARCO   lounge-day
+       'bg-h24.jpg',   # rule 2 lounge-night
+       'bg-h35.jpg',   # rule 3 supercars-dusk
+       'bg-h45.jpg',   # rule 4 window-silhouette (the one person)
+       'bg-h37.jpg']   # rule 5 supercars-dusk (bg-h49 rendered washed:
+                       #        the copy landed on a bright sky and the
+                       #        monitor bezels and the dashes disappeared)
 
-BODY = {
- 'Claude': [
-    'It builds a working page in the',
-    'chat and you can share the link.',
-    '',
-    'The small tool you needed exists',
-    'without installing anything.',
- ],
- 'CapCut': [
-    'Auto cutout removes the background',
-    'with no green screen.',
-    '',
-    'You film against a bare wall and',
-    'still land on any backdrop.',
- ],
- 'Higgsfield': [
-    'A preset locks the look so a whole',
-    'batch comes out in one style.',
-    '',
-    'Every image in a set matches with',
-    'no prompt written twice.',
- ],
- 'Descript': [
-    'Type over a word you fluffed and',
-    'it speaks it in your voice.',
-    '',
-    'One bad sentence gets fixed',
-    'without recording the take again.',
- ],
-}
-
-preflight(TOPIC, TOOLS, BGS, hook=HOOK)
+preflight(TOPIC, ['ARCO'], BGS, pillar='screentime', hook=HOOK)
 
 log = json.load(open(f'{c.SP}/hook_usage.json'))
 if BGS[0] not in log:
@@ -61,17 +40,44 @@ if BGS[0] not in log:
 hook_slide(BGS[0], HOOK, f'{OUT}/01.jpg')
 mark_hook_used(HOOK, TOPIC)
 
-# ARCO carries its full App Store name on its own slide, so a viewer who
-# goes looking finds the listing under the name they just read.
-TITLES = {'ARCO': 'ARCO: Day Planner & Focus'}
+# The app leads on a numbered badge like every other slide: in a method post
+# an app icon here would be the only icon in the carousel and would mark that
+# slide as the advert. Copy comes from the screentime-tagged angles.
+rule_slide(BGS[1], 1, 'ARCO: Day Planner & Focus',
+           next_arco_angle(THEME), f'{OUT}/02.jpg')
 
-icons = json.load(open(c.TOOL_POOL))['icons']
-for i, tool in enumerate(TOOLS):
-    n, bg = i + 1, BGS[i + 1]
-    body = next_arco_angle(THEME) if tool == 'ARCO' else BODY[tool]
-    title = f'{n}. {TITLES.get(tool, tool)}'
-    app_slide(bg, icons[tool], title, body, f'{OUT}/{n+1:02d}.jpg')
+rule_slide(BGS[2], 2, 'Empty the lock screen', [
+    'Put every app in the scheduled',
+    'summary and hide the previews.',
+    '',
+    'You pick the phone up, see a clock,',
+    'and put it back down.',
+], f'{OUT}/03.jpg')
 
-record_post_tools(TOPIC, TOOLS)
+rule_slide(BGS[3], 3, 'Unfollow until it runs out', [
+    'Unfollow and mute everything you',
+    'would not go looking for by name.',
+    '',
+    'The feed reaches the end in a',
+    'minute instead of never.',
+], f'{OUT}/04.jpg')
+
+rule_slide(BGS[4], 4, 'Turn autoplay off', [
+    'Switch off autoplay so the next',
+    'video does not start itself.',
+    '',
+    'Every extra one needs a tap, and',
+    'most nights you stop at the first.',
+], f'{OUT}/05.jpg')
+
+rule_slide(BGS[5], 5, 'Move the watching to a laptop', [
+    'Keep the long stuff on a laptop',
+    'and off the phone entirely.',
+    '',
+    'Sitting down to watch gives the',
+    'session a start and an end.',
+], f'{OUT}/06.jpg')
+
+record_post_tools(TOPIC, ['ARCO'])
 record_post_bgs(TOPIC, BGS)
 print('\nbackgrounds:', ', '.join(BGS))

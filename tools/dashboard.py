@@ -334,8 +334,13 @@ of Thinh's voice; it is not optional.
 Rules, all enforced in code, so run them rather than trusting memory:
 
 1. Hooks MUST come from tools/hook_pool.json, and only ones that are
-   eligible: hooks are reusable but sit out a cooldown, so read
-   hook_rules.eligible() rather than the `used` flag. compose.hook_slide
+   eligible for THIS pillar: call hook_rules.eligible(pillar='{pillar}').
+   Never take a hook tagged with another pillar — the hook decides the shape
+   of the post, and compose refuses a roster of apps under a screentime,
+   discipline or learn hook. Those get rule_slide: numbered steps that answer
+   the hook. Hooks are reusable but sit out a cooldown, so read
+   hook_rules.eligible() rather than the `used` flag. Rewording a hook a
+   little is allowed; inventing one is not. compose.hook_slide
    refuses anything else. Record each with compose.mark_hook_used(HOOK,
    TOPIC) — pass the topic, it is what ties the hook to its performance.
    If there are not enough eligible hooks, build fewer and say so.

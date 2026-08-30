@@ -336,18 +336,6 @@
    "_note": "tools pillar; llm this post: perplexity"
   },
   {
-   "topic": "three-hours-back",
-   "title": "i cut 3 hours of screen time without deleting a single app",
-   "caption": "the arco block runs on a timetable and not on willpower, so there is no decision left to make when the hour starts. paste a video link into gemini and it answers from the transcript, so you take the one part you needed and never open the app. the notion web clipper saves a page into a database in one tap, so reading gets a slot later instead of eating the next hour now. endel scenes download and keep playing with no connection, so the phone goes on airplane mode and the session still has sound. buffer rewrites one draft for every platform before it goes out, so you post from a laptop instead of opening the feed to do it. #screentime #digitaldetox #focus #productivity",
-   "_note": "tools pillar; llm this post: gemini"
-  },
-  {
-   "topic": "boring-phone",
-   "title": "my phone is boring now and it changed everything",
-   "caption": "i start a session in arco and every app on the list locks itself, and four hours later the phone has not been picked up once. claude builds a working page inside the chat and you can share the link, so the small tool you needed exists without installing anything. capcut auto cutout removes the background with no green screen, so you film against a bare wall and still land on any backdrop. a higgsfield preset locks the look so a whole batch comes out in one style, with no prompt written twice. in descript you type over a word you fluffed and it speaks it in your voice, so one bad sentence gets fixed without recording the take again. #focus #screentime #creator #tools",
-   "_note": "tools pillar; llm this post: claude"
-  },
-  {
    "topic": "four-x-tools",
    "title": "the tools i used to 4x my productivity",
    "caption": "every task and every habit gets planned in 30 seconds in arco, and focus mode puts every distraction away, my holy grail. cursor rules files in the repo apply your conventions to every edit, so you stop repeating the same correction in each new chat. raycast extensions search inside the apps you already use from one bar, so you land on the page or the issue without opening the app first. a zapier path splits the zap and runs a different branch per case, so one automation covers the exceptions instead of five. loom cuts the ums and the long silences out of the recording, so one take is usable and nothing has to be recorded twice. #productivity #tools #aitools #automation",
@@ -358,6 +346,18 @@
    "title": "the 5 apps i would keep if i deleted everything else",
    "caption": "i manage all my tasks in arco and the day is planned in half a minute, and focus mode puts every distraction away until i am done. chatgpt canvas opens the draft beside the chat and edits happen in place, so you rewrite one paragraph instead of regenerating the whole thing. obsidian bases turns a folder of notes into a table you can filter, so the reading list is a view of what you wrote and not a second list. a canva doc converts into slides in one click, headings and all, so the deck gets built from the notes you already wrote. notion ai answers a question from the pages in your workspace, so you search what you wrote instead of trying to remember where. #productivity #apps #tools #aitools",
    "_note": "tools pillar; llm this post: chatgpt"
+  },
+  {
+   "topic": "three-hours-back",
+   "title": "i cut 3 hours of screen time without deleting a single app",
+   "caption": "three hours back and every app is still installed. arco insights show where the hours actually went, by app and by day, so you stop guessing which one took the evening. then log out of every feed app and remove it from autofill, so opening one costs a password. delete the icons and leave the apps in the app library, so getting in means typing the name of what takes your evening. switch off badges and banners for every feed app, not just sounds, so nothing decides when you open it. and keep one fixed window for scrolling, thirty minutes after dinner, so the other hours stop leaking. #screentime #digitaldetox #focus #productivity #phoneaddiction",
+   "_note": "screentime pillar, method post: five rule_slide steps, ARCO leads at rule 1 on the insights angle. app_slide is barred under a screentime hook (assert_roster_allowed) so there is no roster. rebuild: python3 tools/gen-three-hours-back.py"
+  },
+  {
+   "topic": "boring-phone",
+   "title": "my phone is boring now and it changed everything",
+   "caption": "a boring phone is built, not willed. arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. put every app in the scheduled summary and hide the previews, so you pick the phone up, see a clock and put it back down. unfollow and mute everything you would not go looking for by name, so the feed reaches the end in a minute instead of never. turn autoplay off so the next video does not start itself. and keep the long watching on a laptop, where sitting down gives the session a start and an end. #screentime #digitaldetox #focus #dopaminedetox #productivity",
+   "_note": "screentime pillar, method post: five rule_slide steps, ARCO leads at rule 1 on the focus-mode angle. slide 6 background swapped from bg-h49 to bg-h37 after the render showed the copy washing out over a bright sky. rebuild: python3 tools/gen-boring-phone.py"
   }
  ]
 }

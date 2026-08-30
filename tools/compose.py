@@ -426,6 +426,7 @@ def preflight(topic, tools, bgs, pillar='tools', hook=None):
     if hook:
         assert_hook_approved(hook)
         assert_hook_fresh(hook, topic)
+        assert_hook_pillar(hook, pillar)
     return True
 
 
@@ -586,6 +587,25 @@ def mark_hook_used(lines, topic=None):
     hook_rules.record(lines, topic)
 
 
+def assert_hook_pillar(lines, pillar):
+    """Raise if the post's shape does not match what the hook promised.
+
+    This is the rule that kept breaking because it lived only in prose. A
+    screentime hook answered with a five-app roster reads as a bait: "i cut 3
+    hours of screen time" promises a method, and a list of SaaS products is
+    not one. The hook decides the shape of the post, so the pillar comes from
+    the hook, never from whatever the build was asked for.
+    """
+    want = hook_rules.pillar_of(lines)
+    if want and want != pillar:
+        raise SystemExit(
+            f'hook "{" / ".join(lines)}" is a {want} hook, but this post is '
+            f'being built as {pillar}. Build it as {want}, or pick a {pillar} '
+            'hook: ' + '; '.join(' / '.join(h['lines'])
+                                 for h in hook_rules.eligible(pillar=pillar)[:5]))
+    return True
+
+
 def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
                accent=YELLOW):
     """Stacked uppercase hook: big headline, smaller line under it.
@@ -619,6 +639,9 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
         (540, HOOK_L1_TOP + (b1[3] - b1[1]) / 2, l1, f1, 'mm', WHITE),
         (540, HOOK_L2_TOP + (b2[3] - b2[1]) / 2, l2, f2, 'mm', WHITE),
     ])
+    _json.dump({'hook': list(lines), 'pillar': hook_rules.pillar_of(lines)},
+               open(os.path.join(os.path.dirname(os.path.abspath(out)),
+                                 '.hook.json'), 'w'), indent=1, ensure_ascii=False)
     im.save(out, quality=92)
     print('wrote', out, '[stacked]')
 
@@ -725,7 +748,33 @@ def assert_teaches(title, body_lines, allow=False):
     return True
 
 
+ROSTER_PILLARS = {'tools', 'build'}
+
+
+def assert_roster_allowed(out):
+    """Raise if this post's hook promised a method and a roster is being drawn.
+
+    hook_slide leaves .hook.json in the draft, so this needs nothing passed in
+    and cannot be skipped by a generator that forgets an argument. "i cut 3
+    hours of screen time" is answered by what you did, not by five products.
+    """
+    side = os.path.join(os.path.dirname(os.path.abspath(out)), '.hook.json')
+    try:
+        meta = _json.load(open(side))
+    except (IOError, ValueError):
+        return True                    # no hook rendered yet: nothing to check
+    pil = meta.get('pillar')
+    if pil and pil not in ROSTER_PILLARS:
+        raise SystemExit(
+            f'this post opens with a {pil} hook ("{" / ".join(meta["hook"])}") '
+            f'so its slides must answer it. Use rule_slide for numbered steps, '
+            'not app_slide: a roster of products does not answer a '
+            f'{pil} hook.')
+    return True
+
+
 def app_slide(bg, icon, title, body_lines, out, grad=(0.85, 0.68, 300, 1250)):
+    assert_roster_allowed(out)
     assert_teaches(title, body_lines)
     im = base_photo(bg, grad)
     im = frame_for_band(im, 600, 1300)
