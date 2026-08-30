@@ -472,5 +472,55 @@
    "Figma",
    "TestFlight"
   ]
+ },
+ {
+  "topic": "run-it-all-at-19",
+  "tools": [
+   "ARCO",
+   "Perplexity",
+   "Stripe",
+   "RevenueCat",
+   "Framer"
+  ]
+ },
+ {
+  "topic": "three-hours-back",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Notion",
+   "Endel",
+   "Buffer"
+  ]
+ },
+ {
+  "topic": "boring-phone",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "CapCut",
+   "Higgsfield",
+   "Descript"
+  ]
+ },
+ {
+  "topic": "four-x-tools",
+  "tools": [
+   "ARCO",
+   "Cursor",
+   "Raycast",
+   "Zapier",
+   "Loom"
+  ]
+ },
+ {
+  "topic": "keep-if-deleted",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "Obsidian",
+   "Canva",
+   "Notion"
+  ]
  }
 ]

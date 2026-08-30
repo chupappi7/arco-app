@@ -328,6 +328,36 @@
    "title": "this is how you lock in when you don't feel like it",
    "caption": "arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. ask claude for a quiz on what you just read and it builds a working one, so you click through questions instead of rereading the page. raycast floating notes keeps a note above every window on one hotkey, so the next step stays on screen while you work somewhere else. cleanshot x captures park in a corner overlay instead of piling on the desktop, so you drag the diagram into your notes without saving a file. any canva design opens out into an infinite whiteboard, so the whole topic gets mapped before you write a word. #discipline #focus #productivity #studytok",
    "_note": "discipline pillar; registered by hand after an interrupted build left it unregistered"
+  },
+  {
+   "topic": "run-it-all-at-19",
+   "title": "everything i run my business on at 19",
+   "caption": "i keep every task in arco and plan the day in 30 seconds, and focus mode puts every distraction away while blocked hours keeps them away on its own. perplexity labs turns a question into a spreadsheet or a small dashboard, so you get the comparison built for you instead of another page of links. the stripe customer portal is a hosted page where people manage their own billing, so they cancel or swap a card without you building a settings screen. revenuecat experiments show two paywalls at once and split the new installs, so you learn which price earns more before you commit to one. a framer cms collection turns one page into a template for every entry, so fifty posts share one layout you change in a single place. #buildinpublic #tools #solofounder #productivity",
+   "_note": "tools pillar; llm this post: perplexity"
+  },
+  {
+   "topic": "three-hours-back",
+   "title": "i cut 3 hours of screen time without deleting a single app",
+   "caption": "the arco block runs on a timetable and not on willpower, so there is no decision left to make when the hour starts. paste a video link into gemini and it answers from the transcript, so you take the one part you needed and never open the app. the notion web clipper saves a page into a database in one tap, so reading gets a slot later instead of eating the next hour now. endel scenes download and keep playing with no connection, so the phone goes on airplane mode and the session still has sound. buffer rewrites one draft for every platform before it goes out, so you post from a laptop instead of opening the feed to do it. #screentime #digitaldetox #focus #productivity",
+   "_note": "tools pillar; llm this post: gemini"
+  },
+  {
+   "topic": "boring-phone",
+   "title": "my phone is boring now and it changed everything",
+   "caption": "i start a session in arco and every app on the list locks itself, and four hours later the phone has not been picked up once. claude builds a working page inside the chat and you can share the link, so the small tool you needed exists without installing anything. capcut auto cutout removes the background with no green screen, so you film against a bare wall and still land on any backdrop. a higgsfield preset locks the look so a whole batch comes out in one style, with no prompt written twice. in descript you type over a word you fluffed and it speaks it in your voice, so one bad sentence gets fixed without recording the take again. #focus #screentime #creator #tools",
+   "_note": "tools pillar; llm this post: claude"
+  },
+  {
+   "topic": "four-x-tools",
+   "title": "the tools i used to 4x my productivity",
+   "caption": "every task and every habit gets planned in 30 seconds in arco, and focus mode puts every distraction away, my holy grail. cursor rules files in the repo apply your conventions to every edit, so you stop repeating the same correction in each new chat. raycast extensions search inside the apps you already use from one bar, so you land on the page or the issue without opening the app first. a zapier path splits the zap and runs a different branch per case, so one automation covers the exceptions instead of five. loom cuts the ums and the long silences out of the recording, so one take is usable and nothing has to be recorded twice. #productivity #tools #aitools #automation",
+   "_note": "tools pillar; llm this post: cursor"
+  },
+  {
+   "topic": "keep-if-deleted",
+   "title": "the 5 apps i would keep if i deleted everything else",
+   "caption": "i manage all my tasks in arco and the day is planned in half a minute, and focus mode puts every distraction away until i am done. chatgpt canvas opens the draft beside the chat and edits happen in place, so you rewrite one paragraph instead of regenerating the whole thing. obsidian bases turns a folder of notes into a table you can filter, so the reading list is a view of what you wrote and not a second list. a canva doc converts into slides in one click, headings and all, so the deck gets built from the notes you already wrote. notion ai answers a question from the pages in your workspace, so you search what you wrote instead of trying to remember where. #productivity #apps #tools #aitools",
+   "_note": "tools pillar; llm this post: chatgpt"
   }
  ]
 }
