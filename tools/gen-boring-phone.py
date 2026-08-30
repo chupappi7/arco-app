@@ -61,11 +61,16 @@ if BGS[0] not in log:
 hook_slide(BGS[0], HOOK, f'{OUT}/01.jpg')
 mark_hook_used(HOOK, TOPIC)
 
+# ARCO carries its full App Store name on its own slide, so a viewer who
+# goes looking finds the listing under the name they just read.
+TITLES = {'ARCO': 'ARCO: Day Planner & Focus'}
+
 icons = json.load(open(c.TOOL_POOL))['icons']
 for i, tool in enumerate(TOOLS):
     n, bg = i + 1, BGS[i + 1]
     body = next_arco_angle(THEME) if tool == 'ARCO' else BODY[tool]
-    app_slide(bg, icons[tool], f'{n}. {tool}', body, f'{OUT}/{n+1:02d}.jpg')
+    title = f'{n}. {TITLES.get(tool, tool)}'
+    app_slide(bg, icons[tool], title, body, f'{OUT}/{n+1:02d}.jpg')
 
 record_post_tools(TOPIC, TOOLS)
 record_post_bgs(TOPIC, BGS)
