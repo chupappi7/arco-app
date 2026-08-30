@@ -21,6 +21,8 @@ import threading
 import time
 import urllib.parse
 
+import hook_rules
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DRAFTS = os.path.join(REPO, 'drafts')
 HOOKS = os.path.join(REPO, 'tools', 'hooks.json')
@@ -331,9 +333,12 @@ of Thinh's voice; it is not optional.
 
 Rules, all enforced in code, so run them rather than trusting memory:
 
-1. Hooks MUST come from tools/hook_pool.json. compose.hook_slide refuses any
-   other hook. Mark each one used with compose.mark_hook_used. If there are
-   not enough unused hooks, build fewer and say so.
+1. Hooks MUST come from tools/hook_pool.json, and only ones that are
+   eligible: hooks are reusable but sit out a cooldown, so read
+   hook_rules.eligible() rather than the `used` flag. compose.hook_slide
+   refuses anything else. Record each with compose.mark_hook_used(HOOK,
+   TOPIC) — pass the topic, it is what ties the hook to its performance.
+   If there are not enough eligible hooks, build fewer and say so.
 2. Roster from tools/tool_pool.json. ARCO leads at slide 1. Exactly one LLM
    per post, rotated between posts. Every tool must pass
    compose.assert_audience.
@@ -505,10 +510,10 @@ def run_build(job):
 
 
 def hooks_available():
-    """Unused approved hooks. A post cannot be built without one, so this is
-    the real ceiling on how many can be made right now."""
-    pool = load(HOOK_POOL, {})
-    return sum(1 for h in pool.get('hooks', []) if not h.get('used'))
+    """Approved hooks eligible right now. Hooks are not burn-once: one sits
+    out a cooldown and comes back, so this number recovers on its own. It is
+    still the ceiling on how many posts can be built in one go."""
+    return len(hook_rules.eligible())
 
 
 def schedules():
@@ -702,6 +707,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 posts[:] = [x for x in posts if x.get('topic') != topic]
                 with open(HOOKS, 'w') as fh:
                     json.dump(raw, fh, indent=1, ensure_ascii=False)
+                hook_rules.forget(topic)
             return self._send(200, {'ok': True, 'moved_to': dest})
         if path == '/api/redo':
             n = queue_redo(body['topic'], int(body['slide']), body.get('note', ''))
@@ -743,11 +749,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             # against the cap, which is the whole reason this state exists.
             with _lock:
                 log = delivery_log()
-                rec = log.get(body['topic'], {}).get(body['account'])
-                if rec:
+                recs = log.get(body['topic'], {})
+                # No account named means the whole post: the top bar marks it
+                # published everywhere in one click.
+                keys = [body['account']] if body.get('account') else [
+                    k for k, r in recs.items() if r.get('status') == 'SENT']
+                for k in keys:
+                    rec = recs.get(k)
+                    if not rec:
+                        continue
                     rec['published'] = bool(body['published'])
                     rec['published_at'] = time.time() if body['published'] else None
-                    save_log(log)
+                save_log(log)
             return self._send(200, {'pending': pending_counts()})
         if path == '/api/published':
             # TikTok exposes no way to read how many drafts are still pending,
@@ -893,6 +906,21 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .del:hover{color:var(--bad);border-color:var(--bad)}
 .del svg{width:15px;height:15px}
 .cardwrap{position:relative}
+.fav{position:absolute;top:8px;left:8px;width:32px;height:32px;border-radius:8px;
+  background:rgba(2,6,23,.72);border:1px solid var(--line-2);font-size:15px;line-height:1;
+  display:flex;align-items:center;justify-content:center;opacity:.35;z-index:2;
+  filter:grayscale(1);transition:opacity .18s,filter .18s,border-color .18s}
+.cardwrap:hover .fav{opacity:.8}
+.fav.on,.cardwrap:hover .fav.on{opacity:1;filter:none;border-color:#5c2244}
+.topbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 22px;
+  padding:13px 15px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.topbar .sub{margin-left:auto}
+.daygrp{margin-bottom:30px}
+.dayhd{display:flex;align-items:baseline;gap:10px;margin:0 0 12px;
+  font:600 13px/1 "Fira Code",monospace;color:var(--muted);
+  border-bottom:1px solid var(--line);padding-bottom:9px}
+.dayhd .ct{color:var(--dim);font-weight:400;font-size:11px}
+.tms{color:var(--dim);font-size:11px;margin-top:3px}
 .new{position:absolute;top:-5px;left:-5px;width:13px;height:13px;border-radius:50%;
   background:var(--bad);border:2px solid var(--bg);z-index:3}
 .nav .badge{margin-left:6px;width:8px;height:8px;border-radius:50%;background:var(--bad);
@@ -1069,8 +1097,11 @@ const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&
 let DATA=null, cur=null, filter='create', sel=0, redoMode=false, zi=-1;
 const PILLARS=[['tools','Tools'],['screentime','Screen time'],['discipline','Discipline'],
                ['build','Building'],['learn','Studying']];
-const FILTERS=[['create','Inbox'],['drafted','Drafted'],['published','Published'],
-               ['liked','Performing'],['archive','Archive'],['all','All posts']];
+const FILTERS=[['create','Inbox'],['out','Drafted/Published'],
+               ['liked','Performing'],['all','All posts'],['archive','Archive']];
+// 'out' is one tab because a post moves drafted -> published without any work
+// here; splitting them made you check two lists for the same post.
+const isOut = p => ['drafted','published','failed'].includes(stateOf(p));
 
 const DAY=86400;
 function stateOf(p){
@@ -1081,12 +1112,11 @@ function stateOf(p){
   // Never sent and older than three days: history from before the log existed,
   // not something waiting on Thinh. Keeping these in Needs review buried the
   // handful of posts that genuinely need a decision.
-  // Approved posts stay on Create rather than moving to a page of their own:
-  // the list is short, and a second page hid work that was one click from going out.
   if ((Date.now()/1000 - p.mtime) > 3*DAY) return 'archive';
   return 'create';
 }
-const match = p => filter==='all' ? true : filter==='liked' ? p.liked : stateOf(p)===filter;
+const match = p => filter==='all' ? true : filter==='liked' ? p.liked
+                 : filter==='out' ? isOut(p) : stateOf(p)===filter;
 
 let lastRuns = 0, notifyOK = false;
 
@@ -1129,9 +1159,11 @@ async function load(){
   const unseen = DATA.posts.some(p => !p.seen && stateOf(p)==='create');
   ICONS.liked = '<path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/>';
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
-    DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked:stateOf(p)===k).length]));
+    DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked
+                         :k==='out'?isOut(p):stateOf(p)===k).length]));
   ICONS.archive = ICONS.archive || '<path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>';
   ICONS.create = ICONS.create || '<path d="M12 5v14M5 12h14"/>';
+  ICONS.out = ICONS.out || ICONS.drafted;
   ICONS.ready = ICONS.ready || '<path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="9"/>';
   document.getElementById('nav').innerHTML = FILTERS.map(([k,lab]) =>
     `<button class="nav" aria-current="${filter===k}" onclick="setFilter('${k}')">
@@ -1166,15 +1198,56 @@ function render_(){
   if (cur) return detail();
   const list = DATA.posts.filter(match);
   document.getElementById('cnt').textContent = `${list.length} post${list.length===1?'':'s'}`;
-  view.innerHTML = (filter==='create' ? maker() : '')
-    + (list.length ? `<div class="grid">${list.map(card).join('')}</div>`
+  view.innerHTML = buildStrip()
+    + (list.length ? groups(list)
                    : `<div class="empty">Nothing here yet.</div>`);
-  const r=document.getElementById('nrange');
-  if(r) r.oninput = e => document.getElementById('ncount').textContent = e.target.value;
   // poll while a build is running so finished posts appear without a refresh
   const running = (DATA.builds||[]).some(b=>['queued','running'].includes(b.status));
   clearTimeout(window._poll);
   if(running) window._poll = setTimeout(()=>load().then(render), 6000);
+}
+
+// The one timestamp that matters for a post: when it was published, else
+// when it was drafted, else when it was built. Every tab groups on it.
+function whenOf(p){
+  const ds = DATA.accounts.map(a=>(p.delivery||{})[a.key]).filter(Boolean);
+  const pubs = ds.map(r=>r.published_at).filter(Boolean);
+  if(pubs.length) return Math.max(...pubs);
+  const sent = ds.map(r=>r.at).filter(Boolean);
+  if(sent.length) return Math.max(...sent);
+  return p.mtime;
+}
+const two = n => String(n).padStart(2,'0');
+function dstamp(ts){ const d=new Date(ts*1000);
+  return `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}`; }
+function hm(ts){ const d=new Date(ts*1000);
+  return `${two(d.getHours())}:${two(d.getMinutes())}`; }
+function ago(ts){
+  const s = Math.max(0, Date.now()/1000 - ts);
+  if(s < 3600){ const m=Math.round(s/60); return m<=1?'just now':m+' minutes ago'; }
+  if(s < 86400){ const h=Math.round(s/3600); return h+' hour'+(h===1?'':'s')+' ago'; }
+  const d=Math.round(s/86400); return d+' day'+(d===1?'':'s')+' ago';
+}
+function times(p){
+  const ds = DATA.accounts.map(a=>(p.delivery||{})[a.key]).filter(Boolean);
+  const sent = ds.map(r=>r.at).filter(Boolean);
+  const pubs = ds.map(r=>r.published_at).filter(Boolean);
+  const bits = [];
+  if(sent.length) bits.push('draft '+hm(Math.min(...sent)));
+  if(pubs.length) bits.push('published '+hm(Math.min(...pubs)));
+  bits.push(ago(whenOf(p)));
+  return bits.join(' · ');
+}
+function groups(list){
+  const by = new Map();
+  list.slice().sort((a,b)=>whenOf(b)-whenOf(a)).forEach(p=>{
+    const k = dstamp(whenOf(p));
+    if(!by.has(k)) by.set(k, []);
+    by.get(k).push(p);
+  });
+  return [...by].map(([d,ps]) => `<div class="daygrp">
+    <div class="dayhd">${d}<span class="ct">${ps.length} post${ps.length===1?'':'s'}</span></div>
+    <div class="grid">${ps.map(card).join('')}</div></div>`).join('');
 }
 
 function poll(){
@@ -1186,8 +1259,11 @@ const TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
   +' stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>'
   +'<path d="M10 11v6M14 11v6"/></svg>';
 
-function maker(){
-  const left = DATA.hooks_left, jobs = (DATA.builds||[]);
+// Posts arrive on a schedule and land in Inbox, so there is no create form
+// here any more. What is left is the notice: what a background build is doing
+// and how the last one ended.
+function buildStrip(){
+  const jobs = (DATA.builds||[]);
   const live = jobs.find(x=>['queued','running'].includes(x.status));
   if(live){
     const mins = live.started ? Math.round((Date.now()/1000-live.started)/60) : 0;
@@ -1198,50 +1274,16 @@ function maker(){
         — writing and checking slides${mins?', '+mins+' min so far':''}. This page updates itself.</div>
       </div><button class="btn sec" onclick="cancelBuild()">Stop tracking</button></div>`;
   }
-  // A finished or interrupted job is a notice, never a state: it must not sit
-  // where the slider goes or you cannot start another build until you clear it.
   const dead = jobs.length ? jobs[jobs.length-1] : null;
-  let strip = '';
-  if(dead){
-    const msg = dead.status==='interrupted'
-      ? 'A build was interrupted by a restart. Anything it finished is in the list below.'
-      : dead.status==='failed' ? 'The last build failed.' : 'Last build finished.';
-    strip = `<div class="maker" style="padding:12px 16px"><div class="grow">
-      <div class="sub">${msg}${dead.log?' '+esc(dead.log.slice(0,120)):''}</div></div>
-      <button class="btn sec" onclick="cancelBuild()">Dismiss</button></div>`;
-  }
-  const max = Math.min(10, left);
-  if(!max) return strip + `<div class="maker"><div class="grow">
-      <div style="font-size:14px;font-weight:600;margin-bottom:4px">No approved hooks left</div>
-      <div class="sub">Every hook in the pool has been used. Give Claude new ones and they
-        become selectable here.</div></div></div>`;
-  return strip + `<div class="maker">
-    <div class="grow">
-      <label for="nrange">How many posts</label>
-      <input type="range" id="nrange" min="1" max="${max}" value="${Math.min(3,max)}">
-      <div class="sub">${left} approved hook${left===1?'':'s'} left, so ${max} at most.</div>
-    </div>
-    <div class="cnt" id="ncount">${Math.min(3,max)}</div>
-    <div class="grow"><label for="npil">Niche</label>
-      <select id="npil">${PILLARS.map(([v,l])=>
-        `<option value="${v}">${l}</option>`).join('')}</select></div>
-    <div class="grow"><label for="nnote">Anything specific? (optional)</label>
-      <input id="nnote" placeholder="e.g. lean on focus and blocking"></div>
-    <button class="btn" onclick="requestBuild()">Create posts</button>
-  </div>`;
+  if(!dead) return '';
+  const msg = dead.status==='interrupted'
+    ? 'A build was interrupted by a restart. Anything it finished is in the list below.'
+    : dead.status==='failed' ? 'The last build failed.' : 'Last build finished.';
+  return `<div class="maker" style="padding:12px 16px"><div class="grow">
+    <div class="sub">${msg}${dead.log?' '+esc(dead.log.slice(0,120)):''}</div></div>
+    <button class="btn sec" onclick="cancelBuild()">Dismiss</button></div>`;
 }
 
-async function requestBuild(){
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission().then(p => notifyOK = p === 'granted');
-  } else if ('Notification' in window) { notifyOK = Notification.permission === 'granted'; }
-  const count=parseInt(document.getElementById('nrange').value,10);
-  const note=document.getElementById('nnote').value;
-  const pillar=document.getElementById('npil').value;
-  await fetch('/api/build',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({count,note,pillar})});
-  await load();
-}
 async function cancelBuild(){
   await fetch('/api/build',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({cancel:true})});
@@ -1252,6 +1294,9 @@ function card(p){
   const st=stateOf(p);
   return `<div class="cardwrap">
     ${p.seen?'':`<span class="new" title="${p.from_replicate?'Replicated from '+esc(p.from_replicate):'Not opened yet'}"></span>`}
+    <button class="fav ${p.liked?'on':''}" onclick="fav(event,'${p.topic}')"
+      aria-label="${p.liked?'Unmark':'Mark'} ${esc(p.topic)} as performing"
+      title="${p.liked?'Performing':'Mark as performing'}">&#128293;</button>
     <button class="del" onclick="del(event,'${p.topic}')"
       aria-label="Delete ${esc(p.topic)}">${TRASH}</button>
     <button class="card" onclick="open_('${p.topic}')">
@@ -1262,13 +1307,21 @@ function card(p){
       <div class="rs">${p.registered?'':'<span style="color:var(--warn)">no caption · </span>'}${
         p.from_replicate?'replicated from '+esc(p.from_replicate)+' · ':''}${
         esc(p.roster.join(' · ')||'roster not recorded')}</div>
-      <div class="pills"><span class="pill ${p.approved&&st==='create'?'ready':st}">${
-          st==='create' ? (p.approved?'ready':'to review') : st}</span>
+      <div class="tms">${times(p)}</div>
+      <div class="pills"><span class="pill ${st}">${
+          st==='create' ? 'to review' : st}</span>
         ${(p.schedules||[]).length?`<span class="pill scheduled">${fmt(p.schedules[0].at)}</span>`:''}
-        ${p.liked?'<span class="pill liked">performing</span>':''}
         ${p.queued?'<span class="pill">replicating</span>':''}
         ${(p.redos||[]).length?`<span class="pill">${p.redos.length} redo</span>`:''}</div>
     </div></button></div>`;
+}
+
+async function fav(e,topic){
+  e.stopPropagation();
+  const p=DATA.posts.find(x=>x.topic===topic);
+  await fetch('/api/like',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic, liked: !p.liked})});
+  await load();
 }
 
 function del(e,topic){
@@ -1302,7 +1355,9 @@ function detail(){
   document.getElementById('cnt').textContent='';
   const sent = DATA.accounts.filter(a=>(p.delivery||{})[a.key]);
   const pub  = DATA.accounts.filter(a=>((p.delivery||{})[a.key]||{}).published);
-  const step = pub.length ? 3 : (p.approved ? 2 : 1);
+  // No approve gate any more: reviewing is reading the slides, and the only
+  // state worth tracking is whether it has gone out.
+  const step = sent.length ? 3 : 1;
   const head = (n,label,note) => `<div class="stephead ${step===n?'now':step>n?'done':'todo'}">
       <span class="stepnum">${step>n?'✓':n}</span><span class="steplabel">${label}</span>
       ${note?`<span class="sub">${note}</span>`:''}</div>`;
@@ -1313,6 +1368,8 @@ function detail(){
       <span class="sub">${esc(p.note||'')}</span>
       <button class="back" style="margin-left:auto" onclick="del(event,'${p.topic}')">Delete post</button>
     </div>
+
+    ${topActions(p, sent, pub)}
 
     <section class="step">
       ${head(1,'Review','check the slides and the words that go out with them')}
@@ -1346,16 +1403,12 @@ function detail(){
       <div class="field"><label for="ca">Caption</label><textarea id="ca">${esc(p.caption)}</textarea></div>
       <div class="actions">
         <button class="btn sec" onclick="save()">Save copy</button>
-        ${p.approved
-          ? `<button class="btn sec" onclick="approve(false)">Unapprove</button>
-             <span class="sub">Approved. Step 2 is unlocked.</span>`
-          : `<button class="btn" onclick="approve(true)">Approve</button>`}
       </div>
     </section>
 
-    <section class="step ${p.approved?'':'locked'}">
+    <section class="step">
       ${head(2,'Deliver','send it to the accounts, now or at a set time')}
-      ${!p.approved ? `<p class="sub">Approve it first.</p>` : `
+      ${`
         ${(p.schedules||[]).length
           ? `<p class="sub" style="margin:0 0 14px">Queued for
                <span class="when">${fmt(p.schedules[0].at)}</span> to
@@ -1399,6 +1452,29 @@ function detail(){
     </section>`;
 }
 
+// The two things you actually do to a post live at the top, so a drafted or
+// published post never needs scrolling to reach them.
+function topActions(p, sent, pub){
+  const unsent = DATA.accounts.filter(a=>!(p.delivery||{})[a.key]);
+  const unpub  = sent.filter(a=>!((p.delivery||{})[a.key]||{}).published);
+  const n = DATA.accounts.length;
+  const btns = [];
+  if(unsent.length) btns.push(`<button class="btn" onclick="draft(null)">Draft to
+    ${unsent.length===n?'all accounts':unsent.length+' remaining'}</button>`);
+  if(unpub.length) btns.push(`<button class="btn ${unsent.length?'sec':''}" onclick="publishAll()">Mark
+    published${unpub.length<n?' ('+unpub.length+')':''}</button>`);
+  if(pub.length===n) btns.push(`<button class="btn sec" onclick="replicate()"
+    ${p.queued?'disabled':''}>${p.queued?'Replicating':'Replicate concept'}</button>`);
+  return `<div class="topbar">${btns.join('')}
+    <span class="sub">${sent.length} of ${n} drafted · ${pub.length} published</span></div>`;
+}
+
+async function publishAll(){
+  await fetch('/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic:cur, published:true})});
+  await load(); render();
+}
+
 function label(k){ return (DATA.accounts.find(a=>a.key===k)||{}).label || k; }
 function fmt(ts){ const d=new Date(ts*1000);
   return d.toLocaleString([], {weekday:'short', day:'numeric', month:'short',
@@ -1417,12 +1493,6 @@ function showModal({title, body='', extra='', ok='Confirm', danger=false, action
 function closeModal(){ document.getElementById('modal').style.display='none'; onOK=null; }
 document.getElementById('mok').onclick=async()=>{ const f=onOK; closeModal(); if(f) await f(); };
 document.getElementById('modal').onclick=e=>{ if(e.target.id==='modal') closeModal(); };
-
-async function approve(v){
-  await fetch('/api/approve',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({topic:cur,approved:v})});
-  await load(); render();
-}
 
 function askSchedule(){
   const d=new Date(Date.now()+3600e3); d.setSeconds(0,0);

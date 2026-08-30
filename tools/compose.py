@@ -120,6 +120,7 @@ MIN_BG_PX = (1000, 1700)
 # single post: two photos of a man at a desk in one carousel reads as stock
 # imagery. `assert_one_person(list_of_bgs)` enforces it at build time.
 import json as _json
+import hook_rules
 try:
     HAS_PERSON = set(_json.load(open(f'{SP}/manifest.json'))['has_person'])
 except Exception:
@@ -409,7 +410,7 @@ def assert_audience(tools):
     return True
 
 
-def preflight(topic, tools, bgs, pillar='tools'):
+def preflight(topic, tools, bgs, pillar='tools', hook=None):
     """Every guard, in one call, before anything renders.
 
     assert_one_llm used to be opt-in and a generator could simply forget it,
@@ -422,6 +423,9 @@ def preflight(topic, tools, bgs, pillar='tools'):
     assert_audience(tools)
     assert_varied(bgs)
     assert_bg_fresh(bgs, topic)
+    if hook:
+        assert_hook_approved(hook)
+        assert_hook_fresh(hook, topic)
     return True
 
 
@@ -533,37 +537,53 @@ def _fit_display(text, variation, start, max_w):
     return display_font(40, variation)
 
 
-HOOK_POOL = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                         'hook_pool.json')
+HOOK_POOL = hook_rules.HOOK_POOL
 
 
 def assert_hook_approved(lines):
     """Raise unless this exact hook is one the user wrote or signed off.
 
     Hooks written from memory drift out of his voice, and he only finds out
-    after the post has shipped. The pool is the same mechanism as the
-    background rotation: draw from approved items, mark them used, and ask
-    for more when it runs dry rather than inventing one.
+    after the post has shipped. Membership in the pool is the only thing this
+    checks; whether the hook is due back is assert_hook_fresh.
     """
-    pool = _json.load(open(HOOK_POOL))
-    pair = [l.strip().lower() for l in lines]
-    for h in pool['hooks']:
-        if [x.strip().lower() for x in h['lines']] == pair:
+    for h in hook_rules.pool():
+        if hook_rules.key(h['lines']) == hook_rules.key(lines):
             return True
-    unused = [' / '.join(h['lines']) for h in pool['hooks'] if not h['used']]
+    ready = [' / '.join(h['lines']) for h in hook_rules.eligible()]
     raise SystemExit(
         'hook not in the approved pool: "' + ' / '.join(lines) + '". '
-        'Use one of the unused approved hooks or ask for new ones. '
-        'Unused: ' + '; '.join(unused[:6]))
+        'Use an eligible approved hook or ask for new ones. '
+        'Eligible now: ' + '; '.join(ready[:6]))
 
 
-def mark_hook_used(lines):
+def assert_hook_fresh(lines, topic=None):
+    """Raise if this hook went out too recently.
+
+    Hooks are not burn-once. A hook sits out hook_rules.HOOK_COOLDOWN posts,
+    or half that if its last post was marked performing, and only a manual
+    `retired: true` takes one out for good. The old boolean was advisory: it
+    lived in a prompt, so a build could ignore it and did.
+    """
+    ok, why = hook_rules.status(lines, topic)
+    if ok:
+        return True
+    ready = [' / '.join(h['lines']) for h in hook_rules.eligible(topic)]
+    raise SystemExit(
+        'hook "' + ' / '.join(lines) + '" is not eligible: ' + why + '. '
+        'Eligible now: ' + ('; '.join(ready[:6]) if ready else
+                            'none, ask Thinh for new hooks'))
+
+
+def mark_hook_used(lines, topic=None):
+    """Record the outing. `topic` is what lets the cooldown name the post and
+    read its performance later, so pass it."""
     pool = _json.load(open(HOOK_POOL))
-    pair = [l.strip().lower() for l in lines]
     for h in pool['hooks']:
-        if [x.strip().lower() for x in h['lines']] == pair:
+        if hook_rules.key(h['lines']) == hook_rules.key(lines):
             h['used'] = True
     _json.dump(pool, open(HOOK_POOL, 'w'), indent=1, ensure_ascii=False)
+    hook_rules.record(lines, topic)
 
 
 def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
@@ -579,6 +599,9 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
     lands far under its ceiling the headline is too long: shorten it.
     """
     assert_hook_approved(lines)
+    # drafts/<topic>/01.jpg — the topic is already in the path, so the guard
+    # works without every generator remembering to pass it.
+    assert_hook_fresh(lines, os.path.basename(os.path.dirname(os.path.abspath(out))))
     im = base_photo(bg, grad)
     im = frame_for_band(im, HOOK_BAND[0], HOOK_BAND[1])
     adaptive_scrim(im, HOOK_BAND[0], HOOK_BAND[1], target=88, strength_cap=0.62)

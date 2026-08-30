@@ -27,6 +27,7 @@ Post view is three gated steps: Review, Deliver, Publish.
 ## Guards that fail the build (in `tools/compose.py`)
 
 - `assert_hook_approved` — hooks only from `tools/hook_pool.json`
+- `assert_hook_fresh` — a hook sits out 8 posts, 4 if it was marked performing
 - `assert_audience` — roster must serve a young solo builder; `tool_pool.json`
 - `assert_one_llm` — exactly one LLM per post, rotated
 - `assert_teaches` — both body lines teach, never a verdict
@@ -46,7 +47,8 @@ Post view is three gated steps: Review, Deliver, Publish.
 
 ## Current state
 
-- 7 approved hooks left. Ask Thinh for more before they run out.
+- Hooks are reusable on a cooldown (`tools/hook_rules.py`), not burn-once.
+  `hook_rules.eligible()` is the real count; the `used` flag gates nothing.
 - `bg/_unapproved/` holds backgrounds a build ingested on its own; keep them out.
 - Pending: a 5am job for 5 tools posts plus one from each other category.
 - Delivery sometimes appears to skip an account; per-account logging is now in
