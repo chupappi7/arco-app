@@ -670,5 +670,15 @@
    "Codex",
    "ClickUp"
   ]
+ },
+ {
+  "topic": "ten-x-3",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Raycast",
+   "Zapier",
+   "Higgsfield"
+  ]
  }
 ]

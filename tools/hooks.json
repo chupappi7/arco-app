@@ -436,6 +436,12 @@
    "title": "4 hours a day is 60 full days a year",
    "caption": "i did the math once and could not unsee it. 4 hours of scrolling a day is 28 hours a week, 60 waking days a year. grayscale and app limits never held because every fix asked me to decide again at the worst moment. now the feeds lock on a schedule, 9 to 12 and 7 to 10 on weekdays, and the block does not ask how i feel. three weeks in my screen time is under 90 minutes. the app is arco, planner and app blocker in one. #screentime #digitaldetox #focus #productivity",
    "_note": "re-shoot of 90-days-lost: identical copy, six new backgrounds; built 2026-08-31"
+  },
+  {
+   "topic": "ten-x-3",
+   "title": "how i 10x'd my productivity",
+   "caption": "five apps, and the day stopped leaking. arco holds every task i have and the day is planned in half a minute, then focus mode puts every distraction away until i am done, my holy grail. a gemini live session can watch your screen while you share it, so you ask about the error in front of you instead of retyping it into a chat. drop your own shell script into raycast and it becomes a command with its own keyword, so the thing you used to open the terminal for runs from the search bar. a digest step in zapier collects items and releases them as one message on a schedule, so ten alerts through the week arrive as one summary on friday. one higgsfield prompt runs as a batch and comes back as several finished frames, so you pick the shot instead of rewriting the prompt ten times. #productivity #aitools #apps #tools #focus",
+   "_note": "built 2026-08-31. asked for the 'i pay for 12 apps' hook, which twelve-down-to-five used one post earlier and hook_rules blocks for another 4; ran on the shortest eligible tools hook instead. shares the hook with ten-x-2 eight posts back, so the roster and all five teaching points are different."
   }
  ]
 }
