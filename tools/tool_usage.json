@@ -604,5 +604,25 @@
    "RevenueCat",
    "Notion"
   ]
+ },
+ {
+  "topic": "stack-at-19",
+  "tools": [
+   "ARCO",
+   "Codex",
+   "GitHub",
+   "Figma",
+   "Framer"
+  ]
+ },
+ {
+  "topic": "lock-in-anyway-2",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "Raycast",
+   "CleanShot X",
+   "Canva"
+  ]
  }
 ]

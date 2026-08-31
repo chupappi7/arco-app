@@ -222,12 +222,6 @@
    "_note": "builder listicle; Supabase/Vercel niche picks; batch 2026-08-24"
   },
   {
-   "topic": "type-less",
-   "title": "i barely type anymore, these 5 tools do it for me",
-   "caption": "superwhisper turns speech into clean text in any app at speaking speed. arco plans my day in 30 seconds instead of a journaling session, tasks and app blocking included, my holy grail. granola listens to meetings and the notes write themselves. claude turns a dictated rough idea into a finished draft, editing beats writing from zero. cleanshot x copies text straight out of any screenshot. #productivity #aitools #tools #mac",
-   "_note": "voice/capture listicle; Superwhisper/Granola/CleanShot niche picks; batch 2026-08-24"
-  },
-  {
    "topic": "keep-five",
    "title": "the 5 apps i would keep if i deleted everything else",
    "caption": "in claude code you can define your own agents and run them at the same time, one building and one reviewing, each with its own clean context window. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. a notion database automation fires when a property changes and not on a timer, so flipping status to done stamps the date and files the page itself. github actions can run on a schedule and not only when you push, so a nightly scraper or weekly report runs on their machines. capcut can read your auto captions out loud with text to speech, so a faceless video gets a voiceover without recording anything. #productivity #apps #aitools #buildinpublic",
@@ -360,12 +354,6 @@
    "_note": "tools pillar; llm this post: chatgpt"
   },
   {
-   "topic": "three-hours-back",
-   "title": "i cut 3 hours of screen time without deleting a single app",
-   "caption": "three hours back and every app is still installed. arco insights show where the hours actually went, by app and by day, so you stop guessing which one took the evening. then log out of every feed app and remove it from autofill, so opening one costs a password. delete the icons and leave the apps in the app library, so getting in means typing the name of what takes your evening. switch off badges and banners for every feed app, not just sounds, so nothing decides when you open it. and keep one fixed window for scrolling, thirty minutes after dinner, so the other hours stop leaking. #screentime #digitaldetox #focus #productivity #phoneaddiction",
-   "_note": "screentime pillar, method post: five rule_slide steps, ARCO leads at rule 1 on the insights angle. app_slide is barred under a screentime hook (assert_roster_allowed) so there is no roster. rebuild: python3 tools/gen-three-hours-back.py"
-  },
-  {
    "topic": "4x-productivity-3",
    "title": "the tools i used to 4x my productivity",
    "caption": "part two, five different tools. obsidian links every note to the others so the graph organises itself. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. granola listens to a meeting and the notes write themselves. cleanshot x captures scrolling pages and lets you copy text straight out of the image. endel generates focus sound live with no playlist to pick. #productivity #tools #aitools #mac #focus",
@@ -400,6 +388,18 @@
    "title": "5 tools that replace a whole team",
    "caption": "no team, no office, five tools. codex writes the feature from a description, runs it and fixes what breaks before i look at the diff. github actions runs my tests and builds on every push and branch protection stops me merging anything that failed. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. revenuecat handles receipts, renewals and refunds so i never built a payment server. notion keeps the roadmap and content calendar as one database with different views. #buildinpublic #indiedev #solofounder #aitools",
    "_note": "re-shoot of ship-alone: identical words, six new backgrounds (bg-h63/20/21/29/32/34). the source shot on bg-h14/12/n09/09/04/02, identified by correlating its slides against the pool since it predates bg_history, and those six are excluded. its generator was never committed, so the copy was read back off drafts/ship-alone/*.jpg. built 2026-08-31 by gen-ship-alone-2.py"
+  },
+  {
+   "topic": "type-less",
+   "title": "i barely type anymore, these 5 tools do it for me",
+   "caption": "superwhisper turns speech into clean text in any app at speaking speed. arco plans my day in 30 seconds instead of a journaling session, tasks and app blocking included, my holy grail. granola listens to meetings and the notes write themselves. claude turns a dictated rough idea into a finished draft, editing beats writing from zero. cleanshot x copies text straight out of any screenshot. #productivity #aitools #tools #mac",
+   "_note": "voice/capture listicle; Superwhisper/Granola/CleanShot niche picks; batch 2026-08-24"
+  },
+  {
+   "topic": "stack-at-19",
+   "title": "the tools i use to run my business at 19 years old",
+   "caption": "nineteen, no team, and this is the whole stack. arco holds every task i have and the day takes 30 seconds to plan, then focus mode puts every distraction away and blocked hours does it on a schedule. tag codex on a pull request and it reviews the diff line by line, so bugs get caught before the merge with no one else on the team. dependabot watches your packages and opens the upgrade for you, so a security fix arrives as something to merge instead of something to find. dev mode in figma hands you the spacing, colour and radius of any layer, so you build the screen from numbers instead of a screenshot and a guess. framer has analytics built into the site with no script to install, so you see which page they land on and where they leave without ever leaving the editor. #buildinpublic #indiedev #solofounder #aitools",
+   "_note": "replication of launch-weekend: same build-pillar shape, one llm + arco + three tools, nothing else carried over. hook is the pool's 'the tools i use to run my business / at 19 years old' (build, last out 13 posts ago); 'how i ship in a weekend' was the closer shape match but weekend-not-month already ran it over arco + codex + figma. roster arco, codex, github, figma, framer, arco leading. llm this post: codex. five teaching points that appear on no other slide and in no caption here: codex reviewing a pr (not agents.md, not the sandbox pr), github dependabot (not actions, used twice already), figma dev mode (not auto layout, components or variables), framer built-in analytics (not cms collections or publish-from-canvas). backgrounds bg-h64/24/39/31/88/45, none of them launch-weekend's bg-h17/21/16/09/02/04. first pass ran the app slides on the freshest photos in the pool, daylight offices at 54-64 luma: they cleared the gate and failed the read, same as ten-x-2, so the set was refrozen on dusk and night only after reading every slide back. rebuild: python3 tools/gen-stack-at-19.py"
   }
  ]
 }
