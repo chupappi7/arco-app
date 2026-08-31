@@ -372,5 +372,27 @@
    "bg-h32.jpg",
    "bg-h24.jpg"
   ]
+ },
+ {
+  "topic": "90-days-lost-2",
+  "bgs": [
+   "bg-h70.jpg",
+   "bg-h29.jpg",
+   "bg-h34.jpg",
+   "bg-h36.jpg",
+   "bg-h48.jpg",
+   "bg-n03.jpg"
+  ]
+ },
+ {
+  "topic": "twelve-down-to-five",
+  "bgs": [
+   "bg-h69.jpg",
+   "bg-h35.jpg",
+   "bg-h45.jpg",
+   "bg-n04.jpg",
+   "bg-h88.jpg",
+   "bg-n01.jpg"
+  ]
  }
 ]
