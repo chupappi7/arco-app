@@ -394,6 +394,12 @@
    "title": "how i 10x'd my productivity",
    "caption": "arco holds every task i have and the day gets planned in 30 seconds, then focus mode puts every distraction away while i work, my holy grail. superwhisper turns one held key into clean text in whatever app is open, so a reply you would type for two minutes is done in fifteen seconds of talking. granola listens to the call and turns the three words you typed into full notes, so nobody writes up the meeting afterwards. claude takes the messy version you talked through and hands back the clean draft, so the morning goes on editing instead of staring at an empty page. cleanshot x reads the words inside an image and copies them to the clipboard, so text you could only look at is text you can paste and search. #productivity #apps #aitools #mac #focus",
    "_note": "tools pillar; reword of do-all-the-work, same roster and the same five teaching points, new copy. its own hook was inside the cooldown and the cooldown keys on the parent, so a rewording of it was blocked too; this took the eligible pool hook that asks the same question. built as work-by-noon-2 first, renamed after a concurrent agent registered that topic with a different roster. llm this post: claude. backgrounds bg-h60/36/31/38/22/45, frozen after reading every render back: the first pass on the daylight desks and the pool villa passed the luma gate and failed the read. rebuild: python3 tools/gen-ten-x-2.py"
+  },
+  {
+   "topic": "ship-alone-2",
+   "title": "5 tools that replace a whole team",
+   "caption": "no team, no office, five tools. codex writes the feature from a description, runs it and fixes what breaks before i look at the diff. github actions runs my tests and builds on every push and branch protection stops me merging anything that failed. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. revenuecat handles receipts, renewals and refunds so i never built a payment server. notion keeps the roadmap and content calendar as one database with different views. #buildinpublic #indiedev #solofounder #aitools",
+   "_note": "re-shoot of ship-alone: identical words, six new backgrounds (bg-h63/20/21/29/32/34). the source shot on bg-h14/12/n09/09/04/02, identified by correlating its slides against the pool since it predates bg_history, and those six are excluded. its generator was never committed, so the copy was read back off drafts/ship-alone/*.jpg. built 2026-08-31 by gen-ship-alone-2.py"
   }
  ]
 }
