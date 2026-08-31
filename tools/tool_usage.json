@@ -644,5 +644,15 @@
    "Canva",
    "CapCut"
   ]
+ },
+ {
+  "topic": "month-in-a-weekend",
+  "tools": [
+   "ARCO",
+   "Codex",
+   "GitHub",
+   "Linear",
+   "Stripe"
+  ]
  }
 ]

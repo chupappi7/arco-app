@@ -361,5 +361,16 @@
    "bg-h48.jpg",
    "bg-n03.jpg"
   ]
+ },
+ {
+  "topic": "month-in-a-weekend",
+  "bgs": [
+   "bg-h68.jpg",
+   "bg-h38.jpg",
+   "bg-h31.jpg",
+   "bg-h22.jpg",
+   "bg-h32.jpg",
+   "bg-h24.jpg"
+  ]
  }
 ]
