@@ -339,5 +339,16 @@
    "bg-n01.jpg",
    "bg-n05.jpg"
   ]
+ },
+ {
+  "topic": "deleted-everything",
+  "bgs": [
+   "bg-h66.jpg",
+   "bg-h37.jpg",
+   "bg-h21.jpg",
+   "bg-h29.jpg",
+   "bg-h32.jpg",
+   "bg-h31.jpg"
+  ]
  }
 ]

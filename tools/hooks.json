@@ -25,7 +25,7 @@
   "cta": {
    "icon": "icon.png",
    "appName": "ARCO: Day Planner & Focus",
-   "subtitle": "Comment “ARCO” — I’ll send you the promo code. First 50 only: first month of Pro free."
+   "subtitle": "Comment \u201cARCO\u201d \u2014 I\u2019ll send you the promo code. First 50 only: first month of Pro free."
   }
  },
  "posts": [
@@ -86,19 +86,19 @@
   {
    "topic": "47-minutes",
    "title": "my screen time is 47 minutes a day",
-   "caption": "47 minutes a day. not discipline — a system: every hour has a job, and the feed apps stay blocked until i say so. the planner and the blocker are one app. it's called ARCO, free on the App Store. #screentime #digitaldetox #productivity #focus #appblocker",
-   "_note": "slides transcribed from rendered JPGs 2026-08-20; source definitions were lost with the old pipeline, so no slides[] — re-render not possible from this entry"
+   "caption": "47 minutes a day. not discipline \u2014 a system: every hour has a job, and the feed apps stay blocked until i say so. the planner and the blocker are one app. it's called ARCO, free on the App Store. #screentime #digitaldetox #productivity #focus #appblocker",
+   "_note": "slides transcribed from rendered JPGs 2026-08-20; source definitions were lost with the old pipeline, so no slides[] \u2014 re-render not possible from this entry"
   },
   {
    "topic": "6h-to-2h",
    "title": "i cut my screen time from 6 hours to 2",
-   "caption": "6 hours a day is 8 full workdays a month. i did the math once and couldn't unsee it. no willpower involved — every hour got a job, and tiktok just won't open during my blocks. 3 weeks later: 2 hours, most of it useful. the planner and blocker are one app — ARCO, free on the App Store. #screentime #digitaldetox #appblocker #productivity #focus",
+   "caption": "6 hours a day is 8 full workdays a month. i did the math once and couldn't unsee it. no willpower involved \u2014 every hour got a job, and tiktok just won't open during my blocks. 3 weeks later: 2 hours, most of it useful. the planner and blocker are one app \u2014 ARCO, free on the App Store. #screentime #digitaldetox #appblocker #productivity #focus",
    "_note": "slides transcribed from rendered JPGs 2026-08-20; source definitions lost with old pipeline, no slides[]"
   },
   {
    "topic": "5-apps",
    "title": "5 apps i use to run my one-person app business",
-   "caption": "I build and ship iOS apps completely alone — no team, no office. These 5 make that possible. Claude writes most of my code now; Claude Code ships whole features while I review. ARCO is my operating system: every hour of the day gets a job, and TikTok stays blocked during focus blocks — planner and app blocker in one (full name on the App Store: App Blocker & Focus — ARCO). Higgsfield generates every visual I post, including this one. RevenueCat runs my subscriptions so I've never touched a payment server. And Notion holds the roadmap, the content calendar, and every 2am idea. The tools aren't the point — the hours of uninterrupted focus they buy are. #aitools #appdevelopment #buildinpublic #indiedev #founder",
+   "caption": "I build and ship iOS apps completely alone \u2014 no team, no office. These 5 make that possible. Claude writes most of my code now; Claude Code ships whole features while I review. ARCO is my operating system: every hour of the day gets a job, and TikTok stays blocked during focus blocks \u2014 planner and app blocker in one (full name on the App Store: App Blocker & Focus \u2014 ARCO). Higgsfield generates every visual I post, including this one. RevenueCat runs my subscriptions so I've never touched a payment server. And Notion holds the roadmap, the content calendar, and every 2am idea. The tools aren't the point \u2014 the hours of uninterrupted focus they buy are. #aitools #appdevelopment #buildinpublic #indiedev #founder",
    "_note": "CheckVibe-style listicle; slides composited 2026-08-20 from existing draft bgs + 1 generated; sources in scratchpad/5apps"
   },
   {
@@ -110,7 +110,7 @@
   {
    "topic": "lockin-apps",
    "title": "5 apps i use to actually lock in",
-   "caption": "none of these are magic. together they're the reason i finish things. claude explains whatever i'm stuck on — half my study time used to be searching, now i just ask. arco plans the day and physically blocks tiktok during focus blocks, so the plan actually happens (full name on the app store: app blocker & focus — arco). google calendar holds the schedule — if it's not in there, it doesn't exist. notion remembers everything so my head doesn't have to. endel plays focus sound with no lyrics and no decisions. plan the hours, block the noise, start. #lockin #focus #productivity #studytok #screentime",
+   "caption": "none of these are magic. together they're the reason i finish things. claude explains whatever i'm stuck on \u2014 half my study time used to be searching, now i just ask. arco plans the day and physically blocks tiktok during focus blocks, so the plan actually happens (full name on the app store: app blocker & focus \u2014 arco). google calendar holds the schedule \u2014 if it's not in there, it doesn't exist. notion remembers everything so my head doesn't have to. endel plays focus sound with no lyrics and no decisions. plan the hours, block the noise, start. #lockin #focus #productivity #studytok #screentime",
    "_note": "app-stack listicle per July CLAUDE.md spec (ARCO #2 among famous apps); composited 2026-08-20"
   },
   {
@@ -406,6 +406,12 @@
    "title": "this is how you lock in when you don't feel like it",
    "caption": "arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. ask claude for a quiz on what you just read and it builds a working one, so you click through questions instead of rereading the page. raycast floating notes keeps a note above every window on one hotkey, so the next step stays on screen while you work somewhere else. cleanshot x captures park in a corner overlay instead of piling on the desktop, so you drag the diagram into your notes without saving a file. any canva design opens out into an infinite whiteboard, so the whole topic gets mapped before you write a word. #discipline #focus #productivity #studytok",
    "_note": "re-shoot of lock-in-anyway: identical copy, six new backgrounds"
+  },
+  {
+   "topic": "deleted-everything",
+   "title": "the 5 apps i would keep if i deleted everything else",
+   "caption": "if everything else went, these five stay. arco holds every task i have and the whole day takes 30 seconds to plan, then focus mode puts every distraction away, my holy grail. superwhisper turns what you say into typed text from a hotkey anywhere on the machine, so the long email you kept putting off gets said out loud once and sent. granola sits on the call and fills in the notes you half typed from the audio, so the write up you would do at 6pm is already there when you hang up. paste the rambling version into claude and ask for the tight one back, and every piece of writing starts at the second draft instead of the first. cleanshot x lifts the text straight out of a screenshot, so an error code in a video or a photo goes into search without retyping. #productivity #aitools #tools #mac",
+   "_note": "reword of do-all-the-work: same concept (a stack that writes and captures for you), same roster arco/superwhisper/granola/claude/cleanshot x, same five teaching points, every sentence rewritten. this is the third phrasing of those points (do-all-the-work, then ten-x-2, now this) so no line repeats either. hook is the pool's 'the 5 apps i would keep / if i deleted everything else' (tools, last out 11 posts ago): do-all-the-work's own hook is off cooldown and hook_rules.parent would take a light rewording of it, but assert_hook_approved matches the pool exactly on purpose, so the reword would not render without weakening the guard that keeps hooks in thinh's voice. the 4x and 10x hooks ask the same question and were skipped because ten-x-2 already shot this roster on the multiplier framing. llm this post: claude. backgrounds bg-h66/37/21/29/32/31, none of them do-all-the-work's bg-h31/22/24/88/45/n04 except bg-h31, which lands on a different slide. the picker's bg-n06 (glass office, luma 54) was cut after reading the render, washed out beside the rest, and bg-h36 was cut as a near duplicate of bg-h37, same house and cars two metres apart. rebuild: python3 tools/gen-deleted-everything.py"
   }
  ]
 }
