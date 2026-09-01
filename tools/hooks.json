@@ -448,6 +448,12 @@
    "title": "the 5 apps i would keep if i deleted everything else",
    "caption": "in claude code you can define your own agents and run them at the same time, one building and one reviewing, each with its own clean context window. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. a notion database automation fires when a property changes and not on a timer, so flipping status to done stamps the date and files the page itself. github actions can run on a schedule and not only when you push, so a nightly scraper or weekly report runs on their machines. capcut can read your auto captions out loud with text to speech, so a faceless video gets a voiceover without recording anything. #productivity #apps #aitools #buildinpublic",
    "_note": "re-shoot of keep-five: identical copy, six new backgrounds; built 2026-09-01"
+  },
+  {
+   "topic": "work-by-noon-3",
+   "title": "the tools i use to do a full day of work by noon",
+   "caption": "arco keeps every task in one place and the whole day gets planned in 30 seconds, with focus mode putting every distraction away. a manus task runs on its own cloud machine and keeps going after you close the tab, so you hand off the long job and come back to a finished file. n8n can be hosted on your own machine, so a workflow reaches local files and private apis a cloud tool cannot touch. a cloudflare tunnel puts your local server on a public https url with no port opened, so you send someone the link while the site still runs on your laptop. any past vercel deployment can be promoted back to production in one click, so a bad release is undone in seconds instead of rebuilt and shipped again. #productivity #tools #aitools #buildinpublic",
+   "_note": "re-shoot of work-by-noon: identical hook, roster, card copy and caption, six new photographs. ARCO stays at #1 on angle v4, written out literally because next_arco_angle() has rotated past it and the caption describes v4. Slug is -3 because work-by-noon-2 is already live. Backgrounds bg-h73/31/29/32/22/n06, picked with the gen-daily-batch walk excluding the source post's own six frames, then frozen: one frame per vibe rather than darkest-five, because the darkest-five walk put the same villa and the same two supercars on slides 2, 4 and 6. rebuild: python3 tools/gen-work-by-noon-3.py"
   }
  ]
 }
