@@ -493,5 +493,16 @@
    "bg-h45.jpg",
    "bg-h21.jpg"
   ]
+ },
+ {
+  "topic": "ship-alone-3",
+  "bgs": [
+   "bg-h76.jpg",
+   "bg-h24.jpg",
+   "bg-h36.jpg",
+   "bg-h46.jpg",
+   "bg-h88.jpg",
+   "bg-n01.jpg"
+  ]
  }
 ]
