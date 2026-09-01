@@ -740,5 +740,15 @@
    "Raycast",
    "Superwhisper"
   ]
+ },
+ {
+  "topic": "delete-the-rest",
+  "tools": [
+   "ARCO",
+   "CapCut",
+   "Claude",
+   "GitHub",
+   "Framer"
+  ]
  }
 ]
