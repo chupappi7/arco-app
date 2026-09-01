@@ -700,5 +700,15 @@
    "Cloudflare",
    "Vercel"
   ]
+ },
+ {
+  "topic": "type-less-3",
+  "tools": [
+   "Superwhisper",
+   "ARCO",
+   "Granola",
+   "Claude",
+   "CleanShot X"
+  ]
  }
 ]
