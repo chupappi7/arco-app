@@ -442,6 +442,12 @@
    "title": "how i 10x'd my productivity",
    "caption": "five apps, and the day stopped leaking. arco holds every task i have and the day is planned in half a minute, then focus mode puts every distraction away until i am done, my holy grail. a gemini live session can watch your screen while you share it, so you ask about the error in front of you instead of retyping it into a chat. drop your own shell script into raycast and it becomes a command with its own keyword, so the thing you used to open the terminal for runs from the search bar. a digest step in zapier collects items and releases them as one message on a schedule, so ten alerts through the week arrive as one summary on friday. one higgsfield prompt runs as a batch and comes back as several finished frames, so you pick the shot instead of rewriting the prompt ten times. #productivity #aitools #apps #tools #focus",
    "_note": "built 2026-08-31. asked for the 'i pay for 12 apps' hook, which twelve-down-to-five used one post earlier and hook_rules blocks for another 4; ran on the shortest eligible tools hook instead. shares the hook with ten-x-2 eight posts back, so the roster and all five teaching points are different."
+  },
+  {
+   "topic": "keep-five-2",
+   "title": "the 5 apps i would keep if i deleted everything else",
+   "caption": "in claude code you can define your own agents and run them at the same time, one building and one reviewing, each with its own clean context window. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. a notion database automation fires when a property changes and not on a timer, so flipping status to done stamps the date and files the page itself. github actions can run on a schedule and not only when you push, so a nightly scraper or weekly report runs on their machines. capcut can read your auto captions out loud with text to speech, so a faceless video gets a voiceover without recording anything. #productivity #apps #aitools #buildinpublic",
+   "_note": "re-shoot of keep-five: identical copy, six new backgrounds; built 2026-09-01"
   }
  ]
 }
