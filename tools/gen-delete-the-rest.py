@@ -62,7 +62,7 @@ HOOK = ['the 5 apps i would keep', 'if i deleted everything else']
 PILLAR = 'tools'
 TOOLS = ['ARCO', 'CapCut', 'Claude', 'GitHub', 'Framer']
 
-# 01 hook    bg-h79  desk-led-neon      first hook outing
+# 01 hook    bg-h22  lounge-day         penthouse at night, band luma 53.5
 # 02 ARCO    bg-h29  supercars-dusk     band luma 18.7
 # 03 CapCut  bg-h32  window-silhouette  band luma 38.8  (the one person)
 # 04 Claude  bg-h88  supercars-dusk     band luma 28.2
@@ -83,7 +83,17 @@ TOOLS = ['ARCO', 'CapCut', 'Claude', 'GitHub', 'Framer']
 # dark set. That is the failure stack-at-19 and all-of-it-at-19 both
 # recorded, so the daylight pools n01/n03/n04 and the desk-city-day family
 # stay out -- they clear BAND_MAX_LUMA and still lose the text.
-BGS = ['bg-h79.jpg', 'bg-h29.jpg', 'bg-h32.jpg',
+# The hook first ran on bg-h79, a night LED gaming desk, and came back for a
+# re-shoot: Thinh had just moved 4x-productivity-5's hook off the same
+# desk-led-neon vibe onto a penthouse, so the RGB gaming desk is the look he
+# is steering slide 1 away from. bg-h22 is the only frame in the pool that is
+# both a night penthouse over a lit skyline and under BAND_MAX_LUMA (53.5 --
+# the darkest candidate that is neither a supercar nor a desk). It carries
+# the lounge-day tag that slide 5's bg-h20 has, but sits four slides away, so
+# assert_varied's adjacency rule holds and the two rooms read as different
+# photographs. bg-h79 goes back into the unused-hook pool: delete-the-rest
+# was the only post that ever used it as a hook.
+BGS = ['bg-h22.jpg', 'bg-h29.jpg', 'bg-h32.jpg',
        'bg-h88.jpg', 'bg-h20.jpg', 'bg-h34.jpg']
 
 # The six frames twelve-apps shot, excluded from this build.
