@@ -19,3 +19,12 @@ tools/post_status.json
 tools/schedule.json
 tools/.dashboard_token
 tools/build_queue.json
+tools/account_stats.json
+tools/post_stats.json
+tools/promoted.json
+tools/stats_history.json
+tools/untracked_posts.json
+tools/stats_daily.json
+tools/__pycache__/
+*.bak
+tools/deploy/
