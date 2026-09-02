@@ -15,7 +15,7 @@ h45 -- and they are ordered by copy band luma rather than alphabetically, the
 way the source render was ordered: the darkest bands carry slides 2 and 3, the
 two slides that actually get read, and the brightest sits at 6.
 
-  01 hook      bg-h75  desk-led-neon      first hook outing
+  01 hook      bg-h20  lounge-day         penthouse at night, band luma 67.0
   02 ARCO      bg-h31  lounge-night       band luma 19.7, seven body lines
   03 Codex     bg-h35  supercars-dusk     band luma 37.2
   04 Notion    bg-h22  lounge-day         band luma 53.5
@@ -42,7 +42,7 @@ HOOK = ['the tools i used to', '4x my productivity']
 PILLAR = 'tools'
 TOOLS = ['ARCO', 'Codex', 'Notion', 'Obsidian', 'CapCut']
 
-BGS = ['bg-h75.jpg', 'bg-h31.jpg', 'bg-h35.jpg',
+BGS = ['bg-h20.jpg', 'bg-h31.jpg', 'bg-h35.jpg',
        'bg-h22.jpg', 'bg-h45.jpg', 'bg-h21.jpg']
 
 # The six frames of the post being re-shot, excluded from the walk.
