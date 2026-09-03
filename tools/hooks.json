@@ -528,6 +528,11 @@
    "title": "how i 10x'd my productivity",
    "caption": "five apps, and the day stopped running me. arco repeats my habits into the day and gives each one its own slot on the timeline, so the plan is half built before i open it and focus mode guards each block, my holy grail. a chatgpt project keeps its own files and instructions and every chat inside it starts with them loaded, so you stop pasting the same context at the top of each new chat. ask granola one question across every call it has ever recorded, so what someone promised three meetings ago comes back with the date on it. cleanshot x records a window and exports it as a gif that plays anywhere you paste it, so a bug report shows the click that caused it instead of describing it. every zap can be given its own email address that starts it, so forwarding a message kicks off the work with nothing new to connect. #productivity #aitools #apps #tools #focus",
    "_note": "tools pillar; llm this post: chatgpt"
+  },
+  {
+   "topic": "work-by-noon-4",
+   "title": "the tools i use to do a full day of work by noon",
+   "caption": "every task i have gets a time on arco's timeline instead of a list, and blocked hours shuts the feeds for those windows without me asking, my holy grail. connect gmail and drive to gemini and it answers from your own mail and files, so the invoice or the thread comes back without you opening the inbox. superwhisper runs the model on your machine, so dictation works with no connection and the audio never leaves the laptop. a make error handler retries the step that failed and carries on, so the overnight batch is finished by morning instead of stopped at item nine. every bug and request lands in linear triage and not straight in the backlog, so you sort it once and the list you work from stays the real one. #productivity #apps #aitools #buildinpublic"
   }
  ]
 }
