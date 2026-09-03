@@ -543,6 +543,11 @@
    "topic": "keep-five-3",
    "title": "the 5 apps i would keep if i deleted everything else",
    "caption": "five apps survive, everything else goes. i keep every task in arco and plan tomorrow in 30 seconds, and focus mode puts every distraction away the moment it starts, the one i would not delete. give cursor a docs url and it indexes that whole site, so you @ the docs in a prompt and the code comes back on the current version and not a two year old one. wire figma frames to each other and share the prototype as a link, so the flow gets tapped through on a phone before any of it is built. descript strips every um and pulls the pauses between words shorter in one pass, so a rambling first take comes back tight before you open the timeline. buffer writes the post in one box and keeps a separate edit per channel, so the same idea goes out short here and long there without retyping. #productivity #apps #aitools #buildinpublic"
+  },
+  {
+   "topic": "4x-productivity-6",
+   "title": "the tools i used to 4x my productivity",
+   "caption": "four times the work out of the same day. tasks without a time wait in arco's anytime list until the day has room for them, and focus mode blocks the apps i chose for exactly that block, my holy grail. antigravity's agent manager runs several agents at once on separate tasks, so you come back to three jobs finished in the time one prompt used to take. pin a step in n8n and it keeps that output while you build the rest, so you test step nine on real data without firing the trigger again. opusclip tracks the speaker and moves the crop, so a wide take goes vertical and one recording comes back as ten clips with the captions burned in. elevenlabs dubbing translates the video and keeps your own voice speaking it, so the same recording goes out in spanish without recording again. #productivity #apps #aitools #buildinpublic"
   }
  ]
 }
