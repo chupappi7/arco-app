@@ -548,5 +548,16 @@
    "bg-n06.jpg",
    "bg-h20.jpg"
   ]
+ },
+ {
+  "topic": "ten-x-4",
+  "bgs": [
+   "bg-h88.jpg",
+   "bg-h31.jpg",
+   "bg-h29.jpg",
+   "bg-h22.jpg",
+   "bg-h32.jpg",
+   "bg-n01.jpg"
+  ]
  }
 ]
