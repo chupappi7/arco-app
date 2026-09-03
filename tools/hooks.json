@@ -533,6 +533,11 @@
    "topic": "work-by-noon-4",
    "title": "the tools i use to do a full day of work by noon",
    "caption": "every task i have gets a time on arco's timeline instead of a list, and blocked hours shuts the feeds for those windows without me asking, my holy grail. connect gmail and drive to gemini and it answers from your own mail and files, so the invoice or the thread comes back without you opening the inbox. superwhisper runs the model on your machine, so dictation works with no connection and the audio never leaves the laptop. a make error handler retries the step that failed and carries on, so the overnight batch is finished by morning instead of stopped at item nine. every bug and request lands in linear triage and not straight in the backlog, so you sort it once and the list you work from stays the real one. #productivity #apps #aitools #buildinpublic"
+  },
+  {
+   "topic": "best-for-last-2",
+   "title": "5 tools to stay productive, i saved the best for last",
+   "caption": "five tools to stay productive, and the best one is last. all of my tasks sit in arco and planning the day takes 30 seconds, then focus mode puts every distraction away and blocked hours repeats it every weekday, my holy grail. manus writes the plan as a checklist and takes new instructions mid run, so you correct step two while it works instead of rerunning the whole job. endel generates the sound against the time of day and your heart rate, so hour three is not hour one looping and it still works late in a session. a loom share link is live the second you stop recording, mid upload, so you send the walkthrough as you finish it. give an app a hotkey in raycast and the same keys put it away again, so your inbox opens and closes on two keys and you never pass the dock. #productivity #apps #aitools #buildinpublic"
   }
  ]
 }
