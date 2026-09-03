@@ -304,7 +304,7 @@
   {
    "id": "v13",
    "lines": [
-    "The block I\u2019m in sits on the Lock",
+    "The block I’m in sits on the Lock",
     "Screen with the time left on it.",
     "",
     "Picking up the phone shows the plan",
@@ -317,25 +317,31 @@
     "build",
     "business"
    ]
+  },
+  {
+   "id": "v14",
+   "themes": [
+    "planning",
+    "build",
+    "business"
+   ],
+   "lines": [
+    "One app holds the plan and the",
+    "block that protects it.",
+    "",
+    "Tasks get a time on the timeline and",
+    "Focus mode shuts the apps for it.",
+    "",
+    "My holy grail."
+   ]
   }
  ],
  "used": [
   "f2",
   "f1",
+  "l1",
   "v1",
-  "v2",
-  "v3",
-  "v4",
-  "v5",
-  "v6",
-  "v7",
-  "v8",
-  "v9",
-  "v10",
-  "v11",
-  "v12",
-  "v13",
-  "l1"
+  "v14"
  ],
  "rule": "Variations of the approved line. Pick by THEME so the slide answers the hook: a study or screentime hook gets a focus or blocking angle, a build or business hook gets the planning angle. Closers stay in register; 'My holy grail.' carries most of them."
 }

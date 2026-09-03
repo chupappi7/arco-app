@@ -800,5 +800,15 @@
    "Obsidian",
    "Canva"
   ]
+ },
+ {
+  "topic": "five-do-the-work",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "ClickUp",
+   "Raycast",
+   "CapCut"
+  ]
  }
 ]

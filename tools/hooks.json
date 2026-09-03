@@ -508,6 +508,20 @@
    "title": "5 apps i wish someone showed me at 17",
    "caption": "five apps i wish someone had put in front of me at 17. arco keeps the study block in the plan and the distracting apps close with it, so the session ends when the timer does and not when i give in, my holy grail. a finished perplexity thread turns into a page written up with its sources, so a night of research ends as a link you can send. the notion web clipper drops any page into a database with your own fields, so every source for the essay lands in one table instead of thirty tabs. put a caret and an id after a line in obsidian and you can link to that line, so the essay points at the exact sentence and not the whole note. canva bulk create builds one design per row of a spreadsheet, so a list of forty terms comes back as forty finished cards. #productivity #studytok #apps #tools #aitools",
    "_note": "built 2026-09-03. first post with the icon-shelf hook: hook_slide(icons=[...]) draws the five roster icons 3-over-2 under the headline. hook is the least recently used eligible tools hook; ARCO on angle l1 via next_arco_angle('study') because the hook is a school-age one. all five teaching points are new against every caption in this file."
+  },
+  {
+   "topic": "five-do-the-work",
+   "title": "i pay for 12 apps, these 5 do all the work",
+   "caption": "i pay for twelve apps and these five do all the work. arco holds the plan and the block that protects it: every task gets a time on the timeline and focus mode shuts the apps for that window, my holy grail. ask claude for a tool and it builds a working one inside the chat, so the tracker you were about to pay for exists in a minute. clickup automations run a rule on the board, status changes and the next task opens, so the handoff you kept doing by hand happens without you. give an app a global hotkey in raycast and one key brings it forward or hides it, so switching stops being a hunt through windows. capcut auto cutout lifts the subject out of a clip with no green screen, so you can sit over your own screen recording in one project. #productivity #apps #tools #aitools #buildinpublic",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-03 by gen-five-do-the-work.py, a replica of wish-i-knew-at-17's build. Kept: the number-forward first-person hook, the icon-shelf hook slide, ARCO leading the roster, one teaching point per app. Changed: hook is 'i pay for 12 apps / these 5 do all the work', the least recently used eligible tools hook (three posts ago, past HOOK_COOLDOWN); roster is ARCO, Claude, ClickUp, Raycast, CapCut with Claude the single LLM; ARCO answers on angle v14, added to arco_angles.json for this build because the hook asks which apps survive a cull and every existing planning angle had been used; and the four other teaching points -- Claude building a working tool in the chat, ClickUp automations, a Raycast app hotkey, CapCut auto cutout -- appear in no other caption in this file. Two things the guards do not catch were done by eye: the pool holds near-duplicate frames (bg-h35..h39/h88 are one scene, bg-h46..h52 are another) and the vibe rule only blocks adjacent repeats, so a first cut put bg-h35 on the hook and bg-h36 on slide 3 and they read as one photo used twice; and BAND_MAX_LUMA is a mean, which passes a daylight frame averaging 55 while a blown sky sits right behind the copy and swallows the grey paragraph dashes. wish-i-knew-at-17 spent all three lounge-night frames, so four app slides here are daylight and carry GRAD_DARK (f_bot 0.42, not 0.68), which drops the 97th-percentile luma behind the copy from 140-160 to about 100. Backgrounds bg-h45/36/49/n04/n06/h20, one frame per cluster, one person, no adjacent vibe repeat. rebuild: python3 tools/gen-five-do-the-work.py"
   }
  ]
 }
