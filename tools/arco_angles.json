@@ -304,7 +304,7 @@
   {
    "id": "v13",
    "lines": [
-    "The block I’m in sits on the Lock",
+    "The block I\u2019m in sits on the Lock",
     "Screen with the time left on it.",
     "",
     "Picking up the phone shows the plan",
@@ -363,7 +363,9 @@
   "v11",
   "v9",
   "v5",
-  "v12"
+  "v12",
+  "v13",
+  "s1"
  ],
  "rule": "Variations of the approved line. Pick by THEME so the slide answers the hook: a study or screentime hook gets a focus or blocking angle, a build or business hook gets the planning angle. Closers stay in register; 'My holy grail.' carries most of them."
 }

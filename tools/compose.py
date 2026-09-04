@@ -524,7 +524,45 @@ HOOK_L2_SIZE = 86         # Condensed Bold ceiling, shrinks to fit
 HOOK_L1_TOP = 655         # glyph top, not baseline
 HOOK_L2_TOP = 881
 HOOK_MAX_W = 930
+HOOK_L1_MIN = 150         # below this the headline stops out-shouting line 2
+HOOK_L1_LEAD = 196        # row pitch when the headline wraps to two rows
 HOOK_BAND = (620, 990)
+
+
+def _wrap_two(text, variation, start, max_w):
+    """Break a headline so the opening phrase can be set large.
+
+    Balanced rows were the wrong goal: "5 APPS I WISH / SOMEONE" splits the
+    idea in half and nothing gets to be big. What reads is a short opener at
+    full size with the rest stepped down under it — "5 APPS" over "I WISH
+    SOMEONE". So this looks for the shortest leading phrase that still says
+    something, which is almost always two or three words.
+    """
+    words = text.split()
+    if len(words) < 2:
+        return [text]
+    # A row may not end on a word that is still waiting for its noun. Breaking
+    # after "5" or "THE 5" or "HOW I" gives a big fragment that means nothing;
+    # breaking after "APPS" gives "5 APPS", which is the whole point.
+    DANGLING = {'the', 'a', 'an', 'i', 'my', 'your', 'this', 'these', 'those',
+                'how', 'why', 'what', 'and', 'or', 'but', 'for', 'to', 'in',
+                'on', 'of', 'at', 'with', 'from', 'do', 'does', 'did', 'is',
+                'are', 'was', 'would', 'could', 'can', 'that', 'it', 'me'}
+    best, best_score = None, None
+    for i in range(1, len(words)):
+        a, b = ' '.join(words[:i]), ' '.join(words[i:])
+        last = words[i - 1].lower().strip('.,')
+        if last in DANGLING or last.isdigit():
+            continue
+        fa = _fit_display(a, variation, start, max_w)
+        fb = _fit_display(b, variation, int(start * 0.62), max_w)
+        if fb.size < 60:
+            continue
+        # Biggest possible opener wins; ties go to the shorter opener.
+        score = (-fa.size, len(a))
+        if best_score is None or score < best_score:
+            best, best_score = [a, b], score
+    return best or [text]
 
 
 def _fit_display(text, variation, start, max_w):
@@ -606,8 +644,48 @@ def assert_hook_pillar(lines, pillar):
     return True
 
 
+# The icon shelf under a hook. Sizes chosen so five icons in a 3-over-2 stack
+# sit inside the lower third without reaching the caption safe area.
+ICON_SHELF_TOP = 1105
+ICON_SIZE = 158
+ICON_GAP = 26
+
+
+def icon_shelf(im, icons, top=ICON_SHELF_TOP, size=ICON_SIZE, gap=ICON_GAP):
+    """Draw the roster's icons under the hook, centred, 3 over 2.
+
+    The hook promises a number and the shelf shows it: the viewer can see
+    what the post is about before reading a word, and recognising one icon is
+    what buys the swipe. Rows are centred independently so an odd count does
+    not sit lopsided.
+    """
+    if not icons:
+        return
+    rows = [icons[:3], icons[3:]] if len(icons) > 3 else [icons]
+    rows = [r for r in rows if r]
+    y = top
+    for row in rows:
+        span = len(row) * size + (len(row) - 1) * gap
+        x = (im.width - span) // 2
+        for name in row:
+            ic, mask = rounded_icon(f'{ICONS}/{name}', size=size,
+                                    radius=int(size * 0.235))
+            # A soft plate behind each icon so a white one does not vanish
+            # into a bright frame and a dark one keeps its edge.
+            plate = Image.new('RGBA', (size + 14, size + 14), (0, 0, 0, 0))
+            ImageDraw.Draw(plate).rounded_rectangle(
+                (0, 0, size + 13, size + 13), radius=int(size * 0.28),
+                fill=(2, 6, 23, 90))
+            im.paste(Image.alpha_composite(
+                Image.new('RGBA', plate.size, (0, 0, 0, 0)), plate).convert('RGB'),
+                (x - 7, y - 7), plate)
+            im.paste(ic, (x, y), mask)
+            x += size + gap
+        y += size + gap
+
+
 def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
-               accent=YELLOW):
+               accent=YELLOW, icons=None):
     """Stacked uppercase hook: big headline, smaller line under it.
 
     `lines[0]` is the headline and should be SHORT (two or three words); it
@@ -627,23 +705,53 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
     adaptive_scrim(im, HOOK_BAND[0], HOOK_BAND[1], target=88, strength_cap=0.62)
 
     l1, l2 = lines[0].upper(), lines[1].upper()
-    f1 = _fit_display(l1, 'Compressed Black', HOOK_L1_SIZE, HOOK_MAX_W)
     f2 = _fit_display(l2, 'Condensed Bold', HOOK_L2_SIZE, HOOK_MAX_W)
 
+    # The whole style is the size gap between the two rows. A long headline
+    # used to shrink until both lines matched and the contrast vanished, so
+    # instead of shrinking past HOOK_L1_MIN the headline wraps onto a second
+    # row and stays big.
+    f1 = _fit_display(l1, 'Compressed Black', HOOK_L1_SIZE, HOOK_MAX_W)
+    rows, fonts = [l1], [f1]
+    if f1.size < HOOK_L1_MIN:
+        rows = _wrap_two(l1, 'Compressed Black', HOOK_L1_SIZE, HOOK_MAX_W)
+        # Each row gets its own size: the opener as big as it will go, the
+        # remainder stepped down under it. One size for both is what made
+        # every headline read as a flat block.
+        top_f = _fit_display(rows[0], 'Compressed Black', HOOK_L1_SIZE, HOOK_MAX_W)
+        rest_f = _fit_display(rows[1], 'Compressed Black',
+                              max(HOOK_L2_SIZE, int(top_f.size * 0.62)), HOOK_MAX_W)
+        fonts = [top_f, rest_f]
+
     probe = ImageDraw.Draw(Image.new('RGB', (1, 1)))
-    b1 = probe.textbbox((0, 0), l1, font=f1)
     b2 = probe.textbbox((0, 0), l2, font=f2)
 
-    draw_text_block(im, [
-        # anchor 'mm' centres the glyph box on y, so glyph top = y - h/2
-        (540, HOOK_L1_TOP + (b1[3] - b1[1]) / 2, l1, f1, 'mm', WHITE),
-        (540, HOOK_L2_TOP + (b2[3] - b2[1]) / 2, l2, f2, 'mm', WHITE),
+    # Two rows push the headline up so the pair stays inside the band.
+    # Rows are stacked from their own heights so a big opener over a smaller
+    # second row sits tight rather than leaving a gap.
+    heights = [probe.textbbox((0, 0), r, font=f)[3] - probe.textbbox((0, 0), r, font=f)[1]
+               for r, f in zip(rows, fonts)]
+    gap = 22
+    total = sum(heights) + gap * (len(rows) - 1)
+    top = HOOK_L2_TOP - 34 - total          # sit the block just above line 2
+    block, y = [], top
+    for r, f, h in zip(rows, fonts, heights):
+        block.append((540, y + h / 2, r, f, 'mm', WHITE))
+        y += h + gap
+
+    draw_text_block(im, block + [
+        # Second line carries the colour. It is the turn in the sentence —
+        # "5 TOOLS / that replace a whole team" — so it is what the eye should
+        # land on second, and yellow on a dark photo does that without moving
+        # anything. Geometry stays frozen; only the fill changes.
+        (540, HOOK_L2_TOP + (b2[3] - b2[1]) / 2, l2, f2, 'mm', accent),
     ])
+    icon_shelf(im, icons)
     _json.dump({'hook': list(lines), 'pillar': hook_rules.pillar_of(lines)},
                open(os.path.join(os.path.dirname(os.path.abspath(out)),
                                  '.hook.json'), 'w'), indent=1, ensure_ascii=False)
     im.save(out, quality=92)
-    print('wrote', out, '[stacked]')
+    print('wrote', out, '[stacked%s]' % (' + icons' if icons else ''))
 
 
 def band_interest(im, y0, y1):

@@ -16,6 +16,13 @@
  *   --direct-post        Publish immediately instead of drafting to the inbox.
  *                        Requires the video.publish scope; drafts only need video.upload.
  *   --privacy LEVEL      Privacy level for --direct-post (default SELF_ONLY)
+ *   --disable-comment    Turn comments off on this post.
+ *   --auto-add-music     Let TikTok add recommended music to the photos.
+ *   --brand-organic      Disclose that it promotes your own brand.
+ *   --branded-content    Disclose a paid partnership. Cannot be SELF_ONLY.
+ *   --creator-info       Print the creator's settings as JSON and exit. The
+ *                        posting UI must be built from these, per TikTok's
+ *                        content-sharing guidelines.
  *   --wait               Poll publish status until it leaves PROCESSING
  *   --dry-run            Run every check and print the payload, but don't post
  *
@@ -30,6 +37,9 @@ const path = require('path');
 const {
   refreshAccessToken,
   initPhotoPost,
+  fetchCreatorInfo,
+  fetchVideoList,
+  fetchUserInfo,
   fetchPostStatus,
   fetchWithRetry,
   TikTokError,
@@ -53,6 +63,13 @@ function parseArgs(argv) {
     baseUrl: process.env.ARCO_BASE_URL || DEFAULT_BASE_URL,
     directPost: false,
     privacy: 'SELF_ONLY',
+    disableComment: false,
+    autoAddMusic: false,
+    brandOrganic: false,
+    brandedContent: false,
+    creatorInfo: false,
+    listPosts: false,
+    accountStats: false,
     wait: false,
     dryRun: false,
     account: 'vn',
@@ -67,6 +84,13 @@ function parseArgs(argv) {
       case '--base-url': opts.baseUrl = argv[++i]; break;
       case '--direct-post': opts.directPost = true; break;
       case '--privacy': opts.privacy = argv[++i]; break;
+      case '--disable-comment': opts.disableComment = true; break;
+      case '--auto-add-music': opts.autoAddMusic = true; break;
+      case '--brand-organic': opts.brandOrganic = true; break;
+      case '--branded-content': opts.brandedContent = true; break;
+      case '--creator-info': opts.creatorInfo = true; break;
+      case '--list-posts': opts.listPosts = true; break;
+      case '--account-stats': opts.accountStats = true; break;
       case '--wait': opts.wait = true; break;
       case '--dry-run': opts.dryRun = true; break;
       case '--us': opts.account = 'us'; break;
@@ -92,6 +116,17 @@ Usage: node tools/autopost.js <topic> [options]
   --base-url URL       public base URL (default ${DEFAULT_BASE_URL})
   --direct-post        publish now instead of drafting to inbox (needs video.publish)
   --privacy LEVEL      privacy for --direct-post (default SELF_ONLY)
+                       PUBLIC_TO_EVERYONE | MUTUAL_FOLLOW_FRIENDS |
+                       FOLLOWER_OF_CREATOR | SELF_ONLY
+  --disable-comment    turn comments off on this post
+  --auto-add-music     let TikTok add recommended music to the photos
+  --brand-organic      discloses your own brand ("Promotional content")
+  --branded-content    discloses a paid partnership ("Paid partnership")
+  --creator-info       print the creator's own settings as JSON and exit
+  --list-posts         print the account's recent posts as JSON and exit
+                       (needs the video.list scope)
+  --account-stats      print follower/like/post counts as JSON and exit
+                       (needs the user.info.stats scope)
   --wait               poll publish status until processing finishes
   --dry-run            validate and print the payload without posting
   --us                 post to the US account (getarcoapp) instead of arco.app
@@ -212,12 +247,72 @@ async function pollStatus({ accessToken, publishId }) {
   return null;
 }
 
+// One table, used by both --creator-info and the posting path.
+const ACCOUNT_ENV = {
+  vn: { env: 'TIKTOK_REFRESH_TOKEN', label: 'arco.app' },
+  us: { env: 'TIKTOK_REFRESH_TOKEN_US', label: 'emiliagonzalez389' },
+  getarco: { env: 'TIKTOK_REFRESH_TOKEN_GETARCO', label: 'getarcoapp' },
+};
+
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
 
-  if (opts.help || !opts.topic) {
+  if (opts.help || (!opts.topic && !opts.creatorInfo && !opts.listPosts
+                    && !opts.accountStats)) {
     usage();
     process.exit(opts.topic ? 0 : 1);
+  }
+
+  // --creator-info asks about the account, not about a post, so it runs before
+  // any topic is resolved and never touches drafts/.
+  if (opts.accountStats) {
+    const key = ACCOUNT_ENV[opts.account];
+    if (!key) throw new Error(`--account must be one of ${Object.keys(ACCOUNT_ENV).join('/')}`);
+    const tokens = await refreshAccessToken({
+      clientKey: requireEnv('TIKTOK_CLIENT_KEY'),
+      clientSecret: requireEnv('TIKTOK_CLIENT_SECRET'),
+      refreshToken: requireEnv(key.env),
+    });
+    console.log(JSON.stringify(await fetchUserInfo({ accessToken: tokens.accessToken }), null, 2));
+    return;
+  }
+
+  if (opts.listPosts) {
+    const key = ACCOUNT_ENV[opts.account];
+    if (!key) throw new Error(`--account must be one of ${Object.keys(ACCOUNT_ENV).join('/')}`);
+    const tokens = await refreshAccessToken({
+      clientKey: requireEnv('TIKTOK_CLIENT_KEY'),
+      clientSecret: requireEnv('TIKTOK_CLIENT_SECRET'),
+      refreshToken: requireEnv(key.env),
+    });
+    // The endpoint pages at 20; accounts here have 29-49 posts, so one page
+    // was quietly hiding half the history from the analytics.
+    const videos = [];
+    let cursor = null, pages = 0, hasMore = true;
+    while (hasMore && pages < 10) {
+      const page = await fetchVideoList({ accessToken: tokens.accessToken, cursor });
+      videos.push(...(page.videos || []));
+      hasMore = !!page.has_more;
+      cursor = page.cursor;
+      pages += 1;
+      if (!page.videos || !page.videos.length) break;
+    }
+    console.log(JSON.stringify({ scope: tokens.scope, videos, pages,
+                                 has_more: hasMore }, null, 2));
+    return;
+  }
+
+  if (opts.creatorInfo) {
+    const key = ACCOUNT_ENV[opts.account];
+    if (!key) throw new Error(`--account must be one of ${Object.keys(ACCOUNT_ENV).join('/')}`);
+    const tokens = await refreshAccessToken({
+      clientKey: requireEnv('TIKTOK_CLIENT_KEY'),
+      clientSecret: requireEnv('TIKTOK_CLIENT_SECRET'),
+      refreshToken: requireEnv(key.env),
+    });
+    const info = await fetchCreatorInfo({ accessToken: tokens.accessToken });
+    console.log(JSON.stringify({ scope: tokens.scope, ...info }, null, 2));
+    return;
   }
 
   const topicDir = path.join(REPO_ROOT, 'drafts', opts.topic);
@@ -244,11 +339,7 @@ async function main() {
 
   // Fail on missing credentials before spending time on network preflight.
   // --dry-run deliberately needs no secrets.
-  const ACCOUNTS = {
-    vn: { env: 'TIKTOK_REFRESH_TOKEN', label: 'arco.app (VN)' },
-    us: { env: 'TIKTOK_REFRESH_TOKEN_US', label: 'emiliagonzalez389 (US)' },
-    getarco: { env: 'TIKTOK_REFRESH_TOKEN_GETARCO', label: 'getarcoapp' },
-  };
+  const ACCOUNTS = ACCOUNT_ENV;
   if (!ACCOUNTS[opts.account]) {
     throw new Error(`--account must be one of ${Object.keys(ACCOUNTS).join('/')}, got: ${opts.account}`);
   }
@@ -274,7 +365,15 @@ async function main() {
           post_info: {
             title,
             ...(description ? { description } : {}),
-            ...(opts.directPost ? { privacy_level: opts.privacy } : {}),
+            ...(opts.directPost
+              ? {
+                  privacy_level: opts.privacy,
+                  disable_comment: opts.disableComment,
+                  auto_add_music: opts.autoAddMusic,
+                  brand_organic_toggle: opts.brandOrganic,
+                  brand_content_toggle: opts.brandedContent,
+                }
+              : {}),
           },
           source_info: { source: 'PULL_FROM_URL', photo_images: urls, photo_cover_index: opts.cover },
         },
@@ -313,6 +412,10 @@ async function main() {
     coverIndex: opts.cover,
     postMode: opts.directPost ? 'DIRECT_POST' : 'MEDIA_UPLOAD',
     privacyLevel: opts.privacy,
+    disableComment: opts.disableComment,
+    autoAddMusic: opts.autoAddMusic,
+    brandOrganic: opts.brandOrganic,
+    brandedContent: opts.brandedContent,
   });
 
   console.log(`\n  posted. publish_id: ${data.publish_id}`);
@@ -336,7 +439,15 @@ main().catch((err) => {
     } else if (err.code === 'spam_risk_too_many_posts') {
       console.error('  Daily post limit reached. Try again tomorrow.');
     } else if (err.code === 'scope_not_authorized') {
-      console.error('  Re-run tools/tiktok-auth.js and grant the video.upload scope.');
+      console.error('  Re-run tools/tiktok-auth.js and grant the scope this mode needs');
+      console.error('  (video.upload for inbox drafts, video.publish for --direct-post).');
+    } else if (err.code === 'unaudited_client_can_only_post_to_private_accounts') {
+      console.error('  Your app has not passed the Content Posting API audit, so every');
+      console.error('  direct post is forced private. Submit the app for audit, or keep');
+      console.error('  drafting to the inbox until it clears.');
+    } else if (err.code === 'privacy_level_option_mismatch') {
+      console.error('  That privacy level is not one this creator has. Run --creator-info');
+      console.error('  and offer only the levels it returns.');
     } else if (err.code === 'url_ownership_unverified') {
       console.error('  Verify the domain under URL properties at developers.tiktok.com.');
     } else if (err.code === 'app_version_check_failed') {

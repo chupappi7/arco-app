@@ -15,7 +15,7 @@
  *   --redirect URI   Redirect URI (overrides TIKTOK_REDIRECT_URI). Must match a
  *                    "Redirect URI" registered on your app at developers.tiktok.com
  *                    byte for byte.
- *   --scope "a,b"    Scopes to request (default: user.info.basic,video.upload)
+ *   --scope "a,b"    Scopes to request (default: user.info.basic,video.upload,video.publish)
  *   --pkce           Send an S256 code_challenge. Required if your app is
  *                    registered as a desktop/mobile client; harmless to omit for web.
  *
@@ -43,7 +43,13 @@ const { spawn } = require('child_process');
 const { URL } = require('url');
 const { AUTHORIZE_URL, exchangeCode } = require('./lib/tiktok');
 
-const DEFAULT_SCOPE = 'user.info.basic,video.upload';
+// video.upload drafts to the creator's inbox; video.publish is what Direct
+// Post needs, and creator_info/query refuses without it. Granting both keeps
+// one token good for either mode.
+// video.upload drafts to the inbox, video.publish is Direct Post,
+// video.list reads the account's own posts back (views, likes, and
+// therefore whether a draft was ever actually published).
+const DEFAULT_SCOPE = 'user.info.basic,user.info.stats,video.upload,video.publish,video.list';
 const STATE_FILE = path.join(__dirname, '.auth-state.json');
 const ENV_FILE = path.join(__dirname, '..', '.env');
 

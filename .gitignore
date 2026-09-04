@@ -28,3 +28,5 @@ tools/stats_daily.json
 tools/__pycache__/
 *.bak
 tools/deploy/
+tools/.slide-cache/
+tools/.api-cache/
