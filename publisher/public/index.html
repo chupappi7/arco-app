@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ARCO Publisher</title>
+<style>
+:root{
+  --bg:#020617; --surface:#0F172A; --surface-2:#1E293B; --line:#1E293B; --line-2:#293548;
+  --text:#F8FAFC; --muted:#94A3B8; --dim:#64748B;
+  --accent:#38BDF8; --ok:#22C55E; --warn:#F59E0B; --bad:#F43F5E;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+a{color:var(--accent)}
+.wrap{max-width:640px;margin:0 auto;padding:32px 20px 64px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+header h1{font-size:17px;font-weight:600;margin:0;letter-spacing:-.01em}
+header .sp{margin-left:auto}
+.badge{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);
+  border:1px solid var(--line-2);border-radius:999px;padding:4px 10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  overflow:hidden;margin-bottom:18px}
+.sec{padding:22px 26px;border-bottom:1px solid var(--line)}
+.sec:last-child{border-bottom:0}
+.cap{display:block;font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:14px}
+label{display:block;font-size:12px;color:var(--muted);margin:0 0 7px}
+select,input{width:100%;background:#0b1120;color:var(--text);border:1px solid var(--line-2);
+  border-radius:9px;padding:12px 13px;font:inherit;min-height:46px}
+select:focus,input:focus{border-color:var(--accent);outline:none}
+.req{color:var(--bad)}
+.note{display:block;font-size:12.5px;color:var(--dim);line-height:1.55;margin-top:9px}
+.note.warn{color:var(--warn)}
+.note.bad{color:var(--bad)}
+/* who we are posting as */
+.who{display:flex;align-items:center;gap:13px}
+.who img{width:44px;height:44px;min-width:44px;max-width:44px;border-radius:50%;
+  object-fit:cover;display:block;border:1px solid var(--line-2)}
+.who b{display:block;font-size:15px;font-weight:600;line-height:1.35}
+.who span{display:block;font-size:13px;color:var(--muted);margin-top:1px}
+/* one control per row */
+.row{display:flex;align-items:flex-start;gap:18px;padding:17px 0;
+  border-bottom:1px solid var(--line)}
+.row:first-of-type{padding-top:0}
+.row:last-child{padding-bottom:0;border-bottom:0}
+.row .txt{flex:1;min-width:0}
+.row .t{display:block;font-size:14px;font-weight:600;line-height:1.4}
+.row .d{display:block;font-size:12.5px;color:var(--dim);line-height:1.55;margin-top:4px}
+.row.muted .t{color:var(--muted)}
+/* switch, with a real checkbox underneath for keyboard and screen readers */
+.sw{position:relative;width:46px;height:27px;min-width:46px;margin-top:1px}
+.sw input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;z-index:2;cursor:pointer}
+.sw i{position:absolute;inset:0;border-radius:999px;background:var(--line-2);
+  transition:background .2s ease;pointer-events:none}
+.sw i::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;
+  border-radius:50%;background:#F8FAFC;transition:transform .2s ease;
+  box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.sw input:checked~i{background:var(--accent)}
+.sw input:checked~i::after{transform:translateX(19px)}
+.sw input:focus-visible~i{outline:2px solid var(--text);outline-offset:2px}
+.sw input:disabled{cursor:not-allowed}
+.sw input:disabled~i{opacity:.35}
+/* commercial disclosure */
+.disc{margin-top:16px;padding:16px;border-radius:10px;background:#0b1120;border:1px solid var(--line)}
+.opts{display:flex;gap:10px;flex-wrap:wrap}
+.chk{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-2);
+  background:var(--surface);border-radius:9px;padding:9px 13px;font-size:13px;
+  cursor:pointer;min-height:42px}
+.chk input{width:auto;min-height:0;margin:0;padding:0}
+/* preview */
+.prev{display:flex;gap:9px;overflow-x:auto;padding-bottom:4px}
+.prev img{width:56px;height:100px;min-width:56px;object-fit:cover;display:block;
+  border-radius:7px;border:1px solid var(--line-2);background:#0b1120}
+.cap-t{margin-top:15px;font-size:13px;font-weight:600;line-height:1.45}
+.cap-b{margin-top:6px;font-size:12.5px;color:var(--muted);line-height:1.6}
+.consent{padding:15px 26px;background:#0b1120;border-top:1px solid var(--line);
+  font-size:12.5px;color:var(--muted);line-height:1.65}
+.foot{padding:20px 26px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn{background:var(--accent);color:#04222f;border-radius:9px;padding:11px 18px;
+  font-weight:600;font-size:13px;min-height:44px}
+.btn.sec{background:var(--surface-2);color:var(--text);border:1px solid var(--line-2)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.hint{flex-basis:100%;font-size:12px;color:var(--dim);line-height:1.55;margin:0}
+.empty{padding:44px 26px;text-align:center;color:var(--dim)}
+.status{margin-top:14px;padding:13px 15px;border-radius:9px;background:#0b1120;
+  border:1px solid var(--line);font-size:13px;line-height:1.6;color:var(--muted)}
+.status b{color:var(--text)}
+.status.ok{border-color:#14532d;color:#86efac}
+.status.err{border-color:#7f1d1d;color:#fca5a5}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line-2);
+  border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;
+  vertical-align:-2px;margin-right:7px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>ARCO Publisher</h1>
+    <span class="sp"></span>
+    <span class="badge" id="mode">Photo post</span>
+  </header>
+  <main id="app"><div class="card"><div class="empty"><span class="spin"></span>Loading…</div></div></main>
+</div>
+
+<script type="module">
+const PRIVACY_LABEL = {
+  PUBLIC_TO_EVERYONE: 'Everyone',
+  MUTUAL_FOLLOW_FRIENDS: 'Friends',
+  FOLLOWER_OF_CREATOR: 'Followers',
+  SELF_ONLY: 'Only me',
+};
+
+const state = {
+  creator: null,      // null = not connected
+  loading: true,
+  topics: [],
+  topic: '',
+  slides: [],
+  set: {
+    privacy: '',           // no default, deliberately
+    disable_comment: false,
+    auto_add_music: false,
+    disclose: false,
+    brand_organic: false,
+    branded_content: false,
+  },
+  busy: false,
+  status: null,          // {kind, text}
+};
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const el = id => document.getElementById(id);
+
+// --- data ---------------------------------------------------------------
+
+async function boot() {
+  const err = new URL(location.href).searchParams.get('auth_error');
+  if (err) {
+    state.status = { kind: 'err', text: err };
+    history.replaceState({}, '', location.pathname);
+  }
+  // The guidelines require the creator's settings to be read every time this
+  // page renders, so this runs on load rather than from anything cached.
+  try {
+    const r = await fetch('/api/creator-info');
+    if (r.ok) state.creator = await r.json();
+  } catch {}
+  if (state.creator) await loadTopics();
+  state.loading = false;
+  render();
+}
+
+async function loadTopics() {
+  try {
+    const r = await fetch('/api/drafts');
+    const j = await r.json();
+    state.topics = j.topics || [];
+  } catch {
+    state.topics = [];
+  }
+}
+
+async function pickTopic(topic) {
+  state.topic = topic;
+  state.slides = [];
+  state.status = null;
+  render();
+  if (!topic) return;
+  try {
+    const r = await fetch('/api/drafts?topic=' + encodeURIComponent(topic));
+    const j = await r.json();
+    state.slides = j.slides || [];
+  } catch {
+    state.slides = [];
+  }
+  render();
+}
+
+function set(key, value) {
+  state.set[key] = value;
+  // Branded content cannot be private: drop the choice rather than let it
+  // sit there invalid, and the option disappears from the list below.
+  if (key === 'branded_content' && value && state.set.privacy === 'SELF_ONLY')
+    state.set.privacy = '';
+  if (key === 'disclose' && !value) {
+    state.set.brand_organic = false;
+    state.set.branded_content = false;
+  }
+  render();
+}
+
+function ready() {
+  if (!state.topic || !state.slides.length) return false;
+  if (!state.set.privacy) return false;
+  if (state.set.disclose && !state.set.brand_organic && !state.set.branded_content)
+    return false;
+  return true;
+}
+
+async function publish() {
+  if (!ready() || state.busy) return;
+  state.busy = true;
+  state.status = { kind: '', text: 'Sending to TikTok…' };
+  render();
+  try {
+    const r = await fetch('/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: state.topic.replace(/-/g, ' '),
+        privacy_level: state.set.privacy,
+        photo_images: state.slides,
+        photo_cover_index: 0,
+        disable_comment: state.set.disable_comment,
+        auto_add_music: state.set.auto_add_music,
+        brand_organic_toggle: state.set.disclose && state.set.brand_organic,
+        brand_content_toggle: state.set.disclose && state.set.branded_content,
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('server returned ' + r.status));
+    state.status = { kind: '', text: 'Posted. Waiting for TikTok to finish processing…' };
+    render();
+    await poll(j.publish_id);
+  } catch (err) {
+    state.status = { kind: 'err', text: err.message };
+  }
+  state.busy = false;
+  render();
+}
+
+// The guidelines ask for a processing state rather than declaring success the
+// moment the request returns, so the publish is polled to a terminal status.
+async function poll(publishId) {
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    let j;
+    try {
+      const r = await fetch('/api/status?publish_id=' + encodeURIComponent(publishId));
+      j = await r.json();
+    } catch { continue; }
+    const s = j.status;
+    if (s === 'PUBLISH_COMPLETE' || s === 'PUBLICLY_AVAILABLE_POST') {
+      state.status = { kind: 'ok', text: 'Published. It may take a few minutes to appear on the profile.' };
+      return;
+    }
+    if (s === 'FAILED') {
+      state.status = { kind: 'err', text: 'TikTok rejected it: ' + (j.fail_reason || 'no reason given') };
+      return;
+    }
+    state.status = { kind: '', text: 'Processing on TikTok… (' + (s || 'in progress') + ')' };
+    render();
+  }
+  state.status = { kind: '', text: 'Still processing. It will appear on the profile when TikTok finishes.' };
+}
+
+// --- view ---------------------------------------------------------------
+
+const sw = (on, attrs) =>
+  `<span class="sw"><input type="checkbox" ${on ? 'checked' : ''} ${attrs}><i></i></span>`;
+const row = (t, d, control, cls = '') =>
+  `<div class="row ${cls}"><span class="txt"><span class="t">${t}</span>` +
+  `${d ? `<span class="d">${d}</span>` : ''}</span>${control}</div>`;
+
+function render() {
+  el('app').innerHTML = view();
+  bind();
+}
+
+function view() {
+  if (state.loading)
+    return `<div class="card"><div class="empty"><span class="spin"></span>Loading…</div></div>`;
+
+  if (!state.creator) return `<div class="card">
+    <div class="sec">
+      <span class="cap">Connect</span>
+      <p style="margin:0 0 18px;color:var(--muted);line-height:1.65">
+        Sign in with the TikTok account you want to post to. We read your
+        nickname and avatar so you can confirm the right account, and post only
+        what you approve on the next screen.</p>
+      <button class="btn" id="connect">Continue with TikTok</button>
+      ${statusBox()}
+    </div></div>`;
+
+  const c = state.creator;
+  const opts = (c.privacy_level_options || [])
+    .filter(o => !(o === 'SELF_ONLY' && state.set.branded_content));
+  const label = state.set.branded_content ? 'Paid partnership'
+              : state.set.brand_organic ? 'Promotional content' : '';
+
+  return `<div class="card">
+    <div class="sec">
+      <span class="cap">Posting to TikTok</span>
+      <div class="who">
+        ${c.creator_avatar_url ? `<img src="${esc(c.creator_avatar_url)}" alt="">` : ''}
+        <span><b>${esc(c.creator_nickname || '')}</b>
+          <span>@${esc(c.creator_username || '')}</span></span>
+      </div>
+    </div>
+
+    <div class="sec">
+      <label for="topic">Post</label>
+      <select id="topic">
+        <option value="">Choose a post…</option>
+        ${state.topics.map(t => `<option value="${esc(t)}"${state.topic === t ? ' selected' : ''}>${esc(t)}</option>`).join('')}
+      </select>
+      ${state.topic && !state.slides.length ? `<span class="note">Loading slides…</span>` : ''}
+    </div>
+
+    <div class="sec">
+      <label for="privacy">Who can view this post <span class="req">*</span></label>
+      <select id="privacy">
+        <option value=""${state.set.privacy ? '' : ' selected'}>Select who can view…</option>
+        ${opts.map(o => `<option value="${o}"${state.set.privacy === o ? ' selected' : ''}>${esc(PRIVACY_LABEL[o] || o)}</option>`).join('')}
+      </select>
+      ${state.set.branded_content && (c.privacy_level_options || []).includes('SELF_ONLY')
+        ? `<span class="note">Branded content cannot be private, so "Only me" is unavailable.</span>` : ''}
+    </div>
+
+    <div class="sec">
+      <span class="cap">Interactions</span>
+      ${row('Comment', c.comment_disabled ? 'Turned off by the creator on TikTok.' : '',
+            sw(!state.set.disable_comment,
+               `data-k="disable_comment" data-invert="1" aria-label="Allow comments" ${c.comment_disabled ? 'disabled' : ''}`),
+            c.comment_disabled ? 'muted' : '')}
+      ${row('Duet', 'Video posts only — not available for photo posts.',
+            sw(false, 'disabled aria-label="Duet"'), 'muted')}
+      ${row('Stitch', 'Video posts only — not available for photo posts.',
+            sw(false, 'disabled aria-label="Stitch"'), 'muted')}
+      ${row('Add recommended music', 'Lets TikTok pick a track for the slideshow.',
+            sw(state.set.auto_add_music, `data-k="auto_add_music" aria-label="Add recommended music"`))}
+    </div>
+
+    <div class="sec">
+      <span class="cap">Disclosure</span>
+      ${row('Disclose post content',
+            'Turn on to disclose that this post promotes yourself, a third party, or both.',
+            sw(state.set.disclose, `data-k="disclose" aria-label="Disclose post content"`))}
+      ${state.set.disclose ? `<div class="disc">
+        <div class="opts">
+          <label class="chk"><input type="checkbox" data-k="brand_organic" ${state.set.brand_organic ? 'checked' : ''}> Your Brand</label>
+          <label class="chk"><input type="checkbox" data-k="branded_content" ${state.set.branded_content ? 'checked' : ''}> Branded Content</label>
+        </div>
+        ${label
+          ? `<span class="note warn">Your photo post will be labeled "${label}". This cannot be changed once posted.</span>`
+          : `<span class="note">Pick at least one to continue.</span>`}
+      </div>` : ''}
+    </div>
+
+    <div class="sec">
+      <span class="cap">Preview</span>
+      ${state.slides.length
+        ? `<div class="prev">${state.slides.map((u, i) => `<img loading="lazy" src="${esc(u)}" alt="Slide ${i + 1}">`).join('')}</div>
+           <div class="cap-t">${esc(state.topic.replace(/-/g, ' '))}</div>
+           <div class="cap-b">${state.slides.length} slides · cover is slide 1</div>`
+        : `<span class="note">Choose a post to see its slides.</span>`}
+    </div>
+
+    <div class="consent">By posting, you agree to TikTok's
+      ${state.set.branded_content
+        ? `<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">Branded Content Policy</a> and `
+        : ''}
+      <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">Music Usage Confirmation</a>.</div>
+
+    <div class="foot">
+      <button class="btn" id="post" ${ready() && !state.busy ? '' : 'disabled'}>
+        ${state.busy ? 'Posting…' : 'Post to TikTok'}</button>
+      <button class="btn sec" id="logout">Disconnect</button>
+      <span class="hint">After posting it may take a few minutes for the post to
+        process and appear on the profile.</span>
+      ${statusBox()}
+    </div>
+  </div>`;
+}
+
+function statusBox() {
+  if (!state.status) return '';
+  const busy = state.busy && state.status.kind === '';
+  return `<div class="status ${state.status.kind}">${busy ? '<span class="spin"></span>' : ''}${esc(state.status.text)}</div>`;
+}
+
+function bind() {
+  const connect = el('connect');
+  if (connect) connect.onclick = () => (location.href = '/api/auth/start');
+  const logout = el('logout');
+  if (logout) logout.onclick = () => (location.href = '/api/auth/logout');
+  const post = el('post');
+  if (post) post.onclick = publish;
+
+  const topic = el('topic');
+  if (topic) topic.onchange = e => pickTopic(e.target.value);
+  const privacy = el('privacy');
+  if (privacy) privacy.onchange = e => set('privacy', e.target.value);
+
+  document.querySelectorAll('input[type=checkbox][data-k]').forEach(input => {
+    input.onchange = () => {
+      const k = input.dataset.k;
+      set(k, input.dataset.invert ? !input.checked : input.checked);
+    };
+  });
+}
+
+boot();
+</script>
+</body>
+</html>

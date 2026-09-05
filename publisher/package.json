@@ -1,0 +1,7 @@
+{
+  "name": "arco-publisher",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Public posting surface for the ARCO TikTok integration.",
+  "type": "module"
+}
