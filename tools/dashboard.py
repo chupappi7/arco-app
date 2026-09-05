@@ -508,6 +508,27 @@ def creator_info(key, max_age=300):
     return data
 
 
+def direct_blocked(key, settings):
+    """Why this direct post must not go out, or '' if it may.
+
+    The same three rules the panel enforces, re-checked at send time because a
+    scheduled job carries choices made long before it fires.
+    """
+    priv = settings.get('privacy')
+    if not priv:
+        return 'no privacy level was chosen'
+    if settings.get('branded_content') and priv == 'SELF_ONLY':
+        return 'branded content cannot be posted privately'
+    info = creator_info(key, max_age=0)
+    if info.get('error'):
+        return 'could not read the creator settings: %s' % info['error']
+    opts = info.get('privacy_level_options') or []
+    if priv not in opts:
+        return '%s is no longer offered by this creator (has: %s)' % (
+            priv, ', '.join(opts) or 'none')
+    return ''
+
+
 def run_publish(topic, key, settings):
     """Publish straight to the account, with the disclosures the user chose.
 
@@ -576,6 +597,7 @@ STATS_DAILY = os.path.join(REPO, 'tools', 'stats_daily.json')
 UNTRACKED = os.path.join(REPO, 'tools', 'untracked_posts.json')
 PROMOTED = os.path.join(REPO, 'tools', 'promoted.json')
 PERFORMING_VIEWS = 1000       # what counts as a post that worked
+REQUIRED_TAG = '#creatorsearchinsights'
 SYNC_EVERY = 1800             # seconds between automatic syncs
 RAW_KEEP = 72 * 3600          # how long raw snapshots live, for trajectories
 
@@ -583,6 +605,48 @@ RAW_KEEP = 72 * 3600          # how long raw snapshots live, for trajectories
 def _norm(t):
     """Captions round-trip through TikTok with whitespace changes."""
     return ' '.join((t or '').lower().split())
+
+
+def claim_published_ids(key):
+    """Ask TikTok which video each of our drafts became.
+
+    Identity today starts with a caption, and a caption is editable on both
+    sides — which is how a post published to three accounts ended up as three
+    unmatched rows. TikTok knows the answer: once a draft is published, its
+    status carries the real post id. Asked once per draft, then never again.
+    """
+    log = delivery_log()
+    todo = [(t, r) for t, per in log.items()
+            for k, r in per.items()
+            if k == key and r.get('publish_id') and not r.get('video_id')]
+    if not todo:
+        return 0
+    found = 0
+    for topic, rec in todo[:12]:          # a slow drip, not a stampede
+        try:
+            p = subprocess.run(
+                ['node', 'tools/autopost.js', '--status', rec['publish_id'],
+                 '--account', key],
+                cwd=REPO, env=_env(), capture_output=True, text=True, timeout=90)
+            out = (p.stdout or '')
+            data = json.loads(out[out.index('{'):]) if '{' in out else {}
+        except Exception:
+            continue
+        ids = data.get('publicaly_available_post_id') or data.get(
+            'publicly_available_post_id') or []
+        if ids:
+            rec['video_id'] = str(ids[0])
+            found += 1
+    if found:
+        with _lock:
+            cur = delivery_log()
+            for topic, per in log.items():
+                for k, r in per.items():
+                    if r.get('video_id'):
+                        cur.setdefault(topic, {}).setdefault(k, {})['video_id'] = r['video_id']
+            save_log(cur)
+        print('[sync] %s: TikTok named %d published post(s)' % (key, found), flush=True)
+    return found
 
 
 def sync_account(key):
@@ -603,17 +667,31 @@ def sync_account(key):
         return {'error': str(exc)}
     if not data.get('videos'):
         return {'error': ((p.stderr or '') + out).strip()[-160:] or 'no videos returned'}
+    try:
+        claim_published_ids(key)
+    except Exception as exc:
+        print('[sync] %s: id claim skipped: %s' % (key, exc), flush=True)
 
     idx, _ = hooks_index()
     # A caption can belong to more than one topic: a reshoot keeps the copy
     # byte-identical on purpose, so `ship-alone` and `ship-alone-2` look the
     # same here. One entry per caption meant the second silently overwrote the
     # first and a dozen uploads vanished from the numbers.
-    by_caption = {}
+    # Hashtags are the part of a caption most likely to change after a post
+    # has gone out — a tag gets added to the pool, or edited in the app — and
+    # an exact match then fails forever. The body is what actually identifies
+    # the post, so it gets its own index as a fallback.
+    def _body(t):
+        return re.sub(r'#\w+', '', _norm(t) or '').strip()
+
+    by_caption, by_body = {}, {}
     for topic, post in idx.items():
         cap = _norm(post.get('caption'))
         if cap:
             by_caption.setdefault(cap, []).append(topic)
+            b = _body(post.get('caption'))
+            if len(b) >= 40:
+                by_body.setdefault(b[:120], []).append(topic)
     log_now = delivery_log()
 
     def pick_topic(cap, key, posted_at, taken):
@@ -623,6 +701,10 @@ def sync_account(key):
         closest before the post appeared. Falls back to any unclaimed topic.
         """
         cands = [t for t in by_caption.get(cap, []) if (t, key) not in taken]
+        if not cands:
+            # Same words, different tags: still the same post.
+            cands = [t for t in by_body.get(_body(cap)[:120], [])
+                     if (t, key) not in taken]
         if not cands:
             return None
         if len(cands) == 1 or not posted_at:
@@ -650,7 +732,18 @@ def sync_account(key):
         # first takes whichever sibling sorts first. That crossed the two
         # series and corrupted a third of the history file. An id never ties.
         pinned = {}
+        # Ids TikTok told us outright, which beat anything inferred.
+        for t, per_ in log.items():
+            r = (per_ or {}).get(key) or {}
+            if r.get('video_id'):
+                pinned[str(r['video_id'])] = t
         for t, per_ in stats.items():
+            # Never pin an untracked video to its own placeholder. Doing so
+            # made the orphan permanent: the id claimed it back on every pass,
+            # so it never got another chance to match a caption, and a post
+            # that failed to match once could never be adopted afterwards.
+            if t.startswith('tiktok:'):
+                continue
             cell = per_.get(key) or {}
             if cell.get('id'):
                 pinned[str(cell['id'])] = t
@@ -721,6 +814,15 @@ def sync_account(key):
             # One close per calendar day, overwritten as the day goes on.
             day = time.strftime('%Y-%m-%d', time.localtime())
             daily.setdefault(topic, {}).setdefault(key, {})[day] = point
+            # A video adopted by a real topic must stop existing as its own
+            # placeholder, or its views are counted twice: once against the
+            # post and once against tiktok:<id>.
+            ph = 'tiktok:' + str(v.get('id') or '')
+            if not topic.startswith('tiktok:') and ph in stats:
+                stats[ph].pop(key, None)
+                if not stats[ph]:
+                    stats.pop(ph, None)
+                    unmatched.pop(ph, None)
             stats.setdefault(topic, {})[key] = dict(
                 point,
                 id=str(v.get('id') or '') or None,
@@ -1220,7 +1322,14 @@ def run_draft(topic, keys):
         else:
             reason = [l.strip() for l in out.splitlines() if 'fail_reason' in l]
             status, detail = 'FAILED', (reason[0] if reason else out.strip()[-160:])
+        # autopost prints the publish id and then discards it. Keeping it is
+        # what lets TikTok name the video later: once the draft is published,
+        # the status endpoint returns the real post id, and a post identified
+        # by its id can never be lost to a caption edit.
+        m = re.search(r'publish_id:\s*(\S+)', out)
         results[key] = {'status': status, 'detail': detail, 'at': time.time()}
+        if m:
+            results[key]['publish_id'] = m.group(1)
         print(f'[draft] {topic} {key}: {status} {detail[:80]}', flush=True)
     with _lock:
         log = delivery_log()
@@ -1469,8 +1578,14 @@ def unregistered(topic):
     rec = idx.get(topic)
     if not rec:
         return 'not registered in hooks.json, so it has no caption to post with'
-    if not (rec.get('caption') or '').strip():
+    cap = (rec.get('caption') or '').strip()
+    if not cap:
         return 'registered with an empty caption'
+    # The search tag is how a post reaches people looking for something rather
+    # than only the feed. Asked for in the skill, checked here, because prose
+    # has not been enough in this pipeline before.
+    if REQUIRED_TAG.lower() not in cap.lower():
+        return 'its caption is missing %s' % REQUIRED_TAG
     return ''
 
 
@@ -1690,10 +1805,25 @@ def scheduler_loop():
                 accts = job.get('accounts') or [a['key'] for a in ACCOUNTS]
                 gap = int(job.get('stagger_min') or 0) * 60
                 results = {}
+                direct = job.get('mode') == 'direct'
                 for i, key in enumerate(accts):
                     if i and gap:
                         time.sleep(gap)
-                    results.update(run_draft(job['topic'], [key]))
+                    if not direct:
+                        results.update(run_draft(job['topic'], [key]))
+                        continue
+                    # The settings were chosen when the job was made, which may
+                    # be days ago. A privacy level the creator has since given
+                    # up would be refused by TikTok anyway; failing here says
+                    # why instead of leaving a bare API error in the log.
+                    st = job.get('settings') or {}
+                    why = direct_blocked(key, st)
+                    if why:
+                        results[key] = {'status': 'FAILED', 'detail': why,
+                                        'at': time.time()}
+                        print(f'[schedule] {job["topic"]} -> {key}: {why}', flush=True)
+                        continue
+                    results[key] = run_publish(job['topic'], key, st)
                 with _lock:
                     sc = schedules()
                     for x in sc:
@@ -1836,8 +1966,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if snap and os.path.isfile(snap):
             try:
                 d = json.load(open(snap))
-                d['stale'] = True
-                d['stale_at'] = os.path.getmtime(snap)
+                d['from_cache'] = True
+                d['cached_at'] = os.path.getmtime(snap)
                 d['upstream_down'] = True
                 return self._send(200, d)
             except Exception:
@@ -1852,13 +1982,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not self.authed():
             return self.deny()
         path = urllib.parse.urlparse(self.path).path
+        if path == '/api/hooks':
+            # A build fails if no hook is eligible, and which pillars are open
+            # is not guessable from anywhere else in the UI.
+            el = hook_rules.eligible()
+            return self._send(200, {
+                'eligible': [{'lines': h['lines'], 'pillar': h.get('pillar')}
+                             for h in el],
+                'blocked': [{'lines': l, 'why': w} for l, w in hook_rules.blocked()],
+            })
         if path == '/api/host':
             # Two dashboards look identical on purpose — same data, same page.
             # This is the one thing that differs, so the UI can say which one
             # you are typing into before you draft from it.
+            # Whichever machine is actually serving this. It used to report a
+            # role — host or local — and the page turned "host" into the word
+            # "mini", which stopped being true the moment the laptop became
+            # the machine holding the data.
+            h = socket.gethostname().split('.')[0]
+            short = re.sub(r'^thinh.?s?[- ]', '', h.lower())
+            short = re.sub(r'[^a-z0-9]+', ' ', short).strip()
+            short = re.sub(r'\s*\d+$', '', short) or h.lower()
             return self._send(200, {
-                'name': socket.gethostname().split('.')[0].replace('s-Mac-mini', ' mini'),
-                'kind': 'local' if UPSTREAM else 'host',
+                'name': short,
+                'owns': not UPSTREAM,
                 'upstream': UPSTREAM or None,
                 'dev': DEV,
             })
@@ -1991,9 +2138,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     sc = [x for x in sc if not (x['topic'] == body['topic'] and not x.get('done'))]
                 else:
                     sc = [x for x in sc if not (x['topic'] == body['topic'] and not x.get('done'))]
+                    mode = 'direct' if body.get('mode') == 'direct' else 'draft'
+                    st = body.get('settings') or {}
+                    if mode == 'direct':
+                        # Refuse an unpostable job at the point it is made,
+                        # rather than letting it sit until it fires and fails.
+                        for key in (body.get('accounts') or [a['key'] for a in ACCOUNTS]):
+                            why = direct_blocked(key, st)
+                            if why:
+                                return self._send(400, {'error': '%s: %s' % (key, why)})
                     sc.append({'topic': body['topic'], 'at': float(body['at']),
                                'accounts': body.get('accounts') or [],
                                'stagger_min': int(body.get('stagger_min') or 0),
+                               'mode': mode, 'settings': st if mode == 'direct' else {},
                                'done': False})
                 save_schedules(sc)
             return self._send(200, {'ok': True})
@@ -2159,6 +2316,28 @@ aside{background:var(--surface);border-right:1px solid var(--line);
 .hostb.local{color:var(--warn)}
 /* Upstream gone: the dot stops glowing and goes red, so a stale page is
    visibly stale rather than quietly wrong. */
+.compose{max-width:720px}
+.compose h3{font:600 16px/1.3 system-ui;margin:0 0 6px}
+.compose textarea{width:100%;min-height:132px;resize:vertical;margin:12px 0 0;
+  background:var(--surface);border:1px solid var(--line-2);border-radius:11px;
+  color:var(--text);font:400 13.5px/1.6 system-ui;padding:13px 14px}
+.compose textarea:focus{outline:none;border-color:var(--accent)}
+.compose textarea::placeholder{color:var(--dim)}
+.crow{display:flex;align-items:center;gap:11px;margin:12px 0 0}
+.crow .sp{margin-left:auto}
+.crow .btn[disabled]{opacity:.4;cursor:not-allowed}
+/* What the pool can actually supply. A build with no eligible hook fails, and
+   nothing else on the page says how many are left. */
+.hooksup{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:18px 0 0;
+  padding:12px 14px;background:var(--surface);border:1px solid var(--line);
+  border-radius:11px}
+.hooksup.none{border-color:rgba(251,146,60,.45)}
+.hooksup.none b{color:var(--warn)}
+.hooksup .hp{padding:4px 9px;border-radius:7px;background:var(--surface-2);
+  border:1px solid var(--line-2);font:500 11.5px/1 "Fira Code",monospace;color:var(--muted)}
+.hooksup .hp b{color:var(--text);font-weight:600}
+.hooksup .sub{font-size:12px}
+@media (max-width:900px){ .crow{flex-wrap:wrap} .crow .sp{display:none} }
 #stalebar{padding:11px 16px;background:rgba(251,146,60,.12);
   border-bottom:1px solid rgba(251,146,60,.4);color:var(--muted);
   font:400 12.5px/1.5 system-ui}
@@ -2759,6 +2938,105 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
 .chk{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-2);
   border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;min-height:40px}
 .chk input{width:auto;margin:0}
+/* Direct Post panel — the surface TikTok audits, so it is also the one screen
+   here that gets filmed. Every size is stated outright rather than inherited:
+   the panel sits inside the post detail view, where the ambient rules size
+   images to their container and would blow the avatar and the preview up. */
+.panel.dp{max-width:600px;padding:0;overflow:hidden}
+.dp .sec{padding:22px 26px;border-bottom:1px solid var(--line)}
+.dp .sec:last-of-type{border-bottom:0}
+.dp .cap-l{display:block;font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:14px}
+/* Who is being posted to. */
+.dp .who{display:flex;align-items:center;gap:13px}
+.dp .who img.av{width:44px;height:44px;min-width:44px;max-width:44px;border-radius:50%;
+  object-fit:cover;display:block;border:1px solid var(--line-2)}
+.dp .who .nm{min-width:0}
+.dp .who .nm b{display:block;font-size:15px;font-weight:600;line-height:1.35}
+.dp .who .nm span{display:block;font-size:13px;color:var(--muted);margin-top:1px}
+/* One control per line: name, then its constraint under it, then the switch. */
+.dp .row{display:flex;align-items:flex-start;gap:18px;padding:17px 0;
+  border-bottom:1px solid var(--line)}
+.dp .row:first-of-type{padding-top:0}
+.dp .row:last-child{padding-bottom:0;border-bottom:0}
+.dp .row .txt{flex:1;min-width:0}
+.dp .row .t{display:block;font-size:14px;font-weight:600;line-height:1.4}
+.dp .row .d{display:block;font-size:12.5px;color:var(--dim);line-height:1.55;margin-top:4px}
+.dp .row.muted .t{color:var(--muted)}
+/* Switch. A checkbox underneath so it stays keyboard reachable and labelled. */
+.dp .sw{position:relative;width:46px;height:27px;min-width:46px;margin-top:1px}
+.dp .sw input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;
+  z-index:2;cursor:pointer}
+.dp .sw i{position:absolute;inset:0;border-radius:999px;background:var(--line-2);
+  transition:background .2s ease;pointer-events:none}
+.dp .sw i::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;
+  border-radius:50%;background:#F8FAFC;transition:transform .2s ease;
+  box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.dp .sw input:checked~i{background:var(--accent)}
+.dp .sw input:checked~i::after{transform:translateX(19px)}
+.dp .sw input:focus-visible~i{outline:2px solid var(--text);outline-offset:2px}
+.dp .sw input:disabled{cursor:not-allowed}
+.dp .sw input:disabled~i{opacity:.35}
+.dp .req{color:var(--bad)}
+.dp select{min-height:46px}
+.dp .note{display:block;font-size:12.5px;color:var(--dim);line-height:1.55;margin-top:8px}
+.dp .note.warn{color:var(--warn)}
+.dp .sub.bad{color:var(--bad)}
+/* Commercial disclosure, revealed under its switch. */
+.dp .disc{margin-top:16px;padding:16px;border-radius:10px;background:#0b1120;
+  border:1px solid var(--line)}
+.dp .disc .opts{display:flex;gap:10px;flex-wrap:wrap}
+.dp .disc .chk{background:var(--surface)}
+/* Preview: required by the guidelines, so it stays — but as a filmstrip. */
+.dp .prev{display:flex;gap:9px;overflow-x:auto;padding-bottom:4px}
+.dp .prev img{width:56px;height:100px;min-width:56px;object-fit:cover;display:block;
+  border-radius:7px;border:1px solid var(--line-2)}
+.dp .cap-t{margin-top:15px;font-size:13px;font-weight:600;line-height:1.45}
+.dp .cap-b{margin-top:6px;font-size:12.5px;color:var(--muted);line-height:1.6;
+  max-height:78px;overflow:auto}
+.dp .consent{padding:14px 26px;background:#0b1120;border-top:1px solid var(--line);
+  font-size:12.5px;color:var(--muted);line-height:1.65}
+.dp .consent a{color:var(--accent)}
+.dp .foot{padding:20px 26px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dp .foot .hint{flex-basis:100%;font-size:12px;color:var(--dim);line-height:1.55;margin:0}
+/* The Post page: a list of what can be sent on the left, the composer beside
+   it. One column on a narrow screen, picker first. */
+.postwrap{display:grid;grid-template-columns:300px minmax(0,1fr);gap:22px;align-items:start}
+.picker{display:flex;flex-direction:column;gap:8px;position:sticky;top:0}
+.picker .cap-l{display:block;font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:4px}
+.pk{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px;
+  background:var(--surface);border:1px solid var(--line);border-radius:11px;
+  color:inherit;transition:border-color .16s,background .16s}
+.pk:hover{border-color:var(--line-2)}
+.pk.on{border-color:var(--accent);background:var(--surface-2)}
+.pk img{width:40px;height:71px;min-width:40px;object-fit:cover;border-radius:6px;
+  display:block;border:1px solid var(--line-2)}
+.pk .m{min-width:0;flex:1}
+.pk .t{display:block;font-size:13px;font-weight:600;line-height:1.35;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pk .d{display:block;font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.45}
+/* Which account, asked before any of the posting controls appear. */
+.acctpick{display:flex;flex-direction:column;gap:9px;margin-bottom:4px}
+.pa{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;
+  text-align:left;padding:14px 16px;background:#0b1120;border:1px solid var(--line-2);
+  border-radius:10px;color:inherit;transition:border-color .16s}
+.pa:hover{border-color:var(--accent)}
+.pa .t{font-size:14px;font-weight:600}
+.pa .d{font-size:12.5px;color:var(--dim)}
+@media (max-width:900px){
+  .postwrap{grid-template-columns:1fr}
+  .picker{position:static;flex-direction:row;overflow-x:auto;padding-bottom:6px}
+  .picker .cap-l{display:none}
+  .pk{width:auto;min-width:210px;flex:none}
+}
+.schedbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;
+  padding:12px 15px;border-radius:10px;background:var(--surface);
+  border:1px solid var(--line-2);border-left:3px solid #A78BFA}
+.schedbar.direct{border-left-color:var(--warn)}
+.schedbar b{font-size:13px;font-weight:600}
+.schedbar .sub{color:var(--muted);font-size:12px}
+.schedbar .btn{margin-left:auto;min-height:34px;padding:7px 13px}
 .when{color:var(--accent);font-family:"Fira Code",monospace;font-size:12px}
 #zoom{position:fixed;inset:0;background:rgba(2,6,23,.94);display:none;align-items:center;
   justify-content:center;z-index:var(--z-modal);padding:24px}
@@ -2957,7 +3235,8 @@ const ICONS = {
   drafted:'<path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/>',
   published:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
   liked:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21l7.7-7.6 1.1-1a5.5 5.5 0 0 0 0-7.8Z"/>',
-  all:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>'
+  all:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>',
+  new:'<path d="M12 5v14M5 12h14"/>'
 };
 const ic = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
@@ -2966,10 +3245,17 @@ const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&
 
 let DATA=null, cur=null, filter='review', sel=0, redoMode=false, zi=-1;
 let redoSel=new Set(), openMenu=null;
+// Direct Post panel: which account's panel is open, that creator's settings as
+// TikTok reports them, and what has been chosen. dpInfo is never reused across
+// opens — the guidelines require the creator's settings to be re-read every
+// time the posting page is rendered.
+let dpAcct=null, dpInfo=null, dpBusy=false, dpTopic=null;
+let dpSet={privacy:'', disable_comment:false, auto_add_music:false,
+           disclose:false, brand_organic:false, branded_content:false};
 const PILLARS=[['tools','Tools'],['screentime','Screen time'],['discipline','Discipline'],
                ['build','Building'],['learn','Studying']];
-const FILTERS=[['review','Review'],['out','Published'],
-               ['liked','Performing'],['stats','Analytics'],
+const FILTERS=[['new','New post'],['review','Review'],['post','Post'],
+               ['out','Published'],['liked','Performing'],['stats','Analytics'],
                ['all','All posts'],['archive','Archive']];
 const isOut = p => ['drafted','published','failed'].includes(stateOf(p));
 // Drafted but not published everywhere: this is the TikTok worklist.
@@ -2994,6 +3280,68 @@ function stateOf(p){
   if ((Date.now()/1000 - p.mtime) > 7*DAY) return 'archive';
   return 'review';
 }
+// Ask for a post in a sentence. The whole build path already takes a free
+// text note and hands it to the agent — this is the missing way to reach it
+// without a terminal.
+let HOOKS = null, buildNote = '', buildCount = 1;
+
+async function loadHooks(){
+  try { HOOKS = await (await fetch('/api/hooks')).json(); } catch(e){ HOOKS = {eligible:[],blocked:[]}; }
+  if(filter==='new') render();
+}
+
+function composeView(){
+  const running = (DATA.runs||[]).filter(r=>r.kind==='build').length;
+  const el = (HOOKS && HOOKS.eligible) || [];
+  const by = {};
+  el.forEach(h => (by[h.pillar||'unknown'] = (by[h.pillar||'unknown']||0) + 1));
+  const pills = Object.entries(by).sort((a,b)=>b[1]-a[1]);
+
+  // The hook pool is what actually limits a build, and nothing else in the UI
+  // says so. Asking for a tools post with no tools hook left just fails.
+  const supply = el.length
+    ? `<div class="hooksup">${pills.map(([k,v])=>
+        `<span class="hp"><b>${v}</b> ${esc(k)}</span>`).join('')}
+       <span class="sub">${el.length} hook${el.length===1?'':'s'} free.
+         Each post spends one; a spent hook sits out four posts.</span></div>`
+    : `<div class="hooksup none"><b>No hooks are free.</b>
+        <span class="sub">Every approved hook is inside its cooldown. Add new
+        ones to tools/hook_pool.json, or wait — the oldest returns after four
+        more posts.</span></div>`;
+
+  return `<div class="compose">
+    <h3>Describe the post</h3>
+    <p class="why">A sentence is enough. Name the hook, the roster, the
+      backgrounds, the caption angle — whatever you actually care about; the
+      rest follows the usual rules and every guard still runs.</p>
+    <textarea id="bnote" placeholder="e.g. five apps for someone starting at 17, ARCO first, icon shelf on the hook, plain dark backgrounds, caption about what each one replaced"
+      oninput="buildNote=this.value">${esc(buildNote)}</textarea>
+    <div class="crow">
+      <span class="sub">How many</span>
+      <div class="segs">${[1,2,3,5].map(nn=>
+        `<button class="seg ${buildCount===nn?'on':''}" onclick="buildCount=${nn};render()">${nn}</button>`).join('')}</div>
+      <span class="sp"></span>
+      <button class="btn" onclick="startBuild()" ${el.length?'':'disabled'}>
+        ${running?'Queue another':'Build'}</button>
+    </div>
+    ${supply}
+    ${running?`<p class="why">${running} build${running===1?'':'s'} already
+      running. They go one at a time — two agents writing hooks.json at once
+      lose each other's work.</p>`:''}
+  </div>`;
+}
+
+async function startBuild(){
+  const note = (document.getElementById('bnote')||{}).value || '';
+  if(!note.trim()) return say('Say what the post should be first.');
+  buildNote = '';
+  await fetch('/api/build',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({count:buildCount, pillar:'tools', note:note.trim()})});
+  say('Building. It lands in Review when the slides and the caption are done.');
+  await load();
+  loadHooks();
+}
+
 const match = p => filter==='all' ? true
                  : filter==='liked' ? p.liked
                  : filter==='out' ? isOut(p)
@@ -3103,8 +3451,8 @@ async function load(quiet){
   }
   // A stale snapshot is still worth showing: you can read the pipeline, you
   // just cannot act on it until the machine that owns it is back.
-  STALE = !!(fresh && fresh.stale);
-  if (fresh && fresh.stale) {
+  STALE = !!(fresh && fresh.from_cache);
+  if (fresh && fresh.from_cache) {
     DATA = fresh;
     paintStale();
     const hb1 = document.getElementById('host');
@@ -3144,12 +3492,14 @@ async function load(quiet){
   ICONS.liked = '<path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/>';
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
     k==='stats' ? '' :
+    k==='post' ? DATA.posts.filter(postable).length :
     DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked
                          :k==='out'?isOut(p):stateOf(p)===k).length]));
   ICONS.archive = ICONS.archive || '<path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>';
   ICONS.review = ICONS.review || '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>';
   ICONS.out = ICONS.out || ICONS.drafted;
   ICONS.stats = ICONS.stats || '<path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/>';
+  ICONS.post = ICONS.post || '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5Z"/>';
   ICONS.ready = ICONS.ready || '<path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="9"/>';
   document.getElementById('nav').innerHTML = FILTERS.map(([k,lab]) =>
     `<button class="nav" aria-current="${filter===k}" onclick="setFilter('${k}')">
@@ -3209,7 +3559,12 @@ function restoreHash(){
   }
 }
 
-function setFilter(k){ filter=k; cur=null; closePages(); saveHash(); load(); }
+function setFilter(k){
+  // Leaving the Post page drops a half-made publish rather than keeping it
+  // armed behind another tab, and forces a fresh creator read on return.
+  if(filter==='post' && k!=='post'){ dpAcct=null; dpInfo=null; }
+  filter=k; cur=null; closePages(); saveHash(); load();
+}
 
 // Pull-to-refresh does not exist here and a phone reload loses the page, so
 // this refetches in place: posts always, and the TikTok numbers too when you
@@ -3232,6 +3587,7 @@ function togglePages(){
   if(!m.hidden) return closePages();
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
     k==='stats' ? '' :
+    k==='post' ? DATA.posts.filter(postable).length :
     DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked
                          :k==='out'?isOut(p):stateOf(p)===k).length]));
   m.innerHTML = `<div class="sheet">${FILTERS.map(([k,lab])=>
@@ -3268,6 +3624,16 @@ function render_(){
       stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M3 12h18"/>
       <path d="M3 18h18"/></svg>`;
   if (cur) return detail();
+  if(filter==='new'){
+    document.getElementById('cnt').textContent = '';
+    view.innerHTML = composeView();
+    if(!HOOKS) loadHooks();
+    return;
+  }
+  if(filter==='post'){
+    view.innerHTML = postView();
+    return;
+  }
   if(filter==='stats'){
     document.getElementById('cnt').textContent = '';
     view.innerHTML = analyticsView();
@@ -3390,7 +3756,7 @@ function paintStale(){
     el.id = 'stalebar';
     document.querySelector('main').prepend(el);
   }
-  const at = (DATA && DATA.stale_at) ? ago(DATA.stale_at) : 'earlier';
+  const at = (DATA && DATA.cached_at) ? ago(DATA.cached_at) : 'earlier';
   el.innerHTML = `<b>Showing a saved copy from ${at}.</b>
     The machine that owns the data is not answering, so nothing here can be
     drafted, redone or replicated until it is back. Retrying every 15 seconds.`;
@@ -3535,10 +3901,10 @@ async function loadAnalytics(){
   } catch (err) {
     got = {error: String(err), upstream_down: true};
   }
-  const dead = got && (got.upstream_down || got.error) && !got.stale;
+  const dead = got && (got.upstream_down || got.error) && !got.from_cache;
   AN = dead ? null : got;
   anError = dead ? got : null;
-  if (got && got.stale) { STALE = true; paintStale(); }
+  if (got && got.from_cache) { STALE = true; paintStale(); }
   render();
 }
 
@@ -4177,7 +4543,11 @@ function card(p){
   // One action per card, chosen by where the post actually is.
   let act = '';
   if(st==='review' || st==='failed')
-    act = `<button class="cta" onclick="cardDraft(event,'${p.topic}')">Draft to all</button>`;
+    act = `${p.approved
+      ? `<button class="cta sec" onclick="approve(event,'${p.topic}',false)"
+           title="Take it back off the Post page">Approved</button>`
+      : `<button class="cta" onclick="approve(event,'${p.topic}',true)">Approve</button>`}
+      <button class="cta sec" onclick="cardDraft(event,'${p.topic}')">Draft to all</button>`;
   // No Mark published button: the sync reads the account back and sets it.
   else if(st==='published' && p.days_since>=7)
     act = `<button class="cta sec" onclick="cardRepost(event,'${p.topic}')">Repost</button>`;
@@ -4232,7 +4602,7 @@ function open_(t){
       body:JSON.stringify({topic:t})}).then(()=>{ p.seen=true; });
   }
 }
-function back(){ cur=null; sel=0; redoMode=false; saveHash(); render(); }
+function back(){ cur=null; sel=0; redoMode=false; dpAcct=null; dpInfo=null; saveHash(); render(); }
 
 function detail(){
   const p=DATA.posts.find(x=>x.topic===cur);
@@ -4274,6 +4644,9 @@ function detail(){
       <span class="who2">${esc(p.topic)}</span>
       <div class="chips">${chips}</div>
       ${primary}
+      ${['review','failed','archive'].includes(st)?`<button
+        class="btn ${p.approved?'sec':''}" onclick="approve(event,'${p.topic}',${!p.approved})">
+        ${p.approved?'Approved ✓':'Approve'}</button>`:''}
       <button class="btn sec" onclick="toggleRedo()" aria-pressed="${redoMode}">
         ${redoMode?'Cancel redo':'Redo slides'}</button>
       <button class="btn sec" onclick="menu('rep')">Replicate &#9662;</button>
@@ -4287,10 +4660,16 @@ function detail(){
         <button onclick="replicate('new')"><b>New take</b>
           <span>Different hook and a sibling roster.</span></button></div>`:''}
       ${openMenu==='more'?`<div class="pop right">
+        ${p.approved?`<button onclick="sendTo('${p.topic}')"><b>Post directly</b>
+          <span>Opens this post on the Post page.</span></button>`
+         :`<button onclick="approve(event,'${p.topic}',true)"><b>Approve to post</b>
+          <span>Only approved posts reach the Post page.</span></button>`}
         <button onclick="askSchedule()"><b>Schedule drafting</b><span>Send later.</span></button>
         <button onclick="del(event,'${p.topic}')"><b>Delete post</b><span>Moves to _deleted.</span></button>
       </div>`:''}
     </div>
+
+    ${schedBar(p)}
 
     ${redoMode?`<div class="redobar">
       <span class="sub">Pick every slide that is wrong — click them, or press 1 to 6.</span>
@@ -4324,6 +4703,16 @@ function detail(){
 
 
 
+async function approve(e, topic, yes){
+  if(e) e.stopPropagation();
+  const p = DATA.posts.find(x=>x.topic===topic);
+  if(p) p.approved = yes;          // paint before the fetch, like marking published
+  render();
+  await fetch('/api/approve',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic, approved:yes})});
+  await load(); render();
+}
+
 async function publishAll(){
   await fetch('/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({topic:cur, published:true})});
@@ -4334,19 +4723,358 @@ async function publishAll(){
 // most of this mandatory: the privacy list must come from the creator, no
 // default may be preselected, a control the creator disabled must be shown
 // disabled, and the commercial disclosure must gate the publish button.
+//
+// This panel is also the audit deliverable. TikTok reviews a video of it, not
+// the API calls, so every control below has to stay visible even when it is
+// inapplicable — a missing disclosure toggle is a disqualification.
 
+const PRIV_LABEL = {
+  PUBLIC_TO_EVERYONE: 'Everyone',
+  MUTUAL_FOLLOW_FRIENDS: 'Friends',
+  FOLLOWER_OF_CREATOR: 'Followers',
+  SELF_ONLY: 'Only me',
+};
 
+// Opening the panel re-reads the creator's settings. Never render the form
+// from a cached copy: what the creator allows can change between posts.
+async function openDirect(key){
+  openMenu = null;
+  if(dpAcct === key) return closeDirect();
+  dpAcct = key; dpInfo = null; dpBusy = false;
+  dpSet = {privacy:'', disable_comment:false, auto_add_music:false,
+           disclose:false, brand_organic:false, branded_content:false};
+  render();
+  try{
+    const res = await fetch('/api/creator_info?account='+encodeURIComponent(key));
+    dpInfo = await res.json();
+  }catch(err){
+    dpInfo = {error: err.message};
+  }
+  if(dpAcct === key) render();
+}
+function closeDirect(){ dpAcct=null; dpInfo=null; render(); }
 
+// From a post straight into the Post page with it already chosen.
+function sendTo(topic){
+  openMenu=null; cur=null; dpTopic=topic; dpAcct=null; dpInfo=null;
+  filter='post'; saveHash(); render();
+}
 
+function dpSetVal(k, v){
+  dpSet[k] = v;
+  // Branded content cannot be private. The server refuses the pair too, but
+  // the guidelines want the option gone from the UI, not rejected on submit.
+  if(k === 'branded_content' && v && dpSet.privacy === 'SELF_ONLY') dpSet.privacy = '';
+  if(k === 'disclose' && !v){ dpSet.brand_organic = false; dpSet.branded_content = false; }
+  render();
+}
 
+// Nothing may publish until a privacy level is chosen, and if the post is
+// declared commercial, until it is said which kind.
+function dpReady(){
+  if(!dpSet.privacy) return false;
+  if(dpSet.disclose && !dpSet.brand_organic && !dpSet.branded_content) return false;
+  return true;
+}
 
+// The Post page. Direct posting is the one flow here that publishes without a
+// second pair of eyes, so it gets a destination of its own rather than a menu
+// item: you go there deliberately, pick the post, then the account.
+// Approving in Review is what puts a post here. Nothing reaches the account
+// without that step, which is the only human gate left once posting is direct.
+const postable = p => p.approved && (p.slides||[]).length > 0
+                   && stateOf(p) !== 'published';
 
+function postView(){
+  const list = DATA.posts.filter(postable).sort((a,b)=>whenOf(b)-whenOf(a));
+  document.getElementById('cnt').textContent =
+    `${list.length} post${list.length===1?'':'s'}`;
 
+  // Anything already queued to go out on its own belongs at the top: it is the
+  // only state here that acts while you are not looking.
+  const queued = DATA.posts.flatMap(p =>
+    (p.schedules||[]).filter(s=>!s.done).map(s=>({p, s})));
 
+  if(!list.length) return `<div class="empty">No finished posts to send yet.</div>`;
 
+  const cards = list.map(p=>{
+    const cover = (p.slides||[])[0];
+    const done = DATA.accounts.filter(a=>((p.delivery||{})[a.key]||{}).published).length;
+    const sent = DATA.accounts.filter(a=>(p.delivery||{})[a.key]).length;
+    return `<button class="pk ${dpTopic===p.topic?'on':''}"
+        onclick="pickPost('${p.topic}')">
+      ${cover?`<img loading="lazy" src="/slide/${p.topic}/${cover}?v=${(p.slide_mtimes||{})[cover]||0}" alt="">`:''}
+      <span class="m">
+        <span class="t">${esc(p.topic)}</span>
+        <span class="d">${(p.slides||[]).length} slides &middot;
+          ${sent?`${done} of ${sent} live`:'not sent'} &middot; ${times(p)}</span>
+      </span>
+    </button>`;
+  }).join('');
 
+  return `
+    ${queued.length?`<div class="panel" style="max-width:760px">
+      <h2>Going out on its own</h2>
+      ${queued.map(({p,s})=>{
+        const who = (s.accounts||[]).map(label).join(', ') || 'all accounts';
+        const priv = s.mode==='direct'
+          ? (PRIV_LABEL[(s.settings||{}).privacy] || (s.settings||{}).privacy || '?') : '';
+        return `<div class="schedbar ${s.mode==='direct'?'direct':''}">
+          <b>${esc(p.topic)} &mdash; ${s.mode==='direct'?'posts directly':'drafts'} to ${esc(who)}</b>
+          <span class="when">${fmt(s.at)}</span>
+          ${priv?`<span class="sub">visible to "${esc(priv)}"</span>`:''}
+          <button class="btn sec" onclick="cancelSched('${p.topic}')">Cancel</button>
+        </div>`;}).join('')}
+    </div>`:''}
 
+    <div class="postwrap">
+      <div class="picker">
+        <span class="cap-l">Choose a post</span>
+        ${cards}
+      </div>
+      <div class="composer">${composerPane()}</div>
+    </div>`;
+}
 
+// Selecting a post on the Post page. Separate from `cur` on purpose: opening a
+// post to review it should not arm a publish.
+function pickPost(topic){
+  dpTopic = topic;
+  if(dpAcct) return openDirect(dpAcct);   // re-read for the newly chosen post
+  render();
+}
+
+function composerPane(){
+  if(!dpTopic) return `<div class="empty">Pick a post to send.</div>`;
+  const p = DATA.posts.find(x=>x.topic===dpTopic);
+  if(!p){ dpTopic=null; return `<div class="empty">That post is gone.</div>`; }
+  if(!dpAcct){
+    return `<div class="panel dp"><div class="sec">
+      <span class="cap-l">Send ${esc(p.topic)} to</span>
+      <div class="acctpick">${DATA.accounts.map(a=>{
+        const r = (p.delivery||{})[a.key];
+        const state = !r ? 'not sent yet'
+                    : r.published ? 'already live there'
+                    : r.status==='SENT' ? 'drafted, waiting in the inbox'
+                    : 'last attempt failed';
+        return `<button class="pa" onclick="openDirect('${a.key}')">
+          <span class="t">@${esc(a.label)}</span><span class="d">${state}</span>
+        </button>`;}).join('')}</div>
+      <span class="note">Posting here publishes straight to the account. To send
+        a draft to the inbox instead, use Draft on the post itself.</span>
+    </div></div>`;
+  }
+  return directPanel(p);
+}
+
+function directPanel(p){
+  const a = DATA.accounts.find(x=>x.key===dpAcct);
+  if(!a) return '';
+  const shell = inner => `<div class="panel dp"><div class="sec">${inner}</div></div>`;
+
+  if(!dpInfo) return shell(
+    `<span class="cap-l">Posting to TikTok</span>
+     <span class="sub">Reading ${esc(a.label)}'s settings from TikTok…</span>`);
+  if(dpInfo.error) return shell(
+    `<span class="cap-l">Posting to TikTok</span>
+     <span class="sub bad">Could not read this creator's settings: ${esc(dpInfo.error)}</span>
+     <div class="actions" style="margin-top:16px">
+       <button class="btn sec" onclick="closeDirect()">Close</button></div>`);
+
+  const opts = dpInfo.privacy_level_options || [];
+  const nick = dpInfo.creator_nickname || a.label;
+  const uname = dpInfo.creator_username ? '@'+dpInfo.creator_username : '';
+  const avatar = dpInfo.creator_avatar_url
+    ? `<img class="av" src="${esc(dpInfo.creator_avatar_url)}" alt="">` : '';
+
+  // A level the creator does not offer is never listed, and SELF_ONLY
+  // disappears entirely once the post is declared branded content.
+  const usable = opts.filter(o => !(o === 'SELF_ONLY' && dpSet.branded_content));
+  const label = dpSet.branded_content ? 'Paid partnership'
+              : dpSet.brand_organic  ? 'Promotional content' : '';
+
+  // One switch, rendered the same way everywhere so the rows line up.
+  const sw = (on, attrs) =>
+    `<span class="sw"><input type="checkbox" ${on?'checked':''} ${attrs}><i></i></span>`;
+  const row = (title, desc, control, cls='') =>
+    `<div class="row ${cls}"><span class="txt"><span class="t">${title}</span>
+       ${desc?`<span class="d">${desc}</span>`:''}</span>${control}</div>`;
+
+  return `<div class="panel dp">
+    <div class="sec">
+      <span class="cap-l">Posting to TikTok</span>
+      <div class="who">${avatar}<span class="nm">
+        <b>${esc(nick)}</b><span>${esc(uname)}</span></span></div>
+    </div>
+
+    <div class="sec">
+      <label for="dppriv">Who can view this post <span class="req">*</span></label>
+      <select id="dppriv" onchange="dpSetVal('privacy', this.value)">
+        <option value=""${dpSet.privacy?'':' selected'}>Select who can view…</option>
+        ${usable.map(o=>`<option value="${o}"${dpSet.privacy===o?' selected':''}
+          >${esc(PRIV_LABEL[o]||o)}</option>`).join('')}
+      </select>
+      ${dpSet.branded_content && opts.includes('SELF_ONLY')
+        ? `<span class="note">Branded content cannot be private, so "Only me" is unavailable.</span>` : ''}
+    </div>
+
+    <div class="sec">
+      <span class="cap-l">Interactions</span>
+      ${row('Comment',
+            dpInfo.comment_disabled ? 'Turned off by the creator on TikTok.' : '',
+            sw(!dpSet.disable_comment,
+               `${dpInfo.comment_disabled?'disabled':''} aria-label="Allow comments"
+                onchange="dpSetVal('disable_comment', !this.checked)"`),
+            dpInfo.comment_disabled?'muted':'')}
+      ${row('Duet', 'Video posts only — not available for photo posts.',
+            sw(false, 'disabled aria-label="Duet"'), 'muted')}
+      ${row('Stitch', 'Video posts only — not available for photo posts.',
+            sw(false, 'disabled aria-label="Stitch"'), 'muted')}
+      ${row('Add recommended music', 'Lets TikTok pick a track for the slideshow.',
+            sw(dpSet.auto_add_music,
+               `aria-label="Add recommended music"
+                onchange="dpSetVal('auto_add_music', this.checked)"`))}
+    </div>
+
+    <div class="sec">
+      <span class="cap-l">Disclosure</span>
+      ${row('Disclose post content',
+            'Turn on to disclose that this post promotes yourself, a third party, or both.',
+            sw(dpSet.disclose,
+               `aria-label="Disclose post content"
+                onchange="dpSetVal('disclose', this.checked)"`))}
+      ${dpSet.disclose?`<div class="disc">
+        <div class="opts">
+          <label class="chk"><input type="checkbox" ${dpSet.brand_organic?'checked':''}
+            onchange="dpSetVal('brand_organic', this.checked)"> Your Brand</label>
+          <label class="chk"><input type="checkbox" ${dpSet.branded_content?'checked':''}
+            onchange="dpSetVal('branded_content', this.checked)"> Branded Content</label>
+        </div>
+        ${label?`<span class="note warn">Your photo post will be labeled
+          "${label}". This cannot be changed once posted.</span>`
+         :`<span class="note">Pick at least one to continue.</span>`}
+      </div>`:''}
+    </div>
+
+    <div class="sec">
+      <span class="cap-l">Preview</span>
+      <div class="prev">${p.slides.map((s,i)=>
+        `<img loading="lazy" src="/slide/${p.topic}/${s}?v=${(p.slide_mtimes||{})[s]||0}"
+           alt="Slide ${i+1}">`).join('')}</div>
+      <div class="cap-t">${esc(p.title)}</div>
+      <div class="cap-b">${esc(p.caption)}</div>
+    </div>
+
+    <div class="consent">By posting, you agree to TikTok's
+      ${dpSet.branded_content
+        ? `<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank"
+             rel="noopener">Branded Content Policy</a> and `:''}
+      <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
+         target="_blank" rel="noopener">Music Usage Confirmation</a>.</div>
+
+    <div class="foot">
+      <button class="btn" ${dpReady() && !dpBusy?'':'disabled'}
+        onclick="publishDirect()">${dpBusy?'Posting…':'Post to '+esc(a.label)}</button>
+      <button class="btn sec" ${dpReady() && !dpBusy?'':'disabled'}
+        onclick="scheduleDirect()">Schedule instead</button>
+      <button class="btn sec" onclick="closeDirect()">Cancel</button>
+      <span class="hint">After posting it may take a few minutes to appear on the
+        profile. A scheduled post goes out with exactly these settings, and only
+        while the dashboard is running.</span>
+    </div>
+  </div>`;
+}
+
+// A pending schedule was invisible until now, which is survivable for a draft
+// and not for a direct post: that one publishes unattended, so it has to be
+// something you can see coming and call off.
+function schedBar(p){
+  const rows = (p.schedules||[]).filter(s=>!s.done);
+  if(!rows.length) return '';
+  return rows.map(s=>{
+    const who = (s.accounts||[]).map(label).join(', ') || 'all accounts';
+    const priv = s.mode==='direct'
+      ? (PRIV_LABEL[(s.settings||{}).privacy] || (s.settings||{}).privacy || '?') : '';
+    return `<div class="schedbar ${s.mode==='direct'?'direct':''}">
+      <b>${s.mode==='direct'?'Posts directly':'Drafts'} to ${esc(who)}</b>
+      <span class="when">${fmt(s.at)}</span>
+      ${priv?`<span class="sub">visible to "${esc(priv)}"</span>`:''}
+      <button class="btn sec" onclick="cancelSched('${p.topic}')">Cancel</button>
+    </div>`;
+  }).join('');
+}
+
+async function cancelSched(topic){
+  await fetch('/api/schedule',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic, cancel:true})});
+  await load(); render();
+  say('Schedule cancelled. Nothing will go out on its own.');
+}
+
+// The settings the panel has collected, in the shape the API takes. Shared by
+// posting now and scheduling, so a scheduled post cannot drift from what the
+// panel showed when the choices were made.
+function dpPayload(){
+  return {
+    privacy: dpSet.privacy,
+    disable_comment: dpSet.disable_comment,
+    auto_add_music: dpSet.auto_add_music,
+    brand_organic: dpSet.disclose && dpSet.brand_organic,
+    branded_content: dpSet.disclose && dpSet.branded_content,
+  };
+}
+
+function scheduleDirect(){
+  if(!dpReady() || dpBusy) return;
+  const key = dpAcct, a = DATA.accounts.find(x=>x.key===key);
+  const d = new Date(Date.now()+3600e3); d.setSeconds(0,0);
+  const iso = new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  const priv = PRIV_LABEL[dpSet.privacy] || dpSet.privacy;
+  showModal({
+    title:'Schedule this post',
+    body:`It posts straight to ${a.label} at the time you pick, visible to `
+        +`"${priv}". The dashboard has to be running when it comes due.`,
+    ok:'Schedule',
+    extra:`<div class="sched"><div><label for="dpwhen">When</label>
+      <input type="datetime-local" id="dpwhen" value="${iso}"></div></div>`,
+    action: async()=>{
+      const at = new Date(document.getElementById('dpwhen').value).getTime()/1000;
+      if(!at) return say('That date could not be read; nothing was scheduled.');
+      const res = await fetch('/api/schedule',{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({topic:dpTopic, at, accounts:[key], mode:'direct',
+                             settings:dpPayload()})});
+      const r = await res.json().catch(()=>({}));
+      if(!res.ok) return say('Not scheduled: '+(r.error||('server returned '+res.status)));
+      dpAcct=null; dpInfo=null;
+      await load(); render();
+      say('Scheduled. It posts to '+key+' at '
+          +new Date(at*1000).toLocaleString()+'.');
+    }});
+}
+
+async function publishDirect(){
+  if(!dpReady() || dpBusy) return;
+  if (blockedOffline()) return;
+  const key = dpAcct;
+  dpBusy = true; render();
+  say('Posting directly. The publish is polled until TikTok reports it complete.');
+  let txt;
+  try{
+    const res = await fetch('/api/publish_direct',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({topic:dpTopic, account:key, settings:dpPayload()})});
+    const r = await res.json();
+    if(!res.ok) throw new Error(r.error || ('server returned '+res.status));
+    txt = 'Posting to '+key+'. The delivery log records the result when TikTok finishes.';
+    dpAcct = null; dpInfo = null;
+  }catch(err){
+    txt = 'Direct post failed: '+err.message;
+  }
+  dpBusy = false;
+  await load();
+  say(txt);
+}
 
 function menu(which){ openMenu = openMenu===which ? null : which; render(); }
 
@@ -4656,13 +5384,12 @@ document.addEventListener('mousemove', e => {
 fetch('/api/host').then(r=>r.json()).then(h=>{
   const el = document.getElementById('host');
   if(!el) return;
-  const local = h.kind === 'local';
-  el.className = local ? 'hostb local' : 'hostb';
-  el.textContent = local ? 'macbook' : 'mini';
+  el.className = h.owns ? 'hostb' : 'hostb local';
+  el.textContent = h.name;
   el.insertAdjacentHTML('beforebegin', '<span style="color:var(--line-2)">·</span>');
-  el.title = local
-    ? 'Served by this MacBook. Data and every action go to ' + h.upstream
-    : 'Served by the mini, which owns the data and runs the schedule';
+  el.title = h.owns
+    ? 'This machine holds the data and runs the schedule'
+    : 'Serving the page only — data and every action go to ' + h.upstream;
 }).catch(()=>{});
 
 load().then(()=>{
