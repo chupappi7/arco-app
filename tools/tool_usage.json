@@ -860,5 +860,15 @@
    "OpusClip",
    "ElevenLabs"
   ]
+ },
+ {
+  "topic": "app-in-a-weekend",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "Supabase",
+   "TestFlight",
+   "Sentry"
+  ]
  }
 ]

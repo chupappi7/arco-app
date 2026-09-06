@@ -604,6 +604,20 @@
    "slides": [
     "01.jpg"
    ]
+  },
+  {
+   "topic": "app-in-a-weekend",
+   "title": "how i ship in a weekend what used to take a month",
+   "caption": "a month of work used to take me a month. now it fits between friday night and sunday. every task i have is in arco and the day gets planned in 30 seconds, then focus mode puts every distraction away while i work, my holy grail. paste a mockup into claude code and ask it to build that screen, and the ui you drew on friday is running saturday morning. every table you create in supabase gets its own api endpoint instantly, so the backend is live before you write a single server file. internal testflight builds skip beta review and land minutes after upload, so a sunday fix is on real phones the same evening. link the repo and sentry flags the suspect commit for each new crash, so the fix starts at the diff that broke it instead of a debugging session. #buildinpublic #indiedev #aitools #productivity #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-06 by gen-app-in-a-weekend.py. Third outing of the ship-in-a-weekend hook (build pillar); fresh roster ARCO, Claude, Supabase, TestFlight, Sentry -- Codex carried both prior outings. All teaching points checked against every prior caption."
   }
  ]
 }
