@@ -120,6 +120,14 @@
    ],
    "used": true,
    "pillar": "discipline"
+  },
+  {
+   "lines": [
+    "5 reasons your screen time",
+    "is still 100+ hours"
+   ],
+   "used": true,
+   "pillar": "screentime"
   }
  ]
 }

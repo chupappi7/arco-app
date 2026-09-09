@@ -984,7 +984,10 @@ def closing_slide(bg, lines, out):
 
 
 def cta_slide(bg, out, subtitle='Planner and app blocker in one.'):
-    """Closing card for story posts: app icon, full store name, one line.
+    """Closing card for story posts: app icon, full store name, the pitch.
+
+    `subtitle` takes a string or a list of lines — a post that has just named
+    five reasons usually needs more than one to answer them.
 
     No promo copy and never the word free; the promo CTA returns only when
     the in-app Redeem flow ships (2.0.2)."""
@@ -1000,10 +1003,13 @@ def cta_slide(bg, out, subtitle='Planner and app blocker in one.'):
     name_f = font(58, 'Bold')
     sub_f = font(42, 'Semibold')
     store_f = font(36, 'Medium')
-    draw_text_block(im, [
-        (540, 940, 'ARCO: Day Planner & Focus', name_f, 'ma', (255, 255, 255)),
-        (540, 1035, subtitle, sub_f, 'ma', (235, 235, 235)),
-        (540, 1115, 'On the App Store', store_f, 'ma', (255, 214, 10)),
-    ])
+    subs = [subtitle] if isinstance(subtitle, str) else list(subtitle)
+    items = [(540, 940, 'ARCO: Day Planner & Focus', name_f, 'ma', (255, 255, 255))]
+    y = 1035
+    for ln in subs:
+        items.append((540, y, ln, sub_f, 'ma', (235, 235, 235)))
+        y += 62
+    items.append((540, y + 18, 'On the App Store', store_f, 'ma', (255, 214, 10)))
+    draw_text_block(im, items)
     im.save(out, quality=92)
     print('wrote', out)

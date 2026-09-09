@@ -20,6 +20,10 @@
  *   --auto-add-music     Let TikTok add recommended music to the photos.
  *   --brand-organic      Disclose that it promotes your own brand.
  *   --branded-content    Disclose a paid partnership. Cannot be SELF_ONLY.
+ *   --status <publish_id> Print that draft's publish status as JSON and exit.
+ *                        Once the creator has published it, the response
+ *                        carries the real post id, which is the only
+ *                        identifier that cannot drift.
  *   --creator-info       Print the creator's settings as JSON and exit. The
  *                        posting UI must be built from these, per TikTok's
  *                        content-sharing guidelines.
@@ -91,6 +95,7 @@ function parseArgs(argv) {
       case '--creator-info': opts.creatorInfo = true; break;
       case '--list-posts': opts.listPosts = true; break;
       case '--account-stats': opts.accountStats = true; break;
+      case '--status': opts.statusOf = argv[++i]; break;
       case '--wait': opts.wait = true; break;
       case '--dry-run': opts.dryRun = true; break;
       case '--us': opts.account = 'us'; break;
@@ -258,7 +263,7 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2));
 
   if (opts.help || (!opts.topic && !opts.creatorInfo && !opts.listPosts
-                    && !opts.accountStats)) {
+                    && !opts.accountStats && !opts.statusOf)) {
     usage();
     process.exit(opts.topic ? 0 : 1);
   }
@@ -299,6 +304,23 @@ async function main() {
     }
     console.log(JSON.stringify({ scope: tokens.scope, videos, pages,
                                  has_more: hasMore }, null, 2));
+    return;
+  }
+
+  // Ask TikTok what became of a draft. Once the creator publishes it the
+  // response carries the real post id, which is the only handle on a post
+  // that cannot drift: captions get edited, ids do not.
+  if (opts.statusOf) {
+    const key = ACCOUNT_ENV[opts.account];
+    if (!key) throw new Error(`--account must be one of ${Object.keys(ACCOUNT_ENV).join('/')}`);
+    const tokens = await refreshAccessToken({
+      clientKey: requireEnv('TIKTOK_CLIENT_KEY'),
+      clientSecret: requireEnv('TIKTOK_CLIENT_SECRET'),
+      refreshToken: requireEnv(key.env),
+    });
+    const data = await fetchPostStatus({
+      accessToken: tokens.accessToken, publishId: opts.statusOf });
+    console.log(JSON.stringify(data, null, 2));
     return;
   }
 
