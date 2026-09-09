@@ -26,10 +26,17 @@ which is why it is cta_slide and not a sixth reason.
 Backgrounds: the hook takes bg-h31, the darkest of the three lounge-night
 frames at band luma 19.7, which is the penthouse-at-night look and the one
 that holds a headline best. The rest avoid adjacent vibe repeats.
+
+Fix pass (2026-09-09), Thinh's notes on the first render: no numbered
+squares on the reason slides — the number lives in the title, and the title
+itself carries the highlight (yellow) instead. The closer swaps the store
+line for the comment-gated offer: comment "locked", free subscription, 50
+spots.
 """
 import os, sys
 sys.path.insert(0, '/Users/thinh/SIXSIX/arco-app/tools')
 import compose as c
+import hook_rules
 from compose import hook_slide, rule_slide, cta_slide, mark_hook_used, record_post_bgs
 
 TOPIC = 'screentime-100h'
@@ -76,12 +83,17 @@ REASONS = [
 CTA = ['Day planner, app blocker and task',
        'manager in one app.',
        'The only productivity app you need.']
+PROMO = ['Comment "locked" for a free subscription',
+         'Only 50 spots available']
 
 hook_slide(BGS[0], HOOK, f'{OUT}/01.jpg')
 for i, (title, body) in enumerate(REASONS):
-    rule_slide(BGS[i + 1], i + 1, title, body, f'{OUT}/0{i + 2}.jpg')
-cta_slide(BGS[6], f'{OUT}/07.jpg', CTA)
+    rule_slide(BGS[i + 1], i + 1, title, body, f'{OUT}/0{i + 2}.jpg',
+               badge=False, title_fill=c.YELLOW)
+cta_slide(BGS[6], f'{OUT}/07.jpg', CTA, store_line=None, promo=PROMO)
 
-mark_hook_used(HOOK, TOPIC)
+# A rebuild must not append a second history entry for the same outing.
+if not any(e.get('topic') == TOPIC for e in hook_rules.history()):
+    mark_hook_used(HOOK, TOPIC)
 record_post_bgs(TOPIC, BGS)
 print('done')

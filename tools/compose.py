@@ -911,7 +911,8 @@ def app_slide(bg, icon, title, body_lines, out, grad=(0.85, 0.68, 300, 1250)):
     im.save(out, quality=92)
     print('wrote', out)
 
-def rule_slide(bg, number, title, body_lines, out, grad=(0.85, 0.68, 300, 1250)):
+def rule_slide(bg, number, title, body_lines, out, grad=(0.85, 0.68, 300, 1250),
+               badge=True, title_fill=WHITE):
     """A tool slide with a numbered badge where the app icon would be.
 
     Method-led pillars (discipline, screentime) have no app to show, and
@@ -920,24 +921,30 @@ def rule_slide(bg, number, title, body_lines, out, grad=(0.85, 0.68, 300, 1250))
     tools posts. This keeps the exact tools layout: same badge box, same
     title position, same dashed body, so a viewer moving between pillars
     sees one format.
+
+    `badge=False` drops the numbered square (the "N." stays in the title) and
+    `title_fill` recolours the title — Thinh asked for both on screentime-100h:
+    no squares, titles highlighted in a light colour. Defaults keep every
+    other post's rebuild pixel-identical.
     """
     im = base_photo(bg, grad)
     im = frame_for_band(im, 600, 1300)
     adaptive_scrim(im, 600, 1300)
 
-    # Badge in the icon slot: rounded square, big number, matching 210px box.
-    badge = Image.new('RGBA', (210, 210), (0, 0, 0, 0))
-    ImageDraw.Draw(badge).rounded_rectangle((0, 0, 209, 209), radius=48,
+    if badge:
+        # Badge in the icon slot: rounded square, big number, matching 210px box.
+        b = Image.new('RGBA', (210, 210), (0, 0, 0, 0))
+        ImageDraw.Draw(b).rounded_rectangle((0, 0, 209, 209), radius=48,
                                             fill=(255, 255, 255, 235))
-    bd = ImageDraw.Draw(badge)
-    nf = display_font(150, 'Compressed Black')
-    # anchor 'mm' already centres the glyph box; do not offset by the bbox too
-    bd.text((105, 105), str(number), font=nf, fill=(18, 18, 20), anchor='mm')
-    im.paste(badge, (88, 610), badge)
+        bd = ImageDraw.Draw(b)
+        nf = display_font(150, 'Compressed Black')
+        # anchor 'mm' already centres the glyph box; do not offset by the bbox too
+        bd.text((105, 105), str(number), font=nf, fill=(18, 18, 20), anchor='mm')
+        im.paste(b, (88, 610), b)
 
     assert_teaches(title, body_lines)
     tf = fit_font(title, 'Black', 84)
-    items = [(85, 865, title, tf, 'la', (255, 255, 255))]
+    items = [(85, 865, title, tf, 'la', title_fill)]
     body_f = font(50, 'Semibold')
     y = 995
     new_para = True
@@ -983,14 +990,17 @@ def closing_slide(bg, lines, out):
 
 
 
-def cta_slide(bg, out, subtitle='Planner and app blocker in one.'):
+def cta_slide(bg, out, subtitle='Planner and app blocker in one.',
+              store_line='On the App Store', promo=None):
     """Closing card for story posts: app icon, full store name, the pitch.
 
     `subtitle` takes a string or a list of lines — a post that has just named
     five reasons usually needs more than one to answer them.
 
-    No promo copy and never the word free; the promo CTA returns only when
-    the in-app Redeem flow ships (2.0.2)."""
+    `store_line=None` drops the yellow store line; `promo` (list of lines)
+    draws a comment-gated offer in its place. Promo copy is opt-in per post
+    and only on Thinh's explicit ask — he asked for the "locked" comment CTA
+    on screentime-100h. Defaults keep every other post's rebuild identical."""
     im = base_photo(bg, (0.72, 0.5, 300, 1250))
     im = frame_for_band(im, 600, 1300)
     adaptive_scrim(im, 560, 1340, target=88)
@@ -1009,7 +1019,14 @@ def cta_slide(bg, out, subtitle='Planner and app blocker in one.'):
     for ln in subs:
         items.append((540, y, ln, sub_f, 'ma', (235, 235, 235)))
         y += 62
-    items.append((540, y + 18, 'On the App Store', store_f, 'ma', (255, 214, 10)))
+    if store_line:
+        items.append((540, y + 18, store_line, store_f, 'ma', (255, 214, 10)))
+    if promo:
+        py = y + 30
+        promo_f = font(40, 'Bold')
+        for ln in promo:
+            items.append((540, py, ln, promo_f, 'ma', YELLOW))
+            py += 60
     draw_text_block(im, items)
     im.save(out, quality=92)
     print('wrote', out)
