@@ -356,7 +356,6 @@
  "used": [
   "f2",
   "f1",
-  "l1",
   "v1",
   "v14",
   "v15",
@@ -366,7 +365,8 @@
   "v12",
   "v13",
   "s1",
-  "v2"
+  "v2",
+  "l1"
  ],
  "rule": "Variations of the approved line. Pick by THEME so the slide answers the hook: a study or screentime hook gets a focus or blocking angle, a build or business hook gets the planning angle. Closers stay in register; 'My holy grail.' carries most of them."
 }
