@@ -637,5 +637,16 @@
    "bg-n04.jpg",
    "bg-h45.jpg"
   ]
+ },
+ {
+  "topic": "five-carry-twelve",
+  "bgs": [
+   "bg-n02.jpg",
+   "bg-h20.jpg",
+   "bg-h32.jpg",
+   "bg-n01.jpg",
+   "bg-h29.jpg",
+   "bg-n03.jpg"
+  ]
  }
 ]
