@@ -30,3 +30,12 @@ tools/__pycache__/
 tools/deploy/
 tools/.slide-cache/
 tools/.api-cache/
+tools/.agent-logs/
+tools/.bg-thumbs/
+tools/gen_queue.json
+tools/.gen/
+
+# State backups written before a risky migration — local only.
+tools/*.prerestore
+tools/*.predupe
+tools/*.prerun

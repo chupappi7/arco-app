@@ -1,0 +1,676 @@
+{
+ "bgs": [
+  {
+   "name": "bg-h01.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 74.8,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h02.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 77.5,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h03.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 89.3,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h04.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 75.9,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h05.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 75.2,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h06.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 85.8,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h07.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 91.9,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h08.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 87.4,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h09.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 76.7,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h10.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 87.5,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h11.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 72.4,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h12.jpg",
+   "vibe": "desk-person-night",
+   "person": true,
+   "hook_only": true,
+   "luma": 61.4,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h14.jpg",
+   "vibe": "desk-person-night",
+   "person": true,
+   "hook_only": true,
+   "luma": 62.3,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h16.jpg",
+   "vibe": "desk-person-night",
+   "person": true,
+   "hook_only": true,
+   "luma": 47.0,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h17.jpg",
+   "vibe": "desk-person-night",
+   "person": true,
+   "hook_only": true,
+   "luma": 62.1,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h19.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 76.6,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h20.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 67.0,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h21.jpg",
+   "vibe": "lounge-night",
+   "person": false,
+   "hook_only": false,
+   "luma": 64.6,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h22.jpg",
+   "vibe": "lounge-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 53.5,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h24.jpg",
+   "vibe": "lounge-night",
+   "person": false,
+   "hook_only": false,
+   "luma": 49.8,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h28.jpg",
+   "vibe": "villa-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 87.1,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h29.jpg",
+   "vibe": "supercars-dusk",
+   "person": false,
+   "hook_only": false,
+   "luma": 18.7,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h30.jpg",
+   "vibe": "jet-mountain",
+   "person": true,
+   "hook_only": true,
+   "luma": 50.2,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h31.jpg",
+   "vibe": "lounge-night",
+   "person": false,
+   "hook_only": false,
+   "luma": 19.7,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h32.jpg",
+   "vibe": "window-silhouette",
+   "person": true,
+   "hook_only": false,
+   "luma": 38.8,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h33.jpg",
+   "vibe": "desk-empty-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 84.7,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h34.jpg",
+   "vibe": "desk-empty-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 62.4,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h35.jpg",
+   "vibe": "supercars-dusk",
+   "person": false,
+   "hook_only": false,
+   "luma": 37.2,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h36.jpg",
+   "vibe": "supercars-dusk",
+   "person": false,
+   "hook_only": false,
+   "luma": 20.3,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h37.jpg",
+   "vibe": "supercars-dusk",
+   "person": false,
+   "hook_only": false,
+   "luma": 22.7,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h38.jpg",
+   "vibe": "supercars-dusk",
+   "person": false,
+   "hook_only": false,
+   "luma": 21.2,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h39.jpg",
+   "vibe": "supercars-dusk",
+   "person": false,
+   "hook_only": false,
+   "luma": 35.8,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h40.jpg",
+   "vibe": "jet-mountain",
+   "person": true,
+   "hook_only": true,
+   "luma": 57.5,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h41.jpg",
+   "vibe": "jet-mountain",
+   "person": true,
+   "hook_only": true,
+   "luma": 16.6,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h42.jpg",
+   "vibe": "jet-mountain",
+   "person": true,
+   "hook_only": true,
+   "luma": 46.5,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h43.jpg",
+   "vibe": "jet-mountain",
+   "person": true,
+   "hook_only": true,
+   "luma": 75.4,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h44.jpg",
+   "vibe": "window-silhouette",
+   "person": true,
+   "hook_only": false,
+   "luma": 96.8,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-h45.jpg",
+   "vibe": "window-silhouette",
+   "person": true,
+   "hook_only": false,
+   "luma": 54.3,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h46.jpg",
+   "vibe": "desk-city-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 59.7,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h48.jpg",
+   "vibe": "desk-city-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 60.8,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h49.jpg",
+   "vibe": "desk-city-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 54.8,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h50.jpg",
+   "vibe": "desk-city-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 64.7,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h51.jpg",
+   "vibe": "desk-city-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 61.7,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h52.jpg",
+   "vibe": "desk-city-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 62.6,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h53.jpg",
+   "vibe": "desk-led-warm",
+   "person": false,
+   "hook_only": true,
+   "luma": 41.4,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h54.jpg",
+   "vibe": "desk-led-warm",
+   "person": false,
+   "hook_only": true,
+   "luma": 35.5,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h55.jpg",
+   "vibe": "desk-led-warm",
+   "person": false,
+   "hook_only": true,
+   "luma": 14.8,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h56.jpg",
+   "vibe": "desk-led-warm",
+   "person": false,
+   "hook_only": true,
+   "luma": 18.2,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h57.jpg",
+   "vibe": "desk-led-warm",
+   "person": false,
+   "hook_only": true,
+   "luma": 33.3,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h58.jpg",
+   "vibe": "desk-led-warm",
+   "person": false,
+   "hook_only": true,
+   "luma": 61.1,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h59.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 12.5,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h60.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 31.3,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h61.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 32.0,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h62.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 22.4,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h63.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 18.0,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h64.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 26.2,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h65.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 35.2,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h66.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 39.7,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h67.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 25.2,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h68.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 6.5,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h69.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 23.9,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h70.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 29.2,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h71.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 31.4,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h72.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 27.2,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h73.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 43.4,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h74.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 25.4,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h75.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 21.1,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h76.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 39.3,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h77.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 35.0,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h78.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 38.5,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h79.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 41.9,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h80.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 38.9,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-h88.jpg",
+   "vibe": "supercars-dusk",
+   "person": false,
+   "hook_only": false,
+   "luma": 28.2,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-n01.jpg",
+   "vibe": "villa-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 66.3,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-n02.jpg",
+   "vibe": "villa-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 89.6,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-n03.jpg",
+   "vibe": "villa-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 63.6,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-n04.jpg",
+   "vibe": "villa-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 57.8,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-n05.jpg",
+   "vibe": "desk-empty-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 57.1,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-n06.jpg",
+   "vibe": "desk-empty-day",
+   "person": false,
+   "hook_only": false,
+   "luma": 53.6,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-n07.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 31.9,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-n08.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 52.3,
+   "copy_ok": true
+  },
+  {
+   "name": "bg-n09.jpg",
+   "vibe": "desk-led-neon",
+   "person": false,
+   "hook_only": true,
+   "luma": 89.0,
+   "copy_ok": false
+  },
+  {
+   "name": "bg-n10.jpg",
+   "vibe": "desk-person-night",
+   "person": true,
+   "hook_only": true,
+   "luma": 57.3,
+   "copy_ok": true
+  }
+ ],
+ "band_max_luma": 70,
+ "hook_only_vibes": [
+  "desk-lamp-night",
+  "desk-led-neon",
+  "desk-led-warm",
+  "desk-person-night",
+  "jet-mountain"
+ ]
+}

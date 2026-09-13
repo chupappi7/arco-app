@@ -13,13 +13,17 @@ import gzip
 import http.client
 import http.server
 import json
+import random
 import secrets
+import signal
 import socket
 import mimetypes
 import os
 import re
 import socketserver
+import ssl
 import subprocess
+import sys
 import threading
 import time
 import urllib.parse
@@ -54,6 +58,15 @@ UPSTREAM_KEY = os.environ.get('ARCO_UPSTREAM_KEY') or ''
 # returned around each call, and warmed at startup so the first request of the
 # session does not pay the handshake either.
 SLIDE_CACHE = os.path.join(REPO, 'tools', '.slide-cache')
+# Where the app's daily usage snapshots are collected. Empty means the
+# Users tab says so rather than showing an empty chart that looks like
+# nobody is using the app.
+METRICS_URL = (os.environ.get('ARCO_METRICS_URL') or '').rstrip('/')
+METRICS_KEY = os.environ.get('ARCO_METRICS_KEY') or ''
+BG_DIR = os.path.join(REPO, 'tools', 'slides', 'bg')
+BG_INDEX = os.path.join(BG_DIR, '.index.json')
+BG_THUMBS = os.path.join(REPO, 'tools', '.bg-thumbs')
+ICON_DIR = os.path.join(REPO, 'tools', 'slides', 'icons')
 API_CACHE = os.path.join(REPO, 'tools', '.api-cache')
 # Reads worth keeping a copy of. Holding no state is what stops two hosts
 # disagreeing about what was sent — but that only has to bind WRITES. A
@@ -173,12 +186,20 @@ def save_log(log):
 
 
 def published_today():
-    """Drafts marked published since local midnight, per account."""
+    """Posts that went out since local midnight, per account.
+
+    A repost is a post going out, so it counts here. published_at is the
+    FIRST outing and never moves, which is why a day spent reposting read as
+    zero posts published — the work happened and the counter denied it.
+    """
     midnight = time.mktime(time.localtime()[:3] + (0, 0, 0, 0, 0, -1))
     out = {a['key']: 0 for a in ACCOUNTS}
     for _t, accts in delivery_log().items():
         for key, rec in accts.items():
-            if rec.get('published') and (rec.get('published_at') or 0) >= midnight:
+            if not rec.get('published'):
+                continue
+            when = max(rec.get('published_at') or 0, rec.get('last_out') or 0)
+            if when >= midnight:
                 out[key] = out.get(key, 0) + 1
     return out
 
@@ -207,24 +228,48 @@ def account_summary():
 
 
 def active_runs():
-    """Every background job still going, so the header can show all of them."""
+    """Every background job still going, plus anything that just failed.
+
+    A failed job used to simply leave the list, and the page reads a job that
+    disappeared as one that finished — so a redo that died on a usage limit
+    showed a green tick for six seconds and then nothing at all. A failure has
+    to outlive the run that caused it.
+    """
     runs = []
+    # A day, not a few hours: a run that dies overnight on a usage limit is
+    # exactly the one you find out about in the morning.
+    recent = time.time() - 36 * 3600
     for label, items in (('build', build_queue()), ('redo', redo_queue()),
-                         ('replicate', replicate_queue())):
+                         ('replicate', replicate_queue()), ('gen', gen_queue())):
         for x in items:
-            if x.get('status') in ('queued', 'running'):
+            bad = (x.get('status') in ('failed', 'interrupted')
+                   and (x.get('finished') or x.get('at') or 0) > recent
+                   and not x.get('dismissed'))
+            if x.get('status') in ('queued', 'running') or bad:
                 if label == 'build':
                     what = '%d post%s' % (x['count'], '' if x['count'] == 1 else 's')
                 elif label == 'redo':
-                    ns = x.get('slides') or [x.get('slide')]
-                    what = '%s slide%s %s' % (x['topic'], '' if len(ns) == 1 else 's',
-                                              ', '.join(str(n) for n in ns))
+                    ns = [n for n in (x.get('slides') or [x.get('slide')]) if n]
+                    # No slides picked is now the normal case: the complaint
+                    # decides which, so the label says the post, not "slide None".
+                    what = ('%s slide%s %s' % (x['topic'], '' if len(ns) == 1 else 's',
+                                               ', '.join(str(n) for n in ns))
+                            if ns else 'redoing %s' % x['topic'])
+                elif label == 'gen':
+                    what = ('writing hooks' if x.get('what') == 'hooks'
+                            else 'writing the post' if x.get('what') == 'post'
+                            else 'writing %s' % (x.get('tool') or 'a slide'))
                 else:
                     what = 'replicating %s' % x['from']
+                log = str(x.get('log') or '')
                 runs.append({'kind': label, 'what': what,
                              'topic': x.get('topic') or x.get('from'),
                              'mode': x.get('mode'),
                              'status': x.get('status', 'queued'),
+                             'at': x.get('at'),
+                             # The first line of the log is the reason; the
+                             # rest is the agent thinking aloud.
+                             'why': log.strip().split('\n')[0][:160] if bad else None,
                              # only a running job has an elapsed time worth
                              # showing; a queued one has not begun
                              'started': x.get('started') if x.get('status') == 'running' else None,
@@ -341,6 +386,14 @@ def list_posts():
             'mtime': (st.get(topic, {}).get('built_at')
                       or os.path.getmtime(os.path.join(d, slides[0]))),
             'delivery': log.get(topic, {}),
+            # How this post is tied to what is live: by an id TikTok gave us,
+            # by an id we read off its url, or only by its caption — which is
+            # the one that breaks when a caption is edited.
+            'ident': {a['key']: (
+                'tiktok' if (log.get(topic, {}).get(a['key']) or {}).get('video_id')
+                else 'id' if ((stats.get(topic) or {}).get(a['key']) or {}).get('id')
+                else 'caption' if ((stats.get(topic) or {}).get(a['key']))
+                else None) for a in ACCOUNTS},
             'liked': bool(fb.get(topic, {}).get('liked')),
             'days_since': _days_since_published(log.get(topic, {})),
             'stats': stats.get(topic),
@@ -770,7 +823,26 @@ def sync_account(key):
                 topic_of[vid] = t
                 claimed.add((t, key))
 
+        # Reposting is a button in this dashboard, so the same post really can
+        # be live twice on one account. Those extra runs used to match nothing
+        # and surface as separate untracked rows — the same slides, the same
+        # caption, three more lines in the list.
+        reruns = {}
         for v in data['videos']:
+            vid = str(v.get('id') or '')
+            if vid in topic_of:
+                continue
+            cap = _norm(v.get('video_description') or v.get('title'))
+            for t in (by_caption.get(cap) or by_body.get(_body(cap)[:120]) or []):
+                if (t, key) in claimed:
+                    topic_of[vid] = t
+                    reruns.setdefault((t, key), []).append(v)
+                    break
+
+        rerun_ids = {str(e.get('id')) for lst in reruns.values() for e in lst}
+        for v in data['videos']:
+            if str(v.get('id') or '') in rerun_ids:
+                continue                       # folded in below, not its own cell
             topic = topic_of.get(str(v.get('id') or ''))
             # Pins keep untracked posts stable across syncs, but they are not
             # matches: counting them would report 59/59 for an account where
@@ -824,12 +896,9 @@ def sync_account(key):
                     stats.pop(ph, None)
                     unmatched.pop(ph, None)
             stats.setdefault(topic, {})[key] = dict(
-                point,
-                id=str(v.get('id') or '') or None,
-                url=v.get('share_url'),
-                cover=v.get('cover_image_url'),
-                posted_at=v.get('create_time'), synced=time.time(),
-            )
+                point, id=str(v.get('id') or '') or None,
+                url=v.get('share_url'), cover=v.get('cover_image_url'),
+                posted_at=v.get('create_time'), synced=time.time())
             acc = log.setdefault(topic, {})
             rec = acc.get(key)
             if rec is None:
@@ -858,6 +927,41 @@ def sync_account(key):
             elif best >= PERFORMING_VIEWS and not fb.get(topic, {}).get('liked'):
                 fb.setdefault(topic, {}).update({'liked': True, 'at': time.time(),
                                                  'by': 'sync'})
+        # One row per post, carrying what every run of it earned. A repost is
+        # the same post reaching more people, not a different post.
+        FIELDS = (('views', 'view_count'), ('likes', 'like_count'),
+                  ('comments', 'comment_count'), ('shares', 'share_count'))
+        for (topic, k), extra in reruns.items():
+            cell = (stats.get(topic) or {}).get(k)
+            if not cell:
+                continue
+            for e in extra:
+                for ours, theirs in FIELDS:
+                    cell[ours] = (cell.get(ours) or 0) + (e.get(theirs) or 0)
+            cell['runs'] = [{'id': str(e.get('id')), 'views': e.get('view_count', 0),
+                             'posted_at': e.get('create_time')} for e in extra]
+            # When it FIRST went out and when it was LAST out are different
+            # dates, and folding a repost into its original row kept only the
+            # first. A post reposted today then sorted to nine days ago and
+            # looked like sync had missed it. posted_at stays the first
+            # outing, because that is what the analytics cohorts count; this
+            # is what the Published list sorts and dates by.
+            cell['last_out'] = max([cell.get('posted_at') or 0]
+                                   + [e.get('create_time') or 0 for e in extra])
+            rec = (log.get(topic) or {}).get(k)
+            if rec:
+                rec['last_out'] = cell['last_out']
+            # A run folded into a post must stop existing as its own orphan,
+            # or the row it was meant to replace stays in the list.
+            for e in extra:
+                ph = 'tiktok:' + str(e.get('id'))
+                if ph in stats:
+                    stats[ph].pop(k, None)
+                    if not stats[ph]:
+                        stats.pop(ph, None)
+                        unmatched.pop(ph, None)
+            print('[sync] %s/%s: folded in %d repost(s)' % (topic, k, len(extra)), flush=True)
+
         save_log(log)
         with open(STATS, 'w') as fh:
             json.dump(stats, fh, indent=1, ensure_ascii=False)
@@ -925,6 +1029,150 @@ def sync_all():
 PERIODS = {'1': 1, '7': 7, '28': 28, '60': 60, '365': 365}
 
 
+# ---------------------------------------------------------------- Konvo
+# The other app. Same person shipping it, so it lives behind a toggle here
+# rather than in a second dashboard nobody would open.
+#
+# Everything comes from PostHog. The key is a personal read key kept outside
+# any repo, and this server only ever binds to localhost, so it never leaves
+# the machine.
+
+KONVO_PH_KEY = os.path.expanduser('~/.posthog_key')
+KONVO_PH_PROJECT = '261232'
+KONVO_PH_HOST = 'https://eu.posthog.com'
+
+
+def _konvo_key():
+    try:
+        with open(KONVO_PH_KEY) as fh:
+            k = fh.read().strip()
+        return k if k.startswith('phx_') else None
+    except OSError:
+        return None
+
+
+def _konvo_ssl():
+    """A verifying context that works on a stock macOS python.
+
+    The python here has no CA bundle of its own, so the default context fails
+    every HTTPS call with CERTIFICATE_VERIFY_FAILED. macOS ships a perfectly
+    good bundle; point at it rather than adding a dependency or, worse,
+    turning verification off.
+    """
+    for path in ('/etc/ssl/cert.pem', '/private/etc/ssl/cert.pem'):
+        if os.path.exists(path):
+            return ssl.create_default_context(cafile=path)
+    return ssl.create_default_context()
+
+
+def _konvo_query(sql, timeout=55):
+    """One HogQL query. Returns rows, or raises with something readable."""
+    key = _konvo_key()
+    if not key:
+        raise RuntimeError('no PostHog key at ~/.posthog_key')
+    body = json.dumps({'query': {'kind': 'HogQLQuery', 'query': sql}}).encode()
+    req = urllib.request.Request(
+        f'{KONVO_PH_HOST}/api/projects/{KONVO_PH_PROJECT}/query/',
+        data=body, method='POST',
+        headers={'Authorization': f'Bearer {key}',
+                 'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=timeout, context=_konvo_ssl()) as r:
+        return json.loads(r.read().decode()).get('results', [])
+
+
+# The 21 onboarding screens, in the order the app shows them. Kept here so the
+# funnel reads in order even on a day when a step got no views at all: a step
+# missing from the chart looks like a step nobody reached, which is a very
+# different thing from a step nobody saw.
+KONVO_STEPS = [
+    'welcome', 'name', 'age', 'gender', 'behaviorChat', 'analysis', 'pattern',
+    'whyItHappens', 'personalizedPlan', 'demo', 'yourScore', 'reviewAsk',
+    'dailyTime', 'notifications', 'priceAnchor', 'trialReminder', 'paywall',
+]
+
+
+def konvo(days=14, version=None):
+    """Everything the Konvo tab draws, in one call.
+
+    Version matters more than it looks. Until 1.1 shipped, the only builds
+    carrying PostHog were the ones running on this machine during development,
+    so the whole project was full of simulator launches that looked exactly
+    like users. The version picker is how you keep those apart, and the default
+    is whichever version the most people are on.
+    """
+    win = f'timestamp > now() - INTERVAL {int(days)} DAY'
+    out = {'days': int(days), 'error': None, 'slow': []}
+
+    def section(name, fn, default):
+        """Each panel survives its own failure.
+
+        Six queries ran in sequence and any one of them timing out returned an
+        error page with nothing on it, which is a poor trade when five of the
+        six had already come back.
+        """
+        try:
+            return fn()
+        except Exception as exc:                  # noqa: BLE001 - surfaced in the UI
+            out['slow'].append(f'{name}: {str(exc)[:60]}')
+            return default
+
+    try:
+        vers = section('versions', lambda: _konvo_query(
+            "SELECT properties.$app_version AS v, properties.$app_build AS b, "
+            "uniq(person_id) AS people, max(timestamp) AS last "
+            f"FROM events WHERE {win} AND v != '' "
+            "GROUP BY v, b ORDER BY people DESC LIMIT 12"), [])
+        out['versions'] = [{'version': v, 'build': b, 'people': p,
+                            'last': str(l)[:16]} for v, b, p, l in vers]
+        if not version and vers:
+            version = f'{vers[0][0]}|{vers[0][1]}'
+        out['version'] = version
+
+        vfilter = ''
+        if version and '|' in version:
+            vv, bb = version.split('|', 1)
+            vv = vv.replace("'", ""); bb = bb.replace("'", "")
+            vfilter = f"AND properties.$app_version = '{vv}' AND properties.$app_build = '{bb}'"
+
+        steps = dict()
+        for idx, step, people in section('funnel', lambda: _konvo_query(
+                "SELECT toInt(properties.step_index) AS idx, any(properties.step) AS step, "
+                "uniq(person_id) AS people FROM events "
+                f"WHERE event = 'onboarding_step_viewed' AND {win} {vfilter} "
+                "GROUP BY idx ORDER BY idx"), []):
+            steps[int(idx)] = (step, people)
+        top = max([p for _, p in steps.values()] or [0])
+        out['funnel'] = [{
+            'index': i, 'step': KONVO_STEPS[i] if i < len(KONVO_STEPS) else str(i),
+            'people': steps.get(i, (None, 0))[1],
+            'pct': round(100.0 * steps.get(i, (None, 0))[1] / top, 1) if top else 0.0,
+        } for i in range(len(KONVO_STEPS))]
+
+        out['events'] = [{'event': e, 'people': p, 'count': c} for e, p, c in section(
+            'events', lambda: _konvo_query(
+                "SELECT event, uniq(person_id) AS people, count() AS n FROM events "
+                f"WHERE {win} {vfilter} GROUP BY event ORDER BY people DESC LIMIT 30"), [])]
+
+        out['daily'] = [{'day': str(d), 'people': p} for d, p in section(
+            'daily', lambda: _konvo_query(
+                "SELECT toDate(timestamp) AS d, uniq(person_id) AS people FROM events "
+                f"WHERE event = 'Application Installed' AND {win} GROUP BY d ORDER BY d"), [])]
+
+        out['countries'] = [{'country': c or 'unknown', 'people': p} for c, p in section(
+            'countries', lambda: _konvo_query(
+                "SELECT properties.$geoip_country_name AS c, uniq(person_id) AS people "
+                f"FROM events WHERE {win} {vfilter} GROUP BY c ORDER BY people DESC LIMIT 10"), [])]
+
+        out['failures'] = [{'endpoint': e, 'count': n, 'people': p} for e, n, p in section(
+            'failures', lambda: _konvo_query(
+                "SELECT properties.endpoint AS e, count() AS n, uniq(person_id) AS people "
+                f"FROM events WHERE event = 'api_call_failed' AND {win} "
+                "GROUP BY e ORDER BY n DESC LIMIT 10"), [])]
+    except Exception as exc:                      # noqa: BLE001 - shown in the UI
+        out['error'] = str(exc)[:300]
+    return out
+
+
 def analytics(period='7', only=None, frm=None, to=None):
     """Everything the Analytics tab needs, computed here rather than in JS.
 
@@ -977,11 +1225,24 @@ def analytics(period='7', only=None, frm=None, to=None):
             'promoted': topic in promoted,
             'title': (idx.get(topic) or {}).get('title', '')
                      or (untracked.get(topic) or {}).get('caption', ''),
+            # A video we cannot tie to a post has no slug, and forty
+            # characters of its caption is not a name — it wraps, it collides
+            # with the next row's, and two different posts can open the same
+            # way. A short slug from its opening words reads like every other
+            # row and still says which post it is.
+            'name': topic if not topic.startswith('tiktok:')
+                    else _slugish((untracked.get(topic) or {}).get('caption', ''),
+                                  topic),
             'cells': cells,
             'likes': {k: (per.get(k) or {}).get('likes') for k in keys},
             'comments': {k: (per.get(k) or {}).get('comments') for k in keys},
             'shares': {k: (per.get(k) or {}).get('shares') for k in keys},
             'at': {k: (per.get(k) or {}).get('posted_at') for k in keys},
+            # First out and last out are different dates once a post has been
+            # reposted, and "the posts I put out today" means the second one.
+            'out': {k: max((per.get(k) or {}).get('posted_at') or 0,
+                           (per.get(k) or {}).get('last_out') or 0) or None
+                    for k in keys},
             'urls': {k: (per.get(k) or {}).get('url') for k in keys},
             'best': max(vals), 'worst': min(vals),
             'spread': round(max(vals) / max(1, min(vals)), 1),
@@ -1199,6 +1460,15 @@ def _top_per_account(rows, keys):
     return out
 
 
+def _slugish(caption, fallback):
+    """A short, slug-shaped name from a caption's opening words."""
+    words = re.findall(r"[a-z0-9']+", (caption or '').lower())
+    drop = {'the', 'a', 'an', 'and', 'of', 'to', 'in', 'is', 'it', 'my', 'i',
+            'for', 'on', 'that', 'this', 'with', 'you', 'your'}
+    keep = [w for w in words if w not in drop][:3] or words[:3]
+    return '-'.join(keep) or fallback[-8:]
+
+
 def _published_cohort(rows, flat, lo, hi, keys):
     """Posts whose publish date falls in the window, with totals to date.
 
@@ -1217,7 +1487,8 @@ def _published_cohort(rows, flat, lo, hi, keys):
 
     out = []
     for r in rows:
-        ats = {k: t for k, t in r['at'].items() if t and lo <= t < hi}
+        when = r.get('out') or r['at']
+        ats = {k: t for k, t in when.items() if t and lo <= t < hi}
         if not ats:
             continue
         tot = {m: sum((r[m].get(k) or 0) for k in ats)
@@ -1330,6 +1601,14 @@ def run_draft(topic, keys):
         results[key] = {'status': status, 'detail': detail, 'at': time.time()}
         if m:
             results[key]['publish_id'] = m.group(1)
+        elif status == 'SENT':
+            # A send with no id means this post can only ever be found again by
+            # its caption, which is the thing that keeps breaking. Say so on
+            # the send rather than discovering it weeks later in the numbers.
+            results[key]['detail'] = (detail + ' · no publish_id captured, so '
+                                      'this one falls back to caption matching').strip(' ·')
+            print('[draft] %s %s: NO publish_id in autopost output' % (topic, key),
+                  flush=True)
         print(f'[draft] {topic} {key}: {status} {detail[:80]}', flush=True)
     with _lock:
         log = delivery_log()
@@ -1362,6 +1641,265 @@ def build_queue():
 def save_builds(q):
     with open(BUILD, 'w') as fh:
         json.dump(q, fh, indent=1, ensure_ascii=False)
+
+
+GEN = os.path.join(REPO, 'tools', 'gen_queue.json')
+GEN_OUT = os.path.join(REPO, 'tools', '.gen')
+
+
+def gen_queue():
+    return load(GEN, [])
+
+
+def save_gen(q):
+    # Only the last fifty. These are drafts of two lines, not history.
+    with open(GEN, 'w') as fh:
+        json.dump(q[-50:], fh, indent=1, ensure_ascii=False)
+
+
+GEN_HOOKS_PROMPT = """Write {n} candidate hooks for the {pillar} pillar of Thinh's TikTok account. Work in {repo}.
+
+Read ~/.claude/skills/tiktok-pipeline/content.md, the "Copy rules" section, and
+examples.md. The register there is the target and it is not negotiable: quiet,
+lowercase, a stated result, no founder framing, no rhetorical questions, no
+vague teases. A hook that could be about anything is not a hook.
+
+Two lines, each under 42 characters, because they are set in SF Bold 74 on a
+1080 canvas and are never shrunk. The break between the lines is a real
+decision: line one sets up, line two lands the result.
+
+These already exist — write nothing close to them:
+{existing}
+
+{ask}
+Write ONLY this JSON to {out} and nothing else:
+{{"hooks": [{{"lines": ["first line", "second line"]}}, ...]}}
+Then print DONE. Do not render slides, do not touch hook_pool.json, do not
+commit. This is a list of candidates for Thinh to choose from.
+"""
+
+GEN_SLIDE_PROMPT = """Write the copy for ONE slide of a TikTok carousel. Work in {repo}.
+
+Read ~/.claude/skills/tiktok-pipeline/content.md first — the copy rules there
+are what this is judged against.
+
+The post: {pillar} pillar, hook "{hook}".
+{about}
+
+What the other slides already say, so this one does not repeat them:
+{others}
+
+Rules for this slide, all of which compose enforces at render time:
+- Two body lines. The first is the MECHANISM — what the thing actually does.
+  The second is the CONSEQUENCE — what that gets you, concretely. Never a
+  verdict, never an adjective doing the work of a claim.
+- It must ANSWER THE HOOK. If the slide would sit unchanged under a different
+  hook, it is not answering this one.
+- The claim must be a real capability, not an invention.
+- First person ("I use this every day") ONLY for tools Thinh actually uses:
+  Claude, Codex, ARCO, GitHub, Notion, Obsidian, ClickUp, Google Calendar,
+  Endel, Higgsfield, RevenueCat, Shopify, OpenClaw. Everything else gets the
+  neutral teaching voice.
+- Sentence case. Roughly 34 characters a line; a title over about 22 characters
+  gets shrunk, so keep it short.
+
+Write ONLY this JSON to {out} and nothing else:
+{{"title": "the slide's heading", "lines": ["mechanism", "consequence"]}}
+Then print DONE. Do not render anything, do not write to hooks.json, do not
+commit. Thinh is composing the post and this is one field in it.
+"""
+
+
+GEN_POST_PROMPT = """Write the copy for the slides of ONE TikTok carousel that are still blank. Work in {repo}.
+
+Read ~/.claude/skills/tiktok-pipeline/content.md first — the copy rules there
+are what this is judged against — and examples.md for the register.
+
+The post: {pillar} pillar, hook "{hook}".
+
+Here is the whole post. Slides marked WRITE THIS are the ones to fill; the
+rest are Thinh's and are shown so the ones you write do not repeat them and
+do read as one post rather than five unrelated cards:
+{plan}
+
+For every slide you write:
+- Two body lines. The first is the MECHANISM — what the thing actually does.
+  The second is the CONSEQUENCE — what that gets you, concretely. Never a
+  verdict, never an adjective doing the work of a claim.
+- It must ANSWER THE HOOK. If a slide would sit unchanged under a different
+  hook, it is not answering this one.
+- The claim must be a real capability, not an invention.
+- First person ("I use this every day") ONLY for tools Thinh actually uses:
+  Claude, Codex, ARCO, GitHub, Notion, Obsidian, ClickUp, Google Calendar,
+  Endel, Higgsfield, RevenueCat, Shopify, OpenClaw. Everything else gets the
+  neutral teaching voice.
+- No two slides may teach the same thing, and none may repeat a teaching
+  point already used in a tools/hooks.json caption.
+- Sentence case, roughly 34 characters a line. A title over about 22
+  characters gets shrunk, so keep titles short.
+
+Write ONLY this JSON to {out} and nothing else, one entry per slide you were
+asked to write, using the slide numbers above:
+{{"slides": [{{"n": 2, "title": "...", "lines": ["mechanism", "consequence"]}}, ...]}}
+Then print DONE. Do not render anything, do not write to hooks.json, do not
+commit. Thinh is composing this post and these are fields in it.
+"""
+
+
+def _gen_clean(job, data):
+    """Keep what the agent returned only if it is the shape that was asked for.
+
+    A generator that quietly returns something else fills the composer with
+    fields nobody checked. Better to fail the run and say so.
+    """
+    if job['what'] == 'hooks':
+        out = []
+        for h in (data.get('hooks') or [])[:8]:
+            lines = [str(x).strip().lower() for x in (h.get('lines') or []) if str(x).strip()]
+            if len(lines) != 2 or any(len(l) > 42 for l in lines):
+                continue
+            # The pool decides what counts as the same hook; reuse that rather
+            # than a second opinion about it.
+            if hook_rules.parent(lines):
+                continue
+            out.append({'lines': lines, 'pillar': job.get('pillar')})
+        return {'hooks': out} if out else None
+    if job['what'] == 'post':
+        out = []
+        for sl in (data.get('slides') or [])[:12]:
+            lines = [str(x).strip() for x in (sl.get('lines') or []) if str(x).strip()]
+            if len(lines) != 2:
+                continue
+            try:
+                n = int(sl.get('n'))
+            except (TypeError, ValueError):
+                continue
+            out.append({'n': n, 'title': str(sl.get('title') or '').strip(),
+                        'lines': lines})
+        return {'slides': out} if out else None
+    lines = [str(x).strip() for x in (data.get('lines') or []) if str(x).strip()]
+    if len(lines) != 2:
+        return None
+    return {'title': str(data.get('title') or '').strip(), 'lines': lines}
+
+
+def run_gen(job):
+    def mark(**kw):
+        with _lock:
+            q = gen_queue()
+            for x in q:
+                if x['at'] == job['at']:
+                    x.update(kw)
+            save_gen(q)
+
+    os.makedirs(GEN_OUT, exist_ok=True)
+    out_file = os.path.join(GEN_OUT, '%s.json' % str(job['at']).replace('.', '_'))
+    if job['what'] == 'hooks':
+        el = hook_rules.pool()
+        existing = '\n'.join('  "%s" / "%s"' % (h['lines'][0], h['lines'][1])
+                              for h in el if h.get('pillar') == job.get('pillar'))
+        prompt = GEN_HOOKS_PROMPT.format(
+            n=job.get('n', 5), pillar=job.get('pillar', 'tools'), repo=REPO,
+            existing=existing or '  (none yet for this pillar)',
+            ask=('Thinh asked for: %s\n' % job['note']) if job.get('note') else '',
+            out=out_file)
+    elif job['what'] == 'post':
+        prompt = GEN_POST_PROMPT.format(
+            repo=REPO, pillar=job.get('pillar', 'tools'),
+            hook=job.get('hook') or '(not chosen yet — write to the pillar)',
+            plan=job.get('plan') or '  (nothing yet)', out=out_file)
+    else:
+        about = (('This slide is about %s. Use its real name as the title.'
+                  % job['tool']) if job.get('tool')
+                 else ('This slide is point %d of the post — a step or reason '
+                       'that answers the hook, not a tool.' % job.get('n', 2)))
+        if job.get('note'):
+            about += '\nThinh asked for: %s' % job['note']
+        prompt = GEN_SLIDE_PROMPT.format(
+            repo=REPO, pillar=job.get('pillar', 'tools'),
+            hook=job.get('hook') or '(not chosen yet — write to the pillar)',
+            about=about, others=job.get('others') or '  (nothing yet)',
+            out=out_file)
+
+    def check(out, good):
+        if not good:
+            return good, out
+        try:
+            with open(out_file) as fh:
+                data = json.load(fh)
+        except Exception as exc:
+            return False, 'it said DONE but wrote no usable JSON: %s' % exc
+        clean = _gen_clean(job, data)
+        if not clean:
+            return False, 'what it wrote was not the shape asked for'
+        mark(result=clean)
+        return True, out
+
+    _agent(prompt, mark, 'DONE', kind='gen', job=job, check=check)
+
+
+def spec_brief(spec):
+    """Turn the composed post into instructions, slide by slide.
+
+    A sentence in a textarea was the only way to reach the build path, so
+    every choice arrived as prose an agent had to interpret — and the parts
+    it interpreted loosely are the parts that came back wrong. A slide he
+    filled in is a slide the agent renders; a slide he left blank is a slide
+    it writes. Nothing in between.
+    """
+    if not spec:
+        return ''
+    slides = spec.get('slides') or []
+    out = []
+    hook = next((sl for sl in slides if sl.get('kind') == 'hook'), None)
+    if hook:
+        lines = [l for l in (hook.get('lines') or []) if str(l).strip()]
+        if lines:
+            out.append('HOOK — use this one, exactly as written. Do not reword '
+                       'it and do not pick another:\n  "%s"\n  "%s"\n'
+                       'It is in tools/hook_pool.json. Call '
+                       'compose.mark_hook_used(HOOK, TOPIC) once the post is saved.'
+                       % (lines[0], lines[1] if len(lines) > 1 else ''))
+    body = []
+    for i, sl in enumerate(slides):
+        n = i + 1
+        kind = sl.get('kind')
+        bits = []
+        if sl.get('bg'):
+            bits.append('background %s' % sl['bg'])
+        if kind == 'hook':
+            bits.append('the hook slide')
+        elif kind == 'cta':
+            bits.append('the closing card — compose.cta_slide, app icon and '
+                        'full store name')
+        elif sl.get('tool'):
+            bits.append('the tool is %s' % sl['tool'])
+        if sl.get('title'):
+            bits.append('title "%s"' % sl['title'])
+        copy = [l for l in (sl.get('lines') or []) if str(l).strip()]
+        if copy and kind != 'hook':
+            bits.append('body:\n' + '\n'.join('      - %s' % l for l in copy))
+        if not bits:
+            bits.append('yours to fill in under the usual rules')
+        elif kind != 'hook' and not copy:
+            bits.append('the copy is yours to write')
+        body.append('  slide %d: %s' % (n, '; '.join(bits)))
+    if body:
+        out.append('SLIDES — this is the post, in this order. Where he named a '
+                   'background use that file and do not substitute; where he '
+                   'wrote copy keep his words and his order, tightening only a '
+                   'line that will not fit; where a slide is blank, write it:\n'
+                   + '\n'.join(body)
+                   + '\nRender exactly %d slide%s.'
+                     % (len(body), '' if len(body) == 1 else 's'))
+    if (spec.get('caption') or '').strip():
+        out.append('CAPTION — write it around this angle: %s'
+                   % spec['caption'].strip())
+    if not out:
+        return ''
+    return ('Thinh composed this post in the dashboard. Everything below is '
+            'decided — follow it exactly. Anything he left open, choose under '
+            'the usual rules.\n\n' + '\n\n'.join(out) + '\n')
 
 
 BUILD_PROMPT = """Build {count} new {pillar} post(s) for the TikTok pipeline. Work in {repo}.
@@ -1447,13 +1985,17 @@ checked after you finish, so skipping it fails the run rather than passing it.
 REDO_PROMPT = """Fix specific slides in an existing TikTok carousel. Work in {repo}.
 
 Post: {topic}
-Slides to fix: {slides}
+{slides}
 What Thinh says is wrong:
 {note}
 
 1. Find tools/gen-*.py referencing '{topic}'. That file is the spec.
-2. Fix EVERY slide listed above in this one run. Change nothing else: the
-   slides not listed must come out byte-identical.
+2. Fix it in this one run, and change NOTHING else — every slide you do not
+   have to touch must come out byte-identical. If the complaint names slides,
+   those are the slides. If it does not, read the post and work out which
+   slides it is actually about, then say which you chose and why. Fixing more
+   than the complaint asks for is the failure here: a re-render that quietly
+   rewrites a slide he was happy with costs him the version he liked.
 3. Re-render each listed slide through the same compose helper, writing to
    drafts/{topic}/<NN>.jpg, and read each JPG back to confirm the complaint is
    actually fixed.
@@ -1539,6 +2081,494 @@ Finish by printing: BUILT <topic>
 # also pick hooks and backgrounds from state the other has not written yet, so
 # running them in parallel breaks the cooldowns as well as the bookkeeping.
 _agent_gate = threading.Semaphore(1)
+AGENT_LOGS = os.path.join(REPO, 'tools', '.agent-logs')
+
+
+def _alive(pid):
+    """True if pid is still one of our claude runs, not a recycled number."""
+    try:
+        os.kill(int(pid), 0)
+    except (OSError, TypeError, ValueError):
+        return False
+    try:
+        cmd = subprocess.run(['ps', '-p', str(int(pid)), '-o', 'command='],
+                             capture_output=True, text=True, timeout=10).stdout
+    except Exception:
+        return True                    # it answered kill(0); believe that
+    return 'claude' in cmd
+
+
+def _agent_log(kind, at):
+    """Where one run's output goes, plus a prune so these do not pile up."""
+    os.makedirs(AGENT_LOGS, exist_ok=True)
+    try:
+        old = sorted(os.path.join(AGENT_LOGS, f) for f in os.listdir(AGENT_LOGS)
+                     if f.endswith('.log'))
+        for f in old[:-60]:
+            os.remove(f)
+    except Exception:
+        pass
+    return os.path.join(AGENT_LOGS, '%s-%s.log' % (kind, str(at).replace('.', '_')))
+
+
+def _read_log(path):
+    try:
+        with open(path, 'rb') as fh:
+            return fh.read().decode('utf-8', 'replace').strip()
+    except Exception:
+        return ''
+
+
+def ensure_tag(topic):
+    """Put the search tag on a caption that is missing it.
+
+    Every post needs it and the agents mostly remember. Mostly is not a
+    guarantee: a run that rendered six good slides died on the one word it
+    forgot. Writing the word is cheaper than throwing the run away, so the
+    guard below is now a backstop rather than the enforcement.
+    """
+    try:
+        idx, raw = hooks_index()
+    except Exception:
+        return False
+    rec = idx.get(topic)
+    if not rec:
+        return False
+    cap = (rec.get('caption') or '').strip()
+    if not cap or REQUIRED_TAG.lower() in cap.lower():
+        return False
+    rec['caption'] = cap + ' ' + REQUIRED_TAG
+    with _lock:
+        with open(HOOKS, 'w') as fh:
+            json.dump(raw, fh, indent=1, ensure_ascii=False)
+    return True
+
+
+def _post_check(topic):
+    """A build that rendered slides and skipped the caption is not done."""
+    def check(out, good):
+        if not good:
+            return good, out
+        built = re.search(r'BUILT\s+([a-z0-9][a-z0-9-]*)', out)
+        name = built.group(1) if built else topic
+        if name:
+            ensure_tag(name)
+        why = (unregistered(name) if name else '') or unpushed()
+        if why:
+            return False, ('Slides built, but %s: %s.\n\n%s'
+                           % (name or 'the run', why, out[-900:]))
+        return True, out
+    return check
+
+
+def _build_check(out, good):
+    """Same, for a batch: any one post missing its caption fails the run."""
+    if not good:
+        return good, out
+    made = set(re.findall(r'BUILT\s+([a-z0-9][a-z0-9-]*)', out))
+    for t in made:
+        ensure_tag(t)
+    broken = [t for t in made if unregistered(t)]
+    push = unpushed()
+    if not (broken or push):
+        return True, out
+    why = []
+    if broken:
+        why.append('No caption on: ' + ', '.join(sorted(broken))
+                   + '. They cannot be delivered until hooks.json has one.')
+    if push:
+        why.append(push.capitalize() + '.')
+    return False, ' '.join(why) + '\n\n' + out[-900:]
+
+
+# The hooks Thinh calibrated as good on 2026-08-25, which live in the skill as
+# prose examples and nowhere the UI can reach. Offered as suggestions minus
+# anything already pooled: writing a hook from a blank box is the hardest part
+# of a post, and his own approved register is the right thing to start from.
+CALIBRATED = [
+    ('tools', 'the 5 apps i would keep', 'if i had to delete everything'),
+    ('tools', 'i pay for 12 apps', 'these 5 do all the work'),
+    ('tools', 'the tools i use to do', 'a full day of work by noon'),
+    ('tools', '5 apps i wish someone', 'showed me at 17'),
+    ('screentime', 'i cut 3 hours of screen time', 'without deleting one app'),
+    ('screentime', 'my phone is boring now', 'and it changed everything'),
+    ('screentime', 'how i stopped picking up my phone', 'the second i wake up'),
+    ('screentime', '47 minutes a day', 'this is the whole system'),
+    ('discipline', 'this is how you lock in', "when you don't feel like it"),
+    ('discipline', 'discipline is a schedule', 'not a personality'),
+    ('discipline', 'how i stopped needing', 'motivation to start'),
+    ('discipline', 'the 4 hours', 'that decide your whole day'),
+    ('build', 'how i ship in a weekend', 'what used to take a month'),
+    ('build', 'everything i run', 'my business on at 19'),
+    ('build', 'one person, no team', 'this is the setup'),
+    ('build', "give me seven days", "and i'd build it like this"),
+    ('learn', 'how i study 4 hours', 'without touching my phone'),
+    ('learn', 'the study setup that got me', 'through exam season'),
+    ('learn', 'i stopped rereading notes', 'and my grades moved'),
+    ('learn', '4 study apps', 'that actually did something'),
+]
+
+
+def hook_suggestions():
+    """Calibrated hooks that are not in the pool yet."""
+    # hook_rules.parent already decides when two hooks are the same hook —
+    # it is what compose uses to accept a rewording. Reusing it means the
+    # gallery cannot drift from the rule it is meant to reflect, and a
+    # differently-broken or slightly reworded line does not come back as new.
+    return [{'lines': [a, b], 'pillar': pillar} for pillar, a, b in CALIBRATED
+            if hook_rules.parent([a, b]) is None]
+
+
+_users_cache = {'at': 0, 'days': 0, 'data': None}
+
+
+def _https():
+    """A verifying SSL context that works on a python.org framework build.
+
+    Those builds do not read the system keychain, so urlopen fails every
+    HTTPS call with CERTIFICATE_VERIFY_FAILED until someone runs Install
+    Certificates.command. certifi is already a dependency of the pipeline;
+    if it is missing the default context still verifies, it just may not
+    find a root here.
+    """
+    import ssl
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
+def user_summary(days=30):
+    """What the app's own users are doing, from the metrics worker.
+
+    Read through a short cache: the numbers move once a day per install, so
+    hitting the worker on every page load would be a request per refresh for
+    data that cannot have changed.
+    """
+    if not METRICS_URL or not METRICS_KEY:
+        return {'off': True, 'why': 'Set ARCO_METRICS_URL and ARCO_METRICS_KEY '
+                                   'to the deployed metrics worker.'}
+    now = time.time()
+    if (_users_cache['data'] and _users_cache['days'] == days
+            and now - _users_cache['at'] < 600):
+        return dict(_users_cache['data'], cached=True)
+    url = '%s/summary?days=%d&k=%s' % (METRICS_URL, days,
+                                       urllib.parse.quote(METRICS_KEY))
+    # Cloudflare turns away the default Python-urllib agent with its own 403
+    # (error 1010, a browser-signature block), which reads exactly like a bad
+    # read key and is not one.
+    req = urllib.request.Request(url, headers={'User-Agent': 'arco-dashboard/1'})
+    try:
+        with urllib.request.urlopen(req, timeout=25, context=_https()) as r:
+            data = json.load(r)
+    except Exception as exc:
+        # A stale answer beats an empty screen; the worker being unreachable
+        # is a fact about the worker, not about the app's users.
+        if _users_cache['data']:
+            return dict(_users_cache['data'], stale=True, why=str(exc))
+        return {'error': str(exc)}
+    _users_cache.update({'at': now, 'days': days, 'data': data})
+    return data
+
+
+def bg_catalog():
+    """The background pool as the gallery needs to see it.
+
+    Facts come from three places that nothing else joins up: .index.json for
+    what the photo is (vibe, person, luma), bg/hook_usage.json for whether it
+    has already opened a post, and bg_history.json for what the last post
+    used. Picking well needs all three at once — a beautiful frame you used
+    yesterday is the wrong pick, and the UI could not tell you that before.
+    """
+    try:
+        with open(BG_INDEX) as fh:
+            idx = json.load(fh)
+    except Exception:
+        return {'bgs': [], 'stale': True,
+                'why': 'no background index yet — run tools/bg_index.py'}
+    hook_used = set(load(os.path.join(BG_DIR, 'hook_usage.json'), []) or [])
+    hist = load(os.path.join(REPO, 'tools', 'bg_history.json'), []) or []
+    recent = set()
+    for entry in hist[-BG_COOLDOWN_POSTS:]:
+        recent.update(entry.get('bgs') or [])
+    for b in idx['bgs']:
+        b['hook_used'] = b['name'] in hook_used
+        b['recent'] = b['name'] in recent
+    on_disk = set(f for f in os.listdir(BG_DIR) if f.endswith('.jpg'))
+    known = set(b['name'] for b in idx['bgs'])
+    idx['bgs'] = [b for b in idx['bgs'] if b['name'] in on_disk]
+    idx['missing'] = sorted(on_disk - known)
+    # A photo he dropped into the pool since the last index has no luma and no
+    # vibe, so the gallery cannot say whether it holds copy. Measure it in the
+    # background rather than making him remember to run a script.
+    if idx['missing']:
+        threading.Thread(target=reindex_bgs, daemon=True).start()
+    idx['hook_left'] = len([b for b in idx['bgs'] if not b['hook_used']])
+    return idx
+
+
+_reindexing = threading.Lock()
+
+
+def reindex_bgs():
+    if not _reindexing.acquire(blocking=False):
+        return
+    try:
+        subprocess.run([sys.executable,
+                        os.path.join(REPO, 'tools', 'bg_index.py')],
+                       cwd=os.path.join(REPO, 'tools'), timeout=900,
+                       capture_output=True)
+    except Exception as exc:
+        print('[bg] reindex failed: %s' % exc, flush=True)
+    finally:
+        _reindexing.release()
+
+
+# One post, matching compose.BG_COOLDOWN: a photo may come back, it just must
+# not appear in the very next post.
+BG_COOLDOWN_POSTS = 1
+THUMB_W = 260
+
+
+def bg_thumb(name):
+    """A gallery-sized copy of one background, made once and kept.
+
+    The pool is 51MB. Eighty-three of those over a phone connection is not a
+    gallery, it is a download, so the grid gets 260px copies. PIL is the
+    pipeline's dependency, not the dashboard's, so if it is somehow absent
+    the full frame is served rather than nothing.
+    """
+    src = os.path.join(BG_DIR, os.path.basename(name))
+    if not os.path.isfile(src):
+        return None, None
+    dst = os.path.join(BG_THUMBS, os.path.basename(name))
+    if (os.path.isfile(dst)
+            and os.path.getmtime(dst) >= os.path.getmtime(src)):
+        with open(dst, 'rb') as fh:
+            return fh.read(), 'image/jpeg'
+    try:
+        from PIL import Image
+        os.makedirs(BG_THUMBS, exist_ok=True)
+        im = Image.open(src).convert('RGB')
+        im.thumbnail((THUMB_W, THUMB_W * 4), Image.LANCZOS)
+        im.save(dst, 'JPEG', quality=78, optimize=True)
+        with open(dst, 'rb') as fh:
+            return fh.read(), 'image/jpeg'
+    except Exception:
+        with open(src, 'rb') as fh:
+            return fh.read(), 'image/jpeg'
+
+
+# Tools that answer a different reader. The pool is a menu, not a target.
+OFF_LANE = {'seller'}
+LLM_NAMES = {'Claude', 'Codex', 'ChatGPT', 'Gemini', 'Perplexity', 'Manus',
+             'Antigravity', 'Cursor', 'Copilot', 'Grok', 'DeepSeek', 'v0',
+             'Lovable'}
+
+
+def _recent_bgs():
+    """What the last post used. A photo may come back, just not next."""
+    hist = load(os.path.join(REPO, 'tools', 'bg_history.json'), []) or []
+    return set(hist[-1].get('bgs') or []) if hist else set()
+
+
+def _tool_rank():
+    """Every pooled tool with how long ago it last appeared.
+
+    Reusing a tool is fine — the audience is not reading every post and a
+    stack that changes completely each time reads as invented. What this
+    buys is rotation: the one that has been rested longest comes up first,
+    so an autofilled roster is not the same five names every time.
+    """
+    hist = load(os.path.join(REPO, 'tools', 'tool_usage.json'), []) or []
+    last = {}
+    for i, entry in enumerate(hist):
+        for t in entry.get('tools') or []:
+            last[t] = i
+    return last, set(hist[-1].get('tools') or []) if hist else set()
+
+
+def autofill_bgs(slides, only=None):
+    """Choose the photos the way a build would, and say nothing about copy.
+
+    Every rule here is one compose enforces at render time: the hook gets a
+    frame nothing has opened with, body slides get one that holds five lines
+    of white text, no two neighbours share a vibe, at most one person in the
+    post, and nothing the last post used. Doing it here rather than in the
+    agent makes it instant and free — the picking was never the judgment
+    call, the words are.
+    """
+    cat = bg_catalog()
+    pool = cat.get('bgs') or []
+    if not pool:
+        return slides
+    recent = _recent_bgs()
+    keep = {i: sl.get('bg') for i, sl in enumerate(slides)
+            if sl.get('bg') and only is not None and i != only}
+    people = sum(1 for b in keep.values() if (next((x for x in pool if x['name'] == b), {}) or {}).get('person'))
+    out = []
+    for i, sl in enumerate(slides):
+        if i in keep:
+            out.append(keep[i])
+            continue
+        taken = set(x for x in out if x) | set(keep.values())
+        prev = out[-1] if out else None
+        nxt = keep.get(i + 1)
+        def vibe(n):
+            return (next((x for x in pool if x['name'] == n), {}) or {}).get('vibe')
+        cands = [b for b in pool
+                 if b['name'] not in taken
+                 and b['name'] not in recent
+                 and b['vibe'] != vibe(prev) and b['vibe'] != vibe(nxt)
+                 and (people < 1 or not b['person'])]
+        if i == 0:
+            # The first slide decides the scroll, so it must never look
+            # familiar: a frame nothing has opened with, and by preference a
+            # night desk, which is the note that slide wants and is barred
+            # from every other slide anyway.
+            fresh = [b for b in cands if not b['hook_used']] or cands
+            best = [b for b in fresh if b['hook_only']] or fresh
+        else:
+            best = [b for b in cands if b['copy_ok'] and not b['hook_only']]
+        if not best:
+            best = cands or [b for b in pool if b['name'] not in taken]
+        if not best:
+            out.append(None)
+            continue
+        pick = random.choice(best)
+        if pick['person']:
+            people += 1
+        out.append(pick['name'])
+    return out
+
+
+# Which readers each pillar is actually talking to. Rest time alone put a
+# background remover and a video generator in a post about productivity: both
+# were simply the tools rested longest. A roster has to answer the hook too.
+PILLAR_AUDIENCE = {
+    'tools': ('focus', 'build', 'any', 'content'),
+    'build': ('build', 'any', 'focus'),
+    'learn': ('focus', 'any', 'content'),
+    'discipline': ('focus', 'any'),
+    'screentime': ('focus', 'any'),
+}
+
+
+def autofill_roster(slides, pillar='tools'):
+    """ARCO first, exactly one model, then what fits the pillar and is rested."""
+    pool = load(os.path.join(REPO, 'tools', 'tool_pool.json'), {})
+    aud = pool.get('audience', {})
+    names = []
+    for cat, items in pool.items():
+        if cat.startswith('_') or cat in ('icons', 'audience') or not isinstance(items, list):
+            continue
+        names += items
+    names = [n for n in dict.fromkeys(names)
+             if aud.get(n) not in OFF_LANE and n in aud and n != 'ARCO']
+    last, in_last = _tool_rank()
+    want = PILLAR_AUDIENCE.get(pillar, PILLAR_AUDIENCE['tools'])
+    def fit(n):
+        tag = aud.get(n)
+        return want.index(tag) if tag in want else len(want)
+    # Fit to the pillar first, then rested longest — and shuffled inside each
+    # band, because strict ordering gave the same four names every time,
+    # which is the opposite of what rotation is for.
+    rested = sorted(names, key=lambda n: (fit(n), n in in_last, last.get(n, -1), n))
+    head, tail = rested[:14], rested[14:]
+    random.shuffle(head)
+    rested = head + tail
+    slots = [i for i, sl in enumerate(slides) if sl.get('kind') == 'tool']
+    out = dict((i, slides[i].get('tool')) for i in slots if slides[i].get('tool'))
+    if slots and not out.get(slots[0]):
+        out[slots[0]] = 'ARCO'
+    have = set(out.values())
+    # Exactly one model, never zero: zero reads as a post that skipped the
+    # thing everyone is actually curious about.
+    if not (have & LLM_NAMES):
+        # Rotate which model appears rather than always the same one: the
+        # rested half of them, picked at random.
+        llms = [n for n in rested if n in LLM_NAMES]
+        llm = random.choice(llms[:max(1, len(llms) // 2)]) if llms else None
+        empty = [i for i in slots if not out.get(i)]
+        if llm and empty:
+            out[empty[0]] = llm
+            have.add(llm)
+    for i in slots:
+        if out.get(i):
+            continue
+        pick = next((n for n in rested
+                     if n not in have and n not in LLM_NAMES), None)
+        if not pick:
+            break
+        out[i] = pick
+        have.add(pick)
+    return out
+
+
+def autofill(pillar, slides, only='all'):
+    """Fill in everything that is still blank, or re-roll what was asked."""
+    slides = [dict(sl) for sl in slides]
+    if only in ('all', 'bgs') or isinstance(only, int):
+        bgs = autofill_bgs(slides, None if only in ('all', 'bgs') else only)
+        for sl, b in zip(slides, bgs):
+            if only == 'all' and sl.get('bg'):
+                continue
+            sl['bg'] = b
+    if only in ('all', 'tools') and any(sl.get('kind') == 'tool' for sl in slides):
+        for i, t in autofill_roster(slides, pillar).items():
+            slides[i]['tool'] = t
+            if not slides[i].get('title'):
+                slides[i]['title'] = t
+    hook = None
+    if only == 'all' or only == 'hook':
+        first = slides[0] if slides else {}
+        if not [l for l in (first.get('lines') or []) if str(l).strip()]:
+            el = hook_rules.eligible(pillar=pillar)
+            if el:
+                pick = random.choice(el)
+                hook = {'lines': pick['lines'], 'pillar': pillar}
+                slides[0]['lines'] = list(pick['lines'])
+    return {'slides': slides, 'hook': hook}
+
+
+def spec_bgs(spec):
+    """The chosen backgrounds in slide order, skipping slides left open."""
+    return [sl['bg'] for sl in ((spec or {}).get('slides') or []) if sl.get('bg')]
+
+
+def bg_problems(bgs):
+    """The same rules compose enforces, said early instead of at render time.
+
+    These all used to surface as a SystemExit an agent hit ten minutes into a
+    build. Checking them while you are still choosing is the whole point of
+    having a gallery.
+    """
+    try:
+        with open(BG_INDEX) as fh:
+            by = {b['name']: b for b in json.load(fh)['bgs']}
+    except Exception:
+        return []
+    out = []
+    people = [b for b in bgs if (by.get(b) or {}).get('person')]
+    if len(people) > 1:
+        out.append('%d backgrounds have a person in them (%s). One per post, '
+                   'or the carousel reads as stock photography.'
+                   % (len(people), ', '.join(people)))
+    for i, b in enumerate(bgs):
+        info = by.get(b) or {}
+        if i > 0 and info.get('hook_only'):
+            out.append('slide %d: %s is a %s — those are hook-only, they are '
+                       'too busy to hold body copy.' % (i + 1, b, info.get('vibe')))
+        if i > 0 and info.get('luma') is not None and not info.get('copy_ok'):
+            out.append('slide %d: %s is too bright behind the copy (luma %s, '
+                       'limit %d).' % (i + 1, b, info['luma'], 70))
+    for i, (a, b) in enumerate(zip(bgs, bgs[1:])):
+        va, vb = (by.get(a) or {}).get('vibe'), (by.get(b) or {}).get('vibe')
+        if va and va == vb:
+            out.append('slides %d and %d are both %s — the eye needs a change '
+                       'of scene between cards.' % (i + 1, i + 2, va))
+    return out
 
 
 def unpushed():
@@ -1589,31 +2619,75 @@ def unregistered(topic):
     return ''
 
 
-def _agent(prompt, mark, ok_token, topic=None):
-    """Run a headless Claude in the repo and record the outcome."""
+def _agent(prompt, mark, ok_token, topic=None, kind='run', job=None, check=None):
+    """Start a headless Claude that outlives this process, then wait on it.
+
+    This used to be a plain subprocess.run, which made the agent a child of
+    the dashboard: restarting the dashboard — a deploy, a crash, launchd —
+    killed whatever was mid-run, and three good runs were thrown away that
+    way in one night. The run is now detached into its own session with its
+    output going to a file, so a restart only loses the thread that was
+    watching it. reconcile_queues finds the pid again and picks it back up.
+    """
+    at = (job or {}).get('at') or time.time()
+    prior = (job or {}).get('status') == 'running'
+    # Left behind by an earlier dashboard and still going: wait, do not
+    # start a second one against the same files.
+    if prior and _alive(job.get('pid')):
+        out_path = job.get('out') or _agent_log(kind, at)
+        with _agent_gate:
+            print('[adopt] %s %s still running as pid %s'
+                  % (kind, at, job.get('pid')), flush=True)
+            return _wait_agent(job['pid'], out_path, mark, ok_token, topic,
+                               check, (job.get('started') or time.time()) + 3600)
+    # It finished while we were down. The log holds the whole answer.
+    if prior and job.get('out') and os.path.exists(job['out']):
+        out = _read_log(job['out'])
+        if out:
+            print('[adopt] %s %s finished while we were down' % (kind, at), flush=True)
+            return _settle(out, mark, ok_token, check)
     mark(status='queued')
     with _agent_gate:
-        mark(status='running', started=time.time())
+        out_path = _agent_log(kind, at)
         try:
-            p = subprocess.run(['claude', '-p', prompt], cwd=REPO,
-                               capture_output=True, text=True, timeout=3600)
-            out = ((p.stdout or '') + (p.stderr or '')).strip()
-            good = ok_token in out
-            # A build that rendered slides and skipped the caption is not done.
-            # It used to report success and sit in Review looking finished.
-            if good and ok_token == 'BUILT':
-                built = re.search(r'BUILT\s+([a-z0-9][a-z0-9-]*)', out)
-                name = built.group(1) if built else topic
-                why = (unregistered(name) if name else '') or unpushed()
-                if why:
-                    return mark(status='failed', done=False,
-                                log='Slides built, but %s: %s.\n\n%s'
-                                    % (name or 'the run', why, out[-900:]),
-                                finished=time.time())
+            with open(out_path, 'wb') as fh:
+                p = subprocess.Popen(['claude', '-p', prompt], cwd=REPO,
+                                     stdout=fh, stderr=subprocess.STDOUT,
+                                     stdin=subprocess.DEVNULL,
+                                     start_new_session=True)
+        except FileNotFoundError:
+            return mark(status='failed', log='claude CLI not found on PATH')
         except Exception as exc:
             return mark(status='failed', log=str(exc))
-        mark(status='done' if good else 'failed', done=good,
-             log=out[-1200:] or 'no output', finished=time.time())
+        mark(status='running', started=time.time(), pid=p.pid, out=out_path)
+        _wait_agent(p.pid, out_path, mark, ok_token, topic, check,
+                    time.time() + 3600)
+
+
+def _settle(out, mark, ok_token, check):
+    good = ok_token in out
+    if check:
+        good, out = check(out, good)
+    mark(status='done' if good else 'failed', done=good,
+         log=out[-1200:] or 'no output', finished=time.time())
+
+
+def _wait_agent(pid, out_path, mark, ok_token, topic, check, deadline):
+    """Poll until the detached run exits, then read its log and score it.
+
+    Polling rather than wait(), because after a restart the process is no
+    longer our child and waitpid would refuse it.
+    """
+    while _alive(pid):
+        if time.time() > deadline:
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
+            except Exception:
+                pass
+            return mark(status='failed', log='timed out after an hour',
+                        finished=time.time())
+        time.sleep(2)
+    _settle(_read_log(out_path), mark, ok_token, check)
 
 
 def run_redo(job):
@@ -1628,8 +2702,11 @@ def run_redo(job):
     slides = job.get('slides') or ([job['slide']] if job.get('slide') else [])
     _agent(REDO_PROMPT.format(
         repo=REPO, topic=job['topic'], note=job['note'],
-        slides=', '.join('%02d.jpg (number %d)' % (n, n) for n in slides)),
-        mark, 'FIXED')
+        slides=('Slides to fix: '
+                + ', '.join('%02d.jpg (number %d)' % (n, n) for n in slides))
+               if slides else
+               'He did not pick slides, so decide from the complaint alone.'),
+        mark, 'FIXED', kind='redo', job=job)
 
 
 def run_replicate(job):
@@ -1668,7 +2745,8 @@ def run_replicate(job):
             repo=REPO, source=job['from'],
             source_roster=', '.join(job['source_roster']),
             suggested=', '.join(job['suggested_roster']))
-    _agent(prompt, mark, 'BUILT', topic=job.get('topic'))
+    _agent(prompt, mark, 'BUILT', topic=job.get('topic'),
+           kind='replicate', job=job, check=_post_check(job.get('topic')))
 
 
 def run_build(job):
@@ -1680,8 +2758,9 @@ def run_build(job):
     and explicitly forbidden from committing or delivering.
     """
     note = ('Thinh asked for: ' + job['note'] + '\n') if job.get('note') else ''
+    brief = spec_brief(job.get('spec'))
     prompt = BUILD_PROMPT.format(count=job['count'], pillar=job.get('pillar', 'tools'),
-                                 repo=REPO, note=note)
+                                 repo=REPO, note=brief + note)
 
     def mark(**kw):
         with _lock:
@@ -1691,36 +2770,86 @@ def run_build(job):
                     x.update(kw)
             save_builds(q)
 
-    mark(status='queued')
-    with _agent_gate:                  # same shared-state reason as _agent
-        mark(status='running', started=time.time())
-        try:
-            p = subprocess.run(['claude', '-p', prompt], cwd=REPO,
-                               capture_output=True, text=True, timeout=3600)
-            out = ((p.stdout or '') + (p.stderr or '')).strip()
-            ok = 'BUILT' in out
-            # A batch can build several; any one of them missing its caption
-            # means the run is not finished, whatever it printed.
-            broken = [t for t in set(re.findall(r'BUILT\s+([a-z0-9][a-z0-9-]*)', out))
-                      if unregistered(t)]
-            push = unpushed() if ok else ''
-            if ok and (broken or push):
-                ok = False
-                why = []
-                if broken:
-                    why.append('No caption on: ' + ', '.join(sorted(broken))
-                               + '. They cannot be delivered until hooks.json has one.')
-                if push:
-                    why.append(push.capitalize() + '.')
-                out = ' '.join(why) + '\n\n' + out[-900:]
-            mark(status='done' if ok else 'failed', done=ok,
-                 log=out[-1200:] or 'no output', finished=time.time())
-        except subprocess.TimeoutExpired:
-            mark(status='failed', log='timed out after an hour')
-        except FileNotFoundError:
-            mark(status='failed', log='claude CLI not found on PATH')
-        except Exception as exc:
-            mark(status='failed', log=str(exc))
+    _agent(prompt, mark, 'BUILT', kind='build', job=job, check=_build_check)
+
+
+INBOX_SEEN = os.path.join(REPO, 'tools', 'inbox_seen.json')
+
+
+def inbox_items():
+    """Everything waiting on a decision, in one list.
+
+    Each of these already existed somewhere — a panel on Act, a colour on a
+    card, a line in a log — which meant noticing them was a matter of being on
+    the right tab at the right time. A delivery that failed on one account sat
+    unnoticed for two days that way.
+
+    Only things that end in an action belong here. "Views went up" is not a
+    notification; "this post never reached an account" is.
+    """
+    out = []
+    now = time.time()
+    log = delivery_log()
+    stats = load(STATS, {})
+    idx, _ = hooks_index()
+    label = {a['key']: a['short'] for a in ACCOUNTS}
+
+    def add(kind, sev, title, detail, topic=None, at=None):
+        out.append({'id': '%s:%s:%s' % (kind, topic or '', title[:40]),
+                    'kind': kind, 'sev': sev, 'title': title,
+                    'detail': detail, 'topic': topic, 'at': at or now})
+
+    # A send that failed. The slides are fine; TikTok did not fetch them.
+    for topic, per in log.items():
+        for k, r in (per or {}).items():
+            if r.get('status') == 'FAILED':
+                add('delivery', 'bad', '%s never reached %s' % (topic, label.get(k, k)),
+                    str(r.get('detail') or '')[:120] + ' — draft it again',
+                    topic, r.get('at'))
+
+    # Live on some accounts and not others, with nothing recorded at all.
+    for g in _undelivered():
+        gaps = [label.get(x, x) for x in (g['failed'] + g['missing'])]
+        if not g['failed']:
+            add('gap', 'warn', '%s is missing from %s' % (g['topic'], ', '.join(gaps)),
+                'Nothing was ever sent there, so it ran on fewer accounts than it looks.',
+                g['topic'], g.get('at'))
+
+    # A draft nobody published is a slot nobody can use.
+    for d in _stale_drafts():
+        add('stale', 'warn', '%s has been waiting %dh on %s'
+            % (d['topic'], d['hours'], label.get(d['account'], d['account'])),
+            'Publish it in TikTok, or the slot stays spent — deleting does not free one.',
+            d['topic'])
+
+    # No caption means it cannot be sent at all.
+    for topic in idx:
+        if os.path.isdir(os.path.join(DRAFTS, topic)):
+            why = unregistered(topic)
+            if why and not any((r or {}).get('status') for r in (log.get(topic) or {}).values()):
+                add('caption', 'warn', '%s cannot be drafted' % topic, why.capitalize(), topic)
+
+    # Accounts with no room left.
+    for k, used in (pending_counts() or {}).items():
+        if used >= 5:
+            add('slots', 'bad', '%s has no draft slots left' % label.get(k, k),
+                'Five pending is the cap. Only publishing frees one.', None)
+
+    # Slides that are not on Pages cannot be pulled by TikTok.
+    push = unpushed()
+    if push:
+        add('push', 'bad', 'Slides are not on GitHub yet', push.capitalize() + '.', None)
+
+    # Nothing left to build with.
+    if not hooks_available():
+        add('hooks', 'warn', 'No hooks are free',
+            'Every approved hook is inside its cooldown. Add new ones, or wait.', None)
+
+    seen = set(load(INBOX_SEEN, []))
+    for x in out:
+        x['read'] = x['id'] in seen
+    out.sort(key=lambda x: (x['read'], {'bad': 0, 'warn': 1}.get(x['sev'], 2), -(x['at'] or 0)))
+    return out
 
 
 def hooks_available():
@@ -1754,14 +2883,20 @@ def reconcile_queues():
     for path, load, runner, save in (
             (REDO, redo_queue, run_redo, None),
             (REPLICATE, replicate_queue, run_replicate, None),
-            (BUILD, build_queue, run_build, save_builds)):
+            (BUILD, build_queue, run_build, save_builds),
+            (GEN, gen_queue, run_gen, save_gen)):
         q = load()
         pending = []
         for x in q:
             if x.get('status') == 'running':
-                x['status'] = 'interrupted'
-                x['log'] = 'the server restarted while this was running'
-                closed += 1
+                # Still alive, or it left a log behind: hand it back to the
+                # runner, which waits on the pid rather than starting again.
+                if _alive(x.get('pid')) or (x.get('out') and os.path.exists(x['out'])):
+                    pending.append((x, runner))
+                else:
+                    x['status'] = 'interrupted'
+                    x['log'] = 'the server restarted while this was running'
+                    closed += 1
             elif x.get('status') == 'queued':
                 pending.append((x, runner))
         if closed or pending:
@@ -1990,7 +3125,44 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 'eligible': [{'lines': h['lines'], 'pillar': h.get('pillar')}
                              for h in el],
                 'blocked': [{'lines': l, 'why': w} for l, w in hook_rules.blocked()],
+                'suggested': hook_suggestions(),
             })
+        if path == '/api/bgs':
+            return self._send(200, bg_catalog())
+        if path == '/api/users':
+            return self._send(200, user_summary(
+                int((urllib.parse.parse_qs(
+                    urllib.parse.urlparse(self.path).query).get('days')
+                    or [30])[0] or 30)))
+        if path == '/api/gen':
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            at = float((q.get('at') or [0])[0] or 0)
+            row = next((x for x in gen_queue() if x['at'] == at), None)
+            if not row:
+                return self._send(404, {'error': 'no such run'})
+            return self._send(200, {'status': row.get('status'),
+                                    'result': row.get('result'),
+                                    'why': str(row.get('log') or '').strip().split(chr(10))[0][:200]})
+        if path == '/api/tools':
+            # The roster picker needs the pool and, for each name, whether an
+            # icon actually exists: a tool with no mark cannot go on a slide,
+            # and finding that out at render time wastes a whole run.
+            pool = load(os.path.join(REPO, 'tools', 'tool_pool.json'), {})
+            have = set(os.listdir(ICON_DIR)) if os.path.isdir(ICON_DIR) else set()
+            def slug(n):
+                return re.sub(r'[^a-z0-9]', '', n.lower())
+            by_slug = {slug(f[5:-4]): f for f in have if f.startswith('icon-')}
+            out = []
+            for cat, names in sorted(pool.items()):
+                if cat.startswith('_') or not isinstance(names, list):
+                    continue
+                for n in names:
+                    out.append({'name': n, 'cat': cat,
+                                'icon': by_slug.get(slug(n))})
+            return self._send(200, {'tools': out,
+                                    'cats': sorted(k for k in pool
+                                                   if not k.startswith('_')
+                                                   and isinstance(pool[k], list))})
         if path == '/api/host':
             # Two dashboards look identical on purpose — same data, same page.
             # This is the one thing that differs, so the UI can say which one
@@ -2030,6 +3202,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._send(404, {'error': 'no icon'})
         if path == '/api/sync':
             return self._send(200, sync_all())
+        if path == '/api/konvo':
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            return self._send(200, konvo(int((q.get('days') or ['14'])[0]),
+                                         (q.get('version') or [None])[0]))
         if path == '/api/analytics':
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             only = [x for x in (q.get('accounts') or [''])[0].split(',') if x]
@@ -2060,10 +3236,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                     'hooks_left': hooks_available(),
                                     'builds': [b for b in build_queue()
                                                if not b.get('done') or b.get('status') == 'running']})
-        if path == '/icon/arco.png':
-            f = os.path.join(REPO, 'tools', 'slides', 'icons', 'icon-arco.png')
+        if path.startswith('/icon/'):
+            f = os.path.normpath(os.path.join(ICON_DIR,
+                                              os.path.basename(path[len('/icon/'):])))
+            if path == '/icon/arco.png':
+                f = os.path.join(ICON_DIR, 'icon-arco.png')
+            if not f.startswith(ICON_DIR) or not os.path.isfile(f):
+                return self._send(404, {'error': 'not found'})
             with open(f, 'rb') as fh:
-                return self._send(200, fh.read(), 'image/png')
+                return self._send(200, fh.read(),
+                                  mimetypes.guess_type(f)[0] or 'image/png')
+        if path.startswith('/bg/'):
+            body, ctype = bg_thumb(path[len('/bg/'):])
+            if body is None:
+                return self._send(404, {'error': 'not found'})
+            return self._send(200, body, ctype)
         if path.startswith('/slide/'):
             rel = path[len('/slide/'):]
             f = os.path.normpath(os.path.join(DRAFTS, rel))
@@ -2102,7 +3289,63 @@ class Handler(http.server.BaseHTTPRequestHandler):
             keys = body.get('accounts') or [a['key'] for a in ACCOUNTS]
             return self._send(200, {'results': run_draft(topic, keys),
                                     'pending': pending_counts()})
+        if path == '/api/autofill':
+            # Choosing was never the judgment call — the words are. So the
+            # photos, the roster and the hook come straight from the rules,
+            # instantly and for free, and the agent is left with the writing.
+            only = body.get('only')
+            if isinstance(only, str) and only.isdigit():
+                only = int(only)
+            return self._send(200, autofill(body.get('pillar') or 'tools',
+                                            body.get('slides') or [],
+                                            only if only is not None else 'all'))
+        if path == '/api/gen':
+            # Writing copy is judgment, so it is an agent — but a small one
+            # that answers into the composer instead of building a post.
+            what = body.get('what')
+            job = {'what': what if what in ('hooks', 'post') else 'slide',
+                   'plan': body.get('plan') or '',
+                   'pillar': body.get('pillar') or 'tools',
+                   'hook': body.get('hook') or '',
+                   'tool': body.get('tool') or '',
+                   'others': body.get('others') or '',
+                   'note': (body.get('note') or '').strip(),
+                   'n': max(1, min(8, int(body.get('n') or 5))),
+                   'at': time.time(), 'done': False, 'status': 'queued'}
+            with _lock:
+                q = gen_queue()
+                q.append(job)
+                save_gen(q)
+            threading.Thread(target=run_gen, args=(job,), daemon=True).start()
+            return self._send(200, {'ok': True, 'at': job['at']})
+        if path == '/api/hook':
+            # hook_slide refuses anything that is not in the pool, so a hook
+            # he writes in the composer has to land there before the build
+            # starts, or the run dies at the first slide.
+            lines = [str(l).strip().lower() for l in (body.get('lines') or []) if str(l).strip()]
+            if len(lines) != 2:
+                return self._send(400, {'error': 'a hook is two lines'})
+            if any(len(l) > 42 for l in lines):
+                return self._send(400, {'error': 'each line has to fit SF Bold 74 '
+                                                 'on a 1080 canvas — keep it under 42 characters'})
+            with _lock:
+                pool = load(os.path.join(REPO, 'tools', 'hook_pool.json'), {})
+                hooks = pool.setdefault('hooks', [])
+                if any([str(x).lower() for x in h.get('lines', [])] == lines for h in hooks):
+                    return self._send(200, {'ok': True, 'already': True})
+                hooks.append({'lines': lines, 'used': False,
+                              'pillar': body.get('pillar') or 'tools',
+                              'added': time.time()})
+                with open(os.path.join(REPO, 'tools', 'hook_pool.json'), 'w') as fh:
+                    json.dump(pool, fh, indent=1, ensure_ascii=False)
+            return self._send(200, {'ok': True})
         if path == '/api/build':
+            # A background set that breaks the rules fails at render, ten
+            # minutes and one agent run later. The gallery says so as you
+            # pick; this is the one that actually stops it.
+            probs = bg_problems(spec_bgs(body.get('spec')))
+            if probs:
+                return self._send(400, {'error': probs[0], 'problems': probs})
             with _lock:
                 q = build_queue()
                 if body.get('cancel'):
@@ -2111,10 +3354,52 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     job = {'count': max(1, min(10, int(body.get('count', 1)))),
                            'pillar': body.get('pillar') or 'tools',
                            'note': (body.get('note') or '').strip(),
+                           'spec': body.get('spec') or None,
                            'at': time.time(), 'done': False, 'status': 'queued'}
                     q.append(job)
                     threading.Thread(target=run_build, args=(job,), daemon=True).start()
                 save_builds(q)
+            return self._send(200, {'ok': True})
+        if path == '/api/retry':
+            # Run the same job again rather than making him rebuild the
+            # request from memory. The old row is marked dismissed so the
+            # panel does not show the failure and its retry side by side.
+            at = float(body.get('at') or 0)
+            kind = body.get('kind')
+            spec = {'build': (BUILD, build_queue, run_build),
+                    'redo': (REDO, redo_queue, run_redo),
+                    'replicate': (REPLICATE, replicate_queue, run_replicate)}.get(kind)
+            if not spec:
+                return self._send(400, {'error': 'unknown kind'})
+            path_, loader, runner = spec
+            with _lock:
+                items = loader()
+                old = next((x for x in items if abs((x.get('at') or 0) - at) < 1), None)
+                if not old:
+                    return self._send(404, {'error': 'that run is gone'})
+                old['dismissed'] = True
+                job = {k: v for k, v in old.items()
+                       if k not in ('status', 'log', 'done', 'started',
+                                    'finished', 'dismissed')}
+                job.update({'at': time.time(), 'status': 'queued', 'done': False})
+                items.append(job)
+                with open(path_, 'w') as fh:
+                    json.dump(items, fh, indent=1, ensure_ascii=False)
+            threading.Thread(target=runner, args=(job,), daemon=True).start()
+            return self._send(200, {'ok': True})
+        if path == '/api/dismiss':
+            with _lock:
+                for path_, loader in ((BUILD, build_queue), (REDO, redo_queue),
+                                      (REPLICATE, replicate_queue)):
+                    items = loader()
+                    hit = False
+                    for x in items:
+                        if x.get('status') in ('failed', 'interrupted'):
+                            x['dismissed'] = True
+                            hit = True
+                    if hit:
+                        with open(path_, 'w') as fh:
+                            json.dump(items, fh, indent=1, ensure_ascii=False)
             return self._send(200, {'ok': True})
         if path == '/api/seen':
             with _lock:
@@ -2338,6 +3623,179 @@ aside{background:var(--surface);border-right:1px solid var(--line);
 .hooksup .hp b{color:var(--text);font-weight:600}
 .hooksup .sub{font-size:12px}
 @media (max-width:900px){ .crow{flex-wrap:wrap} .crow .sp{display:none} }
+
+/* ---------- the composer ----------
+   One card per slide, laid out the way the carousel is: the photo on the
+   left at 9:16, the words beside it. A wizard would hide the pool behind
+   Next buttons; seeing the whole post at once is the point. */
+.cx{max-width:920px}
+.ptop{margin:0 0 10px!important}
+.csub{font:600 11px/1 "Fira Code",monospace;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--dim);margin:18px 0 2px}
+.csum{font-size:11.5px;color:var(--dim)}
+.cwarn{margin:10px 0 0;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.55;
+  background:rgba(245,158,11,.09);border:1px solid rgba(245,158,11,.38);color:#fde68a}
+.cwarn b{color:var(--warn)}
+.warnt{color:var(--warn)}
+.segs.multi{flex-wrap:wrap;gap:6px;margin:10px 0 0;border:0;overflow:visible;
+  align-items:flex-start}
+.segs.multi .seg{border:1px solid var(--line-2);border-radius:8px;padding:7px 12px;
+  white-space:nowrap}
+.btn.sm{padding:7px 13px;font-size:12.5px}
+.addsl{margin:10px 0 0}
+/* ---------- users ----------
+   Distributions, not totals: "how many habits does a real user keep" is a
+   shape, and a mean would hide it. */
+.ukpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
+  gap:9px;margin:14px 0 0}
+.ukpi{padding:13px 14px;border:1px solid var(--line);border-radius:12px;
+  background:var(--surface)}
+.ukpi b{display:block;font:600 25px/1.1 system-ui;letter-spacing:-.02em}
+.ukpi span{display:block;margin-top:5px;font-size:12px;color:var(--muted)}
+.ukpi i{display:block;margin-top:3px;font-style:normal;font-size:11px;color:var(--dim)}
+.ugrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:10px;margin:14px 0 0}
+.ubox{padding:13px 14px;border:1px solid var(--line);border-radius:12px;
+  background:var(--surface)}
+.ubox h4{margin:0 0 9px;font:600 13px/1.3 system-ui}
+.ubar{display:flex;align-items:center;gap:9px;margin:0 0 5px}
+.ubar .l{width:56px;flex:none;font:500 10.5px/1 "Fira Code",monospace;color:var(--dim)}
+.ubar .l.bad{color:var(--bad)}
+.ubar .fl{width:150px;flex:none;font-size:11.5px;color:var(--muted)}
+.ubar .t i.bad{background:var(--bad)}
+.ubox.wide{grid-column:1/-1;margin:14px 0 0}
+.ubox .csum i{font-style:normal;color:var(--dim)}
+.ubar .t{flex:1;height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.ubar .t i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.ubar .v{width:34px;flex:none;text-align:right;font:500 11px/1 "Fira Code",monospace;
+  color:var(--muted)}
+
+/* The fast path, first thing on the page: everything the rules can decide,
+   decided, and then straight out. The cards below are for having a say. */
+.fastrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0 0}
+.btn.qd{font-weight:600}
+.slbgwrap{position:relative;flex:none;width:84px;align-self:flex-start}
+/* Without align-self the wrapper stretches to the card's height and the
+   re-roll lands under the photo instead of on it. */
+.reroll{position:absolute;right:4px;bottom:4px;width:24px;height:24px;padding:0;
+  border-radius:7px;border:1px solid var(--line-2);background:rgba(2,6,23,.82);
+  color:var(--muted);font-size:13px;line-height:22px}
+.reroll:hover{color:var(--accent);border-color:var(--accent)}
+@media (max-width:900px){ .slbgwrap{width:66px} }
+
+.slrows{display:flex;flex-direction:column;gap:10px;margin:12px 0 0}
+.slrow{display:flex;gap:13px;padding:12px;border:1px solid var(--line);
+  border-radius:13px;background:var(--surface)}
+.slbg{position:relative;width:84px;flex:none;aspect-ratio:9/16;border-radius:9px;
+  overflow:hidden;padding:0;border:1px dashed var(--line-2);background:var(--surface-2)}
+.slbg.has{border-style:solid;border-color:var(--line-2)}
+.slbg img{width:100%;height:100%;object-fit:cover;display:block}
+.slbg .lab{position:absolute;left:0;right:0;bottom:0;padding:10px 3px 3px;
+  background:linear-gradient(transparent,rgba(2,6,23,.92));
+  font:500 8px/1.2 "Fira Code",monospace;color:#cbd5e1}
+.slbg .pick{display:block;padding:0 6px;color:var(--dim);font:500 10px/1.35 "Fira Code",monospace}
+.slbg:hover{border-color:var(--accent)}
+.slmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+.slhead{display:flex;align-items:center;gap:8px}
+.slhead .k{font:600 10px/1 "Fira Code",monospace;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--dim)}
+.slhead .rm{margin-left:auto;background:none;border:0;color:var(--dim);
+  font-size:17px;padding:0 4px;line-height:1}
+.slhead .rm:hover{color:var(--bad)}
+.slact{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.gbusy{font:500 11px/1 "Fira Code",monospace;color:var(--accent)}
+.slrow.hook{border-color:var(--line-2)}
+.slrow.k-cta{opacity:.92}
+
+.cin{width:100%;background:var(--surface-2);border:1px solid var(--line-2);
+  border-radius:9px;color:var(--text);font:400 13px/1.5 system-ui;padding:8px 11px}
+.cin.big{font-size:14.5px}
+.cin.wide{display:block;margin:8px 0 0}
+.cin:focus{outline:none;border-color:var(--accent)}
+.cin::placeholder{color:var(--dim)}
+.cx textarea{width:100%;min-height:76px;resize:vertical;margin:8px 0 0;
+  background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;
+  color:var(--text);font:400 13px/1.6 system-ui;padding:9px 11px}
+.cx textarea:focus{outline:none;border-color:var(--accent)}
+.cx textarea::placeholder{color:var(--dim)}
+
+/* hook cards read as the slide reads: two lines, lowercase, one size */
+.hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(206px,1fr));gap:8px;margin:8px 0 0}
+.hk{border:1px solid var(--line-2);border-radius:10px;background:var(--surface-2);
+  padding:12px 13px;text-align:left;color:var(--text);font:400 13px/1.45 system-ui}
+.hk:hover{border-color:var(--muted)}
+.hk.sug{border-style:dashed}
+.hk.sug .p{color:var(--accent)}
+.hk .p{display:block;margin-top:7px;font:500 9.5px/1 "Fira Code",monospace;
+  color:var(--dim);text-transform:uppercase;letter-spacing:.07em}
+
+/* the gallery, inside the sheet. 9:16 because that is the shape they become */
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;
+  margin:11px 0 0;padding:2px}
+.bt{position:relative;aspect-ratio:9/16;border-radius:9px;overflow:hidden;padding:0;
+  border:1px solid var(--line-2);background:var(--surface-2)}
+.bt img{width:100%;height:100%;object-fit:cover;display:block}
+.bt.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+/* Not hidden: a rule-breaking photo can still be the right call, it just has
+   to be a decision rather than an accident. */
+.bt.faded{opacity:.42}
+.bt.faded:hover{opacity:1}
+.bt .fl{position:absolute;top:5px;right:5px;display:flex;flex-direction:column;gap:3px;align-items:flex-end}
+.bt .fl i{font-style:normal;font:600 8.5px/14px "Fira Code",monospace;padding:0 4px;
+  border-radius:4px;background:rgba(2,6,23,.82);color:var(--muted)}
+.bt .fl i.warn{color:var(--warn)}
+.bt .vb{position:absolute;left:0;right:0;bottom:0;padding:14px 5px 4px;text-align:left;
+  background:linear-gradient(transparent,rgba(2,6,23,.92));
+  font:500 8.5px/1.25 "Fira Code",monospace;color:#cbd5e1}
+
+/* tools: the icon is how you recognise one, so the icon leads */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:7px;margin:8px 0 0}
+.tl{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:9px;
+  border:1px solid var(--line-2);background:var(--surface-2);color:var(--text);
+  font:500 12px/1.25 system-ui;text-align:left;width:100%}
+.tl img,.tl .noico{width:22px;height:22px;border-radius:6px;flex:none}
+.tl .noico{background:var(--line-2)}
+.tl.on{border-color:var(--accent);background:rgba(56,189,248,.1)}
+.tl.faded{opacity:.45}
+.tl .tnum{margin-left:auto;font:700 10px/1 "Fira Code",monospace;color:var(--accent)}
+.tl .tnum.warn{color:var(--warn);font-weight:600}
+.slmain>.tl{width:auto;align-self:flex-start}
+
+/* the sheet: a picker over the post, not a page you navigate to */
+.shwrap{position:fixed;inset:0;z-index:var(--z-modal);background:rgba(2,6,23,.72);
+  display:flex;align-items:flex-end;justify-content:center;padding:24px}
+.sh{width:min(760px,100%);max-height:86vh;display:flex;flex-direction:column;
+  background:var(--surface);border:1px solid var(--line-2);border-radius:15px;
+  box-shadow:0 24px 60px rgba(2,6,23,.7)}
+.shhead{display:flex;align-items:center;gap:10px;padding:14px 16px;
+  border-bottom:1px solid var(--line);font:600 14px/1 system-ui}
+.shhead .rm{margin-left:auto;background:none;border:0;color:var(--dim);font-size:21px;
+  line-height:1;padding:0 4px}
+.shhead .rm:hover{color:var(--text)}
+.shbody{padding:4px 16px 18px;overflow:auto}
+
+/* the bar follows you down the page: what you have, and the one button */
+.cbar{position:sticky;bottom:8px;display:flex;align-items:center;gap:11px;flex-wrap:wrap;
+  margin:16px 0 0;padding:12px 14px;background:var(--surface);
+  border:1px solid var(--line-2);border-radius:13px;box-shadow:0 8px 24px rgba(2,6,23,.55)}
+.cbar .sum{flex:1;min-width:170px;font-size:12px;color:var(--dim);line-height:1.45}
+@media (max-width:900px){
+  .slrow{padding:10px;gap:10px}
+  .slbg{width:66px}
+  .bgrid{grid-template-columns:repeat(auto-fill,minmax(76px,1fr))}
+  .hgrid{grid-template-columns:1fr}
+  .tgrid{grid-template-columns:repeat(auto-fill,minmax(116px,1fr))}
+  .shwrap{padding:0}
+  .sh{max-height:92vh;border-radius:15px 15px 0 0}
+  .cbar{position:sticky;bottom:0;border-radius:13px 13px 0 0}
+}
+.runpill.bad{border-color:var(--bad);color:var(--bad)}
+.toast .bad{color:var(--bad);font-weight:700}
+.trow.fail{align-items:flex-start}
+.trow.fail i{display:block;margin-top:3px;font-style:normal;font-size:11px;
+  color:var(--dim);line-height:1.45}
+.trow.fail .rt{margin-left:auto;align-self:flex-start;flex:none;
+  padding:5px 11px;font-size:11.5px}
 #stalebar{padding:11px 16px;background:rgba(251,146,60,.12);
   border-bottom:1px solid rgba(251,146,60,.4);color:var(--muted);
   font:400 12.5px/1.5 system-ui}
@@ -2438,14 +3896,38 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .del:hover{color:var(--bad);border-color:var(--bad)}
 .del svg{width:15px;height:15px}
 .cardwrap{position:relative}
-/* Set by the sync from real view counts, never by hand. */
-.tier{position:absolute;top:8px;left:8px;z-index:2;padding:4px 8px;border-radius:7px;
-  font:600 10.5px/1 "Fira Code",monospace;letter-spacing:.02em;
-  background:rgba(56,189,248,.16);border:1px solid var(--accent);color:var(--accent);
-  backdrop-filter:blur(6px)}
+/* Set by the sync from real view counts, never by hand. Solid, because a
+   translucent badge takes its colour from whatever photograph is behind it,
+   and the colour is the thing carrying the tier. */
+.tier{position:absolute;top:8px;left:8px;z-index:2;padding:4px 9px;border-radius:7px;
+  font:700 11px/1 "Fira Code",monospace;letter-spacing:.02em;
+  color:#04121f;background:#38bdf8;border:0;
+  box-shadow:0 2px 10px rgba(0,0,0,.45)}
+/* Cool to hot as the number climbs, so a grid reads by colour before it is
+   read by digits. */
+.tier.t1{background:#38bdf8}                    /* 1k  */
+.tier.t2{background:#22d3ee}                    /* 2k  */
+.tier.t3{background:#34d399}                    /* 3k  */
+.tier.t4{background:#facc15}                    /* 5k  */
+.tier.t5{background:#fb923c}                    /* 10k */
+.tier.t6{background:#f43f5e;color:#fff}         /* 25k */
 /* In the footer, not beside the title: the numbers are the outcome of the
    post, not part of naming it. Values bold and light, units dim, so the row
    reads as three numbers rather than six words. */
+/* Two actions of equal weight: they split the footer rather than one
+   hugging the stats and the other the edge. */
+/* A row named by its caption is one we could not tie to a post. Saying so
+   beats leaving it to be inferred from the shape of the name. */
+.idtag{margin-left:9px;padding:2px 7px;border-radius:5px;vertical-align:2px;
+  font:600 9.5px/1.5 system-ui;letter-spacing:.05em;text-transform:uppercase;
+  background:rgba(56,189,248,.13);border:1px solid var(--accent);color:var(--accent)}
+.idtag.weak{background:rgba(251,146,60,.13);border-color:var(--warn);color:var(--warn)}
+.unk{display:inline-flex;align-items:center;justify-content:center;
+  width:15px;height:15px;margin-right:7px;border-radius:50%;vertical-align:-2px;
+  font:700 10px/1 system-ui;background:var(--surface-2);
+  border:1px solid var(--line-2);color:var(--dim);cursor:help}
+.acts{display:flex;gap:7px;flex:1;margin-left:auto}
+.acts .cta{flex:1;text-align:center}
 .cstat{display:flex;align-items:baseline;gap:5px;margin-right:auto;
   font:500 11px/1 "Fira Code",monospace;color:var(--dim)}
 .cstat b{font-weight:600;font-size:12.5px;color:var(--text)}
@@ -2455,7 +3937,6 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
   font:500 13px/1 "Fira Code",monospace;color:var(--text)}
 .livestat .r{color:var(--dim)}
 .tier.inline{position:static;backdrop-filter:none}
-.chips{display:flex;gap:5px}
 .chip{font:500 10.5px/1 "Fira Code",monospace;padding:5px 8px;border-radius:6px;
   border:1px solid var(--line-2);background:var(--surface-2);color:var(--dim);
   letter-spacing:.01em;transition:all .14s;white-space:nowrap}
@@ -2545,7 +4026,11 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 /* ---------- published: the date-cohort browser ---------- */
 .rlab{font:600 12px/1 system-ui;color:var(--dim);margin-right:4px;
   text-transform:uppercase;letter-spacing:.06em}
-.cust{display:inline-flex;gap:6px;margin-left:6px}
+.cust{display:inline-flex;align-items:center;gap:7px;margin-left:6px;flex-wrap:wrap}
+.cust .dash{font:400 11.5px/1 system-ui;color:var(--dim)}
+.cust .btn{padding:7px 13px;font-size:12px}
+.cust .btn[disabled]{opacity:.4;cursor:not-allowed}
+.cust .sub{font-size:11px}
 .cust input{background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);
   border-radius:8px;padding:6px 8px;font:500 12px/1 system-ui;color-scheme:dark}
 .plist{display:flex;flex-direction:column;gap:6px;margin-top:14px}
@@ -3130,7 +4615,6 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
     font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .actbar .btn.more{order:3;flex:none;width:38px;min-width:0;padding:0;
     min-height:38px;font-size:15px}
-  .actbar .chips{order:4;width:100%;margin:1px 0 0}
   /* The primary is the whole point of the screen, so it gets its own row. */
   .actbar .btn:not(.sec){order:5;flex:1 1 100%;min-height:44px;font-size:13.5px}
   .actbar .btn.sec:not(.more){order:6;flex:1 1 calc(50% - 4px);min-height:40px;
@@ -3182,13 +4666,37 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
   .bar{padding:12px 12px}
   h1{font-size:15px}
 }
+.appsw{display:flex;gap:4px;margin:0 0 14px;padding:3px;border-radius:999px;
+  background:rgba(255,255,255,.05)}
+.appsw button{flex:1;border:0;border-radius:999px;padding:7px 0;cursor:pointer;
+  font:600 12px/1 inherit;color:var(--dim);background:transparent}
+.appsw button.on{background:var(--fg);color:var(--bg)}
+.kfun{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+.kfun .row{display:grid;grid-template-columns:118px 1fr 54px;align-items:center;gap:10px;
+  font-size:12.5px}
+.kfun .nm{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kfun .tr{background:rgba(255,255,255,.06);border-radius:4px;height:15px;overflow:hidden}
+.kfun .fl{height:100%;border-radius:4px;background:linear-gradient(90deg,#E08968,#F0C08D)}
+.kfun .vv{text-align:right;font-variant-numeric:tabular-nums}
+.kfun .row.drop .fl{background:linear-gradient(90deg,#c2554a,#E08968)}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0 18px}
+.kcard{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+  border-radius:12px;padding:12px 14px}
+.kcard .n{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.kcard .l{font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-top:2px}
+.kspark{display:flex;align-items:flex-end;gap:3px;height:46px;margin-top:8px}
+.kspark i{flex:1;background:#E08968;border-radius:2px 2px 0 0;min-height:2px;display:block}
 </style></head><body>
 <div class="app">
 <aside>
   <div class="brand">
     <img src="/icon/arco.png" alt="ARCO app icon">
-    <div><div class="n">ARCO</div>
-      <div class="v">content pipeline<span id="host"></span></div></div>
+    <div><div class="n" id="brandn">ARCO</div>
+      <div class="v" id="brandv">content pipeline<span id="host"></span></div></div>
+  </div>
+  <div class="appsw" role="tablist" aria-label="Which app">
+    <button id="sw-arco" onclick="setApp('arco')">ARCO</button>
+    <button id="sw-konvo" onclick="setApp('konvo')">Konvo</button>
   </div>
   <nav aria-label="Filter posts">
     <p class="navlabel">Pipeline</p>
@@ -3236,7 +4744,8 @@ const ICONS = {
   published:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
   liked:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21l7.7-7.6 1.1-1a5.5 5.5 0 0 0 0-7.8Z"/>',
   all:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>',
-  new:'<path d="M12 5v14M5 12h14"/>'
+  new:'<path d="M12 5v14M5 12h14"/>',
+  users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>'+'<circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/>'
 };
 const ic = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
@@ -3256,7 +4765,7 @@ const PILLARS=[['tools','Tools'],['screentime','Screen time'],['discipline','Dis
                ['build','Building'],['learn','Studying']];
 const FILTERS=[['new','New post'],['review','Review'],['post','Post'],
                ['out','Published'],['liked','Performing'],['stats','Analytics'],
-               ['all','All posts'],['archive','Archive']];
+               ['users','Users'],['all','All posts'],['archive','Archive']];
 const isOut = p => ['drafted','published','failed'].includes(stateOf(p));
 // Drafted but not published everywhere: this is the TikTok worklist.
 const needsPublish = p => stateOf(p)==='drafted';
@@ -3280,66 +4789,639 @@ function stateOf(p){
   if ((Date.now()/1000 - p.mtime) > 7*DAY) return 'archive';
   return 'review';
 }
-// Ask for a post in a sentence. The whole build path already takes a free
-// text note and hands it to the agent — this is the missing way to reach it
-// without a terminal.
-let HOOKS = null, buildNote = '', buildCount = 1;
+// ---------------------------------------------------------------- composer
+//
+// New post used to be one textarea: a sentence went to the agent and it chose
+// the hook, the photos and the words. That works, but every choice you cared
+// about had to survive being read out of prose, and the ones that did not are
+// what came back wrong. So the page now IS the post — one card per slide,
+// each holding its own photo and its own copy. Fill in what you have a view
+// about; leave the rest blank and the agent writes those and only those.
+let HOOKS = null;
+let SPEC = null, BGS = null, TOOLPOOL = null;
+let sheet = null;          // {mode:'bg'|'tool'|'hook', slide:n} or null
+let bgFilter = 'all', genBusy = {};
+
+const SLIDE_LABEL = {hook:'Hook', tool:'Tool', point:'Point', cta:'Closing card'};
+
+function freshSpec(pillar){
+  pillar = pillar || 'tools';
+  // Six slides: the shape that works, already laid out, so the first thing you
+  // see is the post rather than an empty box asking what you want.
+  // Tools, building and studying are listicles — that is what their hooks
+  // promise. Screen time and discipline are method posts: numbered reasons,
+  // no roster.
+  const listicle = ['tools','build','learn'].includes(pillar);
+  const body = listicle
+    ? [{kind:'tool', tool:'ARCO'}, {kind:'tool'}, {kind:'tool'}, {kind:'tool'}]
+    : [{kind:'point'}, {kind:'point'}, {kind:'point'}, {kind:'point'}];
+  return {pillar, caption:'', note:'', count:1,
+    slides: [{kind:'hook'}].concat(body).concat([{kind:'cta'}])
+             .map(sl => Object.assign({tool:'', title:'', lines:['',''], bg:null, gen:0}, sl))};
+}
+
+// A composed post is twenty small decisions. Losing them to a refresh, a
+// phone locking, or a tab closed while an agent was writing would make the
+// whole thing not worth using — so it lives in localStorage between renders,
+// and any run that was in flight is polled again on the way back in.
+const SPEC_KEY = 'arco.compose.v1';
+function saveSpec(){
+  try { localStorage.setItem(SPEC_KEY, JSON.stringify(SPEC)); } catch(e){}
+}
+function restoreSpec(){
+  try {
+    const raw = localStorage.getItem(SPEC_KEY);
+    if(!raw) return null;
+    const sp = JSON.parse(raw);
+    if(!sp || !Array.isArray(sp.slides) || !sp.slides.length) return null;
+    return sp;
+  } catch(e){ return null; }
+}
+// Whoever needs SPEC first creates it — and whoever creates it is the one
+// that has to pick up runs left in flight. Having two places do the first
+// half and only one do the second is why a closed tab lost its answer.
+function ensureSpec(){
+  if(SPEC) return SPEC;
+  SPEC = restoreSpec() || freshSpec();
+  resumeGen();
+  return SPEC;
+}
+
+function resumeGen(){
+  // Several slides can be waiting on ONE run — "Write the blanks" is a single
+  // agent — so poll each distinct run once and apply whatever shape it
+  // returns, rather than once per slide.
+  const runs = [...new Set(SPEC.slides.map(s=>s.gen).filter(Boolean))];
+  runs.forEach(at => {
+    const mine = SPEC.slides.map((s,i)=>s.gen===at?i:-1).filter(i=>i>=0);
+    mine.forEach(i => genBusy[i] = true);
+    pollGen(at, res => {
+      mine.forEach(i => { genBusy[i] = false; SPEC.slides[i].gen = 0; });
+      applyGen(res, mine[0]);
+      saveSpec(); render();
+    });
+  });
+  if(SPEC.genHooks){
+    genBusy['hooks'] = true;
+    pollGen(SPEC.genHooks, res => {
+      genBusy['hooks'] = false; SPEC.genHooks = 0;
+      if(res && res.hooks){ HOOKS = Object.assign({}, HOOKS, {made:res.hooks});
+        sheet = {mode:'hook', slide:0}; }
+      saveSpec(); render();
+    });
+  }
+}
 
 async function loadHooks(){
-  try { HOOKS = await (await fetch('/api/hooks')).json(); } catch(e){ HOOKS = {eligible:[],blocked:[]}; }
+  try { HOOKS = await (await fetch('/api/hooks')).json(); } catch(e){ HOOKS = {eligible:[],blocked:[],suggested:[]}; }
+  ensureSpec();
+  if(!BGS){ try { BGS = await (await fetch('/api/bgs')).json(); } catch(e){ BGS = {bgs:[]}; } }
+  if(!TOOLPOOL){ try { TOOLPOOL = await (await fetch('/api/tools')).json(); } catch(e){ TOOLPOOL = {tools:[],cats:[]}; } }
   if(filter==='new') render();
 }
 
-function composeView(){
-  const running = (DATA.runs||[]).filter(r=>r.kind==='build').length;
-  const el = (HOOKS && HOOKS.eligible) || [];
-  const by = {};
-  el.forEach(h => (by[h.pillar||'unknown'] = (by[h.pillar||'unknown']||0) + 1));
-  const pills = Object.entries(by).sort((a,b)=>b[1]-a[1]);
+const bgBy = n => (BGS && BGS.bgs || []).find(b => b.name===n) || {};
+const toolBy = n => ((TOOLPOOL&&TOOLPOOL.tools)||[]).find(t => t.name===n) || {};
+const LLMS = () => new Set(((TOOLPOOL&&TOOLPOOL.tools)||[]).filter(t=>t.cat==='llm').map(t=>t.name));
+const hookLines = () => (SPEC.slides.find(s=>s.kind==='hook')||{lines:[]}).lines;
+const usedBgs = () => SPEC.slides.map(s=>s.bg).filter(Boolean);
 
-  // The hook pool is what actually limits a build, and nothing else in the UI
-  // says so. Asking for a tools post with no tools hook left just fails.
-  const supply = el.length
-    ? `<div class="hooksup">${pills.map(([k,v])=>
-        `<span class="hp"><b>${v}</b> ${esc(k)}</span>`).join('')}
-       <span class="sub">${el.length} hook${el.length===1?'':'s'} free.
-         Each post spends one; a spent hook sits out four posts.</span></div>`
-    : `<div class="hooksup none"><b>No hooks are free.</b>
-        <span class="sub">Every approved hook is inside its cooldown. Add new
-        ones to tools/hook_pool.json, or wait — the oldest returns after four
-        more posts.</span></div>`;
+// The rules compose enforces at render time, said while you are still
+// choosing. The server checks them again before a build starts — this copy is
+// here so the answer is instant on a phone, not so it can be the only one.
+function bgProblems(){
+  const out = [], sl = SPEC.slides;
+  const ppl = sl.filter(s=>s.bg && bgBy(s.bg).person);
+  if(ppl.length>1) out.push(`${ppl.length} slides have a person in them. One per post — more reads as stock photography.`);
+  sl.forEach((s,i)=>{
+    if(!s.bg) return;
+    const b = bgBy(s.bg);
+    if(i>0 && b.hook_only) out.push(`Slide ${i+1}: ${b.vibe} is hook-only — too busy under body copy.`);
+    if(i>0 && b.copy_ok===false) out.push(`Slide ${i+1}: too bright behind the copy (luma ${b.luma}, limit ${BGS.band_max_luma}).`);
+  });
+  for(let i=0;i<sl.length-1;i++){
+    const a = sl[i].bg && bgBy(sl[i].bg).vibe, b = sl[i+1].bg && bgBy(sl[i+1].bg).vibe;
+    if(a && a===b) out.push(`Slides ${i+1} and ${i+2} are both ${a} — the eye needs a change of scene.`);
+  }
+  const llm = LLMS(), n = SPEC.slides.filter(s=>s.tool && llm.has(s.tool)).length;
+  if(SPEC.pillar==='tools' && n>1) out.push(`${n} models in one post. Exactly one; nobody can tell two apart from a single line.`);
+  const dup = sl.map(s=>s.bg).filter(Boolean);
+  if(new Set(dup).size !== dup.length) out.push('The same photo is on two slides.');
+  return out;
+}
 
-  return `<div class="compose">
-    <h3>Describe the post</h3>
-    <p class="why">A sentence is enough. Name the hook, the roster, the
-      backgrounds, the caption angle — whatever you actually care about; the
-      rest follows the usual rules and every guard still runs.</p>
-    <textarea id="bnote" placeholder="e.g. five apps for someone starting at 17, ARCO first, icon shelf on the hook, plain dark backgrounds, caption about what each one replaced"
-      oninput="buildNote=this.value">${esc(buildNote)}</textarea>
-    <div class="crow">
-      <span class="sub">How many</span>
-      <div class="segs">${[1,2,3,5].map(nn=>
-        `<button class="seg ${buildCount===nn?'on':''}" onclick="buildCount=${nn};render()">${nn}</button>`).join('')}</div>
-      <span class="sp"></span>
-      <button class="btn" onclick="startBuild()" ${el.length?'':'disabled'}>
-        ${running?'Queue another':'Build'}</button>
+// ---------------------------------------------------------------- slide card
+function slideCard(sl, i){
+  const b = sl.bg ? bgBy(sl.bg) : null;
+  const busy = genBusy[i];
+  const thumb = sl.bg
+    ? `<img src="/bg/${sl.bg}" alt=""><span class="lab">${esc(b.vibe||'')}</span>`
+    : `<span class="pick">photo<br>${SPEC.pillar && i===0?'for the hook':'slide '+(i+1)}</span>`;
+  return `<article class="slrow ${sl.kind==="cta"?"k-cta":sl.kind}">
+    <div class="slbgwrap">
+      <button class="slbg ${sl.bg?'has':''}" onclick="openSheet('bg',${i})"
+        aria-label="Background for slide ${i+1}">${thumb}</button>
+      <button class="reroll" onclick="rerollBg(${i})" title="Another photo"
+        aria-label="Another photo for slide ${i+1}">↻</button>
     </div>
-    ${supply}
-    ${running?`<p class="why">${running} build${running===1?'':'s'} already
-      running. They go one at a time — two agents writing hooks.json at once
-      lose each other's work.</p>`:''}
-  </div>`;
+    <div class="slmain">
+      <div class="slhead"><span class="k">${i+1} · ${SLIDE_LABEL[sl.kind]}</span>
+        ${sl.kind==='hook'||sl.kind==='cta'?'':
+          `<button class="rm" onclick="removeSlide(${i})" aria-label="Remove slide">×</button>`}</div>
+      ${sl.kind==='hook' ? hookFields(sl) :
+        sl.kind==='cta'  ? ctaFields(sl, i) : bodyFields(sl, i)}
+      ${busy?`<span class="gbusy">writing… it keeps going if you leave</span>`:''}
+    </div></article>`;
+}
+
+function hookFields(sl){
+  return `<input class="cin big" maxlength="42" placeholder="my phone is boring now"
+      value="${esc(sl.lines[0]||'')}" oninput="setLine(0,0,this.value)">
+    <input class="cin big" maxlength="42" placeholder="and it changed everything"
+      value="${esc(sl.lines[1]||'')}" oninput="setLine(0,1,this.value)">
+    <div class="slact">
+      <button class="btn sec sm" onclick="openSheet('hook',0)">Pick from pool</button>
+      <button class="btn sec sm" onclick="genHooks()">Write me some</button>
+      <span class="csum">Two lines, under 42 each. State the result.</span>
+    </div>`;
+}
+
+function bodyFields(sl, i){
+  const t = sl.tool ? toolBy(sl.tool) : null;
+  return `${sl.kind==='tool'
+    ? `<button class="tl ${sl.tool?'on':''}" onclick="openSheet('tool',${i})">
+         ${t&&t.icon?`<img src="/icon/${t.icon}" alt="">`:'<span class="noico"></span>'}
+         ${esc(sl.tool||'pick a tool')}</button>`
+    : `<input class="cin" placeholder="the heading for this point"
+         value="${esc(sl.title||'')}" oninput="SPEC.slides[${i}].title=this.value;paintBar()">`}
+    <input class="cin" placeholder="what it does — the mechanism"
+      value="${esc(sl.lines[0]||'')}" oninput="setLine(${i},0,this.value)">
+    <input class="cin" placeholder="what that gets you — the consequence"
+      value="${esc(sl.lines[1]||'')}" oninput="setLine(${i},1,this.value)">
+    <div class="slact">
+      <button class="btn sec sm" onclick="genSlide(${i})">Write this slide</button>
+      <span class="csum">Leave it blank and the agent writes it.</span>
+    </div>`;
+}
+
+function ctaFields(sl, i){
+  return `<input class="cin" placeholder="day planner, app blocker, task manager"
+      value="${esc(sl.lines[0]||'')}" oninput="setLine(${i},0,this.value)">
+    <input class="cin" placeholder="the only productivity app you need"
+      value="${esc(sl.lines[1]||'')}" oninput="setLine(${i},1,this.value)">
+    <div class="slact"><span class="csum">App icon, full store name and these
+      lines. Leave blank for the usual card.</span></div>`;
+}
+
+function setLine(i, n, v){ SPEC.slides[i].lines[n] = v; paintBar(); }
+
+function addSlide(){
+  // Match what the post already is rather than what the pillar defaults to,
+  // so a slide added to a listicle is another tool.
+  const kind = SPEC.slides.some(s=>s.kind==='tool') ? 'tool' : 'point';
+  SPEC.slides.splice(SPEC.slides.length-1, 0,
+    {kind, tool:'', title:'', lines:['',''], bg:null, gen:0});
+  render();
+}
+function removeSlide(i){ SPEC.slides.splice(i,1); render(); }
+
+// ---------------------------------------------------------------- the sheet
+function openSheet(mode, i){ sheet = {mode, slide:i}; render(); }
+function closeSheet(){ sheet = null; render(); }
+
+function sheetView(){
+  if(!sheet) return '';
+  const body = sheet.mode==='bg' ? bgSheet(sheet.slide)
+             : sheet.mode==='tool' ? toolSheet(sheet.slide)
+             : hookSheet();
+  const title = sheet.mode==='bg' ? `Photo for slide ${sheet.slide+1}`
+              : sheet.mode==='tool' ? `Tool for slide ${sheet.slide+1}` : 'Hooks';
+  return `<div class="shwrap" onclick="if(event.target===this)closeSheet()">
+    <div class="sh"><div class="shhead"><b>${esc(title)}</b>
+      <button class="rm" onclick="closeSheet()" aria-label="Close">×</button></div>
+      <div class="shbody">${body}</div></div></div>`;
+}
+
+function bgSheet(i){
+  const all = (BGS&&BGS.bgs)||[];
+  if(!all.length) return `<div class="cwarn"><b>No background index.</b>
+    Run <code>python3 tools/bg_index.py</code>.</div>`;
+  const vibes = [...new Set(all.map(b=>b.vibe))].sort();
+  const prev = i>0 ? (SPEC.slides[i-1].bg && bgBy(SPEC.slides[i-1].bg).vibe) : null;
+  const next = i<SPEC.slides.length-1 ? (SPEC.slides[i+1].bg && bgBy(SPEC.slides[i+1].bg).vibe) : null;
+  const taken = {};
+  SPEC.slides.forEach((s,n)=>{ if(s.bg && n!==i) taken[s.bg] = n+1; });
+  const shown = all.filter(b =>
+      bgFilter==='all' ? true :
+      bgFilter==='fresh' ? !b.hook_used :
+      bgFilter==='fit' ? (i===0 ? true : (b.copy_ok && !b.hook_only)) :
+      b.vibe===bgFilter);
+  return `<div class="segs multi bgfil">
+      <button class="seg ${bgFilter==='fit'?'on':''}" onclick="bgFilter='fit';render()">
+        ${i===0?'Any':'Holds copy'}</button>
+      <button class="seg ${bgFilter==='fresh'?'on':''}" onclick="bgFilter='fresh';render()">Never a hook ${BGS.hook_left}</button>
+      <button class="seg ${bgFilter==='all'?'on':''}" onclick="bgFilter='all';render()">All ${all.length}</button>
+      ${vibes.map(v=>`<button class="seg ${bgFilter===v?'on':''}" onclick="bgFilter='${v}';render()">${esc(v)}</button>`).join('')}
+    </div>
+    ${SPEC.slides[i].bg?`<button class="btn sec sm" onclick="setBg(${i},null)">Clear this slide</button>`:''}
+    <div class="bgrid">${shown.map(b=>{
+      const bad = i>0 && (b.hook_only || b.copy_ok===false);
+      const clash = (b.vibe===prev || b.vibe===next);
+      const flags = [];
+      if(b.person) flags.push('<i>person</i>');
+      if(i>0 && b.hook_only) flags.push('<i class="warn">hook only</i>');
+      if(i>0 && b.copy_ok===false) flags.push('<i class="warn">bright</i>');
+      if(clash) flags.push('<i class="warn">same as neighbour</i>');
+      if(b.recent) flags.push('<i>last post</i>');
+      if(taken[b.name]) flags.push(`<i>slide ${taken[b.name]}</i>`);
+      return `<button class="bt ${SPEC.slides[i].bg===b.name?'on':''} ${bad||clash?'faded':''}"
+          onclick="setBg(${i},'${b.name}')" title="${esc(b.vibe)} · luma ${b.luma==null?'?':b.luma}">
+        <img loading="lazy" src="/bg/${b.name}" alt="">
+        <span class="fl">${flags.join('')}</span>
+        <span class="vb">${esc(b.vibe)}${b.hook_used?'':' · fresh'}</span></button>`;}).join('')}</div>`;
+}
+
+function setBg(i, name){ SPEC.slides[i].bg = name; sheet = null; render(); }
+
+function toolSheet(i){
+  const tools = (TOOLPOOL&&TOOLPOOL.tools)||[], cats = (TOOLPOOL&&TOOLPOOL.cats)||[];
+  const on = new Set(SPEC.slides.map(s=>s.tool).filter(Boolean));
+  return cats.map(c=>`<h4 class="csub">${esc(c)}</h4>
+    <div class="tgrid">${tools.filter(t=>t.cat===c).map(t=>
+      `<button class="tl ${SPEC.slides[i].tool===t.name?'on':''} ${on.has(t.name)&&SPEC.slides[i].tool!==t.name?'faded':''}"
+         onclick="setTool(${i},'${esc(t.name)}')">
+        ${t.icon?`<img src="/icon/${t.icon}" alt="">`:'<span class="noico"></span>'}${esc(t.name)}
+        ${t.icon?'':'<span class="tnum warn">no icon</span>'}</button>`).join('')}</div>`).join('');
+}
+
+function setTool(i, name){
+  SPEC.slides[i].tool = name;
+  if(!SPEC.slides[i].title) SPEC.slides[i].title = name;
+  sheet = null; render();
+}
+
+function hookSheet(){
+  const el = ((HOOKS&&HOOKS.eligible)||[]).filter(h=>h.pillar===SPEC.pillar);
+  const sug = ((HOOKS&&HOOKS.suggested)||[]).filter(h=>h.pillar===SPEC.pillar);
+  const made = (HOOKS&&HOOKS.made)||[];
+  const card = (h, cls) => `<button class="hk ${cls||''}" onclick='useHook(${JSON.stringify(h)})'>
+      ${esc(h.lines[0])}<br>${esc(h.lines[1]||'')}
+      <span class="p">${esc(h.pillar||SPEC.pillar)}${cls?' · add':''}</span></button>`;
+  return `${made.length?`<h4 class="csub">Just written</h4>
+      <div class="hgrid">${made.map(h=>card(h,'sug')).join('')}</div>`:''}
+    ${el.length?`<h4 class="csub">In the pool, off cooldown</h4>
+      <div class="hgrid">${el.map(h=>card(h)).join('')}</div>`
+     :`<div class="cwarn"><b>No ${esc(SPEC.pillar)} hook is free.</b> Every approved
+        one is inside its cooldown — write one, or have some written.</div>`}
+    ${sug.length?`<h4 class="csub">Calibrated, not in the pool yet</h4>
+      <div class="hgrid">${sug.map(h=>card(h,'sug')).join('')}</div>`:''}
+    <div class="slact"><button class="btn sec sm" onclick="genHooks()">Write me some</button></div>`;
+}
+
+async function useHook(h){
+  const r = await fetch('/api/hook',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({lines:h.lines, pillar:h.pillar||SPEC.pillar})});
+  const j = await r.json();
+  if(j.error) return say(j.error);
+  SPEC.slides[0].lines = h.lines.slice();
+  if(h.pillar && h.pillar!==SPEC.pillar) setPillar(h.pillar, true);
+  sheet = null;
+  HOOKS = null; loadHooks(); render();
+}
+
+// ------------------------------------------------------------------ autofill
+//
+// Picking a photo, a hook and a roster is not judgment, it is rule-following:
+// a frame nothing has opened with, one that holds white text, no two
+// neighbours alike, one person at most, ARCO first, exactly one model. All of
+// that runs on the server in milliseconds and costs nothing. What is left for
+// the agent is the only part that was ever a decision — the words.
+async function fillSlides(only){
+  const r = await fetch('/api/autofill',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pillar:SPEC.pillar, only, slides:SPEC.slides.map(s=>
+      ({kind:s.kind, tool:s.tool, title:s.title, lines:s.lines, bg:s.bg}))})});
+  const j = await r.json();
+  if(j.error) { say(j.error); return false; }
+  j.slides.forEach((n,i)=>{ if(!SPEC.slides[i]) return;
+    SPEC.slides[i].bg = n.bg; SPEC.slides[i].tool = n.tool;
+    SPEC.slides[i].title = n.title; SPEC.slides[i].lines = n.lines; });
+  saveSpec();
+  return true;
+}
+
+async function fillIn(){ if(await fillSlides('all')) render(); }
+async function shufflePhotos(){ if(await fillSlides('bgs')) render(); }
+async function rerollBg(i){ if(await fillSlides(i)) render(); }
+
+// Two taps: everything the rules can decide, decided, then straight to the
+// build — which writes the copy as it renders. The composer below is for when
+// you want a say; this is for when you do not.
+async function quickDraft(){
+  if(!await fillSlides('all')) return;
+  render();
+  await startBuild();
+}
+
+// ---------------------------------------------------------------- generation
+async function genHooks(){
+  const r = await fetch('/api/gen',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({what:'hooks', pillar:SPEC.pillar, n:5, note:SPEC.note})});
+  const j = await r.json();
+  if(j.error) return say(j.error);
+  say('Writing hooks. They appear here when it is done.');
+  genBusy['hooks'] = true; SPEC.genHooks = j.at; saveSpec(); render();
+  pollGen(j.at, res => {
+    genBusy['hooks'] = false; SPEC.genHooks = 0;
+    if(res && res.hooks){ HOOKS = Object.assign({}, HOOKS, {made:res.hooks});
+      sheet = {mode:'hook', slide:0}; }
+    saveSpec(); render();
+  });
+}
+
+// One result, two shapes: a whole post comes back as numbered slides, a
+// single slide as one title and two lines.
+function applyGen(res, fallbackIndex){
+  if(!res) return;
+  if(res.slides){
+    res.slides.forEach(sl => {
+      const t = SPEC.slides[sl.n-1];
+      if(!t) return;
+      if(sl.title) t.title = sl.title;
+      t.lines = sl.lines.slice();
+    });
+    return;
+  }
+  const t = SPEC.slides[fallbackIndex];
+  if(!t || !res.lines) return;
+  if(res.title) t.title = res.title;
+  t.lines = res.lines.slice();
+}
+
+async function genPost(){
+  const blanks = SPEC.slides
+    .map((s,i)=>({s,i}))
+    .filter(({s}) => s.kind!=='hook' && s.kind!=='cta' && !(s.lines||[]).filter(l=>l.trim()).length);
+  if(!blanks.length) return say('Every slide already says something.');
+  const plan = SPEC.slides.map((s,i)=>{
+    const who = s.tool || s.title || SLIDE_LABEL[s.kind];
+    const said = (s.lines||[]).filter(l=>l.trim()).join(' / ');
+    return `  slide ${i+1} (${who})${blanks.some(b=>b.i===i)?' — WRITE THIS':''}${said?': '+said:''}`;
+  }).join('\n');
+  const r = await fetch('/api/gen',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({what:'post', pillar:SPEC.pillar,
+      hook:hookLines().filter(Boolean).join(' / '), plan, note:SPEC.note})});
+  const j = await r.json();
+  if(j.error) return say(j.error);
+  // One run for the whole post, not one per slide: agent runs go one at a
+  // time, so four "write this slide" taps is four waits in a row — and the
+  // slides come out reading like one post rather than five separate ones.
+  blanks.forEach(({i}) => { genBusy[i] = true; SPEC.slides[i].gen = j.at; });
+  saveSpec(); render();
+  pollGen(j.at, res => {
+    blanks.forEach(({i}) => { genBusy[i] = false; SPEC.slides[i].gen = 0; });
+    applyGen(res, blanks[0].i);
+    saveSpec(); render();
+  });
+}
+
+async function genSlide(i){
+  const sl = SPEC.slides[i];
+  const others = SPEC.slides.map((s,n)=> n===i ? null
+      : (s.lines||[]).filter(Boolean).length
+        ? `  slide ${n+1} (${s.tool||s.title||SLIDE_LABEL[s.kind]}): ${s.lines.filter(Boolean).join(' / ')}` : null)
+    .filter(Boolean).join('\n');
+  const r = await fetch('/api/gen',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({what:'slide', pillar:SPEC.pillar, tool:sl.tool,
+      hook:hookLines().filter(Boolean).join(' / '), others, n:i+1, note:SPEC.note})});
+  const j = await r.json();
+  if(j.error) return say(j.error);
+  genBusy[i] = true; SPEC.slides[i].gen = j.at; saveSpec(); render();
+  pollGen(j.at, res => {
+    genBusy[i] = false; SPEC.slides[i].gen = 0;
+    applyGen(res, i); saveSpec(); render();
+  });
+}
+
+// Agent runs are serialised, so a queued one can sit for a while. Polling
+// rather than waiting on the request keeps the page usable meanwhile.
+function pollGen(at, done){
+  let tries = 0;
+  const tick = async () => {
+    tries++;
+    let j = {};
+    try { j = await (await fetch('/api/gen?at='+at)).json(); } catch(e){}
+    if(j.status==='done') return done(j.result);
+    if(j.status==='failed' || j.status==='interrupted'){
+      say(j.why || 'That run did not finish.');
+      return done(null);
+    }
+    if(tries > 260) { say('Still going — it will land in the job panel.'); return done(null); }
+    setTimeout(tick, 2500);
+  };
+  setTimeout(tick, 2000);
+}
+
+// ---------------------------------------------------------------- the page
+function setPillar(k, keepHook){
+  if(k===SPEC.pillar) return;
+  const old = SPEC;
+  SPEC = freshSpec(k);
+  SPEC.caption = old.caption; SPEC.note = old.note; SPEC.count = old.count;
+  if(keepHook) SPEC.slides[0].lines = old.slides[0].lines.slice();
+  SPEC.slides[0].bg = old.slides[0].bg;
+  render();
+}
+
+function barInner(){
+  ensureSpec();
+  const n = SPEC.slides.length;
+  const blank = SPEC.slides.filter(s => s.kind!=='cta' && !(s.lines||[]).filter(Boolean).length).length;
+  const noBg = SPEC.slides.filter(s => !s.bg).length;
+  const probs = bgProblems();
+  return `<span class="sum">${n} slides · ${blank?blank+' for the agent to write':'all written'}
+      · ${noBg?noBg+' photos for it to pick':'all photos chosen'}
+      ${probs.length?`<b class="warnt">${probs.length} to look at</b>`:''}</span>
+    <div class="segs">${[1,2,3].map(c=>
+      `<button class="seg ${SPEC.count===c?'on':''}" onclick="SPEC.count=${c};paintBar()">${c}</button>`).join('')}</div>
+    <button class="btn" onclick="startBuild()">Generate</button>`;
+}
+function paintBar(){ saveSpec();
+  const el = document.getElementById('cbar'); if(el) el.innerHTML = barInner(); }
+
+function composeView(){
+  ensureSpec();
+  saveSpec();
+  const running = (DATA.runs||[]).filter(r=>r.kind==='build').length;
+  const probs = bgProblems();
+  return `<div class="cx">
+    <div class="segs multi ptop">${PILLARS.map(([k,lab])=>
+      `<button class="seg ${SPEC.pillar===k?'on':''}" onclick="setPillar('${k}')">${lab}</button>`).join('')}</div>
+    <div class="fastrow">
+      <button class="btn qd" onclick="quickDraft()">Quick draft</button>
+      <button class="btn sec sm" onclick="fillIn()">Fill it in</button>
+      <button class="btn sec sm" onclick="shufflePhotos()">Shuffle photos</button>
+      <button class="btn sec sm" onclick="genPost()">Write the blanks</button>
+    </div>
+    <p class="why">Quick draft picks the hook, the photos and the roster from
+      the rules and sends it straight to build — two taps to a post. Everything
+      below is the same thing, one decision at a time: whatever you set is kept,
+      whatever you leave blank gets chosen for you.</p>
+    ${probs.length?`<div class="cwarn"><b>Worth changing:</b> ${probs.map(esc).join('<br>')}</div>`:''}
+    <div class="slrows">${SPEC.slides.map(slideCard).join('')}</div>
+    <button class="btn sec sm addsl" onclick="addSlide()">Add a slide</button>
+    <h4 class="csub">Caption</h4>
+    <input class="cin wide" value="${esc(SPEC.caption)}" placeholder="the angle it takes — the search tag is added either way"
+      oninput="SPEC.caption=this.value">
+    <h4 class="csub">Anything else</h4>
+    <textarea placeholder="e.g. keep the icon shelf on the hook, no numbers in the corners"
+      oninput="SPEC.note=this.value">${esc(SPEC.note)}</textarea>
+    <div class="cbar" id="cbar">${barInner()}</div>
+    ${running?`<p class="why">${running} build${running===1?'':'s'} already running.
+      They go one at a time — two agents writing hooks.json at once lose each
+      other's work.</p>`:''}
+    ${sheetView()}</div>`;
 }
 
 async function startBuild(){
-  const note = (document.getElementById('bnote')||{}).value || '';
-  if(!note.trim()) return say('Say what the post should be first.');
-  buildNote = '';
-  await fetch('/api/build',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({count:buildCount, pillar:'tools', note:note.trim()})});
+  const slides = SPEC.slides.map(s => ({kind:s.kind, tool:s.tool, title:s.title,
+    lines:(s.lines||[]).filter(l=>l.trim()), bg:s.bg}));
+  const r = await fetch('/api/build',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({count:SPEC.count, pillar:SPEC.pillar, note:SPEC.note.trim(),
+      spec:{pillar:SPEC.pillar, slides, caption:SPEC.caption}})});
+  const j = await r.json().catch(()=>({}));
+  if(j.error) return say(j.error);
   say('Building. It lands in Review when the slides and the caption are done.');
+  SPEC = freshSpec(SPEC.pillar);
   await load();
-  loadHooks();
+  HOOKS = null; loadHooks();
+}
+
+// ---------------------------------------------------------------- users
+//
+// The app's own numbers, next to the numbers for the posts that sell it. They
+// belong on one screen: a week of good reach that moves no installs and no
+// blocking is a content problem, and the same week with installs that never
+// turn blocking on is a product one. Two dashboards could never say that.
+let USERS = null, usersDays = 30;
+
+async function loadUsers(){
+  try { USERS = await (await fetch('/api/users?days='+usersDays)).json(); }
+  catch(e){ USERS = {error: String(e)}; }
+  if(filter==='users') render();
+}
+
+const PCT = (n,d) => d ? Math.round(100*n/d) : 0;
+
+function bars(rows, key, label){
+  const order = ['0','1-2','3-5','6-10','11+'];
+  const mine = (rows||[]).filter(r=>r.k===key && r.b!=='?');
+  const total = mine.reduce((a,r)=>a+r.n,0);
+  if(!total) return '';
+  const by = Object.fromEntries(mine.map(r=>[r.b,r.n]));
+  return `<div class="ubox"><h4>${esc(label)}</h4>
+    ${order.map(b=>{
+      const n = by[b]||0, p = PCT(n,total);
+      return `<div class="ubar"><span class="l">${b}</span>
+        <span class="t"><i style="width:${p}%"></i></span>
+        <span class="v">${p}%</span></div>`;}).join('')}
+    <p class="csum">${total} install${total===1?'':'s'} seen</p></div>`;
+}
+
+// The funnel, in the order it happens. Percentages are of installs that
+// finished onboarding, because an install that never got through onboarding
+// has not had a chance to do any of the rest.
+const FUNNEL = [['onboarded','Finished onboarding'],
+                ['screenTimeGranted','Allowed Screen Time'],
+                ['firstTask','Planned a task'],
+                ['firstWindow','Created a block window'],
+                ['firstWindowRan','A window actually ran']];
+
+function funnelBox(){
+  const rows = USERS.funnel || [];
+  if(!rows.length) return '';
+  const total = {};
+  rows.forEach(r => { total[r.event] = (total[r.event]||0) + r.n; });
+  const base = total.onboarded || Math.max(...Object.values(total), 1);
+  const r = USERS.retention || {};
+  return `<div class="ubox wide"><h4>Where installs stop</h4>
+    ${FUNNEL.map(([k,label])=>{
+      const n = total[k]||0, p = PCT(n, base);
+      return `<div class="ubar"><span class="fl">${esc(label)}</span>
+        <span class="t"><i style="width:${p}%"></i></span>
+        <span class="v">${n}</span></div>`;}).join('')}
+    ${r.cohort?`<p class="csum">Came back: ${PCT(r.d1,r.cohort)}% after a day ·
+      ${PCT(r.d7,r.cohort)}% after a week · ${PCT(r.d30,r.cohort)}% after a month
+      <i>(of ${r.cohort} installs)</i></p>`:''}</div>`;
+}
+
+// The two permissions the product rests on. A denied Screen Time
+// authorisation means the blocker cannot work at all for that install, and
+// no other number here would ever show it.
+function permsBox(){
+  const rows = USERS.perms || [];
+  if(!rows.length) return '';
+  const tally = (field) => {
+    const out = {};
+    rows.forEach(r => { out[r[field]] = (out[r[field]]||0) + r.n; });
+    return out;
+  };
+  const box = (t, label, warn) => {
+    const total = Object.values(t).reduce((a,b)=>a+b,0) || 1;
+    return `<div class="ubox"><h4>${esc(label)}</h4>
+      ${['granted','denied','unasked','?'].filter(k=>t[k]).map(k=>
+        `<div class="ubar"><span class="l ${k==='denied'?'bad':''}">${k}</span>
+          <span class="t"><i class="${k==='denied'?'bad':''}"
+            style="width:${PCT(t[k],total)}%"></i></span>
+          <span class="v">${PCT(t[k],total)}%</span></div>`).join('')}
+      <p class="csum">${esc(warn)}</p></div>`;
+  };
+  return `<div class="ugrid">
+    ${box(tally('screenTime'), 'Screen Time permission',
+          'Denied means the blocker cannot run for them at all.')}
+    ${box(tally('notifs'), 'Notification permission',
+          'Denied means no reminders — for a planner that is most of it.')}
+  </div>`;
+}
+
+function usersView(){
+  if(!USERS) { loadUsers(); return '<div class="empty">Reading the app…</div>'; }
+  if(USERS.off) return `<div class="cwarn"><b>Not collecting yet.</b> ${esc(USERS.why)}</div>`;
+  if(USERS.error) return `<div class="cwarn"><b>The metrics worker did not answer.</b>
+    ${esc(USERS.error)}</div>`;
+  const a = USERS.active || {}, n = a.installs || 0;
+  const rate = (USERS.taskRate||{}).avg_rate;
+  const kpi = (v, l, sub) => `<div class="ukpi"><b>${v}</b><span>${esc(l)}</span>
+    ${sub?`<i>${esc(sub)}</i>`:''}</div>`;
+  return `<div class="cx">
+    <div class="segs multi">${[7,30,90].map(d=>
+      `<button class="seg ${usersDays===d?'on':''}"
+        onclick="usersDays=${d};USERS=null;loadUsers()">${d} days</button>`).join('')}</div>
+    ${USERS.stale?`<div class="cwarn"><b>Saved copy.</b> The worker is not
+      answering right now, so these are the last numbers it gave.</div>`:''}
+    <div class="ukpis">
+      ${kpi(n, 'installs seen', 'opened the app at least once')}
+      ${kpi(a.today||0, 'opened today')}
+      ${kpi(PCT(a.blocking_installs, n)+'%', 'turned blocking on',
+            (a.blocking_installs||0)+' of '+n)}
+      ${kpi(PCT(a.focus_installs, n)+'%', 'used focus',
+            (a.focus_installs||0)+' of '+n)}
+      ${kpi(PCT(a.premium_installs, n)+'%', 'on premium',
+            (a.premium_installs||0)+' of '+n)}
+      ${kpi(rate==null?'–':Math.round(rate)+'%', 'of planned tasks done',
+            'averaged over days where anything was planned')}
+    </div>
+    ${funnelBox()}
+    ${permsBox()}
+    <div class="ugrid">
+      ${bars(USERS.dist,'habits','Habits kept')}
+      ${bars(USERS.dist,'tasks','Tasks planned in a day')}
+      ${bars(USERS.dist,'blockWindows','Blocked Hours windows')}
+      ${bars(USERS.dist,'focusSessions7d','Focus sessions a week')}
+    </div>
+    <p class="why">One snapshot per install per day, counts bucketed, nothing
+      identifying. A user with an iPhone and a Mac counts once — the day is
+      claimed in iCloud, not on the device.</p>
+  </div>`;
 }
 
 const match = p => filter==='all' ? true
@@ -3360,7 +5442,11 @@ function elapsed(ts){
 let seenRuns = [], justDone = [], batchTotal = 0, batchDone = 0;
 
 function paintRuns(){
-  const runs = DATA.runs||[];
+  const all = DATA.runs||[];
+  // A failure is not a job in progress. Keeping it out of the counts stops
+  // "building 3 of 3" claiming work that already died.
+  const bad  = all.filter(r => r.status === 'failed' || r.status === 'interrupted');
+  const runs = all.filter(r => r.status === 'running' || r.status === 'queued');
   const running = runs.filter(r => r.status === 'running');
   const queued  = runs.filter(r => r.status !== 'running');
 
@@ -3381,11 +5467,30 @@ function paintRuns(){
     ? `<button class="runpill" onclick="jobsOpen=!jobsOpen;paintRuns()">
          <span class="busy"></span>building ${Math.min(batchDone + 1, batchTotal)}/${batchTotal}${
            queued.length ? ` <span class="q">${queued.length} waiting</span>` : ''}</button>`
+    : bad.length
+    ? `<button class="runpill bad" onclick="jobsOpen=!jobsOpen;paintRuns()">
+         ${bad.length} failed</button>`
     : '';
 
   const box = document.getElementById('jobs');
-  if ((!runs.length && !justDone.length) || (!jobsOpen && runs.length)) {
+  if ((!runs.length && !justDone.length && !bad.length)
+      || (!jobsOpen && (runs.length || bad.length))) {
     box.innerHTML = '';
+  } else if (!runs.length && !justDone.length && bad.length) {
+    // Nothing running, something broken: say what and why, and stay until
+    // dismissed. This is the state a failed redo used to spend six seconds in
+    // wearing a green tick.
+    box.innerHTML = `<div class="toast">
+      <button class="x" onclick="jobsOpen=false;paintRuns()">&times;</button>
+      <h5><span class="bad">!</span>${bad.length} run${bad.length===1?'':'s'} failed</h5>
+      ${bad.map(r => `<div class="trow fail">
+        <span class="mk"><span class="bad">!</span></span>
+        <span>${esc(r.what)}<br><i>${esc(whyPlain(r))}</i></span>
+        <button class="btn sec rt" onclick="retryRun('${r.kind}',${r.at})">Retry</button>
+      </div>`).join('')}
+      <button class="btn sec" style="width:100%;margin-top:9px"
+        onclick="dismissFails()">Clear</button>
+    </div>`;
   } else {
     const head = runs.length
       ? `<h5><span class="spin"></span>Building ${
@@ -3401,6 +5506,9 @@ function paintRuns(){
       ${justDone.map(w => `<div class="trow">
          <span class="mk"><span class="ok">&#10003;</span></span>
          <span>${esc(w)}</span></div>`).join('')}
+      ${bad.map(r => `<div class="trow fail">
+         <span class="mk"><span class="bad">!</span></span>
+         <span>${esc(r.what)}<br><i>${esc(r.why || '')}</i></span></div>`).join('')}
       ${runs.map(r => r.status === 'running'
         ? `<div class="trow"><span class="mk"><span class="spin"></span></span>
              <span>${esc(r.what)}</span>
@@ -3491,7 +5599,7 @@ async function load(quiet){
   const unseen = DATA.posts.some(p => !p.seen && stateOf(p)==='review');
   ICONS.liked = '<path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/>';
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
-    k==='stats' ? '' :
+    k==='stats'||k==='users' ? '' :
     k==='post' ? DATA.posts.filter(postable).length :
     DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked
                          :k==='out'?isOut(p):stateOf(p)===k).length]));
@@ -3531,10 +5639,50 @@ async function load(quiet){
 // Review. The hash carries the whole view: tab, post, analytics sub-tab and
 // period. `?` separates the post from the rest so old <topic>/<slide> links
 // still work.
+let app = 'arco';            // 'arco' | 'konvo'
+let kData = null, kDays = 14, kVer = null, kBusy = false;
+
+// Two apps, one dashboard. The alternative was a second tool that would be
+// opened once a month and then not maintained.
+function setApp(a){
+  app = a;
+  document.getElementById('sw-arco').className  = a==='arco'  ? 'on' : '';
+  document.getElementById('sw-konvo').className = a==='konvo' ? 'on' : '';
+  document.getElementById('brandn').textContent = a==='konvo' ? 'Konvo' : 'ARCO';
+  const v = document.getElementById('brandv');
+  if(v) v.firstChild.nodeValue = a==='konvo' ? 'onboarding analytics' : 'content pipeline';
+  document.querySelector('nav[aria-label="Filter posts"]').style.display = a==='konvo' ? 'none' : '';
+  const ac = document.getElementById('accounts');
+  if(ac) ac.style.display = a==='konvo' ? 'none' : '';
+  saveHash(); render();
+  if(a==='konvo' && !kData) loadKonvo();
+}
+
+async function loadKonvo(){
+  kBusy = true; render();
+  try{
+    const q = new URLSearchParams({days: kDays});
+    if(kVer) q.set('version', kVer);
+    kData = await (await fetch('/api/konvo?' + q)).json();
+  }catch(e){ kData = {error: String(e)}; }
+  kBusy = false; render();
+}
+
 function saveHash(){
   const q = ['v=' + filter];
+  if(app !== 'arco') q.push('app=' + app);
+  // Which section of the composer is open, so a reload puts you back in it
+  // rather than at the top with your choices intact but hidden.
+  if(filter === 'new' && cstep) q.push('step=' + cstep);
+  if(filter === 'liked' && perfSort !== 'views') q.push('s=' + perfSort);
   if(filter === 'stats'){
     q.push('t=' + anTab, 'p=' + anPeriod, 'r=' + anRange);
+    // Custom carries its dates, or reloading the page lands on a range with
+    // no bounds and nothing to show.
+    if(anRange === 'custom' && anFrom){
+      q.push('cf=' + Math.round(anFrom));
+      if(anTo) q.push('ct=' + Math.round(anTo));
+    }
     if(anAccs) q.push('a=' + [...anAccs].join(','));
   }
   location.replace('#' + (cur ? encodeURIComponent(cur) + (zi >= 0 ? '/' + (zi+1) : '') + '?' : '?') + q.join('&'));
@@ -3545,10 +5693,15 @@ function restoreHash(){
   if(!raw) return;
   const [postPart, queryPart] = raw.split('?');
   new URLSearchParams(queryPart || '').forEach((val, key) => {
+    if(key === 'app' && (val === 'arco' || val === 'konvo')) app = val;
     if(key === 'v' && FILTERS.some(f => f[0] === val)) filter = val;
+    if(key === 'step') cstep = val;
     if(key === 't') anTab = val;
     if(key === 'p') anPeriod = val;
     if(key === 'r') anRange = val;
+    if(key === 's') perfSort = val;
+    if(key === 'cf') anFrom = +val || null;
+    if(key === 'ct') anTo = +val || null;
     if(key === 'a') anAccs = new Set(val.split(',').filter(Boolean));
   });
   if(!postPart) return;
@@ -3586,7 +5739,7 @@ function togglePages(){
   const m = document.getElementById('pagemenu');
   if(!m.hidden) return closePages();
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
-    k==='stats' ? '' :
+    k==='stats'||k==='users' ? '' :
     k==='post' ? DATA.posts.filter(postable).length :
     DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked
                          :k==='out'?isOut(p):stateOf(p)===k).length]));
@@ -3614,8 +5767,102 @@ function render(){ try{ render_(); }catch(err){
     (err && err.message ? err.message : err)+'</code></div>';
   console.error(err);
 } }
+function konvoView(){
+  const esc = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  if(kBusy && !kData) return '<div class="empty">Reading PostHog…</div>';
+  if(!kData) return '<div class="empty">Nothing loaded yet.</div>';
+  if(kData.error) return '<div class="empty">PostHog said no.<br><br><code>'+esc(kData.error)+'</code></div>';
+
+  const ev = {}; (kData.events||[]).forEach(e => ev[e.event] = e.people);
+  const n = k => ev[k] || 0;
+  const f = kData.funnel || [];
+  const started = (f[0]||{}).people || 0;
+  const finished = (f[f.length-1]||{}).people || 0;
+
+  // Which build these numbers come from. Until 1.1 shipped, the only builds
+  // carrying PostHog were running on this machine, so an unlabelled funnel was
+  // mostly simulator launches wearing a user's clothes.
+  const vsel = `<select class="tabsel" onchange="kVer=this.value;loadKonvo()">`
+    + (kData.versions||[]).map(v=>{
+        const id = v.version+'|'+v.build;
+        return `<option value="${esc(id)}" ${kData.version===id?'selected':''}>`
+             + `${esc(v.version)} (${esc(String(v.build).replace(/\.0$/,''))}) · ${v.people} ppl</option>`;
+      }).join('') + `</select>`;
+  const dsel = `<select class="tabsel" onchange="kDays=+this.value;loadKonvo()">`
+    + [7,14,30,90].map(d=>`<option value="${d}" ${kData.days===d?'selected':''}>${d} days</option>`).join('')
+    + `</select>`;
+
+  const card = (num, label) => `<div class="kcard"><div class="n">${num}</div><div class="l">${label}</div></div>`;
+
+  // Installs per day, as bars. A number alone cannot show you a spike.
+  const daily = kData.daily || [];
+  const dmax = Math.max(1, ...daily.map(d=>d.people));
+  const spark = daily.length
+    ? `<div class="sect"><h3>Installs per day</h3>
+        <div class="kspark">${daily.map(d=>
+          `<i style="height:${Math.round(100*d.people/dmax)}%" title="${esc(d.day)}: ${d.people}"></i>`).join('')}</div>
+        <p>${esc((daily[0]||{}).day||'')} to ${esc((daily[daily.length-1]||{}).day||'')},
+           peak ${dmax} in a day</p></div>`
+    : '';
+
+  // The funnel. Each row is marked when it loses more than a fifth of the
+  // people the row above it had, because that is the screen worth looking at.
+  let prev = null;
+  const rows = f.map(r=>{
+    const lost = prev===null ? 0 : Math.max(0, prev - r.people);
+    const bad  = prev ? (lost / prev) > 0.2 : false;
+    const out = `<div class="row ${bad?'drop':''}">
+        <span class="nm">${r.index+1}. ${esc(r.step)}</span>
+        <span class="tr"><span class="fl" style="width:${r.pct}%"></span></span>
+        <span class="vv">${r.people}${lost?` <span style="color:#c2554a">-${lost}</span>`:''}</span>
+      </div>`;
+    prev = r.people; return out;
+  }).join('');
+
+  const tbl = (title, rows_, cols) => rows_.length
+    ? `<div class="sect"><h3>${title}</h3><div class="kfun">${rows_.map(r=>
+        `<div class="row"><span class="nm">${esc(r[0])}</span>
+         <span class="tr"><span class="fl" style="width:${r[2]}%"></span></span>
+         <span class="vv">${r[1]}</span></div>`).join('')}</div></div>`
+    : '';
+  const cmax = Math.max(1, ...(kData.countries||[]).map(c=>c.people));
+  const countries = tbl('Where they are',
+    (kData.countries||[]).map(c=>[c.country, c.people, Math.round(100*c.people/cmax)]));
+  const fmax = Math.max(1, ...(kData.failures||[]).map(x=>x.count));
+  const fails = tbl('Backend failures',
+    (kData.failures||[]).map(x=>[x.endpoint+' · '+x.people+' ppl', x.count, Math.round(100*x.count/fmax)]));
+
+  return `<div class="subtabs">${vsel}${dsel}
+      <button class="sub ghost" onclick="loadKonvo()">${kBusy?'Loading…':'Refresh'}</button></div>
+    <div class="kgrid">
+      ${card(n('Application Installed'), 'installs')}
+      ${card(started, 'started onboarding')}
+      ${card(finished, 'reached paywall')}
+      ${card(n('purchase_succeeded'), 'purchased')}
+    </div>
+    <div class="sect"><h3>Onboarding, screen by screen</h3>
+      <p>${started? Math.round(100*finished/started):0}% of the people who opened the app reached the paywall.
+         Rows in red lose more than a fifth of the row above.</p>
+      <div class="kfun">${rows}</div></div>
+    ${spark}
+    <div class="sect"><h3>What they did</h3><div class="kfun">${
+      ['diagnostic_completed','demo_reply_scored','paywall_viewed','paywall_plan_selected',
+       'purchase_attempted','purchase_succeeded','drill_started','drill_completed']
+      .map(k=>`<div class="row"><span class="nm">${esc(k.replace(/_/g,' '))}</span>
+        <span class="tr"><span class="fl" style="width:${started?Math.round(100*n(k)/started):0}%"></span></span>
+        <span class="vv">${n(k)}</span></div>`).join('')}</div></div>
+    ${countries}
+    ${fails}`;
+}
+
 function render_(){
   const view=document.getElementById('view');
+  if(app === 'konvo'){
+    document.getElementById('ttl').textContent = 'Konvo';
+    document.getElementById('cnt').textContent = kData && !kData.error ? kData.days + ' days' : '';
+    view.innerHTML = konvoView();
+    return;
+  }
   const pageName = cur ? cur : (FILTERS.find(f=>f[0]===filter)||[])[1];
   document.getElementById('ttl').textContent = pageName;
   const mb = document.getElementById('menubtn');
@@ -3628,6 +5875,11 @@ function render_(){
     document.getElementById('cnt').textContent = '';
     view.innerHTML = composeView();
     if(!HOOKS) loadHooks();
+    return;
+  }
+  if(filter === 'users'){
+    document.getElementById('cnt').textContent = '';
+    view.innerHTML = usersView();
     return;
   }
   if(filter==='post'){
@@ -3653,6 +5905,10 @@ function render_(){
 // when it was drafted, else when it was built. Every tab groups on it.
 function whenOf(p){
   const ds = DATA.accounts.map(a=>(p.delivery||{})[a.key]).filter(Boolean);
+  // last_out beats published_at: a repost is the same post going out again,
+  // and it is the going-out that this list is ordered by.
+  const outs = ds.map(r=>r.last_out).filter(Boolean);
+  if(outs.length) return Math.max(...outs);
   const pubs = ds.map(r=>r.published_at).filter(Boolean);
   if(pubs.length) return Math.max(...pubs);
   const sent = ds.map(r=>r.at).filter(Boolean);
@@ -3695,6 +5951,19 @@ function groups(list){
     return [...by].map(([d,ps]) => `<div class="daygrp">
       <div class="dayhd">${d}<span class="ct">${ps.length} post${ps.length===1?'':'s'}</span></div>
       <div class="grid">${ps.map(card).join('')}</div></div>`).join('');
+  }
+  // Performing is a ranking, not a feed: the question is which post did best,
+  // so it opens on views and can fall back to recency.
+  if(filter==='liked'){
+    const by = {
+      views: (a,b) => bestViews(b) - bestViews(a),
+      total: (a,b) => totals(b).v - totals(a).v,
+      new:   (a,b) => whenOf(b) - whenOf(a),
+    }[perfSort] || ((a,b) => bestViews(b) - bestViews(a));
+    return `<div class="mxbar"><div class="segs">${
+      [['views','Best account'],['total','All accounts'],['new','Newest']].map(([v,l])=>
+        `<button class="seg ${perfSort===v?'on':''}" onclick="perfSort='${v}';saveHash();render()">${l}</button>`).join('')
+      }</div></div><div class="grid">${list.slice().sort(by).map(card).join('')}</div>`;
   }
   return `<div class="grid">${list.slice().sort((a,b)=>whenOf(b)-whenOf(a))
     .map(card).join('')}</div>`;
@@ -3744,7 +6013,7 @@ let AN = null, anAll = false, anSort = 'best', anTab = 'published', anPeriod = '
 // "published when", the other "gained when", and sharing a control is how
 // those two get confused.
 let anRange = '7', anFrom = null, anTo = null, pubSort = 'new', pubAll = false;
-let anError = null, STALE = false;
+let anError = null, STALE = false, perfSort = 'views';
 
 // One bar, above everything, when the data on screen is a saved copy. It says
 // how old it is, because a number you cannot date is worse than no number.
@@ -3871,24 +6140,43 @@ function rangeBounds(){
   if(anRange === 'yesterday') return [m - DAY, m];
   if(anRange === '7')         return [m - 6 * DAY, null];
   if(anRange === '30')        return [m - 29 * DAY, null];
-  if(anRange === 'custom')    return [anFrom, anTo];
+  if(anRange === 'custom')    return [anFrom, anTo];   // only from an old link
   return [0, null];                       // all time
 }
 function setRange(r){
-  // Custom used to open on two empty inputs, which resolved to no range at
-  // all and showed nothing. It starts on today and is narrowed from there.
-  if(r === 'custom' && anFrom == null){ anFrom = midnight(); anTo = null; }
+  // Custom opens on yesterday, one day, because that is the thing you
+  // usually want a custom range for. It used to open on two empty inputs,
+  // which resolved to no range at all and showed nothing.
+  if(r === 'custom' && anFrom == null){
+    anFrom = midnight() - 86400;
+    anTo = null;
+  }
   anRange = r; AN = null; pubAll = false; saveHash(); loadAnalytics();
 }
+
+// The two date fields only hold what you typed. Nothing reloads until Apply:
+// picking a start date used to fire a query against a half-finished range,
+// so you watched the numbers change into something you had not asked for.
+let draftFrom = null, draftTo = null;
 function setCustom(which, v){
-  const t = v ? new Date(v + 'T00:00:00').getTime() / 1000 : null;
-  if(which === 'from') anFrom = t;
-  else anTo = t === null ? null : t + 86400;   // inclusive of the chosen day
-  if(anFrom == null) anFrom = 0;
-  if(anTo != null && anFrom > anTo) anFrom = anTo - 86400;
+  if(which === 'from') draftFrom = v || null;
+  else draftTo = v || null;
+  const b = document.getElementById('applyrange');
+  if(b) b.disabled = !draftFrom;
+}
+function applyCustom(){
+  if(!draftFrom) return;
+  const day = t => new Date(t + 'T00:00:00').getTime() / 1000;
+  anFrom = day(draftFrom);
+  // One date means that one day, not everything since. A range needs both.
+  anTo = draftTo ? day(draftTo) + 86400 : anFrom + 86400;
+  if(anTo <= anFrom) anTo = anFrom + 86400;
   anRange = 'custom'; AN = null; pubAll = false; saveHash(); loadAnalytics();
 }
 async function loadAnalytics(){
+  // Restored onto custom with no dates — from a bookmark or a reload — so
+  // fall back to the day it opens on rather than querying nothing.
+  if(anRange === 'custom' && anFrom == null){ anFrom = midnight() - 86400; anTo = null; }
   const [lo, hi] = rangeBounds();
   const q = 'period=' + anPeriod +
     (lo != null ? '&from=' + lo : '') + (hi != null ? '&to=' + hi : '') +
@@ -4260,7 +6548,8 @@ function analyticsView(){
   const latest = `<div class="chart wide"><h4>Latest posts</h4>
     <p class="why">Best account per post, newest first.</p>
     <ul class="tight">${recent.map(r=>`<li>
-      <span class="il">${esc(r.untracked?r.title.slice(0,34)+'…':r.topic)}</span>
+      <span class="il">${r.untracked ? '<span class="unk">?</span>' : ''}${
+        esc(r.name || r.topic)}</span>
       <span class="ir ${r.best>=T?'hit':''}">${fmt(r.best)}</span>
       <span class="is">${aged(r.posted_at)}</span></li>`).join('')}</ul></div>`;
 
@@ -4296,15 +6585,11 @@ function analyticsView(){
   const I_SHARE = SVGI('<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/>');
 
   const RANGES = [['today','Today'],['7','7 days'],
-                  ['30','30 days'],['all','All'],['custom','Custom']];
+                  ['30','30 days'],['all','All']];
   const iso = ts => ts ? new Date(ts*1000).toISOString().slice(0,10) : '';
   const rangeChips = () => `<div class="periods">
       ${RANGES.map(([v,l])=>`<button class="pillp ${anRange===v?'on':''}"
         onclick="setRange('${v}')">${l}</button>`).join('')}
-      ${anRange==='custom'?`<span class="cust">
-        <input type="date" value="${iso(anFrom)}" onchange="setCustom('from',this.value)">
-        <input type="date" value="${iso(anTo?anTo-86400:null)}" onchange="setCustom('to',this.value)">
-      </span>`:''}
       <span class="acctfilter">${every.map(a=>
         `<button class="pilla ${on(a.key)?'on':'off'}" onclick="toggleAcct('${a.key}')">
            <i style="${on(a.key)?`background:${ACOL[a.key]};border-color:${ACOL[a.key]}`
@@ -4313,7 +6598,11 @@ function analyticsView(){
 
   function publishedView(){
     const P = AN.published;
-    if(!P) return '<div class="empty">Pick a date range.</div>';
+    // The bar comes first no matter what. Returning early on an empty range
+    // took the chips with it and left a page that asked for a date range
+    // while offering nothing to pick.
+    if(!P) return rangeChips()
+      + '<div class="empty">Pick a date range above.</div>';
     const t = P.totals, bar = rangeChips();
 
     const sameDay = P.to - P.from <= 86400;
@@ -4365,7 +6654,9 @@ function analyticsView(){
       <div class="prow" onclick="open_('${r.topic}')">
         <div class="pth">${r.thumb?`<img loading="lazy" src="${r.thumb}" alt="">`:''}</div>
         <div class="pnm">
-          <b>${esc(r.untracked ? (r.title||r.topic).slice(0,40) : r.topic)}</b>
+          <b>${r.untracked ? `<span class="unk"
+              title="Live on the account but not one of our posts: published before the pipeline, or its caption was rewritten. Named from its opening words.">?</span>` : ''}${
+            esc(r.name || r.topic)}</b>
           <span>${hm(r.first_at)}${r.pillar?' · '+esc(r.pillar):''}${r.promoted?' · <i class="paid">$</i>':''}</span>
         </div>
         <div class="pcells">${accs.map(a=>cell(r,a)).join('')}</div>
@@ -4510,11 +6801,19 @@ const fmtn = n => (n || 0).toLocaleString();
 // Reach, rounded down to the tier it cleared. The sync already sets the
 // performing flag from real view counts, so a button to say so by hand was
 // asking for an opinion the numbers had already given.
+// The badge is read at a glance across a grid, so it carries one number and
+// a colour. Rounding 1,240 down to "1k" threw away the part that separates a
+// post that just cleared the bar from one that doubled it.
+const TIERS = [[25000,6],[10000,5],[5000,4],[3000,3],[2000,2],[1000,1]];
 function tierOf(views){
-  if(views >= 100000) return '100k+';
-  if(views >= 10000) return Math.floor(views/10000)*10 + 'k+';
-  if(views >= 1000) return Math.floor(views/1000) + 'k+';
-  return null;
+  const t = TIERS.find(([n]) => views >= n);
+  if(!t) return null;
+  const k = views / 1000;
+  // One decimal below 10k, where the hundreds still say something; whole
+  // thousands above it, where they do not.
+  const label = k < 10 ? k.toFixed(1).replace('.', ',') + 'k'
+                       : Math.round(k) + 'k';
+  return {label, lvl: t[1]};
 }
 function bestViews(p){
   const cells = Object.values(p.stats || {});
@@ -4543,11 +6842,11 @@ function card(p){
   // One action per card, chosen by where the post actually is.
   let act = '';
   if(st==='review' || st==='failed')
-    act = `${p.approved
+    act = `<span class="acts">${p.approved
       ? `<button class="cta sec" onclick="approve(event,'${p.topic}',false)"
            title="Take it back off the Post page">Approved</button>`
       : `<button class="cta" onclick="approve(event,'${p.topic}',true)">Approve</button>`}
-      <button class="cta sec" onclick="cardDraft(event,'${p.topic}')">Draft to all</button>`;
+      <button class="cta sec" onclick="cardDraft(event,'${p.topic}')">Draft to all</button></span>`;
   // No Mark published button: the sync reads the account back and sets it.
   else if(st==='published' && p.days_since>=7)
     act = `<button class="cta sec" onclick="cardRepost(event,'${p.topic}')">Repost</button>`;
@@ -4556,7 +6855,8 @@ function card(p){
   return `<div class="cardwrap" data-topic="${p.topic}">
     ${p.seen?'':`<span class="new" title="${p.from_replicate?'From '+esc(p.from_replicate):'Not opened yet'}"></span>`}
     ${(() => { const t = tierOf(bestViews(p));
-      return t ? `<span class="tier" title="Best account: ${fmtn(bestViews(p))} views">${t}</span>` : ''; })()}
+      return t ? `<span class="tier t${t.lvl}"
+        title="Best account: ${fmtn(bestViews(p))} views">${t.label}</span>` : ''; })()}
     <button class="del" onclick="del(event,'${p.topic}')"
       aria-label="Delete ${esc(p.topic)}">${TRASH}</button>
     <button class="card" onclick="open_('${p.topic}')">
@@ -4619,30 +6919,34 @@ function detail(){
     primary = `<button class="btn" onclick="draft(null)">Draft to all accounts</button>`;
   else if(unpub.length)
     primary = `<span class="sub">Drafted. The sync marks it published once it is live.</span>`;
+
   else {
     // Live everywhere. The numbers are the status, so show them rather than
     // a button asking whether this one did well.
     const t = totals(p), tier = tierOf(bestViews(p));
     primary = t.v
-      ? `<span class="livestat">${tier ? `<b class="tier inline">${tier}</b>` : ''}
+      ? `<span class="livestat">${tier ? `<b class="tier inline t${tier.lvl}">${tier.label}</b>` : ''}
            <span>${fmtn(t.v)} views</span><span>${fmtn(t.l)} likes</span>
            <span class="r">${(100*t.l/t.v).toFixed(1)}% liked</span></span>`
       : `<span class="sub">Live. The sync reads the numbers back every 30 minutes.</span>`;
   }
 
-  const chips = DATA.accounts.map(a=>{
-    const r=(p.delivery||{})[a.key];
-    const k = !r ? 'none' : r.published ? 'pub' : r.status==='SENT' ? 'drf'
-            : r.status==='FAILED' ? 'err' : 'none';
-    return `<button class="chip ${k}" title="${esc(a.label)}"
-      onclick="chip(event,'${p.topic}','${a.key}')">${esc(a.short||a.key)}</button>`;
-  }).join('');
 
   document.getElementById('view').innerHTML = `
     <div class="actbar">
       <button class="back" onclick="back()">&larr;</button>
-      <span class="who2">${esc(p.topic)}</span>
-      <div class="chips">${chips}</div>
+      <span class="who2">${esc(p.topic)}${(() => {
+        // How this post stays findable. A copy known only by its caption is
+        // the one that goes missing when a caption is edited, and that is
+        // worth seeing before it happens rather than after.
+        const id = p.ident || {};
+        const live = Object.values(id).filter(Boolean);
+        if(!live.length) return '';
+        const weak = live.filter(x => x === 'caption').length;
+        return weak
+          ? `<span class="idtag weak" title="${weak} live cop${weak===1?'y is':'ies are'} matched only by caption — editing it would detach ${weak===1?'it':'them'}">by caption</span>`
+          : `<span class="idtag" title="Every live copy is pinned to its TikTok video id, so a caption edit cannot detach it">pinned</span>`;
+      })()}</span>
       ${primary}
       ${['review','failed','archive'].includes(st)?`<button
         class="btn ${p.approved?'sec':''}" onclick="approve(event,'${p.topic}',${!p.approved})">
@@ -4672,10 +6976,14 @@ function detail(){
     ${schedBar(p)}
 
     ${redoMode?`<div class="redobar">
-      <span class="sub">Pick every slide that is wrong — click them, or press 1 to 6.</span>
-      <input id="rnote" placeholder="What is wrong? Mention slide numbers if they differ.">
-      <button class="btn" id="rgo" onclick="redo()" ${redoSel.size?'':'disabled'}>
-        Redo ${redoSel.size||''} slide${redoSel.size===1?'':'s'}</button>
+      <input id="rnote" autofocus
+        placeholder="What is wrong? e.g. the hook is too long, or slide 3 says the wrong thing"
+        onkeydown="if(event.key==='Enter')redo()">
+      <button class="btn" id="rgo" onclick="redo()">
+        ${redoSel.size ? `Redo ${redoSel.size} slide${redoSel.size===1?'':'s'}` : 'Redo'}</button>
+      <span class="sub">${redoSel.size
+        ? 'Only the picked slides change; the rest come out byte-identical.'
+        : 'Say what is wrong and it works out which slides. Click any to narrow it.'}</span>
     </div>`:''}
 
     <div class="strip">${p.slides.map((s,i)=>
@@ -5231,7 +7539,7 @@ async function redo(){
   if (blockedOffline()) return;
   const note=(document.getElementById('rnote')||{}).value||'';
   const slides=[...redoSel].sort((a,b)=>a-b);
-  if(!slides.length) return;
+  if(!note.trim()) return say('Say what is wrong first.');
   const topic = cur;
   redoMode=false; redoSel=new Set();
   await fetch('/api/redo',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -5240,6 +7548,36 @@ async function redo(){
   // visible, but the job panel is on every page now, so the jump only ever
   // read as the page refreshing itself for no reason.
   await load(); render();
+}
+
+// The recorded reason plus what it means. "the dashboard restarted mid-run"
+// is accurate and tells you nothing about whether to try again.
+function whyPlain(r){
+  const w = r.why || '';
+  if(/restarted (mid-run|while)/i.test(w))
+    return 'The run was gone when the dashboard came back — it had already died on its own. Nothing was written. Retry is safe.';
+  if(/session limit|usage limit/i.test(w))
+    return w + ' — retry after it resets.';
+  if(/not logged in/i.test(w))
+    return 'The claude CLI is not signed in on this machine. Run claude once in a terminal, then retry.';
+  if(/no caption/i.test(w))
+    return w + ' The slides exist; only the hooks.json entry is missing.';
+  return w || 'No reason was recorded.';
+}
+
+async function retryRun(kind, at){
+  await fetch('/api/retry', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({kind, at})});
+  say('Queued again.');
+  jobsOpen = true;
+  await load();
+}
+
+async function dismissFails(){
+  await fetch('/api/dismiss', {method:'POST',
+    headers:{'Content-Type':'application/json'}, body:'{}'});
+  jobsOpen = false;
+  await load();
 }
 
 function say(t){const l=document.getElementById('log');if(l){l.textContent=t;l.classList.add('on');}}
@@ -5394,7 +7732,7 @@ fetch('/api/host').then(r=>r.json()).then(h=>{
 
 load().then(()=>{
   restoreHash();
-  render();
+  setApp(app);
 });
 </script></body></html>"""
 
@@ -5542,21 +7880,12 @@ def clean_history():
 
 
 if __name__ == '__main__':
-    import sys
     if '--clean-history' in sys.argv:
         clean_history()
         raise SystemExit(0)
-    # A restart orphans any in-flight build: the thread that would mark it done
-    # is gone, so the job would read as running forever.
-    for path_, loader in ((BUILD, build_queue), (REDO, redo_queue), (REPLICATE, replicate_queue)):
-        items = loader()
-        if any(b.get('status') == 'running' for b in items):
-            for b in items:
-                if b.get('status') == 'running':
-                    b['status'] = 'interrupted'
-                    b['log'] = 'the dashboard restarted mid-run; check drafts/'
-            with open(path_, 'w') as fh:
-                json.dump(items, fh, indent=1, ensure_ascii=False)
+    # In-flight runs are detached, so a restart does not end them. Deciding
+    # what happened to each one is reconcile_queues' job, below — this used
+    # to mark them all interrupted first, which threw away live work.
     backfill_built_at()
     if UPSTREAM:
         print('[proxy] api -> %s' % UPSTREAM)
