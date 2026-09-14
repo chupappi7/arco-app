@@ -928,5 +928,15 @@
    "Canva",
    "Higgsfield"
   ]
+ },
+ {
+  "topic": "business-at-19-2",
+  "tools": [
+   "ARCO",
+   "Codex",
+   "Stripe",
+   "Higgsfield",
+   "Buffer"
+  ]
  }
 ]
