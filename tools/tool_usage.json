@@ -898,5 +898,35 @@
    "Endel",
    "Firebase"
   ]
+ },
+ {
+  "topic": "ten-x-5",
+  "tools": [
+   "ARCO",
+   "Cursor",
+   "CleanShot X",
+   "Airtable",
+   "Photoroom"
+  ]
+ },
+ {
+  "topic": "work-by-noon-5",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "Vercel",
+   "Descript",
+   "Supabase"
+  ]
+ },
+ {
+  "topic": "best-for-last-3",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "Notion",
+   "Canva",
+   "Higgsfield"
+  ]
  }
 ]

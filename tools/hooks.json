@@ -634,6 +634,24 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-11 from Thinh's dashboard compose: his hook, his six backgrounds, his titles and body copy verbatim (wrapped only), cta_slide closer with my two-line subtitle. Dashboard slot metadata said Codex/Obsidian/Superwall but his titles and copy name Manus/Endel/Firebase, so those render and register. ARCO copy is angle v6, counted in arco_angles used. Endel weather and Firebase Remote Config points repeat five-carry-twelve by his decision."
+  },
+  {
+   "topic": "ten-x-5",
+   "title": "how i 10x'd my productivity",
+   "caption": "five apps, ten times the output. arco's insights show where the hours went, by app and by day, so i stopped guessing which one took the evening, my holy grail. cursor's tab predicts your next edit and jumps the cursor to it, so a rename ripples through the file on tab presses instead of retyping. every cleanshot x capture uploads itself and puts the link on your clipboard, so the screenshot is shared before a save dialog would have opened. an airtable interface turns the base into a small app you hand to someone, so the status gets updated by them and not by emails to you. photoroom builds the scene you type behind a product photo, shadows included, so a phone shot becomes the studio shot without a studio. #productivity #aitools #apps #tools #creatorsearchinsights",
+   "_note": "tools listicle, icon-shelf hook; rendered by tools/gen-ten-x-5.py"
+  },
+  {
+   "topic": "work-by-noon-5",
+   "title": "the tools i use to do a full day of work by noon",
+   "caption": "the morning is the whole workday if nothing interrupts it. arco's focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs, my holy grail. chatgpt memory picks up facts from your chats without being told to, so a deadline you mention once gets planned around weeks later. vercel rollback puts an earlier deploy back live in one click, so a broken ship costs a minute and not the rest of the morning. descript learns your voice once and typed words come out spoken, so a flubbed line is fixed by typing instead of re-recording the take. supabase realtime pushes database changes to every open screen, so two phones stay in sync with no sync code written. #productivity #apps #aitools #buildinpublic #creatorsearchinsights",
+   "_note": "tools listicle, icon-shelf hook; rendered by tools/gen-work-by-noon-5.py"
+  },
+  {
+   "topic": "best-for-last-3",
+   "title": "5 tools to stay productive, i saved the best for last",
+   "caption": "five tools to stay productive, and the best one is last. all my tasks live in arco and i plan the whole day in 30 seconds, then focus mode puts every distraction away, my holy grail. claude code checkpoints the code before every change it makes, so you let it attempt the big rewrite because undo is one command. notion calendar lays database dates over your real calendar, so deadlines and meetings share one week view. canva resize remakes one design into every format in a single pass, so the post, the story and the banner come from one file. higgsfield trains once on your face and keeps the same person in every image, so a week of visuals needs no shoot. #productivity #apps #aitools #tools #creatorsearchinsights",
+   "_note": "tools listicle, icon-shelf hook; rendered by tools/gen-best-for-last-3.py"
   }
  ]
 }
