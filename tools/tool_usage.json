@@ -938,5 +938,15 @@
    "Higgsfield",
    "Buffer"
   ]
+ },
+ {
+  "topic": "ship-weekend-4",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Vercel",
+   "Superwall",
+   "PostHog"
+  ]
  }
 ]
