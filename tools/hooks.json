@@ -25,7 +25,7 @@
   "cta": {
    "icon": "icon.png",
    "appName": "ARCO: Day Planner & Focus",
-   "subtitle": "Comment \u201cARCO\u201d \u2014 I\u2019ll send you the promo code. First 50 only: first month of Pro free."
+   "subtitle": "Comment “ARCO” — I’ll send you the promo code. First 50 only: first month of Pro free."
   }
  },
  "posts": [
@@ -86,19 +86,19 @@
   {
    "topic": "47-minutes",
    "title": "my screen time is 47 minutes a day",
-   "caption": "47 minutes a day. not discipline \u2014 a system: every hour has a job, and the feed apps stay blocked until i say so. the planner and the blocker are one app. it's called ARCO, free on the App Store. #screentime #digitaldetox #productivity #focus #appblocker",
-   "_note": "slides transcribed from rendered JPGs 2026-08-20; source definitions were lost with the old pipeline, so no slides[] \u2014 re-render not possible from this entry"
+   "caption": "47 minutes a day. not discipline — a system: every hour has a job, and the feed apps stay blocked until i say so. the planner and the blocker are one app. it's called ARCO, free on the App Store. #screentime #digitaldetox #productivity #focus #appblocker",
+   "_note": "slides transcribed from rendered JPGs 2026-08-20; source definitions were lost with the old pipeline, so no slides[] — re-render not possible from this entry"
   },
   {
    "topic": "6h-to-2h",
    "title": "i cut my screen time from 6 hours to 2",
-   "caption": "6 hours a day is 8 full workdays a month. i did the math once and couldn't unsee it. no willpower involved \u2014 every hour got a job, and tiktok just won't open during my blocks. 3 weeks later: 2 hours, most of it useful. the planner and blocker are one app \u2014 ARCO, free on the App Store. #screentime #digitaldetox #appblocker #productivity #focus",
+   "caption": "6 hours a day is 8 full workdays a month. i did the math once and couldn't unsee it. no willpower involved — every hour got a job, and tiktok just won't open during my blocks. 3 weeks later: 2 hours, most of it useful. the planner and blocker are one app — ARCO, free on the App Store. #screentime #digitaldetox #appblocker #productivity #focus",
    "_note": "slides transcribed from rendered JPGs 2026-08-20; source definitions lost with old pipeline, no slides[]"
   },
   {
    "topic": "5-apps",
    "title": "5 apps i use to run my one-person app business",
-   "caption": "I build and ship iOS apps completely alone \u2014 no team, no office. These 5 make that possible. Claude writes most of my code now; Claude Code ships whole features while I review. ARCO is my operating system: every hour of the day gets a job, and TikTok stays blocked during focus blocks \u2014 planner and app blocker in one (full name on the App Store: App Blocker & Focus \u2014 ARCO). Higgsfield generates every visual I post, including this one. RevenueCat runs my subscriptions so I've never touched a payment server. And Notion holds the roadmap, the content calendar, and every 2am idea. The tools aren't the point \u2014 the hours of uninterrupted focus they buy are. #aitools #appdevelopment #buildinpublic #indiedev #founder",
+   "caption": "I build and ship iOS apps completely alone — no team, no office. These 5 make that possible. Claude writes most of my code now; Claude Code ships whole features while I review. ARCO is my operating system: every hour of the day gets a job, and TikTok stays blocked during focus blocks — planner and app blocker in one (full name on the App Store: App Blocker & Focus — ARCO). Higgsfield generates every visual I post, including this one. RevenueCat runs my subscriptions so I've never touched a payment server. And Notion holds the roadmap, the content calendar, and every 2am idea. The tools aren't the point — the hours of uninterrupted focus they buy are. #aitools #appdevelopment #buildinpublic #indiedev #founder",
    "_note": "CheckVibe-style listicle; slides composited 2026-08-20 from existing draft bgs + 1 generated; sources in scratchpad/5apps"
   },
   {
@@ -110,7 +110,7 @@
   {
    "topic": "lockin-apps",
    "title": "5 apps i use to actually lock in",
-   "caption": "none of these are magic. together they're the reason i finish things. claude explains whatever i'm stuck on \u2014 half my study time used to be searching, now i just ask. arco plans the day and physically blocks tiktok during focus blocks, so the plan actually happens (full name on the app store: app blocker & focus \u2014 arco). google calendar holds the schedule \u2014 if it's not in there, it doesn't exist. notion remembers everything so my head doesn't have to. endel plays focus sound with no lyrics and no decisions. plan the hours, block the noise, start. #lockin #focus #productivity #studytok #screentime #creatorsearchinsights",
+   "caption": "none of these are magic. together they're the reason i finish things. claude explains whatever i'm stuck on — half my study time used to be searching, now i just ask. arco plans the day and physically blocks tiktok during focus blocks, so the plan actually happens (full name on the app store: app blocker & focus — arco). google calendar holds the schedule — if it's not in there, it doesn't exist. notion remembers everything so my head doesn't have to. endel plays focus sound with no lyrics and no decisions. plan the hours, block the noise, start. #lockin #focus #productivity #studytok #screentime #creatorsearchinsights",
    "_note": "app-stack listicle per July CLAUDE.md spec (ARCO #2 among famous apps); composited 2026-08-20"
   },
   {
@@ -482,7 +482,7 @@
   {
    "topic": "delete-the-rest",
    "title": "the 5 apps i would keep if i deleted everything else",
-   "caption": "in arco the block i\u2019m in sits on the lock screen with the time left on it, so picking up the phone shows the plan before it shows a feed, my holy grail. capcut translates the auto captions into another language in place, so one edit becomes the english and the spanish cut instead of two projects. a custom style in claude learns your voice from one writing sample you paste, so every answer after that comes back in your words and not the model\u2019s. github codespaces runs the whole project in the browser already installed, so any borrowed laptop becomes your dev machine in about a minute. right click a page in framer and it makes a control and a variant, splits the traffic itself and names the winner once one pulls ahead. #productivity #apps #aitools #buildinpublic #creatorsearchinsights",
+   "caption": "in arco the block i’m in sits on the lock screen with the time left on it, so picking up the phone shows the plan before it shows a feed, my holy grail. capcut translates the auto captions into another language in place, so one edit becomes the english and the spanish cut instead of two projects. a custom style in claude learns your voice from one writing sample you paste, so every answer after that comes back in your words and not the model’s. github codespaces runs the whole project in the browser already installed, so any borrowed laptop becomes your dev machine in about a minute. right click a page in framer and it makes a control and a variant, splits the traffic itself and names the winner once one pulls ahead. #productivity #apps #aitools #buildinpublic #creatorsearchinsights",
    "_note": "built 2026-09-02 by gen-delete-the-rest.py. A replication of twelve-apps keeping its shape only: an approved two-line hook that cuts everything you own down to five, five tools one per slide, ARCO leading. The hook is \"the 5 apps i would keep / if i deleted everything else\", five posts rested (keep-five-2) against a cooldown of four; the source's own hook is eligible but reusing it would be the repeat this build exists to avoid. Roster is the one suggested for this build, reordered so ARCO leads: ARCO, CapCut, Claude, GitHub, Framer, with Claude the single LLM. All five teaching points are new against every caption in this file -- the ARCO one is angle v13, written for this build because next_arco_angle would have returned Blocked Hours, which ten captions already carry. Six fresh backgrounds, none of them from twelve-apps."
   },
   {
@@ -682,6 +682,24 @@
    "title": "i pay for 12 apps, these 5 do all the work",
    "caption": "twelve subscriptions, five earn their keep. all my tasks live in arco and the day gets planned in 30 seconds, then focus mode puts every distraction away, my holy grail. a perplexity task re-runs your search on a schedule you set once, so the price drop or the news lands as a morning message. a granola template shapes the notes to the meeting type you pick, so a sales call and a standup come back as different documents. a higgsfield soul preset holds one photographic look by name, so every image i generate lands in the same aesthetic. airtable sync mirrors another app's data into your base on its own, so the report reads live numbers nobody pasted in. #productivity #apps #aitools #tools #creatorsearchinsights",
    "_note": "tools listicle, stacked hook, 6th outing of the 12-apps hook; Perplexity the LLM; rendered by tools/gen-five-of-twelve.py"
+  },
+  {
+   "topic": "keep-five-4",
+   "title": "the 5 apps i would keep if i deleted everything else",
+   "caption": "five apps survive the reset, everything else goes. every task i have is in arco and the day gets planned in 30 seconds, then focus mode puts every distraction away while i work, my holy grail. chatgpt record mode in the desktop app listens to a meeting as it runs, so the notes and the action items are written when the call ends. any notion page publishes as a live site on your own domain, so the landing page is a doc you wrote with nothing built in code. canva mockups wraps a design onto a phone, a mug or a t-shirt, so the product shot exists before the product does. captions eye contact moves your gaze to the lens while you read a script, so a take read off the screen looks like it was said from memory. #productivity #apps #aitools #tools #creatorsearchinsights",
+   "_note": "tools listicle, stacked hook with icon shelf, 4th outing of the keep-five hook; ChatGPT the LLM; rendered by tools/gen-keep-five-4.py"
+  },
+  {
+   "topic": "ten-x-6",
+   "title": "how i 10x'd my productivity",
+   "caption": "five apps, ten times the output. i manage all my tasks in arco and the day takes 30 seconds to plan, then focus mode puts every distraction away and blocked hours does it on a schedule. in claude code, plan mode reads the repo and proposes the change first, so you say yes once and it works through every file without asking. supabase cron runs a query on a schedule from inside the database itself, so the nightly cleanup or the weekly digest needs no server at all. describe a change to a finished clip and runway aleph re-renders it, so the shot becomes night or loses the crowd with no reshoot. a superwhisper vocabulary list teaches it the names and terms you actually use, so dictated text comes back spelled right with no correction pass. #productivity #aitools #apps #tools #creatorsearchinsights",
+   "_note": "tools listicle, stacked hook with icon shelf, 6th outing of the 10x hook; Claude the LLM; rendered by tools/gen-ten-x-6.py"
+  },
+  {
+   "topic": "work-by-noon-6",
+   "title": "the tools i use to do a full day of work by noon",
+   "caption": "the morning is the whole workday when the machines do the afternoon. all my tasks live in arco and i plan the whole day in 30 seconds, then focus mode puts every distraction away, my holy grail. tag cursor in slack and a cloud agent picks the task up from the thread, so the bug reported in the channel is a pull request before the standup. tag a github release and the notes write themselves from the merged prs, so the changelog is done the second the version goes out. a posthog survey shows only to users who just did the thing you care about, so you ask why they cancelled at the moment it happens and not by email. revenuecat customer center lets users cancel, refund or restore inside the app, so the support inbox stops filling with billing questions. #productivity #apps #aitools #buildinpublic #creatorsearchinsights",
+   "_note": "tools listicle, stacked hook with icon shelf, 6th outing of the by-noon hook; Cursor the LLM; rendered by tools/gen-work-by-noon-6.py"
   }
  ]
 }

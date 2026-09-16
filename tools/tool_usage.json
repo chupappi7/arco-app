@@ -978,5 +978,35 @@
    "Higgsfield",
    "Airtable"
   ]
+ },
+ {
+  "topic": "keep-five-4",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "Notion",
+   "Canva",
+   "Captions"
+  ]
+ },
+ {
+  "topic": "ten-x-6",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "Supabase",
+   "Runway",
+   "Superwhisper"
+  ]
+ },
+ {
+  "topic": "work-by-noon-6",
+  "tools": [
+   "ARCO",
+   "Cursor",
+   "GitHub",
+   "PostHog",
+   "RevenueCat"
+  ]
  }
 ]
