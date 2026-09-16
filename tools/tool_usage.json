@@ -948,5 +948,35 @@
    "Superwall",
    "PostHog"
   ]
+ },
+ {
+  "topic": "4x-productivity-7",
+  "tools": [
+   "ARCO",
+   "Antigravity",
+   "Notion",
+   "ClickUp",
+   "Descript"
+  ]
+ },
+ {
+  "topic": "wish-i-knew-at-17-3",
+  "tools": [
+   "ARCO",
+   "Manus",
+   "GitHub",
+   "Figma",
+   "Loom"
+  ]
+ },
+ {
+  "topic": "five-of-twelve",
+  "tools": [
+   "ARCO",
+   "Perplexity",
+   "Granola",
+   "Higgsfield",
+   "Airtable"
+  ]
  }
 ]
