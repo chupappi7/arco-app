@@ -23,6 +23,11 @@ What is deliberately different from that outing:
             person), app slides from non-hook-only vibes under
             BAND_MAX_LUMA, no adjacent vibe repeats, nothing from the
             previous post (best-for-last-3).
+  hook      carries the roster's icon shelf (ARCO, Codex, Stripe,
+            Higgsfield, Buffer, 3 over 2) under the copy, so the viewer sees
+            what the post is about before reading a word. Hook gradient
+            floor lowered to 0.40 so the icons sit on a dark plate rather
+            than the window's daylight.
 
 Usage:
     python3 tools/gen-business-at-19-2.py            # every slide
@@ -48,6 +53,7 @@ PILLAR = 'build'
 THEME = 'business'
 
 TOOLS = ['ARCO', 'Codex', 'Stripe', 'Higgsfield', 'Buffer']
+HOOK_GRAD = (0.85, 0.40, 300, 1300)
 TITLES = ['1. ARCO: Day Planner & Focus', '2. Codex', '3. Stripe',
           '4. Higgsfield', '5. Buffer']
 
@@ -105,14 +111,17 @@ def main(only=None):
             raise SystemExit(f'{bg} copy band is {luma:.1f}, over '
                              f'{c.BAND_MAX_LUMA}')
 
+    icons = json.load(open(c.TOOL_POOL))['icons']
     if only in (None, 1):
         log = json.load(open(f'{c.SP}/hook_usage.json'))
         if BGS[0] not in log:
             c.pick_hook_bg(prefer=BGS[0])
-        hook_slide(BGS[0], HOOK, f'{OUT}/01.jpg')
-        mark_hook_used(HOOK, TOPIC)
+        shelf = [icons[t] for t in TOOLS]
+        hook_slide(BGS[0], HOOK, f'{OUT}/01.jpg', grad=HOOK_GRAD, icons=shelf)
+        # A redo of slide 1 must not log a second outing of the hook.
+        if not any(e.get('topic') == TOPIC for e in c.hook_rules.history()):
+            mark_hook_used(HOOK, TOPIC)
 
-    icons = json.load(open(c.TOOL_POOL))['icons']
     for i, tool in enumerate(TOOLS):
         n, bg = i + 1, BGS[i + 1]
         if only not in (None, n + 1):
