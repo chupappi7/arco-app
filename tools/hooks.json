@@ -690,6 +690,20 @@
    "_note": "tools listicle, stacked hook with icon shelf, 4th outing of the keep-five hook; ChatGPT the LLM; rendered by tools/gen-keep-five-4.py"
   },
   {
+   "topic": "study-four-hours-2",
+   "title": "how i study 4 hours without touching my phone",
+   "caption": "four hours with the phone face down and never picked up, this is the whole setup. arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs, my holy grail. water, charger, calculator and the textbook are on the desk before i sit, because every trip to the kitchen is where the phone gets picked up. a reply to send or a thing to look up goes on a sheet of paper, so the thought is parked and the list gets dealt with at the break. four hours is the container but a finished past paper is the finish, so there is no checking how long is left, and the clock lives on the phone. ten minutes every fifty, and the break is a walk or a window, because a feed break resets attention to zero and a walk keeps the thread. #studytok #studytips #focus #exams #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-17. learn pillar, method post: rule_slide steps, no roster, no icon shelf (a lone ARCO icon would mark the post as the advert). second outing of the hook (first was study-four-hours, a listicle before the pillar guard existed). ARCO leads on angle f1 via next_arco_angle('study'). rule slides in the screentime-100h style Thinh asked for: no badge, yellow titles. backgrounds bg-h51/h31/h37/n04/h45/h22 by the gen-daily-batch walk. rebuild: python3 tools/gen-study-four-hours-2.py"
+  },
+  {
    "topic": "ten-x-6",
    "title": "how i 10x'd my productivity",
    "caption": "five apps, ten times the output. i manage all my tasks in arco and the day takes 30 seconds to plan, then focus mode puts every distraction away and blocked hours does it on a schedule. in claude code, plan mode reads the repo and proposes the change first, so you say yes once and it works through every file without asking. supabase cron runs a query on a schedule from inside the database itself, so the nightly cleanup or the weekly digest needs no server at all. describe a change to a finished clip and runway aleph re-renders it, so the shot becomes night or loses the crowd with no reshoot. a superwhisper vocabulary list teaches it the names and terms you actually use, so dictated text comes back spelled right with no correction pass. #productivity #aitools #apps #tools #creatorsearchinsights",
