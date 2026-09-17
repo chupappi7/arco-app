@@ -9,6 +9,7 @@ job uses, so nothing here is a second implementation that can drift.
 
 Stdlib only, no install. Binds to localhost.
 """
+import base64
 import gzip
 import http.client
 import http.server
@@ -34,6 +35,8 @@ import hook_rules
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DRAFTS = os.path.join(REPO, 'drafts')
 HOOKS = os.path.join(REPO, 'tools', 'hooks.json')
+IDEAS = os.path.join(REPO, 'tools', 'ideas.json')
+IDEA_IMG = os.path.join(REPO, 'tools', 'ideas_img')
 LOG = os.path.join(REPO, 'tools', 'delivery_log.json')
 FEEDBACK = os.path.join(REPO, 'tools', 'post_feedback.json')
 REPLICATE = os.path.join(REPO, 'tools', 'replicate_queue.json')
@@ -63,6 +66,12 @@ SLIDE_CACHE = os.path.join(REPO, 'tools', '.slide-cache')
 # nobody is using the app.
 METRICS_URL = (os.environ.get('ARCO_METRICS_URL') or '').rstrip('/')
 METRICS_KEY = os.environ.get('ARCO_METRICS_KEY') or ''
+# Writing to the Instagram queue is a different privilege from reading it.
+METRICS_WRITE = os.environ.get('ARCO_METRICS_WRITE') or ''
+# Instagram is its own lane. TikTok's ACCOUNTS carry a 5-draft cap, a
+# delivery log and analytics cohorts, none of which mean anything here —
+# Instagram publishes immediately and the Worker owns the result.
+IG_ACCOUNTS = [{'key': 'getarco', 'label': 'get.arco'}]
 BG_DIR = os.path.join(REPO, 'tools', 'slides', 'bg')
 BG_INDEX = os.path.join(BG_DIR, '.index.json')
 BG_THUMBS = os.path.join(REPO, 'tools', '.bg-thumbs')
@@ -178,6 +187,141 @@ def hooks_index():
 
 def delivery_log():
     return load(LOG, {})
+
+
+# ---------------------------------------------------------------- ideas
+#
+# The board that feeds the pipeline: things to make, lines to open with,
+# pictures to steal from, codes to give away. One flat list with a kind on
+# each row rather than four files, because a note often turns out to be a
+# hook and retyping it into another store is how notes get lost.
+
+def load_ideas():
+    try:
+        with open(IDEAS, encoding='utf-8') as fh:
+            rows = json.load(fh)
+        return rows if isinstance(rows, list) else []
+    except Exception:
+        return []
+
+
+def save_ideas(rows):
+    tmp = IDEAS + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as fh:
+        json.dump(rows, fh, indent=1, ensure_ascii=False)
+    os.replace(tmp, IDEAS)
+
+
+# The four that ship with the board. A kind is just a label, so anything
+# typed into the kind field is as valid as these — the colour is derived from
+# the string rather than looked up, which is what makes custom kinds free.
+IDEA_KINDS = ('idea', 'hook', 'ref', 'code')
+
+
+def clean_kind(k):
+    k = re.sub(r'[^a-z0-9 _-]', '', (k or '').strip().lower())[:24]
+    return k or 'idea'
+
+
+def idea_apply(body):
+    """One writer for every edit, so the file is read and written once."""
+    rows = load_ideas()
+    op = body.get('op')
+    if op == 'add':
+        row = {'id': 'i%d' % (time.time() * 1000),
+               'kind': clean_kind(body.get('kind')),
+               'text': (body.get('text') or '').strip()[:2000],
+               'note': (body.get('note') or '').strip()[:2000],
+               'pillar': body.get('pillar') or '',
+               'img': body.get('img') or '',
+               'used': False,
+               'x': int(body.get('x') or 0),
+               'y': int(body.get('y') or 0),
+               'links': [],
+               'at': int(time.time())}
+        parent = body.get('from')
+        if parent and any(r.get('id') == parent for r in rows):
+            row['links'] = [parent]
+        rows.insert(0, row)
+    else:
+        row = next((r for r in rows if r.get('id') == body.get('id')), None)
+        if not row:
+            return {'error': 'not found'}
+        if op == 'del':
+            # The picture goes with the card; nothing else references it.
+            if row.get('img'):
+                f = os.path.join(IDEA_IMG, os.path.basename(row['img']))
+                if os.path.isfile(f):
+                    try:
+                        os.remove(f)
+                    except OSError:
+                        pass
+            rows = [r for r in rows if r is not row]
+            for r in rows:
+                if r.get('links'):
+                    r['links'] = [x for x in r['links'] if x != row['id']]
+        elif op == 'edit':
+            for k in ('text', 'note', 'pillar'):
+                if k in body:
+                    row[k] = (body.get(k) or '').strip()[:2000]
+            if 'kind' in body:
+                row['kind'] = clean_kind(body.get('kind'))
+            if 'img' in body:
+                # Swapping a picture leaves the old file with no card on it.
+                old = row.get('img')
+                row['img'] = os.path.basename(body.get('img') or '')
+                if old and old != row['img']:
+                    f = os.path.join(IDEA_IMG, os.path.basename(old))
+                    if os.path.isfile(f):
+                        try:
+                            os.remove(f)
+                        except OSError:
+                            pass
+        elif op == 'move':
+            row['x'] = int(body.get('x') or 0)
+            row['y'] = int(body.get('y') or 0)
+        elif op == 'link':
+            # One edge, stored once, on whichever end was dragged from. Both
+            # ends draw it, so which end holds it never matters.
+            other = body.get('to')
+            if other == row['id'] or not any(r.get('id') == other for r in rows):
+                return {'error': 'bad link'}
+            for r in rows:
+                r.setdefault('links', [])
+            has = other in row['links'] or row['id'] in next(
+                (r['links'] for r in rows if r.get('id') == other), [])
+            if has:
+                row['links'] = [x for x in row['links'] if x != other]
+                for r in rows:
+                    if r.get('id') == other:
+                        r['links'] = [x for x in r['links'] if x != row['id']]
+            else:
+                row['links'].append(other)
+        elif op == 'used':
+            row['used'] = bool(body.get('used'))
+        else:
+            return {'error': 'bad op'}
+    save_ideas(rows)
+    return {'rows': rows}
+
+
+def idea_save_image(data_url):
+    """A pasted screenshot, straight off the clipboard. Returns its filename."""
+    if not data_url.startswith('data:image/'):
+        return None
+    head, _, b64 = data_url.partition(',')
+    ext = {'jpeg': 'jpg', 'png': 'png', 'gif': 'gif',
+           'webp': 'webp'}.get(head.split('/')[1].split(';')[0], '')
+    if not ext:
+        return None
+    raw = base64.b64decode(b64)
+    if len(raw) > 12 * 1024 * 1024:
+        return None
+    os.makedirs(IDEA_IMG, exist_ok=True)
+    name = '%d.%s' % (time.time() * 1000, ext)
+    with open(os.path.join(IDEA_IMG, name), 'wb') as fh:
+        fh.write(raw)
+    return name
 
 
 def save_log(log):
@@ -1029,149 +1173,6 @@ def sync_all():
 PERIODS = {'1': 1, '7': 7, '28': 28, '60': 60, '365': 365}
 
 
-# ---------------------------------------------------------------- Konvo
-# The other app. Same person shipping it, so it lives behind a toggle here
-# rather than in a second dashboard nobody would open.
-#
-# Everything comes from PostHog. The key is a personal read key kept outside
-# any repo, and this server only ever binds to localhost, so it never leaves
-# the machine.
-
-KONVO_PH_KEY = os.path.expanduser('~/.posthog_key')
-KONVO_PH_PROJECT = '261232'
-KONVO_PH_HOST = 'https://eu.posthog.com'
-
-
-def _konvo_key():
-    try:
-        with open(KONVO_PH_KEY) as fh:
-            k = fh.read().strip()
-        return k if k.startswith('phx_') else None
-    except OSError:
-        return None
-
-
-def _konvo_ssl():
-    """A verifying context that works on a stock macOS python.
-
-    The python here has no CA bundle of its own, so the default context fails
-    every HTTPS call with CERTIFICATE_VERIFY_FAILED. macOS ships a perfectly
-    good bundle; point at it rather than adding a dependency or, worse,
-    turning verification off.
-    """
-    for path in ('/etc/ssl/cert.pem', '/private/etc/ssl/cert.pem'):
-        if os.path.exists(path):
-            return ssl.create_default_context(cafile=path)
-    return ssl.create_default_context()
-
-
-def _konvo_query(sql, timeout=55):
-    """One HogQL query. Returns rows, or raises with something readable."""
-    key = _konvo_key()
-    if not key:
-        raise RuntimeError('no PostHog key at ~/.posthog_key')
-    body = json.dumps({'query': {'kind': 'HogQLQuery', 'query': sql}}).encode()
-    req = urllib.request.Request(
-        f'{KONVO_PH_HOST}/api/projects/{KONVO_PH_PROJECT}/query/',
-        data=body, method='POST',
-        headers={'Authorization': f'Bearer {key}',
-                 'Content-Type': 'application/json'})
-    with urllib.request.urlopen(req, timeout=timeout, context=_konvo_ssl()) as r:
-        return json.loads(r.read().decode()).get('results', [])
-
-
-# The 21 onboarding screens, in the order the app shows them. Kept here so the
-# funnel reads in order even on a day when a step got no views at all: a step
-# missing from the chart looks like a step nobody reached, which is a very
-# different thing from a step nobody saw.
-KONVO_STEPS = [
-    'welcome', 'name', 'age', 'gender', 'behaviorChat', 'analysis', 'pattern',
-    'whyItHappens', 'personalizedPlan', 'demo', 'yourScore', 'reviewAsk',
-    'dailyTime', 'notifications', 'priceAnchor', 'trialReminder', 'paywall',
-]
-
-
-def konvo(days=14, version=None):
-    """Everything the Konvo tab draws, in one call.
-
-    Version matters more than it looks. Until 1.1 shipped, the only builds
-    carrying PostHog were the ones running on this machine during development,
-    so the whole project was full of simulator launches that looked exactly
-    like users. The version picker is how you keep those apart, and the default
-    is whichever version the most people are on.
-    """
-    win = f'timestamp > now() - INTERVAL {int(days)} DAY'
-    out = {'days': int(days), 'error': None, 'slow': []}
-
-    def section(name, fn, default):
-        """Each panel survives its own failure.
-
-        Six queries ran in sequence and any one of them timing out returned an
-        error page with nothing on it, which is a poor trade when five of the
-        six had already come back.
-        """
-        try:
-            return fn()
-        except Exception as exc:                  # noqa: BLE001 - surfaced in the UI
-            out['slow'].append(f'{name}: {str(exc)[:60]}')
-            return default
-
-    try:
-        vers = section('versions', lambda: _konvo_query(
-            "SELECT properties.$app_version AS v, properties.$app_build AS b, "
-            "uniq(person_id) AS people, max(timestamp) AS last "
-            f"FROM events WHERE {win} AND v != '' "
-            "GROUP BY v, b ORDER BY people DESC LIMIT 12"), [])
-        out['versions'] = [{'version': v, 'build': b, 'people': p,
-                            'last': str(l)[:16]} for v, b, p, l in vers]
-        if not version and vers:
-            version = f'{vers[0][0]}|{vers[0][1]}'
-        out['version'] = version
-
-        vfilter = ''
-        if version and '|' in version:
-            vv, bb = version.split('|', 1)
-            vv = vv.replace("'", ""); bb = bb.replace("'", "")
-            vfilter = f"AND properties.$app_version = '{vv}' AND properties.$app_build = '{bb}'"
-
-        steps = dict()
-        for idx, step, people in section('funnel', lambda: _konvo_query(
-                "SELECT toInt(properties.step_index) AS idx, any(properties.step) AS step, "
-                "uniq(person_id) AS people FROM events "
-                f"WHERE event = 'onboarding_step_viewed' AND {win} {vfilter} "
-                "GROUP BY idx ORDER BY idx"), []):
-            steps[int(idx)] = (step, people)
-        top = max([p for _, p in steps.values()] or [0])
-        out['funnel'] = [{
-            'index': i, 'step': KONVO_STEPS[i] if i < len(KONVO_STEPS) else str(i),
-            'people': steps.get(i, (None, 0))[1],
-            'pct': round(100.0 * steps.get(i, (None, 0))[1] / top, 1) if top else 0.0,
-        } for i in range(len(KONVO_STEPS))]
-
-        out['events'] = [{'event': e, 'people': p, 'count': c} for e, p, c in section(
-            'events', lambda: _konvo_query(
-                "SELECT event, uniq(person_id) AS people, count() AS n FROM events "
-                f"WHERE {win} {vfilter} GROUP BY event ORDER BY people DESC LIMIT 30"), [])]
-
-        out['daily'] = [{'day': str(d), 'people': p} for d, p in section(
-            'daily', lambda: _konvo_query(
-                "SELECT toDate(timestamp) AS d, uniq(person_id) AS people FROM events "
-                f"WHERE event = 'Application Installed' AND {win} GROUP BY d ORDER BY d"), [])]
-
-        out['countries'] = [{'country': c or 'unknown', 'people': p} for c, p in section(
-            'countries', lambda: _konvo_query(
-                "SELECT properties.$geoip_country_name AS c, uniq(person_id) AS people "
-                f"FROM events WHERE {win} {vfilter} GROUP BY c ORDER BY people DESC LIMIT 10"), [])]
-
-        out['failures'] = [{'endpoint': e, 'count': n, 'people': p} for e, n, p in section(
-            'failures', lambda: _konvo_query(
-                "SELECT properties.endpoint AS e, count() AS n, uniq(person_id) AS people "
-                f"FROM events WHERE event = 'api_call_failed' AND {win} "
-                "GROUP BY e ORDER BY n DESC LIMIT 10"), [])]
-    except Exception as exc:                      # noqa: BLE001 - shown in the UI
-        out['error'] = str(exc)[:300]
-    return out
-
 
 def analytics(period='7', only=None, frm=None, to=None):
     """Everything the Analytics tab needs, computed here rather than in JS.
@@ -1922,7 +1923,11 @@ Rules, all enforced in code, so run them rather than trusting memory:
    refuses anything else. Record each with compose.mark_hook_used(HOOK,
    TOPIC) — pass the topic, it is what ties the hook to its performance.
    If there are not enough eligible hooks, build fewer and say so.
-2. Roster from tools/tool_pool.json. ARCO leads at slide 1. Exactly one LLM
+2. The hook slide carries the ICON SHELF: call compose.hook_slide(..., icons=[...])
+   with the roster's icons, so the apps appear under the hook. This is the
+   look of the account, not a variation to choose between — a hook with no
+   shelf reads as a different series. Use it on every tools post.
+3. Roster from tools/tool_pool.json. ARCO leads at slide 1. Exactly one LLM
    per post, rotated between posts. Every tool must pass
    compose.assert_audience.
 3. Call compose.preflight(topic, tools, bgs) before rendering. Pick
@@ -2237,6 +2242,171 @@ def _https():
         return ssl.create_default_context(cafile=certifi.where())
     except Exception:
         return ssl.create_default_context()
+
+
+def _metrics(path, payload=None, write=False, timeout=40):
+    """Talk to the metrics worker. Returns the parsed body or an {'error'}."""
+    if not METRICS_URL:
+        return {'error': 'ARCO_METRICS_URL is not set'}
+    key = METRICS_WRITE if write else METRICS_KEY
+    if not key:
+        return {'error': 'no %s key configured' % ('write' if write else 'read')}
+    url = '%s%s%sk=%s' % (METRICS_URL, path, '&' if '?' in path else '?',
+                          urllib.parse.quote(key))
+    data = json.dumps(payload).encode() if payload is not None else None
+    req = urllib.request.Request(url, data=data, headers={
+        'User-Agent': 'arco-dashboard/1',
+        'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout, context=_https()) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as exc:
+        try:
+            return json.load(exc)
+        except Exception:
+            return {'error': 'HTTP %s' % exc.code}
+    except Exception as exc:
+        return {'error': str(exc)}
+
+
+def ig_slide_urls(topic):
+    """Public URLs for a topic's 4:5 crops, or [] if they have not been made."""
+    d = os.path.join(DRAFTS, topic, 'ig')
+    if not os.path.isdir(d):
+        return []
+    files = sorted(f for f in os.listdir(d) if re.match(r'^\d+\.jpg$', f))
+    return ['%s/%s/ig/%s' % (PAGES.rstrip('/'), topic, f) for f in files]
+
+
+# Instagram captions are shorter than TikTok's. A TikTok caption carries a
+# teaching line per tool because the search index reads it; on Instagram that
+# is a wall of text under a picture and the slides already say all of it.
+def ig_caption(topic):
+    """One sentence saying what the post is, plus its hashtags.
+
+    The title is that sentence and already exists on every post — "5 tools
+    that replace a whole team", "the 5 apps i would keep if i deleted
+    everything else". Truncating the TikTok caption instead was unreliable:
+    its opening sentence is usually the hook but sometimes a tool detail,
+    so `saved-hours` would have led with a line about Perplexity rather
+    than anything describing the post.
+
+    #creatorsearchinsights is TikTok's search programme and does nothing
+    here, so it comes off with the rest.
+    """
+    idx, _ = hooks_index()
+    rec = idx.get(topic) or {}
+    cap = rec.get('caption') or ''
+    tags = [t for t in re.findall(r'#\w+', cap)
+            if t.lower() != '#creatorsearchinsights']
+    line = (rec.get('title') or '').strip()
+    if not line:
+        # No title: fall back to the caption's first sentence rather than
+        # posting nothing.
+        body = re.sub(r'#\w+', '', cap).strip()
+        line = re.split(r'(?<=\.)\s', body)[0].strip() if body else ''
+    if not line:
+        return ''
+    line = line.rstrip(' .') + '.'
+    return (line + ('\n\n' + ' '.join(tags) if tags else '')).strip()
+
+
+def ig_blocked(topic):
+    """Why this post cannot go to Instagram, or '' if it can.
+
+    Deliberately NOT unregistered(): that guard requires the TikTok search
+    tag, which this platform strips anyway — so reusing it rejected posts
+    for missing a hashtag that would never have been sent.
+    """
+    if not ig_caption(topic):
+        return 'no caption in hooks.json, so there is nothing to post with'
+    if not ig_slide_urls(topic):
+        return 'no 4:5 crops yet'
+    return ''
+
+
+def ig_prepare_many(topics):
+    """Crop everything that needs it, then commit and push once.
+
+    ig_prepare does a commit and a push per topic. Filling a week means
+    about seventeen of them, which is seventeen Pages builds queued behind
+    each other and minutes of waiting for something git can do in one go.
+    """
+    made, failed = [], {}
+    for t in topics:
+        if ig_slide_urls(t):
+            continue
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'tools', 'variants.py'),
+                            t, '--ig'], cwd=os.path.join(REPO, 'tools'),
+                           capture_output=True, text=True, timeout=600)
+        if r.returncode != 0:
+            failed[t] = (r.stderr or r.stdout).strip()[-160:]
+        else:
+            made.append(t)
+
+    def git(*a):
+        return subprocess.run(('git',) + a, cwd=REPO, capture_output=True,
+                              text=True, timeout=600)
+    pushed = False
+    if made:
+        for t in made:
+            git('add', os.path.join('drafts', t, 'ig'))
+        if git('diff', '--cached', '--name-only').stdout.strip():
+            c = git('commit', '-m',
+                    '4:5 crops for %d post%s, so Instagram can fetch them'
+                    % (len(made), '' if len(made) == 1 else 's'))
+            if c.returncode != 0:
+                return {'error': (c.stdout + c.stderr).strip()[-200:]}
+        pu = git('push', 'origin', 'HEAD')
+        if pu.returncode != 0:
+            return {'error': 'push failed: ' + (pu.stdout + pu.stderr).strip()[-200:]}
+        pushed = True
+    return {'ok': True, 'cropped': made, 'failed': failed, 'pushed': pushed}
+
+
+def ig_prepare(topic):
+    """Crop, commit and push, so Instagram can fetch the slides.
+
+    The Worker cannot crop and cannot read this disk, so this is the one part
+    of scheduling that has to happen here. It pushes because Instagram pulls
+    the images from Pages — a post whose slides are only on this laptop
+    cannot be published by anything.
+    """
+    out = []
+    r = subprocess.run([sys.executable, os.path.join(REPO, 'tools', 'variants.py'),
+                        topic, '--ig'], cwd=os.path.join(REPO, 'tools'),
+                       capture_output=True, text=True, timeout=300)
+    out.append((r.stdout or r.stderr).strip()[-200:])
+    if r.returncode != 0:
+        return {'error': out[-1] or 'variants.py failed'}
+
+    def git(*a):
+        return subprocess.run(('git',) + a, cwd=REPO, capture_output=True,
+                              text=True, timeout=300)
+    git('add', os.path.join('drafts', topic, 'ig'))
+    st = git('diff', '--cached', '--name-only').stdout.strip()
+    if st:
+        c = git('commit', '-m', '4:5 crops for %s, so Instagram can fetch them' % topic)
+        if c.returncode != 0:
+            return {'error': (c.stdout + c.stderr).strip()[-200:]}
+    p = git('push', 'origin', 'HEAD')
+    if p.returncode != 0:
+        return {'error': 'push failed: ' + (p.stdout + p.stderr).strip()[-200:]}
+    return {'ok': True, 'urls': ig_slide_urls(topic), 'log': ' / '.join(out)}
+
+
+def ig_serving(urls):
+    """Which of these are actually live on Pages. Pages lags a push."""
+    live = 0
+    for u in urls:
+        try:
+            req = urllib.request.Request(u, method='HEAD',
+                                         headers={'User-Agent': 'arco-dashboard/1'})
+            with urllib.request.urlopen(req, timeout=15, context=_https()) as r:
+                live += 1 if r.status == 200 else 0
+        except Exception:
+            pass
+    return live
 
 
 def user_summary(days=30):
@@ -2868,6 +3038,47 @@ def save_schedules(sc):
         json.dump(sc, fh, indent=1)
 
 
+def settle_orphans():
+    """Finish rows whose agent is gone but whose watcher never noticed.
+
+    reconcile_queues only runs at startup. A run whose watching thread died
+    with a restart, and whose process then exited while the server stayed
+    up, has nobody left to mark it done — so it reads as running forever and
+    the job panel shows a spinner for work that finished an hour ago. This
+    is the same settle the watcher would have done, on a slow beat.
+    """
+    for path, load_, save_ in ((BUILD, build_queue, save_builds),
+                               (REDO, redo_queue, None),
+                               (REPLICATE, replicate_queue, None),
+                               (GEN, gen_queue, save_gen)):
+        q, dirty = load_(), False
+        for x in q:
+            if x.get('status') != 'running' or _alive(x.get('pid')):
+                continue
+            out = _read_log(x.get('out') or '')
+            token = {'build': 'BUILT', 'gen': 'DONE'}.get(x.get('what') and 'gen'
+                                                          or ('build' if path == BUILD else ''), '')
+            if out:
+                x['status'] = 'done' if (token and token in out) or 'BUILT' in out or 'DONE' in out \
+                              else 'failed'
+                x['done'] = x['status'] == 'done'
+                x['log'] = out[-1200:]
+            else:
+                x['status'] = 'interrupted'
+                x['log'] = 'the run ended and nothing was watching it'
+            x['finished'] = time.time()
+            dirty = True
+            print('[sweep] settled %s as %s' % (x.get('topic') or x.get('from')
+                                                or x.get('what') or 'a build', x['status']),
+                  flush=True)
+        if dirty:
+            if save_:
+                save_(q)
+            else:
+                with open(path, 'w') as fh:
+                    json.dump(q, fh, indent=1, ensure_ascii=False)
+
+
 def reconcile_queues():
     """Sort out jobs left behind by a previous server.
 
@@ -2927,6 +3138,11 @@ def scheduler_loop():
     while True:
         try:
             now = time.time()
+            # A finished run with no watcher left reads as running forever.
+            try:
+                settle_orphans()
+            except Exception as exc:
+                print('[sweep] failed: %s' % exc, flush=True)
             # Reconcile with TikTok on a slow beat. It is an HTTPS call, not an
             # agent, so it costs nothing but a token refresh.
             if now - _last_sync[0] > SYNC_EVERY:
@@ -3127,8 +3343,32 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 'blocked': [{'lines': l, 'why': w} for l, w in hook_rules.blocked()],
                 'suggested': hook_suggestions(),
             })
+        if path == '/api/ideas':
+            return self._send(200, {'rows': load_ideas()})
+        if path.startswith('/ideas_img/'):
+            f = os.path.normpath(os.path.join(
+                IDEA_IMG, os.path.basename(path[len('/ideas_img/'):])))
+            if not f.startswith(IDEA_IMG) or not os.path.isfile(f):
+                return self._send(404, {'error': 'not found'})
+            with open(f, 'rb') as fh:
+                return self._send(200, fh.read(),
+                                  mimetypes.guess_type(f)[0] or 'image/png')
         if path == '/api/bgs':
             return self._send(200, bg_catalog())
+        if path == '/api/ig':
+            # The queue, plus which posts on this disk are ready to join it.
+            q = _metrics('/ig/queue')
+            ready = {}
+            for topic in sorted(os.listdir(DRAFTS)):
+                if topic.startswith('_'):
+                    continue
+                urls = ig_slide_urls(topic)
+                if urls:
+                    ready[topic] = len(urls)
+            return self._send(200, {'queue': q.get('rows') or [],
+                                    'error': q.get('error'),
+                                    'prepared': ready,
+                                    'accounts': IG_ACCOUNTS})
         if path == '/api/users':
             return self._send(200, user_summary(
                 int((urllib.parse.parse_qs(
@@ -3163,28 +3403,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                     'cats': sorted(k for k in pool
                                                    if not k.startswith('_')
                                                    and isinstance(pool[k], list))})
-        if path == '/api/host':
-            # Two dashboards look identical on purpose — same data, same page.
-            # This is the one thing that differs, so the UI can say which one
-            # you are typing into before you draft from it.
-            # Whichever machine is actually serving this. It used to report a
-            # role — host or local — and the page turned "host" into the word
-            # "mini", which stopped being true the moment the laptop became
-            # the machine holding the data.
-            h = socket.gethostname().split('.')[0]
-            short = re.sub(r'^thinh.?s?[- ]', '', h.lower())
-            short = re.sub(r'[^a-z0-9]+', ' ', short).strip()
-            short = re.sub(r'\s*\d+$', '', short) or h.lower()
-            return self._send(200, {
-                'name': short,
-                'owns': not UPSTREAM,
-                'upstream': UPSTREAM or None,
-                'dev': DEV,
-            })
-        # Answered here, never forwarded: the question is which server you are
-        # talking to, and the proxy would hand back the other one's answer.
-        if UPSTREAM and path.startswith('/api/'):
-            return self._proxy()
         if path == '/':
             return self._send(200, PAGE, 'text/html; charset=utf-8')
         if path == '/phone':
@@ -3202,10 +3420,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._send(404, {'error': 'no icon'})
         if path == '/api/sync':
             return self._send(200, sync_all())
-        if path == '/api/konvo':
-            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            return self._send(200, konvo(int((q.get('days') or ['14'])[0]),
-                                         (q.get('version') or [None])[0]))
         if path == '/api/analytics':
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             only = [x for x in (q.get('accounts') or [''])[0].split(',') if x]
@@ -3289,6 +3503,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             keys = body.get('accounts') or [a['key'] for a in ACCOUNTS]
             return self._send(200, {'results': run_draft(topic, keys),
                                     'pending': pending_counts()})
+        if path == '/api/ideas':
+            return self._send(200, idea_apply(body))
+        if path == '/api/ideas/img':
+            name = idea_save_image(body.get('data') or '')
+            if not name:
+                return self._send(400, {'error': 'not an image'})
+            return self._send(200, {'img': name})
         if path == '/api/autofill':
             # Choosing was never the judgment call — the words are. So the
             # photos, the roster and the hook come straight from the rules,
@@ -3318,6 +3539,36 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 save_gen(q)
             threading.Thread(target=run_gen, args=(job,), daemon=True).start()
             return self._send(200, {'ok': True, 'at': job['at']})
+        if path == '/api/ig/prepare':
+            return self._send(200, ig_prepare(body['topic']))
+        if path == '/api/ig/prepare_many':
+            return self._send(200, ig_prepare_many(body.get('topics') or []))
+        if path == '/api/ig/caption':
+            t = body['topic']
+            return self._send(200, {'caption': ig_caption(t),
+                                    'blocked': ig_blocked(t)})
+        if path == '/api/ig/check':
+            urls = ig_slide_urls(body['topic'])
+            return self._send(200, {'urls': urls, 'live': ig_serving(urls),
+                                    'total': len(urls)})
+        if path == '/api/ig/schedule':
+            topic = body['topic']
+            urls = ig_slide_urls(topic)
+            if not urls:
+                return self._send(400, {'error': 'no 4:5 crops yet — prepare it first'})
+            # What he typed in the sheet wins; the stored caption is only
+            # the starting point, because Instagram wants its own hashtags.
+            cap = (body.get('caption') or '').strip() or ig_caption(topic)
+            if not cap:
+                return self._send(400, {'error': 'no caption to post with'})
+            return self._send(200, _metrics('/ig/schedule', {
+                'topic': topic, 'account': body.get('account') or 'getarco',
+                'at': int(body.get('at') or 0), 'urls': urls, 'caption': cap},
+                write=True))
+        if path == '/api/ig/cancel':
+            return self._send(200, _metrics('/ig/cancel', {'id': body['id']}, write=True))
+        if path == '/api/ig/run':
+            return self._send(200, _metrics('/ig/run', {}, write=True))
         if path == '/api/hook':
             # hook_slide refuses anything that is not in the pool, so a hook
             # he writes in the composer has to land there before the build
@@ -3567,13 +3818,185 @@ PAGE = r"""<!doctype html><html lang="en"><head>
 <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#020617; --surface:#0F172A; --surface-2:#1E293B; --line:#1E293B; --line-2:#293548;
-  --text:#F8FAFC; --muted:#94A3B8; --dim:#64748B;
-  --accent:#38BDF8; --ok:#22C55E; --warn:#F59E0B; --bad:#F43F5E;
-  --r:10px; --z-modal:50;
+  /* Near-black with a blue cast rather than neutral black — the reference
+     reads as glass lit from behind, not as paper inverted. Panels are
+     translucent over it so the ground shows through and the whole thing
+     sits on one surface instead of many stacked cards. */
+  /* One channel drives the whole theme: --accent-rgb. Every tint, hairline
+     and glow is mixed from it, so changing the palette is one line rather
+     than hunting twenty-five hardcoded rgba() calls. */
+  --accent-rgb:232,237,250;
+  /* Black, with the light arriving as glow rather than as paint. Panels and
+     type stay neutral so the only colour on screen comes from the accent —
+     tinting every surface made the whole page look washed instead of lit.
+     White reads far brighter than a hue at the same alpha, so the hairlines
+     sit lower than they would for a coloured accent. */
+  --bg:#040507; --ink-rgb:4,5,7;
+  --bg:#040507; --surface:rgba(16,17,22,.93); --surface-2:rgba(27,29,36,.95);
+  --line:rgba(var(--accent-rgb),.14); --line-2:rgba(var(--accent-rgb),.3);
+  --text:#ECEEF4; --muted:#979BA6; --dim:#5D616C;
+  --accent:#E8EDFA; --glow:rgba(var(--accent-rgb),.42);
+  /* Status keeps its own hues: these carry meaning and must not all be cyan. */
+  --ok:#34E39B; --warn:#F5B945; --bad:#FF5C7A;
+  --r:3px; --z-modal:50;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
+/* A faint grid, the way a HUD sits on a surface rather than on nothing.
+   Two hairlines at 64px; far enough apart to read as structure, faint
+   enough that nothing on top of it has to fight. */
+/* Rings leaving the eye. Three, staggered, so one is always mid-flight —
+   the page reads as lit from a source rather than tinted at the corners. */
+@keyframes ping{
+  0%{transform:scale(.06);opacity:0}
+  12%{opacity:.5}
+  100%{transform:scale(1);opacity:0}}
+.bgfx{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.bgfx .ring{position:absolute;left:60px;top:60px;width:2400px;height:2400px;
+  margin:-1200px 0 0 -1200px;border-radius:50%;
+  border:1px solid rgba(var(--accent-rgb),.5);
+  animation:ping 14s cubic-bezier(.2,.5,.3,1) infinite}
+.bgfx .ring:nth-child(2){animation-delay:-4.6s}
+.bgfx .ring:nth-child(3){animation-delay:-9.3s}
+/* Grain. Flat black on a wide screen bands; a little noise kills that and
+   gives the surfaces something to sit on. */
+.bgfx .grain{position:absolute;inset:-50%;opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E")}
+/* A large dial assembly behind the work. It is the same construct as the
+   reticle in the corner, drawn at twenty times the size and a twentieth the
+   contrast — present when you look for it, invisible when you are reading a
+   caption. Everything here is a fraction of a percent of alpha; raising it
+   turns a background into wallpaper. */
+.hud{position:absolute;left:58%;top:50%;width:860px;height:860px;
+  margin:-430px 0 0 -430px;opacity:.55}
+.hud i{position:absolute;inset:0;border-radius:50%}
+.hud i.m{-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - var(--w)),#000 0);
+         mask:radial-gradient(farthest-side,transparent calc(100% - var(--w)),#000 0)}
+/* thin outer ring, broken on the diagonals */
+.hud .h1{--w:1px;inset:0;
+  background:conic-gradient(from -40deg,
+    rgba(var(--accent-rgb),.16) 0deg 80deg,transparent 80deg 90deg,
+    rgba(var(--accent-rgb),.16) 90deg 170deg,transparent 170deg 180deg,
+    rgba(var(--accent-rgb),.16) 180deg 260deg,transparent 260deg 270deg,
+    rgba(var(--accent-rgb),.16) 270deg 350deg,transparent 350deg 360deg);
+  animation:spin 190s linear infinite}
+/* the long tick comb — 120 teeth */
+.hud .h2{--w:16px;inset:26px;
+  background:repeating-conic-gradient(from 0deg,
+    rgba(var(--accent-rgb),.11) 0deg .7deg,transparent .7deg 3deg);
+  animation:spinback 240s linear infinite}
+/* segment band */
+.hud .h3{--w:30px;inset:74px;
+  background:repeating-conic-gradient(from 6deg,
+    rgba(var(--accent-rgb),.055) 0deg 16deg,transparent 16deg 24deg);
+  animation:spin 300s linear infinite}
+/* two long arcs, the brightest thing in the assembly and still barely there */
+.hud .h4{--w:2px;inset:132px;
+  background:conic-gradient(from 20deg,
+    rgba(var(--accent-rgb),.2) 0deg 104deg,transparent 104deg 190deg,
+    rgba(var(--accent-rgb),.13) 190deg 244deg,transparent 244deg 360deg);
+  animation:spinback 120s linear infinite}
+/* spokes, cut back to a ring so the middle stays clear */
+.hud .h5{--w:120px;inset:180px;
+  background:repeating-conic-gradient(from 0deg,
+    rgba(var(--accent-rgb),.06) 0deg .35deg,transparent .35deg 15deg);
+  animation:spin 400s linear infinite}
+/* inner comb and edge */
+.hud .h6{--w:9px;inset:308px;
+  background:repeating-conic-gradient(from 0deg,
+    rgba(var(--accent-rgb),.1) 0deg 1.4deg,transparent 1.4deg 6deg);
+  animation:spinback 150s linear infinite}
+.hud .h7{inset:352px;border:1px solid rgba(var(--accent-rgb),.11)}
+@media(max-width:900px){.hud{display:none}}
+
+/* Satellite dials. Each is three rings: a comb, a broken ring and an arc,
+   turning against each other the way the big one does. */
+.sat{position:absolute;border-radius:50%;opacity:.5}
+.sat i{position:absolute;inset:0;border-radius:50%;
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - var(--w)),#000 0);
+          mask:radial-gradient(farthest-side,transparent calc(100% - var(--w)),#000 0)}
+.sat .s1{--w:1px;inset:0;
+  background:conic-gradient(from -30deg,
+    rgba(var(--accent-rgb),.22) 0deg 120deg,transparent 120deg 150deg,
+    rgba(var(--accent-rgb),.22) 150deg 270deg,transparent 270deg 300deg,
+    rgba(var(--accent-rgb),.22) 300deg 360deg);
+  animation:spin 80s linear infinite}
+.sat .s2{--w:6px;inset:11%;
+  background:repeating-conic-gradient(from 0deg,
+    rgba(var(--accent-rgb),.13) 0deg 1.1deg,transparent 1.1deg 5deg);
+  animation:spinback 110s linear infinite}
+.sat .s3{--w:2px;inset:30%;
+  background:conic-gradient(from 60deg,
+    rgba(var(--accent-rgb),.26) 0deg 88deg,transparent 88deg 360deg);
+  animation:spin 46s linear infinite}
+.sat .s4{inset:46%;background:rgba(var(--accent-rgb),.18);-webkit-mask:none;mask:none}
+.sat.a{left:16%;top:13%;width:168px;height:168px;margin:-84px 0 0 -84px}
+.sat.b{left:80%;top:74%;width:224px;height:224px;margin:-112px 0 0 -112px}
+.sat.c{left:70%;top:9%;width:96px;height:96px;margin:-48px 0 0 -48px}
+@media(max-width:1200px){.sat.c{display:none}}
+@media(max-width:900px){.sat{display:none}}
+
+/* Readouts. A console shows numbers. These are the real ones — the same
+   figures the pages are built from — set low enough to be texture until you
+   choose to read them, which is the only reason to put text in a background.
+   Hidden on a narrow screen, where the panels cover this corner. */
+.hudread{position:fixed;right:30px;bottom:26px;z-index:0;pointer-events:none;
+  text-align:right;font-family:"Fira Code",monospace;
+  color:rgba(var(--accent-rgb),.42);user-select:none}
+/* Lit, not merely lighter: the halo is what makes a readout look powered.
+   Values carry more of it than their labels, so the figures come forward. */
+.hudread .clk{font-size:56px;font-weight:600;line-height:.95;letter-spacing:-.01em;
+  font-variant-numeric:tabular-nums;color:rgba(var(--accent-rgb),.5);
+  text-shadow:0 0 26px rgba(var(--accent-rgb),.34),0 0 8px rgba(var(--accent-rgb),.22)}
+.hudread .clk span{font-size:22px;color:rgba(var(--accent-rgb),.3);margin-left:4px}
+.hudread .dt{font-size:10.5px;font-weight:700;letter-spacing:.22em;
+  text-transform:uppercase;margin-top:5px;color:rgba(var(--accent-rgb),.38);
+  text-shadow:0 0 14px rgba(var(--accent-rgb),.25)}
+.hudread .rows{margin-top:13px;display:grid;gap:4px;font-size:10px;font-weight:700;
+  letter-spacing:.14em}
+.hudread .rows div{display:flex;justify-content:flex-end;gap:10px}
+.hudread .rows i{font-style:normal;color:rgba(var(--accent-rgb),.3)}
+.hudread .rows b{font-weight:700;font-variant-numeric:tabular-nums;
+  color:rgba(var(--accent-rgb),.62);min-width:56px;text-align:right;
+  text-shadow:0 0 16px rgba(var(--accent-rgb),.4)}
+@media(max-width:1200px){.hudread{display:none}}
+
+/* Hairlines between the dials. A console is wired together; without these
+   the circles float. */
+.wire{position:absolute;background:rgba(var(--accent-rgb),.08)}
+.wire.w1{left:16%;top:13%;width:54%;height:1px}
+.wire.w2{left:70%;top:13%;width:1px;height:61%}
+.wire.w3{left:24%;top:74%;width:56%;height:1px}
+@media(max-width:900px){.wire{display:none}}
+@media(prefers-reduced-motion:reduce){.hud i{animation:none}}
+
+/* Corner brackets — the frame that makes the page an instrument panel. */
+/* The brackets ride above the panels — a frame drawn behind the sidebar is
+   not a frame. Nothing else in .bgfx leaves z-index 0. */
+.bgfx .br{position:fixed;z-index:200;width:26px;height:26px;
+  border:1px solid rgba(var(--accent-rgb),.28)}
+.bgfx .br.tl{top:10px;left:10px;border-right:0;border-bottom:0}
+.bgfx .br.tr{top:10px;right:10px;border-left:0;border-bottom:0}
+.bgfx .br.bl{bottom:10px;left:10px;border-right:0;border-top:0}
+.bgfx .br.br2{bottom:10px;right:10px;border-left:0;border-top:0}
+@media(prefers-reduced-motion:reduce){
+  .bgfx .ring{animation:none;opacity:0}}
+
+/* The bloom comes from the eye. It is anchored at the reticle in the top
+   left and breathes on a slow cycle, so the light on the page has a source
+   you can point at rather than being a wash applied to the corners. A far
+   fainter second source keeps the opposite side from going flat black. */
+@keyframes breathe{
+  0%,100%{opacity:.85;transform:scale(1)}
+  50%{opacity:1;transform:scale(1.06)}}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  transform-origin:60px 60px;
+  background:
+    radial-gradient(38% 52% at 60px 60px,rgba(var(--accent-rgb),.17),transparent 72%),
+    radial-gradient(70% 60% at 60px 60px,rgba(var(--accent-rgb),.07),transparent 76%),
+    radial-gradient(50% 45% at 92% 104%,rgba(var(--accent-rgb),.055),transparent 72%);
+  animation:breathe 7s ease-in-out infinite}
+.app{position:relative;z-index:1}
 body{background:var(--bg);color:var(--text);
   font:400 15px/1.6 "Fira Sans",-apple-system,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 code,.mono{font-family:"Fira Code",ui-monospace,monospace}
@@ -3587,18 +4010,90 @@ button{font:inherit;cursor:pointer}
 aside{background:var(--surface);border-right:1px solid var(--line);
   display:flex;flex-direction:column;padding:20px 14px;gap:26px;overflow:auto}
 .brand{display:flex;align-items:center;gap:11px;padding:0 8px}
-.brand img{width:34px;height:34px;border-radius:9px}
-.brand .n{font-weight:600;font-size:15px;letter-spacing:.01em}
+/* The reticle. Six layers, because the look comes from density rather than
+   from any one ring: a comb of fine ticks, two bright arcs turning against
+   each other, a dashed hairline, a coarser tick ring, and a lit inner edge.
+   All CSS — repeating-conic-gradient draws the combs, and a radial mask
+   punches each one back to a ring so the middle stays clear for the mark. */
+.eye{position:relative;display:grid;place-items:center;width:76px;height:76px;flex:none}
+.eye i{position:absolute;border-radius:50%;pointer-events:none}
+/* ring() — keep only the outer Npx of a filled circle, so a conic gradient
+   painted across the whole disc reads as a band of ticks */
+.eye .r1,.eye .r2,.eye .r4,.eye .r5,.eye .r7,.eye .r8{
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - var(--w)),#000 0);
+          mask:radial-gradient(farthest-side,transparent calc(100% - var(--w)),#000 0)}
+
+/* outermost: four heavy bracket arcs with gaps on the diagonals. Static —
+   it is the frame the moving parts are read against. */
+.eye .r1{--w:2px;inset:0;
+  background:conic-gradient(from -38deg,
+    rgba(var(--accent-rgb),.8) 0deg 76deg,transparent 76deg 90deg,
+    rgba(var(--accent-rgb),.8) 90deg 166deg,transparent 166deg 180deg,
+    rgba(var(--accent-rgb),.8) 180deg 256deg,transparent 256deg 270deg,
+    rgba(var(--accent-rgb),.8) 270deg 346deg,transparent 346deg 360deg)}
+/* fine comb: 72 ticks, turning slowly */
+.eye .r2{--w:3.5px;inset:3px;
+  background:repeating-conic-gradient(from 0deg,
+    rgba(var(--accent-rgb),.5) 0deg 1.2deg,transparent 1.2deg 5deg);
+  animation:spin 30s linear infinite}
+/* dashed hairline, still */
+.eye .r3{inset:7.5px;border:1px dashed rgba(var(--accent-rgb),.34)}
+/* segmented band: twelve blocks, the slowest thing on the dial */
+.eye .r7{--w:3px;inset:9px;
+  background:repeating-conic-gradient(from 0deg,
+    rgba(var(--accent-rgb),.32) 0deg 22deg,transparent 22deg 30deg);
+  animation:spin 44s linear infinite}
+/* the sweep — one short bright arc, the fastest thing on it */
+.eye .r8{--w:1.5px;inset:12.5px;
+  background:conic-gradient(from 0deg,
+    rgba(var(--accent-rgb),1) 0deg 26deg,transparent 26deg 360deg);
+  animation:spin 3.4s linear infinite;
+  filter:drop-shadow(0 0 7px rgba(var(--accent-rgb),.9))}
+/* two bright arcs, the other way and slower */
+.eye .r4{--w:2px;inset:14.5px;
+  background:conic-gradient(from 0deg,
+    rgba(var(--accent-rgb),.95) 0deg 52deg,transparent 52deg 132deg,
+    rgba(var(--accent-rgb),.75) 132deg 164deg,transparent 164deg 360deg);
+  animation:spinback 7.5s linear infinite;
+  filter:drop-shadow(0 0 5px rgba(var(--accent-rgb),.8))}
+/* coarse comb of 24 ticks, slow, the other way again */
+.eye .r5{--w:1.5px;inset:17px;
+  background:repeating-conic-gradient(from 7.5deg,
+    rgba(var(--accent-rgb),.5) 0deg 2.6deg,transparent 2.6deg 15deg);
+  animation:spinback 22s linear infinite}
+
+/* the orbiting tabs — eight blocks pushed out on a radius, turning as a
+   group, plus four larger ones going the other way further in */
+.eye .tb,.eye .tb2{position:absolute;inset:0;border-radius:50%}
+.eye .tb{animation:spin 17s linear infinite}
+.eye .tb2{animation:spinback 11s linear infinite}
+.eye .tb b,.eye .tb2 b{position:absolute;left:50%;top:50%;display:block;
+  background:rgba(var(--accent-rgb),.62);
+  box-shadow:0 0 6px -1px rgba(var(--accent-rgb),.8)}
+.eye .tb b{width:6px;height:2.5px;margin:-1.25px 0 0 -3px;
+  transform:rotate(var(--a)) translateY(-33px)}
+.eye .tb2 b{width:3px;height:5px;margin:-2.5px 0 0 -1.5px;
+  background:rgba(var(--accent-rgb),.85);
+  transform:rotate(var(--a)) translateY(-25px)}
+
+/* the lit edge the mark sits inside */
+.eye .r6{inset:19px;border:1px solid rgba(var(--accent-rgb),.55);
+  box-shadow:0 0 14px -2px rgba(var(--accent-rgb),.6),
+    inset 0 0 10px -4px rgba(var(--accent-rgb),.6)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes spinback{to{transform:rotate(-360deg)}}
+.brand img{position:relative;z-index:1;width:38px;height:38px;border-radius:10px;
+  box-shadow:0 0 22px -6px var(--glow)}
+.brand{gap:9px}
+/* The one piece of type that is allowed to be an object rather than a
+   label — it is the only thing on the page that never changes. */
+.brand .n{font-weight:600;font-size:17px;letter-spacing:.06em;color:#EAFBFF;
+  text-shadow:0 0 14px rgba(var(--accent-rgb),.55),0 0 34px rgba(var(--accent-rgb),.28)}
 .brand .v{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 /* A property of the subtitle, not a third thing in the stack: a dot in the
    host's colour and the name beside it, on the same line. */
-.hostb{display:inline-flex;align-items:center;gap:5px;
-  font:500 11px/1 "Fira Code",monospace;color:var(--accent)}
-.hostb::before{content:"";width:6px;height:6px;border-radius:50%;
-  background:currentColor;box-shadow:0 0 7px currentColor}
 /* The laptop is the one that can be closed mid-task, so it gets the warmer
    colour. */
-.hostb.local{color:var(--warn)}
 /* Upstream gone: the dot stops glowing and goes red, so a stale page is
    visibly stale rather than quietly wrong. */
 .compose{max-width:720px}
@@ -3643,6 +4138,275 @@ aside{background:var(--surface);border-right:1px solid var(--line);
   white-space:nowrap}
 .btn.sm{padding:7px 13px;font-size:12.5px}
 .addsl{margin:10px 0 0}
+/* ---------- motion ----------
+   One orchestrated moment on load, and after that only motion that answers
+   something you did. render() runs on every state change, so nothing here
+   is attached to content — an entrance that re-fires on every repaint is
+   a twitch, not polish. The boot class is set once and removed. */
+@keyframes sweep{from{transform:translateY(-100%)}to{transform:translateY(100vh)}}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes wake{from{opacity:0}to{opacity:1}}
+@keyframes livepulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+body.boot main::after{content:"";position:fixed;left:232px;right:0;top:0;height:120px;
+  pointer-events:none;z-index:40;
+  background:linear-gradient(rgba(var(--accent-rgb),0),rgba(var(--accent-rgb),.13),rgba(var(--accent-rgb),0));
+  animation:sweep .85s cubic-bezier(.4,0,.2,1) forwards}
+body.boot aside{animation:wake .5s ease both}
+body.boot .brand{animation:rise .55s cubic-bezier(.2,.8,.2,1) both .05s}
+body.boot .nav{animation:rise .4s cubic-bezier(.2,.8,.2,1) both}
+body.boot .nav:nth-child(2){animation-delay:.05s}
+body.boot .nav:nth-child(3){animation-delay:.09s}
+body.boot .nav:nth-child(4){animation-delay:.13s}
+body.boot .nav:nth-child(5){animation-delay:.17s}
+body.boot main{animation:wake .6s ease both .15s}
+
+/* Live, not decorative: the only thing that moves on its own is the post
+   currently being handed to Instagram. */
+.qrow.publishing .st,.wc.publishing .pill{animation:livepulse 1.4s ease-in-out infinite}
+
+/* Turning to another page. The content carries the movement; the nav does
+   not, because the bar sliding and the page sliding at once reads as drift. */
+@keyframes turn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#view.turned{animation:turn .26s cubic-bezier(.2,.8,.2,1)}
+
+/* Every control says it was pressed. Depth, not colour: a HUD control is a
+   switch you push, and the glow underneath confirms contact. */
+.btn:active,.seg:active,.nav:active,.pil:active,.igcard:active,.wkarr:active,
+.chk.acc:active,.lnk:active{transform:translateY(1px) scale(.985)}
+.btn:active{box-shadow:0 0 22px -6px var(--glow)}
+.btn,.seg,.nav,.pil,.igcard,.wkarr,.chk.acc,.lnk,.wc,.bt,.tl,.hk{
+  transition:transform .09s cubic-bezier(.2,.8,.2,1),background .18s,
+    color .18s,border-color .18s,box-shadow .22s,opacity .18s}
+
+/* Motion that answers an action. */
+.shwrap{animation:wake .16s ease}
+.sh{animation:rise .22s cubic-bezier(.2,.8,.2,1)}
+#modal[style*="flex"] .box{animation:rise .2s cubic-bezier(.2,.8,.2,1)}
+.cardmenu{animation:rise .14s cubic-bezier(.2,.8,.2,1)}
+.nav,.seg,.btn,.wc,.qrow{transition:background .18s,color .18s,border-color .18s,
+  box-shadow .22s,opacity .18s}
+.wc:hover{box-shadow:0 0 0 1px var(--line-2),0 0 22px -10px var(--glow)}
+
+/* Inline links inside prose. Without this they fall through to the browser
+   default — blue and underlined in the middle of a purple instrument. */
+.why a,p a{color:var(--accent);text-decoration:none;
+  border-bottom:1px solid rgba(var(--accent-rgb),.45);padding-bottom:1px}
+.why a:hover,p a:hover{border-bottom-color:var(--accent);
+  text-shadow:0 0 12px var(--glow)}
+
+/* ---------- HUD ----------
+   One bold device, used sparingly: corner brackets. They mark a panel as an
+   instrument rather than a card, and because they only draw four corners
+   they cost less visual weight than a full border would. Everything else
+   here is restraint — hairlines, and glow reserved for what is active. */
+.pcard, .ubox, .ukpi, .qrow, .slrow, .tkbar, .npbar, .cbar, .libbar + .grid,
+#modal .box{position:relative}
+.pcard::before, .ubox::before, .ukpi::before, .tkbar::before, .npbar::before,
+.cbar::before, #modal .box::before{
+  content:"";position:absolute;inset:-1px;pointer-events:none;
+  background:
+    linear-gradient(var(--line-2),var(--line-2)) 0 0/9px 1px no-repeat,
+    linear-gradient(var(--line-2),var(--line-2)) 0 0/1px 9px no-repeat,
+    linear-gradient(var(--line-2),var(--line-2)) 100% 0/9px 1px no-repeat,
+    linear-gradient(var(--line-2),var(--line-2)) 100% 0/1px 9px no-repeat,
+    linear-gradient(var(--line-2),var(--line-2)) 0 100%/9px 1px no-repeat,
+    linear-gradient(var(--line-2),var(--line-2)) 0 100%/1px 9px no-repeat,
+    linear-gradient(var(--line-2),var(--line-2)) 100% 100%/9px 1px no-repeat,
+    linear-gradient(var(--line-2),var(--line-2)) 100% 100%/1px 9px no-repeat}
+
+/* Glow marks the one thing that is live, never decoration. */
+.nav[aria-current="true"]{box-shadow:inset 2px 0 0 var(--accent),
+  0 0 22px -8px var(--glow)}
+.btn{box-shadow:0 0 16px -8px var(--glow)}
+.seg.on{box-shadow:inset 0 0 0 1px var(--line-2),0 0 14px -8px var(--glow)}
+.wc.publishing{box-shadow:0 0 20px -8px var(--glow)}
+.wh.today b,.wh.today i{text-shadow:0 0 12px var(--glow)}
+
+/* Figures are the instrument reading; they get the mono face and the glow,
+   prose stays quiet. */
+.ukpi b,.kpi b,.astat b{font-family:"Fira Code",ui-monospace,monospace;
+  letter-spacing:-.02em;text-shadow:0 0 18px rgba(var(--accent-rgb),.25)}
+
+/* Thumbnails are the one place colour comes from the content, so the chrome
+   around them gets out of the way. */
+.thumb,.wc,.igcard img,.sth{border-radius:2px}
+.card,.cardwrap,.igcard,.wc{border-radius:3px}
+
+/* ---------- tiktok + library ---------- */
+.tkbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 6px;
+  padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.tkbar .slots{display:flex;gap:8px;flex-wrap:wrap}
+.tkbar .csum{flex:1;min-width:120px}
+.slot{padding:5px 10px;border-radius:8px;background:var(--surface-2);
+  border:1px solid var(--line-2);font:500 11.5px/1 "Fira Code",monospace;color:var(--muted)}
+.slot b{color:var(--ok);font-weight:700;margin-right:3px}
+.slot.none{opacity:.55}
+.slot.none b{color:var(--dim)}
+.libbar{display:flex;align-items:center;gap:10px;margin:0 0 6px;flex-wrap:wrap}
+.libbar .lbl{width:52px;flex:none;font:500 10.5px/1 "Fira Code",monospace;
+  text-transform:uppercase;letter-spacing:.07em;color:var(--dim)}
+.libbar .segs{margin:0}
+.libbar.sort{margin-bottom:14px}
+.libbar.sort .seg{padding:5px 10px;font-size:10.5px}
+@media (max-width:900px){ .libbar .lbl{width:auto} }
+/* ---------- new post ----------
+   One question, five answers, one button. */
+.np{max-width:640px}
+.np h3{font:600 17px/1.3 system-ui;margin:0 0 12px}
+.pillars{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:8px}
+.pil{padding:13px 14px;border:1px solid var(--line-2);border-radius:12px;
+  background:var(--surface);color:var(--text);text-align:left}
+.pil:hover{border-color:var(--muted)}
+.pil.on{border-color:var(--accent);background:rgba(var(--accent-rgb),.1)}
+.pil b{display:block;font:600 13.5px/1.3 system-ui}
+.pil i{display:block;margin-top:3px;font-style:normal;font-size:11.5px;color:var(--dim)}
+.pil.on i{color:var(--muted)}
+.csub .opt{text-transform:none;letter-spacing:0;color:var(--dim);font-weight:500}
+.npnote{width:100%;min-height:64px;resize:vertical;margin:8px 0 0;
+  background:var(--surface-2);border:1px solid var(--line-2);border-radius:10px;
+  color:var(--text);font:400 13px/1.6 system-ui;padding:10px 12px}
+.npnote:focus{outline:none;border-color:var(--accent)}
+.npnote::placeholder{color:var(--dim)}
+.npbar{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin:18px 0 0;
+  padding:12px 14px;background:var(--surface);border:1px solid var(--line-2);
+  border-radius:13px}
+.npbar .sum{flex:1;min-width:150px;font-size:12px;color:var(--dim)}
+.npbar .btn[disabled]{opacity:.4;cursor:not-allowed}
+.thumb .dots{position:absolute;top:8px;right:8px;width:32px;height:32px;
+  border-radius:8px;background:rgba(var(--ink-rgb),.72);border:1px solid var(--line-2);
+  color:var(--muted);font:600 16px/29px system-ui;text-align:center;cursor:pointer;
+  opacity:.5;z-index:2;transition:opacity .18s,color .18s,border-color .18s}
+.cardwrap:hover .thumb .dots{opacity:1}
+.thumb .dots:hover{color:var(--text);border-color:var(--accent)}
+.cardmenu{position:fixed;z-index:var(--z-modal);background:var(--surface);
+  border:1px solid var(--line-2);border-radius:10px;padding:5px;
+  box-shadow:0 12px 30px rgba(var(--ink-rgb),.65)}
+.cardmenu button{display:block;width:100%;text-align:left;background:none;
+  border:0;color:var(--text);font:500 13px/1 system-ui;padding:9px 13px;border-radius:7px}
+.cardmenu button:hover{background:var(--surface-2);color:var(--accent)}
+.cardmenu button.bad:hover{color:var(--bad)}
+/* ---------- schedule ----------
+   A day-grouped list, not a month grid: a month grid at 400px is unreadable
+   and the question is always "what goes out next", never "what did June
+   look like". */
+.qrow{display:flex;align-items:center;gap:11px;padding:9px 12px;margin:0 0 7px;
+  border:1px solid var(--line);border-radius:11px;background:var(--surface)}
+.qrow .tm{width:44px;flex:none;font:600 12px/1 "Fira Code",monospace;color:var(--text)}
+.qrow .sth{width:30px;height:53px;object-fit:cover;border-radius:5px;flex:none;
+  border:1px solid var(--line-2)}
+.qrow .sw{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.qrow .sw b{font:600 13px/1.3 system-ui}
+.qrow .sw i{font-style:normal;font-size:11px;color:var(--dim)}
+/* flex:none, or the label is the thing that gets squeezed off the row when
+   a Cancel button is also present. */
+.qrow .st{flex:none;min-width:86px;text-align:right;white-space:nowrap;
+  font:500 10px/1 "Fira Code",monospace;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.06em}
+.qrow.published{border-color:rgba(34,197,94,.35)}
+.qrow.published .st{color:var(--ok)}
+.qrow.failed{border-color:rgba(244,63,94,.45)}
+.qrow.failed .st{color:var(--bad)}
+.qrow.publishing .st{color:var(--accent)}
+.iggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));
+  gap:9px;margin:9px 0 0}
+.igcard{padding:0;border:1px solid var(--line);border-radius:11px;overflow:hidden;
+  background:var(--surface);text-align:left;color:var(--text);display:block}
+.igcard:hover{border-color:var(--accent)}
+.igcard img{width:100%;aspect-ratio:9/16;object-fit:cover;display:block;
+  border-bottom:1px solid var(--line)}
+.igcard .n{display:block;padding:8px 10px 0;font:600 12px/1.3 system-ui;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.igcard .s{display:block;padding:2px 10px 9px;font:500 10px/1.3 "Fira Code",monospace;
+  color:var(--dim)}
+.iggrid.pick{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));
+  max-height:42vh;overflow:auto;padding:2px}
+.igpicked{display:flex;align-items:center;gap:11px;margin:8px 0 0;padding:9px 11px;
+  border:1px solid var(--accent);border-radius:11px;background:rgba(var(--accent-rgb),.07)}
+.igpicked img{width:34px;height:60px;object-fit:cover;border-radius:6px;flex:none}
+.igpicked .n{flex:1;min-width:0;font:600 13px/1.35 system-ui;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.igpicked .n i{display:block;font-style:normal;font:500 10.5px/1.4 "Fira Code",monospace;
+  color:var(--dim);margin-top:2px}
+/* A quiet text action. "Change" and "Publish now" are not primary buttons and
+   should not be shaped like the one thing you came here to press. */
+.lnk{background:none;border:0;color:var(--muted);font:500 12px/1 system-ui;
+  padding:7px 4px;text-decoration:underline;text-underline-offset:3px}
+.lnk:hover{color:var(--accent)}
+.lnk[disabled]{opacity:.4;text-decoration:none}
+.igcap{width:100%;min-height:112px;resize:vertical;margin:8px 0 0;
+  background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;
+  color:var(--text);font:400 12.5px/1.6 system-ui;padding:9px 11px}
+.igcap:focus{outline:none;border-color:var(--accent)}
+.whenrow{display:grid;grid-template-columns:1.4fr 1fr;gap:8px;margin:8px 0 0}
+.whenrow .cin{width:100%}
+.shfoot{display:flex;align-items:center;gap:10px;justify-content:flex-end;
+  padding:12px 16px;border-top:1px solid var(--line)}
+.shfoot .btn[disabled]{opacity:.4;cursor:not-allowed}
+.shfoot .spin{vertical-align:-2px;margin-right:5px}
+.qrow .st.published{color:var(--ok)}
+.qrow .st.publishing{color:var(--accent)}
+/* A button stretches its content by default; without an explicit height an
+   empty slot drew as tall as a filled one with a thumbnail in it. */
+.qrow.empty{width:100%;height:46px;padding:0 12px;text-align:left;
+  border-style:dashed;background:none;color:var(--dim)}
+.qrow.empty .sw{flex-direction:row;align-items:center}
+.qrow.empty:hover:not(:disabled){border-color:var(--accent);color:var(--text)}
+.qrow.empty .sw i{font-style:normal;font-size:12px}
+.qrow.empty.past{opacity:.4}
+.qrow.empty.past:hover{border-color:var(--line)}
+/* the week as a week */
+.wknav{display:flex;align-items:center;justify-content:center;gap:6px;position:relative}
+.wknav .lnk{position:absolute;right:0}
+.wkr{min-width:132px;text-align:center;font:600 14px/1 system-ui;letter-spacing:.01em}
+.wkarr{width:30px;height:30px;padding:0;border-radius:8px;border:1px solid var(--line-2);
+  background:var(--surface);color:var(--muted);font:400 17px/26px system-ui}
+.wkarr:hover:not(:disabled){color:var(--accent);border-color:var(--accent)}
+.wkarr:disabled{opacity:.3;cursor:not-allowed}
+.wknav .lnk{margin-left:4px}
+.wgrid{display:grid;grid-template-columns:52px repeat(7,1fr);gap:6px;margin:6px 0 0}
+.wh{padding:2px 4px 4px;text-align:center;font:600 11px/1.25 "Fira Code",monospace;
+  color:var(--dim)}
+.wh b{display:block;font-weight:600;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.06em}
+.wh i{font-style:normal;font-size:14px;color:var(--text)}
+.wh.today b,.wh.today i{color:var(--accent)}
+.wt{display:flex;align-items:center;justify-content:flex-end;padding-right:8px;
+  font:600 11px/1 "Fira Code",monospace;color:var(--dim)}
+.wc{position:relative;aspect-ratio:4/5;border-radius:10px;overflow:hidden;padding:0;
+  border:1px solid var(--line-2);background:var(--surface)}
+.wc img{width:100%;height:100%;object-fit:cover;display:block;opacity:.85}
+.wc .t{position:absolute;left:0;right:0;bottom:0;padding:14px 5px 4px;text-align:left;
+  background:linear-gradient(transparent,rgba(var(--ink-rgb),.94));
+  font:600 9px/1.25 system-ui;color:#e2e8f0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wc .x{position:absolute;top:3px;right:3px;width:19px;height:19px;padding:0;
+  border-radius:6px;border:0;background:rgba(var(--ink-rgb),.78);color:var(--muted);
+  font:600 13px/17px system-ui;opacity:0;transition:opacity .15s}
+.wc:hover .x{opacity:1}
+.wc .x:hover{color:var(--bad)}
+.wc.published{border-color:rgba(34,197,94,.4);cursor:pointer}
+.wc.failed{border-color:rgba(244,63,94,.45)}
+.wc .pill{position:absolute;top:4px;left:4px;padding:2px 6px;border-radius:6px;
+  font:600 8px/1.5 "Fira Code",monospace;text-transform:uppercase;letter-spacing:.05em;
+  background:rgba(var(--ink-rgb),.82)}
+.wc .pill.ok{color:var(--ok)}
+.wc .pill.bad{color:var(--bad)}
+.wc .pill.go{color:var(--accent)}
+.wstats{position:absolute;left:0;right:0;bottom:17px;display:flex;justify-content:center;
+  gap:7px;padding:3px 4px;background:linear-gradient(transparent,rgba(var(--ink-rgb),.9));
+  font:600 9px/1.4 "Fira Code",monospace;color:#cbd5e1}
+.wstats i{font-style:normal;margin-right:2px;color:var(--dim)}
+
+.wc.publishing{border-color:var(--accent)}
+.wc.empty{border-style:dashed;background:none;color:var(--line-2);
+  font:400 17px/1 system-ui}
+.wc.empty:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.wc.empty.past{font:500 9px/1 "Fira Code",monospace;color:var(--dim);opacity:.45}
+.weeklist{display:none}
+@media (max-width:900px){ .wgrid{display:none} .weeklist{display:block} }
+@media (max-width:900px){ .srow .sth{display:none} }
+
 /* ---------- users ----------
    Distributions, not totals: "how many habits does a real user keep" is a
    shape, and a mean would hide it. */
@@ -3672,13 +4436,19 @@ aside{background:var(--surface);border-right:1px solid var(--line);
 
 /* The fast path, first thing on the page: everything the rules can decide,
    decided, and then straight out. The cards below are for having a say. */
-.fastrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0 0}
+.fastrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* Status on the left, the week you are looking at dead centre. The centre
+   column is sized by its content so the range stays centred on the page
+   however long the status text runs. */
+.ighead{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+  gap:12px;margin:2px 0 0}
+@media(max-width:900px){.ighead{grid-template-columns:1fr;gap:8px}}
 .btn.qd{font-weight:600}
 .slbgwrap{position:relative;flex:none;width:84px;align-self:flex-start}
 /* Without align-self the wrapper stretches to the card's height and the
    re-roll lands under the photo instead of on it. */
 .reroll{position:absolute;right:4px;bottom:4px;width:24px;height:24px;padding:0;
-  border-radius:7px;border:1px solid var(--line-2);background:rgba(2,6,23,.82);
+  border-radius:7px;border:1px solid var(--line-2);background:rgba(var(--ink-rgb),.82);
   color:var(--muted);font-size:13px;line-height:22px}
 .reroll:hover{color:var(--accent);border-color:var(--accent)}
 @media (max-width:900px){ .slbgwrap{width:66px} }
@@ -3691,7 +4461,7 @@ aside{background:var(--surface);border-right:1px solid var(--line);
 .slbg.has{border-style:solid;border-color:var(--line-2)}
 .slbg img{width:100%;height:100%;object-fit:cover;display:block}
 .slbg .lab{position:absolute;left:0;right:0;bottom:0;padding:10px 3px 3px;
-  background:linear-gradient(transparent,rgba(2,6,23,.92));
+  background:linear-gradient(transparent,rgba(var(--ink-rgb),.92));
   font:500 8px/1.2 "Fira Code",monospace;color:#cbd5e1}
 .slbg .pick{display:block;padding:0 6px;color:var(--dim);font:500 10px/1.35 "Fira Code",monospace}
 .slbg:hover{border-color:var(--accent)}
@@ -3742,10 +4512,10 @@ aside{background:var(--surface);border-right:1px solid var(--line);
 .bt.faded:hover{opacity:1}
 .bt .fl{position:absolute;top:5px;right:5px;display:flex;flex-direction:column;gap:3px;align-items:flex-end}
 .bt .fl i{font-style:normal;font:600 8.5px/14px "Fira Code",monospace;padding:0 4px;
-  border-radius:4px;background:rgba(2,6,23,.82);color:var(--muted)}
+  border-radius:4px;background:rgba(var(--ink-rgb),.82);color:var(--muted)}
 .bt .fl i.warn{color:var(--warn)}
 .bt .vb{position:absolute;left:0;right:0;bottom:0;padding:14px 5px 4px;text-align:left;
-  background:linear-gradient(transparent,rgba(2,6,23,.92));
+  background:linear-gradient(transparent,rgba(var(--ink-rgb),.92));
   font:500 8.5px/1.25 "Fira Code",monospace;color:#cbd5e1}
 
 /* tools: the icon is how you recognise one, so the icon leads */
@@ -3755,18 +4525,19 @@ aside{background:var(--surface);border-right:1px solid var(--line);
   font:500 12px/1.25 system-ui;text-align:left;width:100%}
 .tl img,.tl .noico{width:22px;height:22px;border-radius:6px;flex:none}
 .tl .noico{background:var(--line-2)}
-.tl.on{border-color:var(--accent);background:rgba(56,189,248,.1)}
+.tl.on{border-color:var(--accent);background:rgba(var(--accent-rgb),.1)}
 .tl.faded{opacity:.45}
 .tl .tnum{margin-left:auto;font:700 10px/1 "Fira Code",monospace;color:var(--accent)}
 .tl .tnum.warn{color:var(--warn);font-weight:600}
 .slmain>.tl{width:auto;align-self:flex-start}
 
 /* the sheet: a picker over the post, not a page you navigate to */
-.shwrap{position:fixed;inset:0;z-index:var(--z-modal);background:rgba(2,6,23,.72);
+.shwrap{position:fixed;inset:0;z-index:var(--z-modal);background:rgba(var(--ink-rgb),.72);
   display:flex;align-items:flex-end;justify-content:center;padding:24px}
+.sh.narrow{width:min(460px,100%)}
 .sh{width:min(760px,100%);max-height:86vh;display:flex;flex-direction:column;
   background:var(--surface);border:1px solid var(--line-2);border-radius:15px;
-  box-shadow:0 24px 60px rgba(2,6,23,.7)}
+  box-shadow:0 24px 60px rgba(var(--ink-rgb),.7)}
 .shhead{display:flex;align-items:center;gap:10px;padding:14px 16px;
   border-bottom:1px solid var(--line);font:600 14px/1 system-ui}
 .shhead .rm{margin-left:auto;background:none;border:0;color:var(--dim);font-size:21px;
@@ -3777,7 +4548,7 @@ aside{background:var(--surface);border-right:1px solid var(--line);
 /* the bar follows you down the page: what you have, and the one button */
 .cbar{position:sticky;bottom:8px;display:flex;align-items:center;gap:11px;flex-wrap:wrap;
   margin:16px 0 0;padding:12px 14px;background:var(--surface);
-  border:1px solid var(--line-2);border-radius:13px;box-shadow:0 8px 24px rgba(2,6,23,.55)}
+  border:1px solid var(--line-2);border-radius:13px;box-shadow:0 8px 24px rgba(var(--ink-rgb),.55)}
 .cbar .sum{flex:1;min-width:170px;font-size:12px;color:var(--dim);line-height:1.45}
 @media (max-width:900px){
   .slrow{padding:10px;gap:10px}
@@ -3800,8 +4571,6 @@ aside{background:var(--surface);border-right:1px solid var(--line);
   border-bottom:1px solid rgba(251,146,60,.4);color:var(--muted);
   font:400 12.5px/1.5 system-ui}
 #stalebar b{color:var(--warn);font-weight:600}
-.hostb.down{color:var(--bad)}
-.hostb.down::before{box-shadow:none;animation:pulse 1.4s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
 .brand .v{font-size:11px;color:var(--dim)}
 nav{display:flex;flex-direction:column;gap:2px}
@@ -3811,7 +4580,10 @@ nav{display:flex;flex-direction:column;gap:2px}
   border:0;color:var(--muted);padding:9px 10px;border-radius:8px;min-height:40px;
   transition:background .18s,color .18s}
 .nav:hover{background:var(--surface-2);color:var(--text)}
-.nav[aria-current="true"]{background:var(--surface-2);color:var(--text);font-weight:500}
+.nav[aria-current="true"]{background:rgba(var(--accent-rgb),.1);color:var(--accent);
+  font-weight:500;border-radius:0 3px 3px 0}
+.nav[aria-current="true"] svg{opacity:1}
+.nav[aria-current="true"] .ct{color:var(--accent)}
 .nav svg{width:17px;height:17px;flex:none;opacity:.9}
 .nav .ct{margin-left:auto;font-size:11px;color:var(--dim);font-family:"Fira Code",monospace}
 
@@ -3843,14 +4615,153 @@ nav{display:flex;flex-direction:column;gap:2px}
 
 /* ---------- main ---------- */
 main{overflow:auto}
-.bar{position:sticky;top:0;z-index:10;background:rgba(2,6,23,.92);backdrop-filter:blur(10px);
+.bar{position:sticky;top:0;z-index:10;background:rgba(var(--ink-rgb),.92);backdrop-filter:blur(10px);
   border-bottom:1px solid var(--line);padding:18px 28px;display:flex;align-items:center;gap:16px}
 h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .sub{color:var(--dim);font-size:12px}
-.wrap{padding:24px 28px 60px}
+.wrap{padding:14px 28px 60px}
+
+/* Accent picker. Every colour on the page derives from --accent-rgb, so
+   the whole theme turns on one value. */
+.cpick{position:relative;flex:none}
+.cpdot{width:26px;height:26px;border-radius:50%;border:1px solid var(--line-2);
+  background:var(--accent);cursor:pointer;padding:0;display:block;
+  box-shadow:0 0 14px -3px var(--glow);transition:transform .16s ease}
+.cpdot:hover{transform:scale(1.1)}
+.cppop{position:absolute;right:0;top:34px;z-index:60;width:212px;padding:12px;
+  background:var(--surface-2);border:1px solid var(--line-2);border-radius:var(--r);
+  box-shadow:0 18px 44px -12px #000,0 0 26px -12px var(--glow)}
+.cppop[hidden]{display:none}
+.cppop .lbl{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--dim);margin:0 0 8px}
+.cpsw{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:11px}
+.cpsw button{width:100%;aspect-ratio:1;border-radius:50%;border:1px solid transparent;
+  cursor:pointer;padding:0}
+.cpsw button[aria-pressed="true"]{border-color:#fff;
+  box-shadow:0 0 0 2px var(--surface-2),0 0 0 3px currentColor}
+.cprow{display:flex;gap:8px;align-items:center}
+.cprow input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--line-2);
+  border-radius:var(--r);background:none;cursor:pointer}
+.cprow .btn{flex:1;justify-content:center}
+
+/* ---------- ideas: the map ----------
+   A pannable surface with bubbles on it. Everything is positioned in map
+   coordinates inside .mmin, which is the only thing that moves when you pan —
+   so a bubble's stored x/y never has to know where the viewport is. */
+.mmwrap{position:relative}
+.mmbar{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin:0 0 11px}
+.mmhint{flex:1;min-width:180px;font-size:11.5px;color:var(--dim)}
+.kchips{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.kchip{background:none;border:1px solid var(--line);border-radius:7px;cursor:pointer;
+  color:var(--muted);font:600 10.5px/1 "Fira Code",monospace;letter-spacing:.06em;
+  text-transform:uppercase;padding:6px 8px;display:flex;align-items:center;gap:6px;
+  transition:color .15s,border-color .15s}
+.kchip::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--kc)}
+.kchip.add::before{display:none}
+.kchip:hover{color:var(--text);border-color:var(--line-2)}
+.kchip.on{color:var(--text);border-color:var(--kc);
+  box-shadow:0 0 0 1px var(--kc) inset,0 0 14px -6px var(--kc)}
+.kin{width:104px;background:var(--surface-2);border:1px solid var(--accent);
+  border-radius:7px;color:var(--text);font:600 10.5px/1 "Fira Code",monospace;
+  padding:7px 8px;text-transform:uppercase}
+.kin:focus{outline:none}
+
+.mmap{position:relative;overflow:hidden;touch-action:none;cursor:grab;
+  height:calc(100vh - 232px);min-height:440px;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.mmap:active{cursor:grabbing}
+.mmin{position:absolute;inset:0;will-change:transform;transform-origin:0 0}
+.mmlines{position:absolute;left:-4000px;top:-4000px;width:8000px;height:8000px;
+  overflow:visible;pointer-events:none}
+/* the svg is offset, so the paths are too — cancel it on the group */
+.mmlines path{transform:translate(4000px,4000px)}
+.mmempty{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;text-align:center;line-height:1.7;
+  color:var(--dim);font-size:13px;pointer-events:none}
+
+.bub{position:absolute;width:186px;box-sizing:border-box;cursor:grab;
+  background:var(--surface-2);border:1px solid var(--line-2);border-radius:11px;
+  padding:9px 10px;display:flex;flex-direction:column;gap:6px;
+  box-shadow:0 10px 26px -14px #000;transition:box-shadow .16s,border-color .16s}
+.bub:hover{border-color:var(--kc)}
+.bub.sel{border-color:var(--kc);box-shadow:0 0 0 1px var(--kc),0 0 26px -10px var(--kc)}
+.bub.target{border-style:dashed}
+.bub:active{cursor:grabbing}
+.bkind{display:flex;align-items:center;gap:5px;
+  font:700 8.5px/1 "Fira Code",monospace;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--kc);opacity:.85}
+.bkind::before{content:"";width:6px;height:6px;border-radius:50%;
+  background:var(--kc);flex:none}
+/* In the inspector it keeps its box — there it is a heading, not a tag. */
+.mmins .bkind{border:1px solid var(--kc);border-radius:5px;padding:4px 6px;opacity:1}
+.bub .btx{font-size:12.5px;line-height:1.5;color:var(--text);word-break:break-word;
+  display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.bub .bpic{width:100%;max-height:132px;object-fit:cover;border-radius:7px;display:block}
+.bub .btx.ph{color:var(--dim);font-style:italic}
+/* Typing happens on the bubble. The box is invisible so the bubble does not
+   change shape the moment you click into it. */
+.bed{width:100%;box-sizing:border-box;background:none;border:0;padding:0;resize:none;
+  color:var(--text);font:400 12.5px/1.5 system-ui;overflow:hidden;min-height:38px}
+.bed:focus{outline:none}
+.bub .bed::placeholder{color:var(--dim)}
+
+.zoomer{display:flex;align-items:center;gap:2px;border:1px solid var(--line);
+  border-radius:8px;padding:2px}
+.zoomer button{width:26px;height:24px;background:none;border:0;cursor:pointer;
+  color:var(--muted);font:500 15px/1 system-ui;border-radius:6px}
+.zoomer button:hover{color:var(--accent);background:rgba(var(--accent-rgb),.08)}
+.zoomer span{min-width:38px;text-align:center;font:600 10.5px/1 "Fira Code",monospace;
+  color:var(--dim)}
+/* A head title is the thing everything else hangs off, so it looks like one. */
+.bub.k-title{width:214px;background:var(--surface);border-width:2px;
+  align-items:center;text-align:center}
+.bub.k-title .btx{font-size:15px;font-weight:600;line-height:1.35;text-align:center}
+.bub.k-title .bed{text-align:center;font-size:15px;font-weight:600}
+
+/* The four handles. They sit outside the bubble's box and only appear when
+   the pointer is on it, so the board is quiet until you reach for a branch. */
+.hnd{position:absolute;width:20px;height:20px;border-radius:50%;padding:0;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  background:var(--surface-2);border:1px solid var(--kc);color:var(--kc);
+  font:600 13px/1 system-ui;opacity:0;transition:opacity .14s,transform .14s;
+  z-index:3}
+.bub:hover .hnd,.bub.sel .hnd{opacity:.75}
+.hnd:hover{opacity:1;transform:scale(1.18);
+  background:var(--kc);color:var(--bg)}
+.hnd.n{top:-11px;left:50%;margin-left:-10px}
+.hnd.s{bottom:-11px;left:50%;margin-left:-10px}
+.hnd.e{right:-11px;top:50%;margin-top:-10px}
+.hnd.w{left:-11px;top:50%;margin-top:-10px}
+
+/* The inspector, not an inline editor: editing in place on a draggable thing
+   fights the drag on every click. */
+.mmins{position:absolute;right:14px;top:60px;width:264px;z-index:12;
+  background:var(--surface-2);border:1px solid var(--line-2);border-radius:13px;
+  padding:13px;display:flex;flex-direction:column;gap:9px;
+  box-shadow:0 22px 50px -18px #000,0 0 24px -14px var(--glow)}
+.mmins .ihead{display:flex;align-items:center;justify-content:space-between}
+.mmins .rm{background:none;border:0;color:var(--dim);font-size:17px;cursor:pointer;
+  line-height:1;padding:0 2px}
+.mmins .rm:hover{color:var(--text)}
+.mmins textarea{min-height:92px;resize:vertical;background:var(--surface);
+  border:1px solid var(--line);border-radius:8px;color:var(--text);
+  font:400 13px/1.55 system-ui;padding:9px 10px}
+.mmins textarea:focus{outline:none;border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(var(--accent-rgb),.12)}
+.mmins .iref{width:100%;border-radius:8px;display:block;cursor:zoom-in}
+.mmins .ilab{margin:2px 0 0;font:700 9.5px/1 "Fira Code",monospace;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--dim)}
+.mmins .iacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.mmins .iacts button{background:none;border:1px solid var(--line);border-radius:7px;
+  color:var(--muted);font:600 10.5px/1 system-ui;padding:7px 9px;cursor:pointer;
+  transition:color .15s,border-color .15s}
+.mmins .iacts button:hover{color:var(--accent);border-color:var(--accent)}
+.mmins .iacts button.warn:hover{color:var(--bad);border-color:var(--bad)}
+.mmins .ifoot{margin:0;font-size:10.5px;color:var(--dim)}
+@media(max-width:900px){.mmins{position:static;width:auto;margin-top:11px}}
 
 /* ---------- cards ---------- */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:12px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
   overflow:hidden;cursor:pointer;transition:border-color .18s,background .18s;
   display:flex;flex-direction:column;text-align:left;padding:0;color:inherit;width:100%}
@@ -3884,12 +4795,12 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
   transition:border-color .18s}
 .slides img:hover{border-color:var(--accent)}
 .sl{position:relative;cursor:pointer;padding:0;background:none;border:0;display:block;width:100%}
-.sl .num{position:absolute;top:7px;left:7px;background:rgba(2,6,23,.82);color:var(--text);
+.sl .num{position:absolute;top:7px;left:7px;background:rgba(var(--ink-rgb),.82);color:var(--text);
   font:500 11px/1 "Fira Code",monospace;padding:4px 7px;border-radius:6px}
-.sl[aria-pressed="true"] img{border-color:var(--accent);box-shadow:0 0 0 2px rgba(56,189,248,.35)}
+.sl[aria-pressed="true"] img{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.35)}
 .sl[aria-pressed="true"] .num{background:var(--accent);color:#04222f}
 .del{position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:8px;
-  background:rgba(2,6,23,.72);border:1px solid var(--line-2);color:var(--muted);
+  background:rgba(var(--ink-rgb),.72);border:1px solid var(--line-2);color:var(--muted);
   display:flex;align-items:center;justify-content:center;opacity:.5;z-index:2;
   transition:opacity .18s,color .18s,border-color .18s}
 .cardwrap:hover .del{opacity:1}
@@ -3920,7 +4831,7 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
    beats leaving it to be inferred from the shape of the name. */
 .idtag{margin-left:9px;padding:2px 7px;border-radius:5px;vertical-align:2px;
   font:600 9.5px/1.5 system-ui;letter-spacing:.05em;text-transform:uppercase;
-  background:rgba(56,189,248,.13);border:1px solid var(--accent);color:var(--accent)}
+  background:rgba(var(--accent-rgb),.13);border:1px solid var(--accent);color:var(--accent)}
 .idtag.weak{background:rgba(251,146,60,.13);border-color:var(--warn);color:var(--warn)}
 .unk{display:inline-flex;align-items:center;justify-content:center;
   width:15px;height:15px;margin-right:7px;border-radius:50%;vertical-align:-2px;
@@ -3940,8 +4851,8 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .chip{font:500 10.5px/1 "Fira Code",monospace;padding:5px 8px;border-radius:6px;
   border:1px solid var(--line-2);background:var(--surface-2);color:var(--dim);
   letter-spacing:.01em;transition:all .14s;white-space:nowrap}
-.chip.drf{color:var(--accent);border-color:#14405a;background:rgba(56,189,248,.09);cursor:pointer}
-.chip.drf:hover{background:rgba(56,189,248,.22)}
+.chip.drf{color:var(--accent);border-color:#14405a;background:rgba(var(--accent-rgb),.09);cursor:pointer}
+.chip.drf:hover{background:rgba(var(--accent-rgb),.22)}
 .chip.pub{color:var(--ok);border-color:#14532d;background:rgba(34,197,94,.10);cursor:pointer}
 .chip.err{color:var(--bad);border-color:#5c1626}
 .cfoot{display:flex;align-items:center;gap:7px;padding:9px 11px;border-top:1px solid var(--line);
@@ -3991,16 +4902,17 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .mx.cmp td{padding:13px 10px}
 .mx.cmp td.n .sp{color:var(--text);font-size:12.5px}
 .mx.cmp .t{font-weight:600;font-size:13.5px}
-.mx.cmp th{font-size:10px;letter-spacing:.1em;padding-bottom:10px}
+.mx.cmp th{font-size:10px;letter-spacing:.1em;padding-bottom:10px;white-space:nowrap}
 .mx.cmp .hr{font:700 17px/1 "Fira Code",monospace;color:var(--text)}
 .mx.cmp tr.lead .hr{color:var(--accent)}
 .best{margin-left:9px;padding:3px 7px;border-radius:5px;vertical-align:2px;
   font:600 9px/1 system-ui;letter-spacing:.07em;text-transform:uppercase;
-  background:rgba(56,189,248,.15);border:1px solid var(--accent);color:var(--accent)}
-.worst{margin-left:9px;font:500 10.5px/1 system-ui;color:var(--dim)}
+  white-space:nowrap;
+  background:rgba(var(--accent-rgb),.15);border:1px solid var(--accent);color:var(--accent)}
+.worst{margin-left:9px;font:500 10.5px/1 system-ui;color:var(--dim);white-space:nowrap}
 .mx.cmp .t i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:9px}
 .mx.cmp b{font:600 14px/1 "Fira Code",monospace;color:var(--text)}
-.mx.cmp tr.lead td{background:rgba(56,189,248,.05)}
+.mx.cmp tr.lead td{background:rgba(var(--accent-rgb),.05)}
 .mx.cmp tr.lead b{color:var(--accent)}
 .sp.paid{color:var(--warn)}
 .kpi .accs{display:flex;flex-direction:column;gap:3px;margin-top:12px}
@@ -4058,6 +4970,9 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .pnm b{font:600 13px/1.2 system-ui;color:var(--text);overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .pnm span{font:400 11px/1 "Fira Code",monospace;color:var(--dim)}
+.daypill{display:inline-block;padding:2px 7px;margin-right:6px;border-radius:6px;
+  border:1px solid;font:600 10.5px/1.5 "Fira Code",monospace;letter-spacing:.01em;
+  vertical-align:1px}
 .paid{color:var(--warn);font-style:normal}
 /* Per account, side by side. Summing them would hide the 30x spread, which
    is the only thing three accounts running one post can teach you. */
@@ -4066,7 +4981,7 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
   padding:6px 9px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line);
   font:500 12px/1 "Fira Code",monospace;color:var(--muted);text-decoration:none}
 .pc i{width:6px;height:6px;border-radius:50%;flex:none}
-.pc.hot{color:var(--text);border-color:var(--accent);background:rgba(56,189,248,.12)}
+.pc.hot{color:var(--text);border-color:var(--accent);background:rgba(var(--accent-rgb),.12)}
 .pc.none{color:var(--line-2);justify-content:center}
 .peng{display:flex;gap:9px;flex:none;font:500 12px/1 "Fira Code",monospace;color:var(--dim)}
 .peng span{min-width:30px;text-align:right}
@@ -4115,7 +5030,7 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
   padding:7px 11px;cursor:pointer;border-right:1px solid var(--line-2)}
 .segs .seg:last-child{border-right:0}
 .seg:hover{color:var(--text)}
-.seg.on{background:rgba(56,189,248,.14);color:var(--accent)}
+.seg.on{background:rgba(var(--accent-rgb),.14);color:var(--accent)}
 .mxbar>.seg{border:1px solid var(--line-2);border-radius:8px}
 .mx{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}
 .mx th{text-align:left;font:500 10.5px/1 "Fira Code",monospace;color:var(--dim);
@@ -4133,7 +5048,7 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
   text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
 .peek:hover{color:var(--accent)}
 /* Slide viewer */
-#peek{position:fixed;inset:0;z-index:80;background:rgba(2,6,23,.86);
+#peek{position:fixed;inset:0;z-index:80;background:rgba(var(--ink-rgb),.86);
   display:flex;align-items:center;justify-content:center;padding:28px}
 /* An ID selector outranks the browser's [hidden]{display:none}, so without
    this the overlay never hides and its backdrop dims the whole page. */
@@ -4206,6 +5121,24 @@ tr:hover .ad{opacity:.9}
 .chart .why{font-size:11px;color:var(--dim);line-height:1.5;margin:0 0 12px}
 .chart svg{width:100%;height:auto;display:block}
 .chart.wide{margin:0 0 4px}
+/* Two cards that answer the same question — which account is working —
+   read better beside each other than one under the other, where you have to
+   scroll to hold both in your head. Stacks again when neither would get
+   enough width to be legible. */
+.duo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;
+  align-items:stretch;margin:0 0 4px}
+.duo>.chart{margin:0;min-width:0;display:flex;flex-direction:column}
+.duo .mx.cmp{flex:1;margin-bottom:0}
+/* flex:none — a flex item may shrink past its content, and an svg sized by
+   aspect ratio has no floor to stop at. */
+/* The base rule centres the plot with `margin: … auto`, and auto side
+   margins in a flex container suppress the stretch and size the item to its
+   content — which is why the chart came out 300px wide inside a 650px card. */
+.duo .chartwrap{flex:none;max-width:none;margin:10px 0 0;width:100%}
+/* Six columns in half a screen: the gutters go before the figures do. */
+.duo .mx.cmp td{padding-left:6px;padding-right:6px}
+.duo .mx.cmp th{padding-left:6px;padding-right:6px}
+@media(max-width:1180px){.duo{grid-template-columns:1fr}}
 /* Capped and centred. Five points stretched across the full width of a
    desktop is a flat line whatever the numbers do. */
 .chartwrap{position:relative;max-width:720px;margin:6px auto 0}
@@ -4239,7 +5172,7 @@ tr:hover .ad{opacity:.9}
   #runs{order:8}
   h1{display:block;font-size:16px;order:1;margin-right:2px}
   .bar .sub{order:3;font-size:11.5px}
-  #pagemenu{position:fixed;inset:0;z-index:70;background:rgba(2,6,23,.6)}
+  #pagemenu{position:fixed;inset:0;z-index:70;background:rgba(var(--ink-rgb),.6)}
   #pagemenu .sheet{position:absolute;left:12px;right:12px;top:64px;
     background:var(--surface);border:1px solid var(--line-2);border-radius:14px;
     padding:7px;box-shadow:0 22px 50px rgba(0,0,0,.6)}
@@ -4279,9 +5212,9 @@ tr:hover .ad{opacity:.9}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cta{margin-left:auto;font-size:11.5px;font-weight:600;padding:7px 13px;border-radius:7px;
   white-space:nowrap;flex:0 0 auto;line-height:1.1;
-  border:1px solid var(--accent);background:rgba(56,189,248,.13);color:var(--accent);cursor:pointer}
+  border:1px solid var(--accent);background:rgba(var(--accent-rgb),.13);color:var(--accent);cursor:pointer}
 .cta.sec{border-color:var(--line-2);background:var(--surface-2);color:var(--muted)}
-.cta:hover{background:rgba(56,189,248,.26)}
+.cta:hover{background:rgba(var(--accent-rgb),.26)}
 /* The grid stretches every card to the tallest in its row, and a block
    container leaves that slack as dead space under the footer — 28px on any
    card without a lineage tag. A column instead: the body takes the slack,
@@ -4307,9 +5240,9 @@ tr:hover .ad{opacity:.9}
 .strip .sl{flex:0 0 auto;width:172px;position:relative;background:none;border:0;
   padding:0;cursor:pointer}
 .strip .sl img{width:100%;border-radius:10px;border:2px solid transparent;display:block}
-.strip .sl.picked img{border-color:var(--accent);box-shadow:0 0 0 3px rgba(56,189,248,.28)}
+.strip .sl.picked img{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.28)}
 .redobar{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin:0 0 14px;padding:12px 14px;
-  border:1px solid var(--accent);border-radius:11px;background:rgba(56,189,248,.06)}
+  border:1px solid var(--accent);border-radius:11px;background:rgba(var(--accent-rgb),.06)}
 .redobar input{flex:1;min-width:260px;background:var(--surface-2);border:1px solid var(--line-2);
   border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px}
 .copyrow{display:grid;grid-template-columns:1fr 2fr;gap:14px}
@@ -4354,7 +5287,7 @@ tr:hover .ad{opacity:.9}
 /* Inside the card. It used to sit at -5,-5 — outside a container with
    overflow:hidden, so it was clipped and never once appeared. */
 .new{position:absolute;top:9px;left:9px;width:11px;height:11px;border-radius:50%;
-  background:var(--bad);box-shadow:0 0 0 2px rgba(2,6,23,.75),0 0 10px rgba(244,63,94,.7);
+  background:var(--bad);box-shadow:0 0 0 2px rgba(var(--ink-rgb),.75),0 0 10px rgba(244,63,94,.7);
   z-index:4}
 /* The badge shares that corner, so it steps right of the dot when a post is
    both unseen and performing. Not down: .tier is positioned against
@@ -4410,12 +5343,24 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
   border-radius:50%;background:var(--accent);margin-top:-8px;cursor:pointer;
   border:2px solid var(--bg)}
 input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--text);outline-offset:2px}
-#modal{position:fixed;inset:0;background:rgba(2,6,23,.8);display:none;align-items:center;
+#modal{position:fixed;inset:0;background:rgba(var(--ink-rgb),.8);display:none;align-items:center;
   justify-content:center;z-index:60;padding:24px}
 #modal .box{background:var(--surface);border:1px solid var(--line-2);border-radius:14px;
   padding:24px;max-width:460px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.55)}
 #modal h3{margin:0 0 10px;font-size:16px;font-weight:600}
 #modal p{margin:0 0 18px;color:var(--muted);font-size:13px;line-height:1.6}
+#modal p b{color:var(--text);font-weight:600}
+/* One row per account, the box beside its name, and the thing that decides
+   whether you can even send — the slot count — on the same line. */
+.accpick{display:grid;gap:8px}
+.chk.acc{display:flex;align-items:center;gap:11px;width:100%;padding:11px 13px;
+  border-radius:10px;background:var(--surface-2)}
+.chk.acc:hover{border-color:var(--muted)}
+.chk.acc:has(input:checked){border-color:var(--accent);background:rgba(var(--accent-rgb),.08)}
+.chk.acc .nm{font-weight:600}
+.chk.acc .sub{margin-left:auto;font:500 11px/1 "Fira Code",monospace;color:var(--dim)}
+.chk.acc.full{opacity:.5;cursor:not-allowed}
+.chk.acc.full .sub{color:var(--warn)}
 #modal .foot{display:flex;gap:9px;justify-content:flex-end;margin-top:20px}
 #modal .danger{background:var(--bad);color:#fff}
 .sched{display:grid;gap:12px}
@@ -4523,7 +5468,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
 .schedbar .sub{color:var(--muted);font-size:12px}
 .schedbar .btn{margin-left:auto;min-height:34px;padding:7px 13px}
 .when{color:var(--accent);font-family:"Fira Code",monospace;font-size:12px}
-#zoom{position:fixed;inset:0;background:rgba(2,6,23,.94);display:none;align-items:center;
+#zoom{position:fixed;inset:0;background:rgba(var(--ink-rgb),.94);display:none;align-items:center;
   justify-content:center;z-index:var(--z-modal);padding:24px}
 #zoom img{max-height:88vh;max-width:min(88vw,520px);border-radius:12px}
 #zoom .nav{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:52px;
@@ -4533,7 +5478,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
 #zoom .nav svg{width:22px;height:22px}
 #zoom .prev{left:24px}#zoom .next{right:24px}
 #zoom .count{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);
-  font:500 13px/1 "Fira Code",monospace;color:var(--muted);background:rgba(2,6,23,.8);
+  font:500 13px/1 "Fira Code",monospace;color:var(--muted);background:rgba(var(--ink-rgb),.8);
   padding:8px 14px;border-radius:20px;border:1px solid var(--line-2)}
 #zoom .close{position:absolute;top:22px;right:24px;width:42px;height:42px;border-radius:50%;
   background:rgba(30,41,59,.9);border:1px solid var(--line-2);color:var(--text)}
@@ -4590,7 +5535,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
     border-left:0;border-right:0;border-bottom:0}
   .cfoot .miss{padding:6px 9px;font-size:10px}
   /* Keep the row's own controls on the thumbnail, clear of the action button. */
-  .fav,.del{opacity:.9;width:32px;height:32px}
+  .fav,.del,.thumb .dots{opacity:.9;width:32px;height:32px}
   .tier{top:6px;left:6px;padding:3px 7px;font-size:10px}
   .del{top:6px;right:auto;left:auto;right:6px}
   .new{top:7px;left:7px}
@@ -4652,7 +5597,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
   .cfoot{padding:9px 10px}
   .cta{padding:8px 12px;font-size:11px}
   /* Comfortable thumb targets. */
-  .fav,.del{width:36px;height:36px;opacity:.85}
+  .fav,.del,.thumb .dots{width:36px;height:36px;opacity:.85}
   .chip{padding:7px 10px}
   .age{padding:5px 8px}
 }
@@ -4666,13 +5611,8 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
   .bar{padding:12px 12px}
   h1{font-size:15px}
 }
-.appsw{display:flex;gap:4px;margin:0 0 14px;padding:3px;border-radius:999px;
-  background:rgba(255,255,255,.05)}
-.appsw button{flex:1;border:0;border-radius:999px;padding:7px 0;cursor:pointer;
-  font:600 12px/1 inherit;color:var(--dim);background:transparent}
-.appsw button.on{background:var(--fg);color:var(--bg)}
 .kfun{display:flex;flex-direction:column;gap:3px;margin-top:6px}
-.kfun .row{display:grid;grid-template-columns:118px 1fr 54px;align-items:center;gap:10px;
+.kfun .row{display:grid;grid-template-columns:150px 1fr 62px;align-items:center;gap:10px;
   font-size:12.5px}
 .kfun .nm{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kfun .tr{background:rgba(255,255,255,.06);border-radius:4px;height:15px;overflow:hidden}
@@ -4680,23 +5620,44 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
 .kfun .vv{text-align:right;font-variant-numeric:tabular-nums}
 .kfun .row.drop .fl{background:linear-gradient(90deg,#c2554a,#E08968)}
 .kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0 18px}
-.kcard{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
-  border-radius:12px;padding:12px 14px}
-.kcard .n{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
-.kcard .l{font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-top:2px}
-.kspark{display:flex;align-items:flex-end;gap:3px;height:46px;margin-top:8px}
-.kspark i{flex:1;background:#E08968;border-radius:2px 2px 0 0;min-height:2px;display:block}
 </style></head><body>
+<script>
+(function(){try{
+  var h=localStorage.getItem('pf.accent'); if(!h) return;
+  var n=parseInt(h.slice(1),16), r=document.documentElement;
+  r.style.setProperty('--accent',h);
+  r.style.setProperty('--accent-rgb',[n>>16&255,n>>8&255,n&255].join(','));
+}catch(e){}})();
+</script>
+<div class="bgfx" aria-hidden="true">
+  <i class="ring"></i><i class="ring"></i><i class="ring"></i>
+  <div class="hud">
+    <i class="m h1"></i><i class="m h2"></i><i class="m h3"></i><i class="m h4"></i>
+    <i class="m h5"></i><i class="m h6"></i><i class="h7"></i>
+  </div>
+  <div class="sat a"><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></div>
+  <div class="sat b"><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></div>
+  <div class="sat c"><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></div>
+  <i class="wire w1"></i><i class="wire w2"></i><i class="wire w3"></i>
+  <i class="grain"></i>
+  <i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br br2"></i>
+</div>
+<div class="hudread" id="hudread" aria-hidden="true">
+  <div class="clk" id="hudclk"></div>
+  <div class="dt" id="huddt"></div>
+  <div class="rows" id="hudrows"></div>
+</div>
 <div class="app">
 <aside>
   <div class="brand">
-    <img src="/icon/arco.png" alt="ARCO app icon">
-    <div><div class="n" id="brandn">ARCO</div>
-      <div class="v" id="brandv">content pipeline<span id="host"></span></div></div>
-  </div>
-  <div class="appsw" role="tablist" aria-label="Which app">
-    <button id="sw-arco" onclick="setApp('arco')">ARCO</button>
-    <button id="sw-konvo" onclick="setApp('konvo')">Konvo</button>
+    <span class="eye" aria-hidden="true"><i class="r1"></i><i class="r2"></i><i class="r3"></i>
+      <i class="r4"></i><i class="r5"></i><i class="r7"></i><i class="r8"></i>
+      <i class="tb"><b style="--a:0deg"></b><b style="--a:45deg"></b><b style="--a:90deg"></b><b style="--a:135deg"></b><b style="--a:180deg"></b><b style="--a:225deg"></b><b style="--a:270deg"></b><b style="--a:315deg"></b></i>
+      <i class="tb2"><b style="--a:30deg"></b><b style="--a:120deg"></b><b style="--a:210deg"></b><b style="--a:300deg"></b></i>
+      <i class="r6"></i>
+      <img src="/icon/arco.png" alt="ARCO app icon"></span>
+    <div><div class="n">ARCO</div>
+      <div class="v">content pipeline</div></div>
   </div>
   <nav aria-label="Filter posts">
     <p class="navlabel">Pipeline</p>
@@ -4711,7 +5672,20 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 2v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/></svg></button>
-  <div id="runs" style="margin-left:auto"></div></div>
+  <div id="runs" style="margin-left:auto"></div>
+  <div class="cpick">
+    <button class="cpdot" id="cpdot" onclick="toggleAccent(event)"
+      aria-label="Dashboard colour"></button>
+    <div class="cppop" id="cppop" hidden>
+      <p class="lbl">Dashboard colour</p>
+      <div class="cpsw" id="cpsw"></div>
+      <div class="cprow">
+        <input type="color" id="cpin" aria-label="Custom colour"
+          oninput="previewAccent(this.value)">
+        <button class="btn" onclick="saveAccent()">Apply</button>
+      </div>
+    </div>
+  </div></div>
 <div id="jobs"></div>
   <div class="wrap" id="view"></div>
 </main>
@@ -4745,6 +5719,10 @@ const ICONS = {
   liked:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21l7.7-7.6 1.1-1a5.5 5.5 0 0 0 0-7.8Z"/>',
   all:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>',
   new:'<path d="M12 5v14M5 12h14"/>',
+  ig:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  tiktok:'<path d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/>',
+  lib:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>',
+  ideas:'<path d="M9 18h6M10 22h4"/><path d="M8 14a6 6 0 1 1 8 0c-.7.6-1 1.2-1 2H9c0-.8-.3-1.4-1-2Z"/>',
   users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>'+'<circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/>'
 };
 const ic = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
@@ -4763,9 +5741,16 @@ let dpSet={privacy:'', disable_comment:false, auto_add_music:false,
            disclose:false, brand_organic:false, branded_content:false};
 const PILLARS=[['tools','Tools'],['screentime','Screen time'],['discipline','Discipline'],
                ['build','Building'],['learn','Studying']];
-const FILTERS=[['new','New post'],['review','Review'],['post','Post'],
-               ['out','Published'],['liked','Performing'],['stats','Analytics'],
-               ['users','Users'],['all','All posts'],['archive','Archive']];
+// Four tabs, one per thing he actually does: make posts, work the TikTok
+// queue, fill the Instagram week, look at numbers. Ten tabs was ten places
+// to check when the question is only ever "what is waiting on me".
+const FILTERS=[['ideas','Ideas'],['new','New post'],['tiktok','TikTok'],
+               ['ig','Instagram'],['lib','Library'],['stats','Analytics']];
+// Library is one grid with a segmented control rather than four tabs that
+// each held a slice of the same list.
+const LIBS=[['liked','Performing'],['out','Published'],
+            ['unsent','Unsent'],['all','All']];
+let libTab = 'liked';
 const isOut = p => ['drafted','published','failed'].includes(stateOf(p));
 // Drafted but not published everywhere: this is the TikTok worklist.
 const needsPublish = p => stateOf(p)==='drafted';
@@ -4789,513 +5774,631 @@ function stateOf(p){
   if ((Date.now()/1000 - p.mtime) > 7*DAY) return 'archive';
   return 'review';
 }
-// ---------------------------------------------------------------- composer
+// ------------------------------------------------------------------ ideas
 //
-// New post used to be one textarea: a sentence went to the agent and it chose
-// the hook, the photos and the words. That works, but every choice you cared
-// about had to survive being read out of prose, and the ones that did not are
-// what came back wrong. So the page now IS the post — one card per slide,
-// each holding its own photo and its own copy. Fill in what you have a view
-// about; leave the rest blank and the agent writes those and only those.
-let HOOKS = null;
-let SPEC = null, BGS = null, TOOLPOOL = null;
-let sheet = null;          // {mode:'bg'|'tool'|'hook', slide:n} or null
-let bgFilter = 'all', genBusy = {};
+// Where a post starts. Four kinds of thing live on one board: ideas to make,
+// hooks to open with, references to steal a look from, and promo codes to
+// give away. They share a board because they are the same act — noticing
+// something now that you will want at 9am on a Tuesday — and because a note
+// often turns out to be a hook, which a four-page version would make you
+// retype.
+//
+// The bar at the top never changes shape, and an idea goes straight from its
+// card into the generator with the text as the brief.
 
-const SLIDE_LABEL = {hook:'Hook', tool:'Tool', point:'Point', cta:'Closing card'};
+let NOTES = null, noteSel = null, noteLink = null, noteKind = 'idea';
+let noteEdit = null, panX = 0, panY = 0, mzoom = 1, notePic = null, newKind = false;
+// True while a pointer is down on a bubble or the canvas. The dashboard polls
+// in the background and re-renders when the pipeline changes; rebuilding the
+// map out from under a pointer is what made dragging tear.
+let mmDrag = false;
+const ZMIN = 0.35, ZMAX = 2.2;
 
-function freshSpec(pillar){
-  pillar = pillar || 'tools';
-  // Six slides: the shape that works, already laid out, so the first thing you
-  // see is the post rather than an empty box asking what you want.
-  // Tools, building and studying are listicles — that is what their hooks
-  // promise. Screen time and discipline are method posts: numbered reasons,
-  // no roster.
-  const listicle = ['tools','build','learn'].includes(pillar);
-  const body = listicle
-    ? [{kind:'tool', tool:'ARCO'}, {kind:'tool'}, {kind:'tool'}, {kind:'tool'}]
-    : [{kind:'point'}, {kind:'point'}, {kind:'point'}, {kind:'point'}];
-  return {pillar, caption:'', note:'', count:1,
-    slides: [{kind:'hook'}].concat(body).concat([{kind:'cta'}])
-             .map(sl => Object.assign({tool:'', title:'', lines:['',''], bg:null, gen:0}, sl))};
+// The four the board ships with. A kind is only a label, so anything typed
+// into the kind box is as real as these — the colour is derived from the
+// string rather than looked up, which is what makes a custom kind free.
+const NKINDS = [['title','Title'],['idea','Idea'],['hook','Hook'],
+                ['ref','Reference'],['code','Code']];
+const NCOL = {title:'#E8EDFA', idea:'#B46BFF', hook:'#3BA8FF',
+              ref:'#26D0C4', code:'#E4C24A'};
+const BUBW = 196, BUBH = 86, GAP = 66;
+// Which way each handle grows, in the order they read around the bubble.
+const DIRS = [['n','↑'],['e','→'],['s','↓'],['w','←']];
+
+function kindColour(k){
+  if(NCOL[k]) return NCOL[k];
+  let h = 0;
+  for(const c of k) h = (h*31 + c.charCodeAt(0)) % 360;
+  return `hsl(${h} 68% 63%)`;
 }
 
-// A composed post is twenty small decisions. Losing them to a refresh, a
-// phone locking, or a tab closed while an agent was writing would make the
-// whole thing not worth using — so it lives in localStorage between renders,
-// and any run that was in flight is polled again on the way back in.
-const SPEC_KEY = 'arco.compose.v1';
-function saveSpec(){
-  try { localStorage.setItem(SPEC_KEY, JSON.stringify(SPEC)); } catch(e){}
+function allKinds(){
+  const seen = new Set(NKINDS.map(k => k[0]));
+  (NOTES||[]).forEach(r => seen.add(r.kind));
+  return [...seen];
 }
-function restoreSpec(){
+
+async function loadNotes(){
+  try { NOTES = (await (await fetch('/api/ideas')).json()).rows || []; }
+  catch(e){ NOTES = []; }
   try {
-    const raw = localStorage.getItem(SPEC_KEY);
-    if(!raw) return null;
-    const sp = JSON.parse(raw);
-    if(!sp || !Array.isArray(sp.slides) || !sp.slides.length) return null;
-    return sp;
-  } catch(e){ return null; }
-}
-// Whoever needs SPEC first creates it — and whoever creates it is the one
-// that has to pick up runs left in flight. Having two places do the first
-// half and only one do the second is why a closed tab lost its answer.
-function ensureSpec(){
-  if(SPEC) return SPEC;
-  SPEC = restoreSpec() || freshSpec();
-  resumeGen();
-  return SPEC;
+    panX = +(localStorage.getItem('pf.mm.x') || 0);
+    panY = +(localStorage.getItem('pf.mm.y') || 0);
+    mzoom = +(localStorage.getItem('pf.mm.z') || 1) || 1;
+  } catch(e){}
+  await seedPositions();
+  paintIdeaCount();
+  if(filter==='ideas') render();
 }
 
-function resumeGen(){
-  // Several slides can be waiting on ONE run — "Write the blanks" is a single
-  // agent — so poll each distinct run once and apply whatever shape it
-  // returns, rather than once per slide.
-  const runs = [...new Set(SPEC.slides.map(s=>s.gen).filter(Boolean))];
-  runs.forEach(at => {
-    const mine = SPEC.slides.map((s,i)=>s.gen===at?i:-1).filter(i=>i>=0);
-    mine.forEach(i => genBusy[i] = true);
-    pollGen(at, res => {
-      mine.forEach(i => { genBusy[i] = false; SPEC.slides[i].gen = 0; });
-      applyGen(res, mine[0]);
-      saveSpec(); render();
-    });
-  });
-  if(SPEC.genHooks){
-    genBusy['hooks'] = true;
-    pollGen(SPEC.genHooks, res => {
-      genBusy['hooks'] = false; SPEC.genHooks = 0;
-      if(res && res.hooks){ HOOKS = Object.assign({}, HOOKS, {made:res.hooks});
-        sheet = {mode:'hook', slide:0}; }
-      saveSpec(); render();
-    });
+// Notes written before the board became a map have no coordinates. Lay them
+// out once, in a grid, and persist — so they never move on their own again.
+async function seedPositions(){
+  const loose = (NOTES||[]).filter(r => !r.x && !r.y);
+  if(loose.length < 2 && (NOTES||[]).length === loose.length && loose.length < 2) {
+    if(!loose.length) return;
+  }
+  if(!loose.length) return;
+  for(let i = 0; i < loose.length; i++){
+    loose[i].x = 60 + (i % 4) * (BUBW + 40);
+    loose[i].y = 60 + Math.floor(i / 4) * 150;
+    await noteWrite({op:'move', id:loose[i].id, x:loose[i].x, y:loose[i].y}, true);
   }
 }
 
+function paintIdeaCount(){
+  const cell = document.querySelector('.nav[onclick*="ideas"] .ct');
+  if(cell) cell.textContent = tabCount('ideas');
+}
+
+// ---------------------------------------------------------------- the map
+
+function ideasView(){
+  const rows = NOTES || [];
+  document.getElementById('cnt').textContent =
+    `${rows.length} bubble${rows.length===1?'':'s'}`;
+
+  return `<div class="mmwrap">
+    <div class="mmbar">
+      <button class="btn" onclick="addHead()">+ Title</button>
+      <div class="kchips">${allKinds().map(k =>
+        `<button class="kchip ${noteKind===k?'on':''}" style="--kc:${kindColour(k)}"
+           onclick="noteKind='${esc(k)}';render()">${esc(k)}</button>`).join('')}
+        ${newKind
+          ? `<input class="kin" id="kin" placeholder="new kind" maxlength="24"
+               onkeydown="if(event.key==='Enter')takeKind();if(event.key==='Escape'){newKind=false;render()}"
+               onblur="takeKind()">`
+          : `<button class="kchip add" onclick="newKind=true;render()">+ kind</button>`}
+      </div>
+      <span class="mmhint">${noteLink
+        ? 'Now click the bubble to connect it to — or press Esc.'
+        : 'Hover a bubble and press + on the side you want the branch. New branches are '
+          + `<b style="color:${kindColour(noteKind)}">${esc(noteKind)}</b>.`}</span>
+      <div class="zoomer">
+        <button onclick="zoomBy(1/1.2)" aria-label="Zoom out">−</button>
+        <span>${Math.round(mzoom*100)}%</span>
+        <button onclick="zoomBy(1.2)" aria-label="Zoom in">+</button>
+      </div>
+      <button class="btn sec sm" onclick="fitMap()">Fit</button>
+    </div>
+
+    <div class="mmap" id="mmap" onpointerdown="panStart(event)"
+         ondblclick="addBubbleAt(event)" onwheel="wheelZoom(event)">
+      <div class="mmin" id="mmin"
+           style="transform:translate(${panX}px,${panY}px) scale(${mzoom})">
+        <svg class="mmlines" id="mmlines"></svg>
+        ${rows.map(bubble).join('')}
+      </div>
+      ${rows.length ? '' : `<div class="mmempty">Nothing on the board.<br>
+        Start with a title, then branch off it with the + handles.</div>`}
+    </div>
+
+    <div id="mmins-host">${inspector()}</div>
+  </div>`;
+}
+
+function bubble(r){
+  const c = kindColour(r.kind);
+  const sel = noteSel === r.id;
+  const pic = r.img
+    ? `<img class="bpic" src="/ideas_img/${esc(r.img)}" alt="" loading="lazy">` : '';
+  const body = r.text || (r.img ? '' : 'Write it here');
+  // The four handles are the whole interaction: a branch is one click on the
+  // side you want it, and it arrives connected.
+  const hands = DIRS.map(([d,gl]) =>
+    `<button class="hnd ${d}" title="Add ${esc(NKINDS.find(k=>k[0]===noteKind)?'a '+noteKind:'a bubble')} ${d==='n'?'above':d==='s'?'below':d==='e'?'right':'left'}"
+       onpointerdown="event.stopPropagation()"
+       onclick="branch(event,'${r.id}','${d}')">+</button>`).join('');
+  return `<div class="bub k-${esc(r.kind)} ${sel?'sel':''} ${noteLink&&noteLink!==r.id?'target':''}"
+    id="b-${r.id}" style="left:${r.x||0}px;top:${r.y||0}px;--kc:${c}"
+    onpointerdown="bubDown(event,'${r.id}')"
+    ondblclick="editBubble(event,'${r.id}')">
+    <span class="bkind">${esc(r.kind)}</span>
+    ${pic}
+    ${noteEdit===r.id
+      ? `<textarea class="bed" id="bed" rows="2"
+           onpointerdown="event.stopPropagation()" ondblclick="event.stopPropagation()"
+           onblur="saveEdit('${r.id}',this.value)"
+           onkeydown="edKey(event,'${r.id}')">${esc(r.text)}</textarea>`
+      : `<div class="btx ${r.text?'':'ph'}">${esc(body)}</div>`}
+    ${hands}
+  </div>`;
+}
+
+function inspector(){
+  const r = (NOTES||[]).find(x => x.id === noteSel);
+  if(!r) return '';
+  const linked = ((r.links)||[]).length +
+    (NOTES||[]).filter(o => (o.links||[]).includes(r.id)).length;
+  return `<aside class="mmins">
+    <div class="ihead"><span class="bkind" style="--kc:${kindColour(r.kind)}">${esc(r.kind)}</span>
+      <button class="rm" onclick="noteSel=null;render()">×</button></div>
+    ${r.img?`<img class="iref" src="/ideas_img/${esc(r.img)}" alt=""
+      onclick="zoomNote('${esc(r.img)}')">`:''}
+    <p class="ilab">Picture</p>
+    <div class="iacts">
+      <button onclick="document.getElementById('ifile').click()">
+        ${r.img?'Replace':'Add picture'}</button>
+      ${r.img?`<button class="warn" onclick="noteWrite({op:'edit',id:'${r.id}',img:''})">Remove</button>`:''}
+      <input type="file" id="ifile" accept="image/*" hidden
+        onchange="attachPic('${r.id}', this)">
+    </div>
+    <p class="ilab">Kind</p>
+    <div class="kchips">${allKinds().map(k =>
+      `<button class="kchip ${r.kind===k?'on':''}" style="--kc:${kindColour(k)}"
+         onclick="noteWrite({op:'edit',id:'${r.id}',kind:'${esc(k)}'})">${esc(k)}</button>`).join('')}</div>
+    <div class="iacts">
+      ${r.kind==='idea'?`<button onclick="buildFromNote('${r.id}')">Build this</button>`:''}
+      <button onclick="startLink('${r.id}')">${noteLink===r.id?'Pick a bubble…':'Connect'}</button>
+      <button onclick="copyNote('${esc(r.text).replace(/'/g,'&#39;')}',this)">Copy</button>
+      <button class="warn" onclick="delNote('${r.id}')">Delete</button>
+    </div>
+    <p class="ifoot">${linked} connection${linked===1?'':'s'} ·
+      ${new Date((r.at||0)*1000).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</p>
+  </aside>`;
+}
+
+// ---------------------------------------------------------------- edges
+//
+// Drawn from where the bubbles actually are rather than from the stored
+// coordinates, so a line keeps up with a bubble mid-drag.
+
+// Where the line from one bubble's centre towards another crosses the first
+// bubble's border.
+function edgePoint(from, to){
+  const cx = from.offsetLeft + from.offsetWidth/2;
+  const cy = from.offsetTop + from.offsetHeight/2;
+  const dx = (to.offsetLeft + to.offsetWidth/2) - cx;
+  const dy = (to.offsetTop + to.offsetHeight/2) - cy;
+  if(!dx && !dy) return {x:cx, y:cy};
+  const hw = from.offsetWidth/2 + 2, hh = from.offsetHeight/2 + 2;
+  const t = Math.min(dx ? hw/Math.abs(dx) : Infinity,
+                     dy ? hh/Math.abs(dy) : Infinity);
+  return {x: Math.round(cx + dx*t), y: Math.round(cy + dy*t)};
+}
+
+function focusEditor(){
+  const t = document.getElementById('bed');
+  if(t && document.activeElement !== t){
+    t.focus();
+    t.setSelectionRange(t.value.length, t.value.length);
+  }
+}
+
+function drawLinks(){
+  const svg = document.getElementById('mmlines'); if(!svg) return;
+  const seen = new Set(), out = [];
+  (NOTES||[]).forEach(r => ((r.links)||[]).forEach(to => {
+    const key = [r.id, to].sort().join('|');
+    if(seen.has(key)) return;
+    seen.add(key);
+    const a = document.getElementById('b-'+r.id), b = document.getElementById('b-'+to);
+    if(!a || !b) return;
+    // Meet the boundary, not the centre: a line that runs under a bubble and
+    // out the other side reads as one long line through it.
+    const A = edgePoint(a, b), B = edgePoint(b, a);
+    const d = Math.abs(B.x-A.x) >= Math.abs(B.y-A.y)
+      ? `M${A.x},${A.y} C${(A.x+B.x)/2},${A.y} ${(A.x+B.x)/2},${B.y} ${B.x},${B.y}`
+      : `M${A.x},${A.y} C${A.x},${(A.y+B.y)/2} ${B.x},${(A.y+B.y)/2} ${B.x},${B.y}`;
+    out.push(`<path d="${d}" fill="none" stroke="${kindColour(r.kind)}"
+      stroke-width="1.5" opacity=".5"/>`);
+  }));
+  svg.innerHTML = out.join('');
+}
+
+// ---------------------------------------------------------------- input
+
+function bubDown(e, id){
+  e.stopPropagation();
+  const el = e.currentTarget;
+  const r = (NOTES||[]).find(x => x.id === id); if(!r) return;
+
+  if(noteLink && noteLink !== id){
+    const from = noteLink; noteLink = null;
+    return noteWrite({op:'link', id:from, to:id});
+  }
+
+  const sx = e.clientX, sy = e.clientY, ox = r.x||0, oy = r.y||0;
+  let moved = false;
+  mmDrag = true;
+  try { el.setPointerCapture(e.pointerId); } catch(err){}
+  const mv = ev => {
+    const dx = ev.clientX - sx, dy = ev.clientY - sy;
+    if(Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+    // Screen pixels are map pixels divided by the zoom.
+    r.x = Math.round(ox + dx/mzoom); r.y = Math.round(oy + dy/mzoom);
+    el.style.left = r.x + 'px'; el.style.top = r.y + 'px';
+    drawLinks();
+  };
+  const up = () => {
+    el.removeEventListener('pointermove', mv);
+    el.removeEventListener('pointerup', up);
+    try { el.releasePointerCapture(e.pointerId); } catch(err){}
+    mmDrag = false;
+    if(moved) noteWrite({op:'move', id, x:r.x, y:r.y}, true);
+    else selectBubble(id);
+  };
+  el.addEventListener('pointermove', mv);
+  el.addEventListener('pointerup', up);
+}
+
+function panStart(e){
+  if(e.target.closest('.bub')) return;
+  const el = document.getElementById('mmin');
+  const sx = e.clientX, sy = e.clientY, ox = panX, oy = panY;
+  let moved = false;
+  mmDrag = true;
+  const mv = ev => {
+    panX = ox + ev.clientX - sx; panY = oy + ev.clientY - sy;
+    if(Math.abs(panX-ox) + Math.abs(panY-oy) > 3) moved = true;
+    el.style.transform = `translate(${panX}px,${panY}px)`;
+  };
+  const up = () => {
+    document.removeEventListener('pointermove', mv);
+    document.removeEventListener('pointerup', up);
+    mmDrag = false;
+    savePan();
+    if(!moved && (noteSel || noteEdit)){
+      noteSel = null; noteEdit = null; render();
+    }
+  };
+  document.addEventListener('pointermove', mv);
+  document.addEventListener('pointerup', up);
+}
+
+function addHead(){
+  const map = document.getElementById('mmap');
+  const w = map ? map.clientWidth : 800, h = map ? map.clientHeight : 500;
+  newBubble(Math.round(w/2 - panX - BUBW/2), Math.round(h/2 - panY - 40), 'title');
+}
+
+function addBubbleAt(e){
+  if(e.target.closest('.bub')) return;
+  const p = toMap(e.clientX, e.clientY);
+  newBubble(Math.round(p.x - BUBW/2), Math.round(p.y - 22));
+}
+
+// Screen point to map point, through the pan and the zoom.
+function toMap(cx, cy){
+  const box = document.getElementById('mmap').getBoundingClientRect();
+  return {x: (cx - box.left - panX)/mzoom, y: (cy - box.top - panY)/mzoom};
+}
+
+function applyView(){
+  const el = document.getElementById('mmin');
+  if(el) el.style.transform = `translate(${panX}px,${panY}px) scale(${mzoom})`;
+  const lab = document.querySelector('.zoomer span');
+  if(lab) lab.textContent = Math.round(mzoom*100) + '%';
+}
+
+function setZoom(z, cx, cy){
+  const next = Math.round(Math.max(ZMIN, Math.min(ZMAX, z)) * 1000) / 1000;
+  if(next === mzoom) return;
+  const box = document.getElementById('mmap').getBoundingClientRect();
+  // Keep whatever is under the cursor (or the middle) where it is.
+  const px = (cx == null ? box.width/2 : cx - box.left);
+  const py = (cy == null ? box.height/2 : cy - box.top);
+  panX = px - (px - panX) * (next/mzoom);
+  panY = py - (py - panY) * (next/mzoom);
+  mzoom = next;
+  applyView();
+  savePan();
+}
+
+const zoomBy = f => setZoom(mzoom * f);
+
+function wheelZoom(e){
+  // Only a deliberate pinch or ⌘/ctrl+wheel zooms. A plain two-finger scroll
+  // belongs to the page, and nothing zooms while a drag is in progress.
+  if(mmDrag || (!e.ctrlKey && !e.metaKey) || !e.deltaY) return;
+  e.preventDefault();
+  setZoom(mzoom * (e.deltaY > 0 ? 1/1.12 : 1.12), e.clientX, e.clientY);
+}
+
+function savePan(){
+  try {
+    localStorage.setItem('pf.mm.x', panX);
+    localStorage.setItem('pf.mm.y', panY);
+    localStorage.setItem('pf.mm.z', mzoom);
+  } catch(e){}
+}
+
+// Grow a branch out of one side. The child lands clear of everything already
+// on the board — a mind map that stacks its own branches on top of each other
+// is worse than a list.
+function branch(e, id, dir){
+  e.stopPropagation();
+  const r = (NOTES||[]).find(x => x.id === id); if(!r) return;
+  const el = document.getElementById('b-'+id);
+  const w = el ? el.offsetWidth : BUBW, h = el ? el.offsetHeight : BUBH;
+  let x = r.x||0, y = r.y||0;
+  if(dir==='e') x += w + GAP;
+  if(dir==='w') x -= BUBW + GAP;
+  if(dir==='s') y += h + GAP;
+  if(dir==='n') y -= BUBH + GAP;
+  // Slide perpendicular to the branch until the spot is empty.
+  const step = (dir==='n'||dir==='s') ? [BUBW+GAP, 0] : [0, BUBH+GAP];
+  for(let i = 0; i < 12 && occupied(x, y); i++){
+    const k = Math.ceil((i+1)/2) * ((i % 2) ? -1 : 1);
+    x = (dir==='n'||dir==='s' ? (r.x||0) + step[0]*k : x);
+    y = (dir==='e'||dir==='w' ? (r.y||0) + step[1]*k : y);
+  }
+  newBubble(Math.round(x), Math.round(y), noteKind, id);
+}
+
+function occupied(x, y){
+  return (NOTES||[]).some(o => {
+    const el = document.getElementById('b-'+o.id);
+    const w = el ? el.offsetWidth : BUBW, h = el ? el.offsetHeight : BUBH;
+    return Math.abs((o.x||0) - x) < w - 8 && Math.abs((o.y||0) - y) < h - 8;
+  });
+}
+
+async function newBubble(x, y, kind, from){
+  const body = {op:'add', kind:kind || noteKind, text:'', x, y};
+  if(from) body.from = from;
+  await noteWrite(body);
+  const first = (NOTES||[])[0];
+  if(first){ noteSel = first.id; noteEdit = first.id; render(); }
+}
+
+// Selecting touches two classes and one panel — never the whole board.
+function selectBubble(id){
+  if(noteSel === id) return;
+  noteSel = id;
+  document.querySelectorAll('.bub.sel').forEach(b => b.classList.remove('sel'));
+  const el = document.getElementById('b-'+id);
+  if(el) el.classList.add('sel');
+  const host = document.getElementById('mmins-host');
+  if(host) host.innerHTML = inspector();
+}
+
+function editBubble(e, id){
+  e.stopPropagation();
+  noteSel = id; noteEdit = id;
+  render();
+}
+
+function saveEdit(id, text){
+  const r = (NOTES||[]).find(x => x.id === id);
+  noteEdit = null;
+  if(r && text.trim() === (r.text||'').trim()){ render(); return; }
+  noteWrite({op:'edit', id, text});
+}
+
+function edKey(e, id){
+  // Enter commits, because a bubble is a label rather than a paragraph;
+  // shift+Enter is there when a line break is genuinely wanted.
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); e.target.blur(); }
+  if(e.key === 'Escape'){ noteEdit = null; render(); }
+  // Tab out of one bubble and straight into a new sibling below it.
+  if(e.key === 'Tab'){ e.preventDefault(); e.target.blur();
+    setTimeout(() => branch({stopPropagation(){}}, id, 's'), 60); }
+}
+
+function startLink(id){
+  noteLink = noteLink === id ? null : id;
+  render();
+}
+
+function takeKind(){
+  const el = document.getElementById('kin');
+  const v = el ? el.value.trim().toLowerCase().replace(/[^a-z0-9 _-]/g,'') : '';
+  newKind = false;
+  if(v) noteKind = v;
+  render();
+}
+
+// Bring everything back on screen — the one thing you cannot do by dragging
+// when you have panned away from all of it.
+function fitMap(){
+  const rows = NOTES || []; if(!rows.length) return;
+  const minX = Math.min(...rows.map(r => r.x||0));
+  const minY = Math.min(...rows.map(r => r.y||0));
+  // Zoom out far enough that the whole map fits, then sit it in the corner.
+  const map = document.getElementById('mmap');
+  const maxX = Math.max(...rows.map(r => (r.x||0) + BUBW));
+  const maxY = Math.max(...rows.map(r => (r.y||0) + BUBH*1.6));
+  const fit = Math.min(1, (map.clientWidth - 80)/Math.max(1, maxX - minX),
+                          (map.clientHeight - 80)/Math.max(1, maxY - minY));
+  mzoom = Math.round(Math.max(ZMIN, Math.min(ZMAX, fit)) * 1000) / 1000;
+  panX = 40 - minX*mzoom; panY = 40 - minY*mzoom;
+  applyView();
+  savePan();
+}
+
+// ---------------------------------------------------------------- writes
+
+async function noteWrite(body, quiet){
+  try {
+    const r = await (await fetch('/api/ideas', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})).json();
+    if(r.rows) NOTES = r.rows;
+    paintIdeaCount();
+    if(!quiet) render(); else drawLinks();
+  } catch(e){ nsay('Could not save'); }
+}
+
+function delNote(id){
+  const r = (NOTES||[]).find(x => x.id===id);
+  showModal({
+    title: 'Delete this bubble?',
+    body: r && r.img
+      ? 'The picture goes with it. There is no copy anywhere else.'
+      : (r ? (r.text || 'It is empty.').slice(0, 160) : ''),
+    ok: 'Delete', danger: true,
+    action: () => { noteSel = null; return noteWrite({op:'del', id}); },
+  });
+}
+
+function copyNote(text, el){
+  navigator.clipboard.writeText(text).then(() => {
+    if(el){ const was = el.textContent; el.textContent = 'Copied';
+      setTimeout(() => { el.textContent = was; }, 900); }
+  });
+}
+
+// The point of the board: an idea leaves it as a brief, not as a memory.
+function buildFromNote(id){
+  const r = (NOTES||[]).find(x => x.id===id); if(!r) return;
+  buildNote = r.text;
+  if(r.pillar) buildPillar = r.pillar;
+  setFilter('new');
+}
+
+// One upload path, whether the bytes came from a file picker or the
+// clipboard. Attaching to an existing bubble beats making a new one — a
+// reference almost always belongs to something already on the board.
+async function uploadPic(dataUrl){
+  const up = await (await fetch('/api/ideas/img', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({data:dataUrl})})).json();
+  return up.img || null;
+}
+
+function attachPic(id, input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = async () => {
+    const img = await uploadPic(rd.result);
+    if(!img) return nsay('That file is not an image');
+    await noteWrite({op:'edit', id, img});
+  };
+  rd.readAsDataURL(f);
+}
+
+function zoomNote(img){
+  const el = document.getElementById('zoomimg');
+  el.src = '/ideas_img/' + img;
+  el.alt = 'Reference';
+  document.getElementById('zcount').textContent = '';
+  document.getElementById('mzoom').style.display = 'flex';
+}
+
+function nsay(msg){
+  const t = document.getElementById('toast'); if(!t) return;
+  t.innerHTML = `<div class="toast"><h5>${esc(msg)}</h5></div>`;
+  setTimeout(() => { if(t.firstChild) t.innerHTML = ''; }, 2600);
+}
+
+// Paste anywhere on the board to drop a screenshot in as its own bubble.
+document.addEventListener('paste', e => {
+  if(filter!=='ideas' || cur) return;
+  const item = [...(e.clipboardData&&e.clipboardData.items||[])]
+    .find(i => i.type.startsWith('image/'));
+  if(!item) return;
+  e.preventDefault();
+  const rd = new FileReader();
+  rd.onload = async () => {
+    try {
+      const img = await uploadPic(rd.result);
+      if(!img) return nsay('That file is not an image');
+      // Onto the selected bubble if there is one; otherwise it becomes its own.
+      if(noteSel) return noteWrite({op:'edit', id:noteSel, img});
+      const map = document.getElementById('mmap');
+      await noteWrite({op:'add', kind:'ref', text:'', img,
+        x: Math.round((map?map.clientWidth:800)/2 - panX - BUBW/2),
+        y: Math.round((map?map.clientHeight:500)/2 - panY - 60)});
+    } catch(err){ nsay('Upload failed'); }
+  };
+  rd.readAsDataURL(item.getAsFile());
+});
+
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape' || filter !== 'ideas') return;
+  if(noteLink){ noteLink = null; render(); }
+  else if(noteEdit){ noteEdit = null; render(); }
+  else if(noteSel){ noteSel = null; render(); }
+});
+
+// ---------------------------------------------------------------- new post
+//
+// Pick what kind of post, press the button. That is the whole page.
+//
+// It used to be a slide-by-slide composer — a card per slide, its own photo,
+// its own copy, a picker for each. It worked, and it was the wrong tool: the
+// point of this dashboard is to keep posts going out, and every field on
+// that page was a decision standing between him and a post. The agent
+// already follows the same rules a person would, so it does the whole thing
+// and the result lands in Review where it can be judged in one look.
+let HOOKS = null, buildPillar = 'tools', buildCount = 1, buildNote = '';
+
 async function loadHooks(){
-  try { HOOKS = await (await fetch('/api/hooks')).json(); } catch(e){ HOOKS = {eligible:[],blocked:[],suggested:[]}; }
-  ensureSpec();
-  if(!BGS){ try { BGS = await (await fetch('/api/bgs')).json(); } catch(e){ BGS = {bgs:[]}; } }
-  if(!TOOLPOOL){ try { TOOLPOOL = await (await fetch('/api/tools')).json(); } catch(e){ TOOLPOOL = {tools:[],cats:[]}; } }
+  try { HOOKS = await (await fetch('/api/hooks')).json(); } catch(e){ HOOKS = {eligible:[]}; }
   if(filter==='new') render();
 }
 
-const bgBy = n => (BGS && BGS.bgs || []).find(b => b.name===n) || {};
-const toolBy = n => ((TOOLPOOL&&TOOLPOOL.tools)||[]).find(t => t.name===n) || {};
-const LLMS = () => new Set(((TOOLPOOL&&TOOLPOOL.tools)||[]).filter(t=>t.cat==='llm').map(t=>t.name));
-const hookLines = () => (SPEC.slides.find(s=>s.kind==='hook')||{lines:[]}).lines;
-const usedBgs = () => SPEC.slides.map(s=>s.bg).filter(Boolean);
-
-// The rules compose enforces at render time, said while you are still
-// choosing. The server checks them again before a build starts — this copy is
-// here so the answer is instant on a phone, not so it can be the only one.
-function bgProblems(){
-  const out = [], sl = SPEC.slides;
-  const ppl = sl.filter(s=>s.bg && bgBy(s.bg).person);
-  if(ppl.length>1) out.push(`${ppl.length} slides have a person in them. One per post — more reads as stock photography.`);
-  sl.forEach((s,i)=>{
-    if(!s.bg) return;
-    const b = bgBy(s.bg);
-    if(i>0 && b.hook_only) out.push(`Slide ${i+1}: ${b.vibe} is hook-only — too busy under body copy.`);
-    if(i>0 && b.copy_ok===false) out.push(`Slide ${i+1}: too bright behind the copy (luma ${b.luma}, limit ${BGS.band_max_luma}).`);
-  });
-  for(let i=0;i<sl.length-1;i++){
-    const a = sl[i].bg && bgBy(sl[i].bg).vibe, b = sl[i+1].bg && bgBy(sl[i+1].bg).vibe;
-    if(a && a===b) out.push(`Slides ${i+1} and ${i+2} are both ${a} — the eye needs a change of scene.`);
-  }
-  const llm = LLMS(), n = SPEC.slides.filter(s=>s.tool && llm.has(s.tool)).length;
-  if(SPEC.pillar==='tools' && n>1) out.push(`${n} models in one post. Exactly one; nobody can tell two apart from a single line.`);
-  const dup = sl.map(s=>s.bg).filter(Boolean);
-  if(new Set(dup).size !== dup.length) out.push('The same photo is on two slides.');
-  return out;
-}
-
-// ---------------------------------------------------------------- slide card
-function slideCard(sl, i){
-  const b = sl.bg ? bgBy(sl.bg) : null;
-  const busy = genBusy[i];
-  const thumb = sl.bg
-    ? `<img src="/bg/${sl.bg}" alt=""><span class="lab">${esc(b.vibe||'')}</span>`
-    : `<span class="pick">photo<br>${SPEC.pillar && i===0?'for the hook':'slide '+(i+1)}</span>`;
-  return `<article class="slrow ${sl.kind==="cta"?"k-cta":sl.kind}">
-    <div class="slbgwrap">
-      <button class="slbg ${sl.bg?'has':''}" onclick="openSheet('bg',${i})"
-        aria-label="Background for slide ${i+1}">${thumb}</button>
-      <button class="reroll" onclick="rerollBg(${i})" title="Another photo"
-        aria-label="Another photo for slide ${i+1}">↻</button>
-    </div>
-    <div class="slmain">
-      <div class="slhead"><span class="k">${i+1} · ${SLIDE_LABEL[sl.kind]}</span>
-        ${sl.kind==='hook'||sl.kind==='cta'?'':
-          `<button class="rm" onclick="removeSlide(${i})" aria-label="Remove slide">×</button>`}</div>
-      ${sl.kind==='hook' ? hookFields(sl) :
-        sl.kind==='cta'  ? ctaFields(sl, i) : bodyFields(sl, i)}
-      ${busy?`<span class="gbusy">writing… it keeps going if you leave</span>`:''}
-    </div></article>`;
-}
-
-function hookFields(sl){
-  return `<input class="cin big" maxlength="42" placeholder="my phone is boring now"
-      value="${esc(sl.lines[0]||'')}" oninput="setLine(0,0,this.value)">
-    <input class="cin big" maxlength="42" placeholder="and it changed everything"
-      value="${esc(sl.lines[1]||'')}" oninput="setLine(0,1,this.value)">
-    <div class="slact">
-      <button class="btn sec sm" onclick="openSheet('hook',0)">Pick from pool</button>
-      <button class="btn sec sm" onclick="genHooks()">Write me some</button>
-      <span class="csum">Two lines, under 42 each. State the result.</span>
-    </div>`;
-}
-
-function bodyFields(sl, i){
-  const t = sl.tool ? toolBy(sl.tool) : null;
-  return `${sl.kind==='tool'
-    ? `<button class="tl ${sl.tool?'on':''}" onclick="openSheet('tool',${i})">
-         ${t&&t.icon?`<img src="/icon/${t.icon}" alt="">`:'<span class="noico"></span>'}
-         ${esc(sl.tool||'pick a tool')}</button>`
-    : `<input class="cin" placeholder="the heading for this point"
-         value="${esc(sl.title||'')}" oninput="SPEC.slides[${i}].title=this.value;paintBar()">`}
-    <input class="cin" placeholder="what it does — the mechanism"
-      value="${esc(sl.lines[0]||'')}" oninput="setLine(${i},0,this.value)">
-    <input class="cin" placeholder="what that gets you — the consequence"
-      value="${esc(sl.lines[1]||'')}" oninput="setLine(${i},1,this.value)">
-    <div class="slact">
-      <button class="btn sec sm" onclick="genSlide(${i})">Write this slide</button>
-      <span class="csum">Leave it blank and the agent writes it.</span>
-    </div>`;
-}
-
-function ctaFields(sl, i){
-  return `<input class="cin" placeholder="day planner, app blocker, task manager"
-      value="${esc(sl.lines[0]||'')}" oninput="setLine(${i},0,this.value)">
-    <input class="cin" placeholder="the only productivity app you need"
-      value="${esc(sl.lines[1]||'')}" oninput="setLine(${i},1,this.value)">
-    <div class="slact"><span class="csum">App icon, full store name and these
-      lines. Leave blank for the usual card.</span></div>`;
-}
-
-function setLine(i, n, v){ SPEC.slides[i].lines[n] = v; paintBar(); }
-
-function addSlide(){
-  // Match what the post already is rather than what the pillar defaults to,
-  // so a slide added to a listicle is another tool.
-  const kind = SPEC.slides.some(s=>s.kind==='tool') ? 'tool' : 'point';
-  SPEC.slides.splice(SPEC.slides.length-1, 0,
-    {kind, tool:'', title:'', lines:['',''], bg:null, gen:0});
-  render();
-}
-function removeSlide(i){ SPEC.slides.splice(i,1); render(); }
-
-// ---------------------------------------------------------------- the sheet
-function openSheet(mode, i){ sheet = {mode, slide:i}; render(); }
-function closeSheet(){ sheet = null; render(); }
-
-function sheetView(){
-  if(!sheet) return '';
-  const body = sheet.mode==='bg' ? bgSheet(sheet.slide)
-             : sheet.mode==='tool' ? toolSheet(sheet.slide)
-             : hookSheet();
-  const title = sheet.mode==='bg' ? `Photo for slide ${sheet.slide+1}`
-              : sheet.mode==='tool' ? `Tool for slide ${sheet.slide+1}` : 'Hooks';
-  return `<div class="shwrap" onclick="if(event.target===this)closeSheet()">
-    <div class="sh"><div class="shhead"><b>${esc(title)}</b>
-      <button class="rm" onclick="closeSheet()" aria-label="Close">×</button></div>
-      <div class="shbody">${body}</div></div></div>`;
-}
-
-function bgSheet(i){
-  const all = (BGS&&BGS.bgs)||[];
-  if(!all.length) return `<div class="cwarn"><b>No background index.</b>
-    Run <code>python3 tools/bg_index.py</code>.</div>`;
-  const vibes = [...new Set(all.map(b=>b.vibe))].sort();
-  const prev = i>0 ? (SPEC.slides[i-1].bg && bgBy(SPEC.slides[i-1].bg).vibe) : null;
-  const next = i<SPEC.slides.length-1 ? (SPEC.slides[i+1].bg && bgBy(SPEC.slides[i+1].bg).vibe) : null;
-  const taken = {};
-  SPEC.slides.forEach((s,n)=>{ if(s.bg && n!==i) taken[s.bg] = n+1; });
-  const shown = all.filter(b =>
-      bgFilter==='all' ? true :
-      bgFilter==='fresh' ? !b.hook_used :
-      bgFilter==='fit' ? (i===0 ? true : (b.copy_ok && !b.hook_only)) :
-      b.vibe===bgFilter);
-  return `<div class="segs multi bgfil">
-      <button class="seg ${bgFilter==='fit'?'on':''}" onclick="bgFilter='fit';render()">
-        ${i===0?'Any':'Holds copy'}</button>
-      <button class="seg ${bgFilter==='fresh'?'on':''}" onclick="bgFilter='fresh';render()">Never a hook ${BGS.hook_left}</button>
-      <button class="seg ${bgFilter==='all'?'on':''}" onclick="bgFilter='all';render()">All ${all.length}</button>
-      ${vibes.map(v=>`<button class="seg ${bgFilter===v?'on':''}" onclick="bgFilter='${v}';render()">${esc(v)}</button>`).join('')}
-    </div>
-    ${SPEC.slides[i].bg?`<button class="btn sec sm" onclick="setBg(${i},null)">Clear this slide</button>`:''}
-    <div class="bgrid">${shown.map(b=>{
-      const bad = i>0 && (b.hook_only || b.copy_ok===false);
-      const clash = (b.vibe===prev || b.vibe===next);
-      const flags = [];
-      if(b.person) flags.push('<i>person</i>');
-      if(i>0 && b.hook_only) flags.push('<i class="warn">hook only</i>');
-      if(i>0 && b.copy_ok===false) flags.push('<i class="warn">bright</i>');
-      if(clash) flags.push('<i class="warn">same as neighbour</i>');
-      if(b.recent) flags.push('<i>last post</i>');
-      if(taken[b.name]) flags.push(`<i>slide ${taken[b.name]}</i>`);
-      return `<button class="bt ${SPEC.slides[i].bg===b.name?'on':''} ${bad||clash?'faded':''}"
-          onclick="setBg(${i},'${b.name}')" title="${esc(b.vibe)} · luma ${b.luma==null?'?':b.luma}">
-        <img loading="lazy" src="/bg/${b.name}" alt="">
-        <span class="fl">${flags.join('')}</span>
-        <span class="vb">${esc(b.vibe)}${b.hook_used?'':' · fresh'}</span></button>`;}).join('')}</div>`;
-}
-
-function setBg(i, name){ SPEC.slides[i].bg = name; sheet = null; render(); }
-
-function toolSheet(i){
-  const tools = (TOOLPOOL&&TOOLPOOL.tools)||[], cats = (TOOLPOOL&&TOOLPOOL.cats)||[];
-  const on = new Set(SPEC.slides.map(s=>s.tool).filter(Boolean));
-  return cats.map(c=>`<h4 class="csub">${esc(c)}</h4>
-    <div class="tgrid">${tools.filter(t=>t.cat===c).map(t=>
-      `<button class="tl ${SPEC.slides[i].tool===t.name?'on':''} ${on.has(t.name)&&SPEC.slides[i].tool!==t.name?'faded':''}"
-         onclick="setTool(${i},'${esc(t.name)}')">
-        ${t.icon?`<img src="/icon/${t.icon}" alt="">`:'<span class="noico"></span>'}${esc(t.name)}
-        ${t.icon?'':'<span class="tnum warn">no icon</span>'}</button>`).join('')}</div>`).join('');
-}
-
-function setTool(i, name){
-  SPEC.slides[i].tool = name;
-  if(!SPEC.slides[i].title) SPEC.slides[i].title = name;
-  sheet = null; render();
-}
-
-function hookSheet(){
-  const el = ((HOOKS&&HOOKS.eligible)||[]).filter(h=>h.pillar===SPEC.pillar);
-  const sug = ((HOOKS&&HOOKS.suggested)||[]).filter(h=>h.pillar===SPEC.pillar);
-  const made = (HOOKS&&HOOKS.made)||[];
-  const card = (h, cls) => `<button class="hk ${cls||''}" onclick='useHook(${JSON.stringify(h)})'>
-      ${esc(h.lines[0])}<br>${esc(h.lines[1]||'')}
-      <span class="p">${esc(h.pillar||SPEC.pillar)}${cls?' · add':''}</span></button>`;
-  return `${made.length?`<h4 class="csub">Just written</h4>
-      <div class="hgrid">${made.map(h=>card(h,'sug')).join('')}</div>`:''}
-    ${el.length?`<h4 class="csub">In the pool, off cooldown</h4>
-      <div class="hgrid">${el.map(h=>card(h)).join('')}</div>`
-     :`<div class="cwarn"><b>No ${esc(SPEC.pillar)} hook is free.</b> Every approved
-        one is inside its cooldown — write one, or have some written.</div>`}
-    ${sug.length?`<h4 class="csub">Calibrated, not in the pool yet</h4>
-      <div class="hgrid">${sug.map(h=>card(h,'sug')).join('')}</div>`:''}
-    <div class="slact"><button class="btn sec sm" onclick="genHooks()">Write me some</button></div>`;
-}
-
-async function useHook(h){
-  const r = await fetch('/api/hook',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({lines:h.lines, pillar:h.pillar||SPEC.pillar})});
-  const j = await r.json();
-  if(j.error) return say(j.error);
-  SPEC.slides[0].lines = h.lines.slice();
-  if(h.pillar && h.pillar!==SPEC.pillar) setPillar(h.pillar, true);
-  sheet = null;
-  HOOKS = null; loadHooks(); render();
-}
-
-// ------------------------------------------------------------------ autofill
-//
-// Picking a photo, a hook and a roster is not judgment, it is rule-following:
-// a frame nothing has opened with, one that holds white text, no two
-// neighbours alike, one person at most, ARCO first, exactly one model. All of
-// that runs on the server in milliseconds and costs nothing. What is left for
-// the agent is the only part that was ever a decision — the words.
-async function fillSlides(only){
-  const r = await fetch('/api/autofill',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({pillar:SPEC.pillar, only, slides:SPEC.slides.map(s=>
-      ({kind:s.kind, tool:s.tool, title:s.title, lines:s.lines, bg:s.bg}))})});
-  const j = await r.json();
-  if(j.error) { say(j.error); return false; }
-  j.slides.forEach((n,i)=>{ if(!SPEC.slides[i]) return;
-    SPEC.slides[i].bg = n.bg; SPEC.slides[i].tool = n.tool;
-    SPEC.slides[i].title = n.title; SPEC.slides[i].lines = n.lines; });
-  saveSpec();
-  return true;
-}
-
-async function fillIn(){ if(await fillSlides('all')) render(); }
-async function shufflePhotos(){ if(await fillSlides('bgs')) render(); }
-async function rerollBg(i){ if(await fillSlides(i)) render(); }
-
-// Two taps: everything the rules can decide, decided, then straight to the
-// build — which writes the copy as it renders. The composer below is for when
-// you want a say; this is for when you do not.
-async function quickDraft(){
-  if(!await fillSlides('all')) return;
-  render();
-  await startBuild();
-}
-
-// ---------------------------------------------------------------- generation
-async function genHooks(){
-  const r = await fetch('/api/gen',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({what:'hooks', pillar:SPEC.pillar, n:5, note:SPEC.note})});
-  const j = await r.json();
-  if(j.error) return say(j.error);
-  say('Writing hooks. They appear here when it is done.');
-  genBusy['hooks'] = true; SPEC.genHooks = j.at; saveSpec(); render();
-  pollGen(j.at, res => {
-    genBusy['hooks'] = false; SPEC.genHooks = 0;
-    if(res && res.hooks){ HOOKS = Object.assign({}, HOOKS, {made:res.hooks});
-      sheet = {mode:'hook', slide:0}; }
-    saveSpec(); render();
-  });
-}
-
-// One result, two shapes: a whole post comes back as numbered slides, a
-// single slide as one title and two lines.
-function applyGen(res, fallbackIndex){
-  if(!res) return;
-  if(res.slides){
-    res.slides.forEach(sl => {
-      const t = SPEC.slides[sl.n-1];
-      if(!t) return;
-      if(sl.title) t.title = sl.title;
-      t.lines = sl.lines.slice();
-    });
-    return;
-  }
-  const t = SPEC.slides[fallbackIndex];
-  if(!t || !res.lines) return;
-  if(res.title) t.title = res.title;
-  t.lines = res.lines.slice();
-}
-
-async function genPost(){
-  const blanks = SPEC.slides
-    .map((s,i)=>({s,i}))
-    .filter(({s}) => s.kind!=='hook' && s.kind!=='cta' && !(s.lines||[]).filter(l=>l.trim()).length);
-  if(!blanks.length) return say('Every slide already says something.');
-  const plan = SPEC.slides.map((s,i)=>{
-    const who = s.tool || s.title || SLIDE_LABEL[s.kind];
-    const said = (s.lines||[]).filter(l=>l.trim()).join(' / ');
-    return `  slide ${i+1} (${who})${blanks.some(b=>b.i===i)?' — WRITE THIS':''}${said?': '+said:''}`;
-  }).join('\n');
-  const r = await fetch('/api/gen',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({what:'post', pillar:SPEC.pillar,
-      hook:hookLines().filter(Boolean).join(' / '), plan, note:SPEC.note})});
-  const j = await r.json();
-  if(j.error) return say(j.error);
-  // One run for the whole post, not one per slide: agent runs go one at a
-  // time, so four "write this slide" taps is four waits in a row — and the
-  // slides come out reading like one post rather than five separate ones.
-  blanks.forEach(({i}) => { genBusy[i] = true; SPEC.slides[i].gen = j.at; });
-  saveSpec(); render();
-  pollGen(j.at, res => {
-    blanks.forEach(({i}) => { genBusy[i] = false; SPEC.slides[i].gen = 0; });
-    applyGen(res, blanks[0].i);
-    saveSpec(); render();
-  });
-}
-
-async function genSlide(i){
-  const sl = SPEC.slides[i];
-  const others = SPEC.slides.map((s,n)=> n===i ? null
-      : (s.lines||[]).filter(Boolean).length
-        ? `  slide ${n+1} (${s.tool||s.title||SLIDE_LABEL[s.kind]}): ${s.lines.filter(Boolean).join(' / ')}` : null)
-    .filter(Boolean).join('\n');
-  const r = await fetch('/api/gen',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({what:'slide', pillar:SPEC.pillar, tool:sl.tool,
-      hook:hookLines().filter(Boolean).join(' / '), others, n:i+1, note:SPEC.note})});
-  const j = await r.json();
-  if(j.error) return say(j.error);
-  genBusy[i] = true; SPEC.slides[i].gen = j.at; saveSpec(); render();
-  pollGen(j.at, res => {
-    genBusy[i] = false; SPEC.slides[i].gen = 0;
-    applyGen(res, i); saveSpec(); render();
-  });
-}
-
-// Agent runs are serialised, so a queued one can sit for a while. Polling
-// rather than waiting on the request keeps the page usable meanwhile.
-function pollGen(at, done){
-  let tries = 0;
-  const tick = async () => {
-    tries++;
-    let j = {};
-    try { j = await (await fetch('/api/gen?at='+at)).json(); } catch(e){}
-    if(j.status==='done') return done(j.result);
-    if(j.status==='failed' || j.status==='interrupted'){
-      say(j.why || 'That run did not finish.');
-      return done(null);
-    }
-    if(tries > 260) { say('Still going — it will land in the job panel.'); return done(null); }
-    setTimeout(tick, 2500);
-  };
-  setTimeout(tick, 2000);
-}
-
-// ---------------------------------------------------------------- the page
-function setPillar(k, keepHook){
-  if(k===SPEC.pillar) return;
-  const old = SPEC;
-  SPEC = freshSpec(k);
-  SPEC.caption = old.caption; SPEC.note = old.note; SPEC.count = old.count;
-  if(keepHook) SPEC.slides[0].lines = old.slides[0].lines.slice();
-  SPEC.slides[0].bg = old.slides[0].bg;
-  render();
-}
-
-function barInner(){
-  ensureSpec();
-  const n = SPEC.slides.length;
-  const blank = SPEC.slides.filter(s => s.kind!=='cta' && !(s.lines||[]).filter(Boolean).length).length;
-  const noBg = SPEC.slides.filter(s => !s.bg).length;
-  const probs = bgProblems();
-  return `<span class="sum">${n} slides · ${blank?blank+' for the agent to write':'all written'}
-      · ${noBg?noBg+' photos for it to pick':'all photos chosen'}
-      ${probs.length?`<b class="warnt">${probs.length} to look at</b>`:''}</span>
-    <div class="segs">${[1,2,3].map(c=>
-      `<button class="seg ${SPEC.count===c?'on':''}" onclick="SPEC.count=${c};paintBar()">${c}</button>`).join('')}</div>
-    <button class="btn" onclick="startBuild()">Generate</button>`;
-}
-function paintBar(){ saveSpec();
-  const el = document.getElementById('cbar'); if(el) el.innerHTML = barInner(); }
-
 function composeView(){
-  ensureSpec();
-  saveSpec();
   const running = (DATA.runs||[]).filter(r=>r.kind==='build').length;
-  const probs = bgProblems();
-  return `<div class="cx">
-    <div class="segs multi ptop">${PILLARS.map(([k,lab])=>
-      `<button class="seg ${SPEC.pillar===k?'on':''}" onclick="setPillar('${k}')">${lab}</button>`).join('')}</div>
-    <div class="fastrow">
-      <button class="btn qd" onclick="quickDraft()">Quick draft</button>
-      <button class="btn sec sm" onclick="fillIn()">Fill it in</button>
-      <button class="btn sec sm" onclick="shufflePhotos()">Shuffle photos</button>
-      <button class="btn sec sm" onclick="genPost()">Write the blanks</button>
+  const free = ((HOOKS&&HOOKS.eligible)||[]).filter(h=>h.pillar===buildPillar).length;
+  return `<div class="cx np">
+    <h3>What kind of post?</h3>
+    <div class="pillars">${PILLARS.map(([k,lab])=>
+      `<button class="pil ${buildPillar===k?'on':''}" onclick="buildPillar='${k}';render()">
+        <b>${lab}</b><i>${esc(PILLAR_IS[k]||'')}</i></button>`).join('')}</div>
+
+    <h4 class="csub">Anything specific? <span class="opt">optional</span></h4>
+    <textarea class="npnote" placeholder="e.g. lead with Raycast, keep it to four tools"
+      oninput="buildNote=this.value">${esc(buildNote)}</textarea>
+
+    <div class="npbar">
+      <span class="sum">${free
+        ? `${free} ${esc(buildPillar)} hook${free===1?'':'s'} free`
+        : `<b class="warnt">no ${esc(buildPillar)} hook is free</b> — every one is inside its cooldown`}</span>
+      <div class="segs">${[1,2,3].map(n=>
+        `<button class="seg ${buildCount===n?'on':''}" onclick="buildCount=${n};render()">${n}</button>`).join('')}</div>
+      <button class="btn" onclick="startBuild()" ${free?'':'disabled'}>
+        ${buildCount===1?'Generate':'Generate '+buildCount}</button>
     </div>
-    <p class="why">Quick draft picks the hook, the photos and the roster from
-      the rules and sends it straight to build — two taps to a post. Everything
-      below is the same thing, one decision at a time: whatever you set is kept,
-      whatever you leave blank gets chosen for you.</p>
-    ${probs.length?`<div class="cwarn"><b>Worth changing:</b> ${probs.map(esc).join('<br>')}</div>`:''}
-    <div class="slrows">${SPEC.slides.map(slideCard).join('')}</div>
-    <button class="btn sec sm addsl" onclick="addSlide()">Add a slide</button>
-    <h4 class="csub">Caption</h4>
-    <input class="cin wide" value="${esc(SPEC.caption)}" placeholder="the angle it takes — the search tag is added either way"
-      oninput="SPEC.caption=this.value">
-    <h4 class="csub">Anything else</h4>
-    <textarea placeholder="e.g. keep the icon shelf on the hook, no numbers in the corners"
-      oninput="SPEC.note=this.value">${esc(SPEC.note)}</textarea>
-    <div class="cbar" id="cbar">${barInner()}</div>
-    ${running?`<p class="why">${running} build${running===1?'':'s'} already running.
-      They go one at a time — two agents writing hooks.json at once lose each
-      other's work.</p>`:''}
-    ${sheetView()}</div>`;
+    <p class="why">It writes the hook, picks the photos and the roster, writes
+      every slide, the title and the caption, renders them and pushes them
+      live. A few minutes, then it appears under
+      <a href="#" onclick="setFilter('tiktok');return false">TikTok › Built, not
+      drafted</a>.</p>
+    ${running?`<p class="why">${running} already running. They go one at a
+      time: two agents writing hooks.json at once lose each other's work.</p>`:''}
+  </div>`;
 }
+
+// What each pillar is actually about, so the choice is not five slugs.
+const PILLAR_IS = {
+  tools: 'a stack of apps, ARCO first',
+  screentime: 'hours lost to the phone',
+  discipline: 'locking in without motivation',
+  build: 'shipping things, running it solo',
+  learn: 'studying and retaining',
+};
 
 async function startBuild(){
-  const slides = SPEC.slides.map(s => ({kind:s.kind, tool:s.tool, title:s.title,
-    lines:(s.lines||[]).filter(l=>l.trim()), bg:s.bg}));
   const r = await fetch('/api/build',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({count:SPEC.count, pillar:SPEC.pillar, note:SPEC.note.trim(),
-      spec:{pillar:SPEC.pillar, slides, caption:SPEC.caption}})});
+    body:JSON.stringify({count:buildCount, pillar:buildPillar, note:buildNote.trim()})});
   const j = await r.json().catch(()=>({}));
   if(j.error) return say(j.error);
-  say('Building. It lands in Review when the slides and the caption are done.');
-  SPEC = freshSpec(SPEC.pillar);
+  buildNote = '';
+  say('Building. It appears under TikTok when the slides and caption are done.');
   await load();
   HOOKS = null; loadHooks();
 }
-
 // ---------------------------------------------------------------- users
 //
 // The app's own numbers, next to the numbers for the posts that sell it. They
@@ -5307,7 +6410,7 @@ let USERS = null, usersDays = 30;
 async function loadUsers(){
   try { USERS = await (await fetch('/api/users?days='+usersDays)).json(); }
   catch(e){ USERS = {error: String(e)}; }
-  if(filter==='users') render();
+  if(filter==='stats') render();
 }
 
 const PCT = (n,d) => d ? Math.round(100*n/d) : 0;
@@ -5385,6 +6488,13 @@ function permsBox(){
 
 function usersView(){
   if(!USERS) { loadUsers(); return '<div class="empty">Reading the app…</div>'; }
+  // Zeroes here are not a bug: no build carrying the telemetry has shipped,
+  // so nothing has reported yet. Saying so beats an empty chart that reads
+  // like nobody uses the app.
+  if(!USERS.off && !USERS.error && !((USERS.active||{}).installs))
+    return `<div class="cwarn"><b>Nothing has reported yet.</b> The app only
+      sends usage once a build carrying it is on someone's phone — 2.0.1 in
+      review does not have it. Ship the next build and this fills in.</div>`;
   if(USERS.off) return `<div class="cwarn"><b>Not collecting yet.</b> ${esc(USERS.why)}</div>`;
   if(USERS.error) return `<div class="cwarn"><b>The metrics worker did not answer.</b>
     ${esc(USERS.error)}</div>`;
@@ -5422,6 +6532,468 @@ function usersView(){
       identifying. A user with an iPhone and a Mac counts once — the day is
       claimed in iCloud, not on the device.</p>
   </div>`;
+}
+
+// A card's overflow menu. One entry today — Instagram is the only thing a
+// finished post can be sent to that is not already a button — but this is
+// where Threads and the rest land when they arrive.
+function cardMenu(topic, ev){
+  closeCardMenu();
+  const m = document.createElement('div');
+  m.className = 'cardmenu';
+  m.innerHTML = `<button onclick="closeCardMenu();igOpen('${topic}')">Post to Instagram</button>
+    <button class="bad" onclick="closeCardMenu();del(event,'${topic}')">Delete</button>`;
+  document.body.appendChild(m);
+  const r = ev.currentTarget.getBoundingClientRect();
+  // Flip above or left when the card sits near an edge, so the menu is never
+  // drawn off screen on a phone.
+  m.style.top = Math.min(r.bottom + 6, innerHeight - m.offsetHeight - 10) + 'px';
+  m.style.left = Math.min(r.left, innerWidth - m.offsetWidth - 10) + 'px';
+  setTimeout(()=>document.addEventListener('click', closeCardMenu, {once:true}), 0);
+}
+function closeCardMenu(){
+  document.querySelectorAll('.cardmenu').forEach(el=>el.remove());
+}
+
+// ------------------------------------------------------------- schedule
+//
+// Instagram has no draft inbox — publishing is immediate — so scheduling
+// means the Cloudflare worker holds the post and fires it on a cron. This
+// page is the view of that queue; the laptop being shut changes nothing.
+let IG = null, igSheet = null, igBusy = false;
+
+async function loadIG(){
+  try { IG = await (await fetch('/api/ig')).json(); } catch(e){ IG = {error:String(e)}; }
+  hudStats();
+  if(filter==='ig') render();
+}
+
+const igAcc = () => ((IG&&IG.accounts)||[{key:'getarco',label:'get.arco'}]);
+const dayKey = ts => new Date(ts*1000).toLocaleDateString('en-GB',
+  {weekday:'short', day:'2-digit', month:'short'});
+
+// Three a day, at the same three times. Fixed rather than configurable:
+// a posting rhythm you can change is a decision you make again every week.
+const IG_SLOTS = ['07:00', '12:00', '19:00'];
+let igWeekOff = 0, igFill = null, igProgress = '';
+
+function igSlotAt(day, hhmm){
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date(day); d.setHours(h, m, 0, 0);
+  return Math.floor(d.getTime() / 1000);
+}
+function igSlotCount(from, to){
+  let n = 0;
+  for(let i = 0; i < 14; i++){
+    const day = new Date(); day.setDate(day.getDate() + i);
+    IG_SLOTS.forEach(t => { const at = igSlotAt(day, t); if(at >= from && at < to) n++; });
+  }
+  return n;
+}
+
+// The seven days ahead, each showing all three slots — filled ones with the
+// post, empty ones drawn as empty. A month grid cannot show times at phone
+// width, and the question is always "what goes out today, where are the holes".
+function igWeekDays(){
+  const rows = ((IG && IG.queue) || []).filter(r => r.status !== 'cancelled');
+  const taken = new Set();
+  const out = [];
+  // Monday to Sunday, not the next seven days. The columns are labelled
+  // MON..SUN, so starting on whatever today happens to be put Thursday in
+  // the Monday column and dropped everything earlier in the week.
+  const monday = new Date();
+  monday.setHours(0,0,0,0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + igWeekOff * 7);
+  for(let i = 0; i < 7; i++){
+    const day = new Date(monday);
+    day.setDate(day.getDate() + i);
+    const slots = IG_SLOTS.map(t => {
+      const at = igSlotAt(day, t);
+      // Anything within the half hour counts as filling that slot, so a post
+      // scheduled by hand at 07:05 is not drawn as a hole at 07:00.
+      const row = rows.find(r => !taken.has(r.id) && Math.abs(r.at - at) < 1800);
+      if(row) taken.add(row.id);
+      return { time: t, at, row, past: at < Date.now() / 1000 };
+    });
+    out.push({ day, slots });
+  }
+  return out;
+}
+
+function schedView(){
+  if(!IG){ loadIG(); return '<div class="empty">Reading the queue…</div>'; }
+  if(IG.error) return `<div class="cwarn"><b>The worker did not answer.</b> ${esc(IG.error)}</div>`;
+  const days = igWeekDays();
+  const holes = days.reduce((n, d) => n + d.slots.filter(s => !s.row && !s.past).length, 0);
+  const filled = days.reduce((n, d) => n + d.slots.filter(s => s.row).length, 0);
+  const done = ((IG.queue) || []).filter(r =>
+    r.status !== 'queued' && r.status !== 'publishing').sort((a, b) => b.at - a.at);
+
+  return `<div class="cx">
+    <div class="ighead">
+      <div class="fastrow">
+        <button class="btn qd" onclick="igFillWeek()" ${holes ? '' : 'disabled'}>
+          ${holes ? `Fill the week · ${holes} empty` : 'Week is full'}</button>
+        <span class="csum">${igProgress ||
+          `${filled}/${days.length * IG_SLOTS.length} filled · ${IG_SLOTS.join(', ')} daily`}</span>
+      </div>
+      ${igWeekNav(days)}
+    </div>
+    ${igGrid(days)}
+    <div class="weeklist">${days.map(d => `<h4 class="csub">${d.day.toLocaleDateString('en-GB',
+        {weekday:'long', day:'2-digit', month:'short'})}</h4>
+      ${d.slots.map(s => igSlotRow(s)).join('')}`).join('')}</div>
+
+    ${igFillView()}${igSheetView()}</div>`;
+}
+
+// Days across, times down — the shape of a week. Only on a wide screen:
+// seven columns at phone width is seven columns of nothing, so below 900px
+// the day-grouped list takes over.
+// Which week you are looking at, and how to get to another one. The range
+// matters more than the offset: "14 – 20 Sept" is a date you can check
+// against your own calendar, "next week" is not.
+function igWeekNav(days){
+  const a = days[0].day, b = days[days.length-1].day;
+  const mon = d => d.toLocaleDateString('en-GB', {month:'short'});
+  const range = mon(a) === mon(b)
+    ? `${a.getDate()} – ${b.getDate()} ${mon(b)}`
+    : `${a.getDate()} ${mon(a)} – ${b.getDate()} ${mon(b)}`;
+  return `<div class="wknav">
+    <button class="wkarr" onclick="igWeekOff--;render()"
+      ${igWeekOff <= 0 ? 'disabled title="This is the current week"' : ''}>‹</button>
+    <span class="wkr">${esc(range)}</span>
+    <button class="wkarr" onclick="igWeekOff++;render()">›</button>
+    ${igWeekOff ? `<button class="lnk" onclick="igWeekOff=0;render()">today</button>` : ''}
+  </div>`;
+}
+
+// One cell. Published carries a pill and opens the post; queued carries a
+// cancel. Nothing else needs to be on it — the picture says which post.
+function wcell(r){
+  const pill = r.status === 'published' ? '<span class="pill ok">published</span>'
+             : r.status === 'failed' ? '<span class="pill bad">failed</span>'
+             : r.status === 'publishing' ? '<span class="pill go">publishing</span>' : '';
+  const open = r.permalink
+    ? `onclick="window.open('${esc(r.permalink)}','_blank','noopener')"` : '';
+  // Instagram's own numbers, not TikTok's — the worker pulls them back for
+  // anything live. Symbol and figure only; the labels would not fit and do
+  // not need to.
+  const n = v => v == null ? null : (v >= 1000 ? (v/1000).toFixed(1).replace('.0','')+'k' : v);
+  const stats = r.status === 'published' && r.views != null
+    ? `<span class="wstats">
+         <i title="views">▶</i>${n(r.views)}
+         <i title="accounts reached">◎</i>${n(r.reach)}
+         <i title="likes">♥</i>${n(r.likes)}
+         <i title="comments">💬</i>${n(r.comments)}</span>` : '';
+  return `<div class="wc ${r.status}" title="${esc(r.topic)}${r.error? ' — '+esc(r.error):''}" ${open}>
+      <img src="/slide/${esc(r.topic)}/01.jpg" alt="" loading="lazy">
+      ${pill}${stats}<span class="t">${esc(r.topic)}</span>
+      ${r.status === 'queued'
+        ? `<button class="x" onclick="event.stopPropagation();igCancel('${r.id}')" title="Cancel">×</button>`
+        : ''}</div>`;
+}
+
+function igGrid(days){
+  const cell = s => {
+    if(!s.row) return `<button class="wc empty ${s.past?'past':''}"
+        ${s.past?'disabled':`onclick="igOpenAt(${s.at})"`}>
+        ${s.past?'passed':'+'}</button>`;
+    return wcell(s.row);
+  };
+  return `<div class="wgrid">
+    <div class="wh"></div>
+    ${days.map(d => `<div class="wh ${d.slots[0] && new Date().toDateString()===d.day.toDateString()?'today':''}">
+        <b>${d.day.toLocaleDateString('en-GB',{weekday:'short'})}</b>
+        <i>${d.day.getDate()}</i></div>`).join('')}
+    ${IG_SLOTS.map((t,i) => `<div class="wt">${t}</div>
+      ${days.map(d => cell(d.slots[i])).join('')}`).join('')}
+  </div>`;
+}
+
+function igSlotRow(s){
+  if(!s.row) return `<button class="qrow empty ${s.past?'past':''}"
+      ${s.past?'disabled':`onclick="igOpenAt(${s.at})"`}>
+      <span class="tm">${s.time}</span>
+      <span class="sw"><i>${s.past ? 'passed' : 'empty — tap to fill'}</i></span></button>`;
+  const r = s.row;
+  return `<div class="qrow ${r.status}">
+      <span class="tm">${s.time}</span>
+      <img class="sth" src="/slide/${esc(r.topic)}/01.jpg" alt="" loading="lazy">
+      <span class="sw"><b>${esc(r.topic)}</b><i>${esc(r.account)}</i></span>
+      <button class="btn sec sm" onclick="igCancel('${r.id}')">Cancel</button>
+      <span class="st ${r.status}">${r.status === 'publishing'
+        ? '<span class="spin"></span> publishing' : 'queued'}</span></div>`;
+}
+
+function igDoneRow(r){
+  return `<div class="qrow ${r.status}">
+      <span class="tm">${hm(r.at)}</span>
+      <img class="sth" src="/slide/${esc(r.topic)}/01.jpg" alt="" loading="lazy">
+      <span class="sw"><b>${esc(r.topic)}</b>
+        <i>${esc(r.account)}${r.error ? ' · ' + esc(r.error) : ''}</i></span>
+      ${r.permalink ? `<a class="btn sec sm" href="${esc(r.permalink)}"
+        target="_blank" rel="noopener">View</a>` : ''}
+      <span class="st ${r.status}">${r.status === 'published'
+        ? '✓ published' : esc(r.status)}</span></div>`;
+}
+
+// Every post that could go out, best first. Performing before merely
+// published, because the whole point of Instagram here is to give a post
+// that already worked a second audience.
+function igPickable(){
+  const queued = new Set(((IG && IG.queue) || [])
+    .filter(r => r.status === 'queued' || r.status === 'publishing').map(r => r.topic));
+  const cutoff = Date.now() / 1000 - 30 * 86400;
+  const recent = new Set(((IG && IG.queue) || [])
+    .filter(r => r.status === 'published' && r.at > cutoff).map(r => r.topic));
+  const ok = p => p.slides && p.slides.length && p.registered
+    && !queued.has(p.topic) && !recent.has(p.topic);
+  const best = (a, b) => bestViews(b) - bestViews(a);
+  return DATA.posts.filter(p => ok(p) && p.liked).sort(best)
+    .concat(DATA.posts.filter(p => ok(p) && !p.liked && isOut(p)).sort(best));
+}
+
+function igFillWeek(){
+  const pool = igPickable();
+  const slots = [];
+  igWeekDays().forEach(d => d.slots.forEach(s => {
+    // Never within a quarter of an hour: Pages needs a moment to serve a
+    // crop that was pushed seconds ago.
+    if(!s.row && !s.past && s.at > Date.now()/1000 + 900) slots.push(s);
+  }));
+  igFill = { picks: slots.map((s, i) => ({ at: s.at, time: s.time,
+             topic: pool[i] ? pool[i].topic : null })),
+             pool: pool.map(p => p.topic), short: Math.max(0, slots.length - pool.length) };
+  render();
+}
+
+function igFillView(){
+  if(!igFill) return '';
+  const used = new Set(igFill.picks.map(p => p.topic).filter(Boolean));
+  const n = igFill.picks.filter(p => p.topic).length;
+  return `<div class="shwrap" onclick="if(event.target===this){igFill=null;render()}">
+    <div class="sh"><div class="shhead"><b>Fill the week</b>
+      <button class="rm" onclick="igFill=null;render()">×</button></div>
+      <div class="shbody">
+        <p class="why">Best-performing first, then the rest of what has been
+          published. Nothing that went to Instagram in the last 30 days.
+          Swap or drop anything before it goes.</p>
+        ${igFill.short ? `<div class="cwarn"><b>Pool ran out.</b>
+          ${igFill.short} slot${igFill.short===1?'':'s'} left empty rather than
+          repeating a post.</div>` : ''}
+        ${igFill.picks.map((p, i) => `<div class="qrow ${p.topic?'':'empty'}">
+            <span class="tm">${new Date(p.at*1000).toLocaleDateString('en-GB',
+              {weekday:'short'})} ${p.time}</span>
+            ${p.topic ? `<img class="sth" src="/slide/${esc(p.topic)}/01.jpg" alt="">
+              <span class="sw"><b>${esc(p.topic)}</b></span>
+              <button class="lnk" onclick="igSwap(${i})">swap</button>
+              <button class="lnk" onclick="igDrop(${i})">×</button>`
+            : '<span class="sw"><i>left empty</i></span>'}</div>`).join('')}
+      </div>
+      <div class="shfoot">
+        <span class="csum">${igProgress || ''}</span>
+        <button class="btn" onclick="igScheduleFill()" ${n?'':'disabled'}>
+          Schedule ${n}</button>
+      </div></div></div>`;
+}
+
+function igSwap(i){
+  const used = new Set(igFill.picks.map(p => p.topic).filter(Boolean));
+  const cur = igFill.picks[i].topic;
+  const next = igFill.pool.find(t => t !== cur && !used.has(t));
+  if(!next) return say('Nothing else in the pool.');
+  igFill.picks[i].topic = next; render();
+}
+function igDrop(i){ igFill.picks[i].topic = null; render(); }
+
+async function igScheduleFill(){
+  const picks = igFill.picks.filter(p => p.topic);
+  const ok = await igEnsurePrepared(picks.map(p => p.topic),
+                                    m => { igProgress = m; render(); });
+  if(!ok){ igProgress = ''; render(); return; }
+  let done = 0, failed = [];
+  for(const p of picks){
+    igProgress = `scheduling ${done+1} of ${picks.length}…`; render();
+    const r = await (await fetch('/api/ig/schedule', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({topic:p.topic, account:igAcc()[0].key, at:p.at})})).json();
+    if(r.error) failed.push(p.topic + ': ' + r.error); else done++;
+  }
+  igProgress = ''; igFill = null; IG = null;
+  await loadIG();
+  say(failed.length ? `${done} scheduled, ${failed.length} failed — ${failed[0]}`
+                    : `${done} scheduled.`);
+}
+function igOpenAt(at){
+  igOpen(null);
+  const d = new Date(at * 1000);
+  igSheet.date = new Date(at*1000 - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  igSheet.time = String(d.getHours()).padStart(2,'0') + ':'
+               + String(d.getMinutes()).padStart(2,'0');
+  render();
+}
+
+function igOpen(topic){
+  if(filter !== 'ig'){ filter = 'ig'; saveHash(); }
+  const d = new Date(Date.now()+3600e3);
+  igSheet = {topic: topic||'', account: igAcc()[0].key,
+             date: d.toISOString().slice(0,10),
+             time: String(d.getHours()).padStart(2,'0')+':00',
+             caption: null};
+  if(topic) igLoadCaption(topic);
+  render();
+}
+
+// Fetched when a post is picked rather than shipped with the whole list —
+// ninety-eight captions is most of a megabyte nobody asked for.
+async function igLoadCaption(topic){
+  const r = await (await fetch('/api/ig/caption',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic})})).json();
+  if(!igSheet || igSheet.topic !== topic) return;
+  igSheet.caption = r.caption || '';
+  render();
+}
+
+function igSheetView(){
+  if(!igSheet) return '';
+  const prepared = (IG&&IG.prepared)||{};
+  const topics = Object.keys(prepared);
+  return `<div class="shwrap" onclick="if(event.target===this){igSheet=null;render()}">
+    <div class="sh ${igSheet.topic?'narrow':''}">
+      <div class="shhead"><b>Post to Instagram</b>
+      <button class="rm" onclick="igSheet=null;render()">×</button></div>
+      <div class="shbody">
+        <h4 class="csub">Which post</h4>
+        ${igSheet.topic ? `<div class="igpicked">
+            <img src="/slide/${esc(igSheet.topic)}/01.jpg" alt="">
+            <span class="n">${esc(igSheet.topic)}
+              <i>${prepared[igSheet.topic]
+                ? prepared[igSheet.topic]+' slides, cropped to 4:5'
+                : 'will be cropped to 4:5 first'}</i></span>
+            <button class="lnk" onclick="igSheet.topic='';render()">Change</button>
+          </div>
+
+          <h4 class="csub">Caption</h4>
+          ${igSheet.caption===null
+            ? '<p class="csum">reading it…</p>'
+            : `<textarea class="igcap" oninput="igSheet.caption=this.value"
+                 placeholder="what goes under the post">${esc(igSheet.caption)}</textarea>
+               <p class="csum">${(igSheet.caption||'').length} characters ·
+                 Instagram allows 2,200. No music: the API cannot attach it.</p>`}`
+        : `<p class="why">Pick one. You recognise these by the picture, not the slug.</p>
+           <div class="iggrid pick">${igPickable().map(p=>`
+             <button class="igcard" onclick="igPick('${esc(p.topic)}')">
+               <img loading="lazy" src="/slide/${esc(p.topic)}/${p.slides[0]}" alt="">
+               <span class="n">${esc(p.topic)}</span>
+               <span class="s">${prepared[p.topic] ? prepared[p.topic]+' ready' : 'needs cropping'}</span>
+             </button>`).join('')}</div>`}
+        <h4 class="csub">Account</h4>
+        <div class="segs multi">${igAcc().map(a=>
+          `<button class="seg ${igSheet.account===a.key?'on':''}"
+            onclick="igSheet.account='${a.key}';render()">${esc(a.label)}</button>`).join('')}</div>
+        <h4 class="csub">When</h4>
+        <div class="whenrow">
+          <input class="cin" type="date" value="${igSheet.date}" oninput="igSheet.date=this.value">
+          <input class="cin" type="time" value="${igSheet.time}" oninput="igSheet.time=this.value">
+        </div>
+        <p class="csum">Publishing is immediate and cannot be undone.</p>
+      </div>
+      <div class="shfoot">
+        <button class="lnk" onclick="igSchedule(true)"
+          ${igBusy||!igSheet.topic?'disabled':''}>Publish now</button>
+        <button class="btn" onclick="igSchedule(false)"
+          ${igBusy||!igSheet.topic?'disabled':''}>
+          ${igBusy?`<span class="spin"></span> ${esc(igProgress||'working')}`:'Schedule'}</button>
+      </div></div></div>`;
+}
+
+function igPick(topic){
+  igSheet.topic = topic; igSheet.caption = null;
+  igLoadCaption(topic); render();
+}
+
+// Crop, push, and wait for Pages to actually serve them — Instagram fetches
+// the images over public HTTPS, so a post that only exists on this laptop
+// cannot be published by anything. Polls rather than sleeping a fixed minute,
+// because Pages is usually quicker than that and occasionally slower.
+async function igEnsurePrepared(topics, onStep){
+  const need = [...new Set(topics)].filter(t => !((IG&&IG.prepared)||{})[t]);
+  if(!need.length) return true;
+  onStep(`cropping ${need.length}…`);
+  const r = await (await fetch('/api/ig/prepare_many',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topics:need})})).json();
+  if(r.error){ say(r.error); return false; }
+  for(let i = 0; i < 40; i++){
+    onStep('waiting for Pages…');
+    const c = await (await fetch('/api/ig/check',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({topic:need[need.length-1]})})).json();
+    if(c.total && c.live === c.total) break;
+    await new Promise(r => setTimeout(r, 5000));
+  }
+  IG = null; await loadIG();
+  return true;
+}
+
+async function igSchedule(now){
+  const topic = igSheet.topic, account = igSheet.account;
+  const at = now ? Math.floor(Date.now()/1000)
+                 : Math.floor(new Date(igSheet.date+'T'+igSheet.time).getTime()/1000);
+  if(!now && at < Date.now()/1000) return say('That time is in the past.');
+  igBusy = true; igProgress = ''; render();
+  const ok = await igEnsurePrepared([topic], m => { igProgress = m; render(); });
+  igProgress = '';
+  if(!ok){ igBusy = false; render(); return; }
+  const r = await (await fetch('/api/ig/schedule',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({topic, account, at, caption: igSheet.caption})})).json();
+  igBusy = false;
+  if(r.error){ render(); return say(r.error); }
+
+  // Close, land on the queue, and show the row working — the same shape as
+  // drafting, where you watch it finish rather than wondering whether it did.
+  igSheet = null;
+  if(filter !== 'ig'){ filter = 'ig'; saveHash(); }
+  IG = null;
+  await loadIG();
+  if(now){
+    // Nothing else will nudge it for up to a minute, so fire it immediately
+    // and then watch the row until Instagram has actually taken it.
+    fetch('/api/ig/run',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    igWatch(topic);
+  }
+  say(now ? 'Publishing…' : 'Scheduled.');
+}
+
+// Poll until the row stops moving. Cheap — it is one small GET, and only
+// while something is actually in flight.
+function igWatch(topic){
+  let tries = 0;
+  const tick = async () => {
+    tries++;
+    await loadIG();
+    const r = ((IG&&IG.queue)||[]).find(x => x.topic === topic);
+    if(r && r.status === 'published'){ say('Published to Instagram.'); return; }
+    if(r && r.status === 'failed'){ say(r.error || 'That did not publish.'); return; }
+    if(tries > 40) return;
+    setTimeout(tick, 4000);
+  };
+  setTimeout(tick, 3500);
+}
+
+async function igCancel(id){
+  await fetch('/api/ig/cancel',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id})});
+  IG = null; await loadIG();
+}
+async function igRunNow(){
+  const r = await (await fetch('/api/ig/run',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:'{}'})).json();
+  say(r.error ? r.error : (r.ran ? 'Published '+r.topic : 'Nothing was due.'));
+  IG = null; await loadIG();
 }
 
 const match = p => filter==='all' ? true
@@ -5563,8 +7135,6 @@ async function load(quiet){
   if (fresh && fresh.from_cache) {
     DATA = fresh;
     paintStale();
-    const hb1 = document.getElementById('host');
-    if (hb1) { hb1.classList.add('down'); hb1.title = 'Upstream is not answering — showing the last copy'; }
     clearTimeout(window._runpoll);
     window._runpoll = setTimeout(() => load(quiet).then(() => render()), 15000);
     if (!quiet) render();
@@ -5581,8 +7151,6 @@ async function load(quiet){
     }, 15000);
     return;
   }
-  const hb0 = document.getElementById('host');
-  if (hb0) hb0.classList.remove('down');
   paintStale();
   DATA = fresh;
   paintRuns();
@@ -5598,11 +7166,7 @@ async function load(quiet){
   }, (DATA.runs||[]).length ? 5000 : 20000);
   const unseen = DATA.posts.some(p => !p.seen && stateOf(p)==='review');
   ICONS.liked = '<path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/>';
-  const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
-    k==='stats'||k==='users' ? '' :
-    k==='post' ? DATA.posts.filter(postable).length :
-    DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked
-                         :k==='out'?isOut(p):stateOf(p)===k).length]));
+  const counts = Object.fromEntries(FILTERS.map(([k]) => [k, tabCount(k)]));
   ICONS.archive = ICONS.archive || '<path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>';
   ICONS.review = ICONS.review || '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>';
   ICONS.out = ICONS.out || ICONS.drafted;
@@ -5639,42 +7203,100 @@ async function load(quiet){
 // Review. The hash carries the whole view: tab, post, analytics sub-tab and
 // period. `?` separates the post from the rest so old <topic>/<slide> links
 // still work.
-let app = 'arco';            // 'arco' | 'konvo'
-let kData = null, kDays = 14, kVer = null, kBusy = false;
 
-// Two apps, one dashboard. The alternative was a second tool that would be
-// opened once a month and then not maintained.
-function setApp(a){
-  app = a;
-  document.getElementById('sw-arco').className  = a==='arco'  ? 'on' : '';
-  document.getElementById('sw-konvo').className = a==='konvo' ? 'on' : '';
-  document.getElementById('brandn').textContent = a==='konvo' ? 'Konvo' : 'ARCO';
-  const v = document.getElementById('brandv');
-  if(v) v.firstChild.nodeValue = a==='konvo' ? 'onboarding analytics' : 'content pipeline';
-  document.querySelector('nav[aria-label="Filter posts"]').style.display = a==='konvo' ? 'none' : '';
-  const ac = document.getElementById('accounts');
-  if(ac) ac.style.display = a==='konvo' ? 'none' : '';
-  saveHash(); render();
-  if(a==='konvo' && !kData) loadKonvo();
+function closePages(){
+  const m = document.getElementById('pagemenu');
+  if(m){ m.hidden = true; m.innerHTML = ''; }
+  document.removeEventListener('click', closeOnce);
 }
 
-async function loadKonvo(){
-  kBusy = true; render();
-  try{
-    const q = new URLSearchParams({days: kDays});
-    if(kVer) q.set('version', kVer);
-    kData = await (await fetch('/api/konvo?' + q)).json();
-  }catch(e){ kData = {error: String(e)}; }
-  kBusy = false; render();
+function closeOnce(e){
+  if(e.target.closest('#pagemenu') || e.target.closest('#menubtn')) return;
+  closePages();
+}
+
+// The view slides in only when you actually moved. One class, removed as
+// soon as it has played, so a repaint mid-animation cannot stack two.
+let navMoved = false;
+function playNav(){
+  if(!navMoved) return;
+  navMoved = false;
+  const v = document.getElementById('view');
+  if(!v) return;
+  v.classList.remove('turned');
+  void v.offsetWidth;            // restart the animation, not queue it
+  v.classList.add('turned');
+  v.addEventListener('animationend', () => v.classList.remove('turned'), {once:true});
+}
+
+/* Accent picker. One stored hex drives --accent and --accent-rgb; every
+   other colour token is written against those, so nothing else changes. */
+const DEFAULT_ACCENT = '#E8EDFA';
+const ACCENTS = ['#E8EDFA','#B46BFF','#7C6BFF','#3BA8FF','#26D0C4','#3ED27A',
+                 '#E4C24A','#FF9A3C','#FF5C7A','#F45CC8','#5AE0FF','#C9FF4A'];
+let accent = localStorage.getItem('pf.accent') || DEFAULT_ACCENT;
+
+function paintAccent(hex){
+  const n = parseInt(hex.slice(1), 16), r = document.documentElement;
+  r.style.setProperty('--accent', hex);
+  r.style.setProperty('--accent-rgb', [n>>16&255, n>>8&255, n&255].join(','));
+}
+function previewAccent(hex){ paintAccent(hex); drawSwatches(hex); }
+
+function drawSwatches(sel){
+  const el = document.getElementById('cpsw'); if(!el) return;
+  el.innerHTML = ACCENTS.map(h =>
+    `<button style="background:${h};color:${h}" title="${h}"` +
+    ` aria-pressed="${h.toLowerCase()===sel.toLowerCase()}"` +
+    ` onclick="previewAccent('${h}');document.getElementById('cpin').value='${h}'"></button>`
+  ).join('');
+}
+
+function toggleAccent(e){
+  e && e.stopPropagation();
+  const pop = document.getElementById('cppop');
+  if(pop.hidden){
+    // Open on the saved colour, not on whatever a cancelled preview left behind.
+    accent = localStorage.getItem('pf.accent') || DEFAULT_ACCENT;
+    paintAccent(accent);
+    document.getElementById('cpin').value = accent;
+    drawSwatches(accent);
+    pop.hidden = false;
+    setTimeout(() => document.addEventListener('click', closeAccentOnce), 0);
+  } else { closeAccent(); }
+}
+function closeAccent(){
+  document.getElementById('cppop').hidden = true;
+  document.removeEventListener('click', closeAccentOnce);
+  // Revert anything previewed but not applied.
+  paintAccent(localStorage.getItem('pf.accent') || DEFAULT_ACCENT);
+}
+function closeAccentOnce(e){
+  if(!e.target.closest('.cpick')) closeAccent();
+}
+function saveAccent(){
+  accent = document.getElementById('cpin').value;
+  localStorage.setItem('pf.accent', accent);
+  paintAccent(accent);
+  document.getElementById('cppop').hidden = true;
+  document.removeEventListener('click', closeAccentOnce);
+  nsay('Colour applied');
+}
+
+function setFilter(k){
+  if(k !== filter) navMoved = true;
+  // Leaving the Post page drops a half-made publish rather than keeping it
+  // armed behind another tab, and forces a fresh creator read on return.
+  if(filter==='post' && k!=='post'){ dpAcct=null; dpInfo=null; }
+  filter=k; cur=null; closePages(); saveHash(); load();
 }
 
 function saveHash(){
   const q = ['v=' + filter];
-  if(app !== 'arco') q.push('app=' + app);
-  // Which section of the composer is open, so a reload puts you back in it
-  // rather than at the top with your choices intact but hidden.
-  if(filter === 'new' && cstep) q.push('step=' + cstep);
-  if(filter === 'liked' && perfSort !== 'views') q.push('s=' + perfSort);
+  if(filter === 'lib'){
+    q.push('lib=' + libTab);
+    if(libTab === 'liked' && perfSort !== 'views') q.push('s=' + perfSort);
+  }
   if(filter === 'stats'){
     q.push('t=' + anTab, 'p=' + anPeriod, 'r=' + anRange);
     // Custom carries its dates, or reloading the page lands on a range with
@@ -5693,13 +7315,12 @@ function restoreHash(){
   if(!raw) return;
   const [postPart, queryPart] = raw.split('?');
   new URLSearchParams(queryPart || '').forEach((val, key) => {
-    if(key === 'app' && (val === 'arco' || val === 'konvo')) app = val;
     if(key === 'v' && FILTERS.some(f => f[0] === val)) filter = val;
-    if(key === 'step') cstep = val;
     if(key === 't') anTab = val;
     if(key === 'p') anPeriod = val;
     if(key === 'r') anRange = val;
     if(key === 's') perfSort = val;
+    if(key === 'lib' && LIBS.some(l => l[0] === val)) libTab = val;
     if(key === 'cf') anFrom = +val || null;
     if(key === 'ct') anTo = +val || null;
     if(key === 'a') anAccs = new Set(val.split(',').filter(Boolean));
@@ -5712,11 +7333,18 @@ function restoreHash(){
   }
 }
 
-function setFilter(k){
-  // Leaving the Post page drops a half-made publish rather than keeping it
-  // armed behind another tab, and forces a fresh creator read on return.
-  if(filter==='post' && k!=='post'){ dpAcct=null; dpInfo=null; }
-  filter=k; cur=null; closePages(); saveHash(); load();
+// On a phone the nav is a strip that scrolls the later pages off screen, so
+// there it becomes a menu instead: current page on the button, full list on tap.
+function togglePages(){
+  const m = document.getElementById('pagemenu');
+  if(!m.hidden) return closePages();
+  const counts = Object.fromEntries(FILTERS.map(([k]) => [k, tabCount(k)]));
+  m.innerHTML = `<div class="sheet">${FILTERS.map(([k,lab])=>
+    `<button class="pg ${filter===k?'on':''}" onclick="setFilter('${k}')">
+       ${ic(ICONS[k]?k:'all')}<span>${lab}</span>
+       <b>${counts[k]}</b></button>`).join('')}</div>`;
+  m.hidden = false;
+  setTimeout(()=>document.addEventListener('click', closeOnce), 0);
 }
 
 // Pull-to-refresh does not exist here and a phone reload loses the page, so
@@ -5733,136 +7361,52 @@ async function refreshNow(btn){
   }
 }
 
-// On a phone the nav is a strip that scrolls the later pages off screen, so
-// there it becomes a menu instead: current page on the button, full list on tap.
-function togglePages(){
-  const m = document.getElementById('pagemenu');
-  if(!m.hidden) return closePages();
-  const counts = Object.fromEntries(FILTERS.map(([k]) => [k,
-    k==='stats'||k==='users' ? '' :
-    k==='post' ? DATA.posts.filter(postable).length :
-    DATA.posts.filter(p => k==='all'?true:k==='liked'?p.liked
-                         :k==='out'?isOut(p):stateOf(p)===k).length]));
-  m.innerHTML = `<div class="sheet">${FILTERS.map(([k,lab])=>
-    `<button class="pg ${filter===k?'on':''}" onclick="setFilter('${k}')">
-       ${ic(ICONS[k]?k:'all')}<span>${lab}</span>
-       <b>${counts[k]}</b></button>`).join('')}</div>`;
-  m.hidden = false;
-  setTimeout(()=>document.addEventListener('click', closeOnce), 0);
-}
-function closeOnce(e){
-  if(e.target.closest('#pagemenu') || e.target.closest('#menubtn')) return;
-  closePages();
-}
-function closePages(){
-  const m = document.getElementById('pagemenu');
-  if(m){ m.hidden = true; m.innerHTML = ''; }
-  document.removeEventListener('click', closeOnce);
+/* The background console. The clock ticks on its own; the figures are
+   refreshed whenever a page draws, so they never contradict what is on it. */
+function hudClock(){
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  const clk = document.getElementById('hudclk');
+  if(clk) clk.innerHTML = `${p(d.getHours())}:${p(d.getMinutes())}<span>${p(d.getSeconds())}</span>`;
+  const dt = document.getElementById('huddt');
+  if(dt) dt.textContent = d.toLocaleDateString('en-GB',
+    {weekday:'short', day:'2-digit', month:'short', year:'numeric'});
 }
 
-function render(){ try{ render_(); }catch(err){
+function hudStats(){
+  const el = document.getElementById('hudrows'); if(!el) return;
+  const AST = DATA.account_stats || {};
+  const followers = (DATA.accounts || [])
+    .reduce((n, a) => n + ((AST[a.key] || {}).followers || 0), 0);
+  const igRows = (IG && IG.queue) || null;
+  const queued = igRows ? igRows.filter(r => r.status === 'queued') : null;
+  const next = queued && queued.map(r => r.at).sort((a, b) => a - b)[0];
+  const hhmm = t => {
+    const d = new Date(t * 1000), p = n => String(n).padStart(2, '0');
+    return `${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+  const rows = [
+    ['LIBRARY', (DATA.posts || []).length],
+    ['FOLLOWERS', followers.toLocaleString('en-GB')],
+    ['IG QUEUED', queued ? queued.length : '—'],
+    ['IG LIVE', igRows ? igRows.filter(r => r.status === 'published').length : '—'],
+    ['NEXT', next ? hhmm(next) : '—'],
+  ];
+  el.innerHTML = rows.map(([k, v]) => `<div><i>${k}</i><b>${v}</b></div>`).join('');
+}
+
+hudClock();
+setInterval(hudClock, 1000);
+
+function render(){ try{ render_(); playNav(); hudStats(); }catch(err){
   // A blank page tells you nothing. Surface the failure where the list goes.
   document.getElementById('view').innerHTML =
     '<div class="empty">Something broke while drawing this view.<br><br><code>'+
     (err && err.message ? err.message : err)+'</code></div>';
   console.error(err);
 } }
-function konvoView(){
-  const esc = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  if(kBusy && !kData) return '<div class="empty">Reading PostHog…</div>';
-  if(!kData) return '<div class="empty">Nothing loaded yet.</div>';
-  if(kData.error) return '<div class="empty">PostHog said no.<br><br><code>'+esc(kData.error)+'</code></div>';
-
-  const ev = {}; (kData.events||[]).forEach(e => ev[e.event] = e.people);
-  const n = k => ev[k] || 0;
-  const f = kData.funnel || [];
-  const started = (f[0]||{}).people || 0;
-  const finished = (f[f.length-1]||{}).people || 0;
-
-  // Which build these numbers come from. Until 1.1 shipped, the only builds
-  // carrying PostHog were running on this machine, so an unlabelled funnel was
-  // mostly simulator launches wearing a user's clothes.
-  const vsel = `<select class="tabsel" onchange="kVer=this.value;loadKonvo()">`
-    + (kData.versions||[]).map(v=>{
-        const id = v.version+'|'+v.build;
-        return `<option value="${esc(id)}" ${kData.version===id?'selected':''}>`
-             + `${esc(v.version)} (${esc(String(v.build).replace(/\.0$/,''))}) · ${v.people} ppl</option>`;
-      }).join('') + `</select>`;
-  const dsel = `<select class="tabsel" onchange="kDays=+this.value;loadKonvo()">`
-    + [7,14,30,90].map(d=>`<option value="${d}" ${kData.days===d?'selected':''}>${d} days</option>`).join('')
-    + `</select>`;
-
-  const card = (num, label) => `<div class="kcard"><div class="n">${num}</div><div class="l">${label}</div></div>`;
-
-  // Installs per day, as bars. A number alone cannot show you a spike.
-  const daily = kData.daily || [];
-  const dmax = Math.max(1, ...daily.map(d=>d.people));
-  const spark = daily.length
-    ? `<div class="sect"><h3>Installs per day</h3>
-        <div class="kspark">${daily.map(d=>
-          `<i style="height:${Math.round(100*d.people/dmax)}%" title="${esc(d.day)}: ${d.people}"></i>`).join('')}</div>
-        <p>${esc((daily[0]||{}).day||'')} to ${esc((daily[daily.length-1]||{}).day||'')},
-           peak ${dmax} in a day</p></div>`
-    : '';
-
-  // The funnel. Each row is marked when it loses more than a fifth of the
-  // people the row above it had, because that is the screen worth looking at.
-  let prev = null;
-  const rows = f.map(r=>{
-    const lost = prev===null ? 0 : Math.max(0, prev - r.people);
-    const bad  = prev ? (lost / prev) > 0.2 : false;
-    const out = `<div class="row ${bad?'drop':''}">
-        <span class="nm">${r.index+1}. ${esc(r.step)}</span>
-        <span class="tr"><span class="fl" style="width:${r.pct}%"></span></span>
-        <span class="vv">${r.people}${lost?` <span style="color:#c2554a">-${lost}</span>`:''}</span>
-      </div>`;
-    prev = r.people; return out;
-  }).join('');
-
-  const tbl = (title, rows_, cols) => rows_.length
-    ? `<div class="sect"><h3>${title}</h3><div class="kfun">${rows_.map(r=>
-        `<div class="row"><span class="nm">${esc(r[0])}</span>
-         <span class="tr"><span class="fl" style="width:${r[2]}%"></span></span>
-         <span class="vv">${r[1]}</span></div>`).join('')}</div></div>`
-    : '';
-  const cmax = Math.max(1, ...(kData.countries||[]).map(c=>c.people));
-  const countries = tbl('Where they are',
-    (kData.countries||[]).map(c=>[c.country, c.people, Math.round(100*c.people/cmax)]));
-  const fmax = Math.max(1, ...(kData.failures||[]).map(x=>x.count));
-  const fails = tbl('Backend failures',
-    (kData.failures||[]).map(x=>[x.endpoint+' · '+x.people+' ppl', x.count, Math.round(100*x.count/fmax)]));
-
-  return `<div class="subtabs">${vsel}${dsel}
-      <button class="sub ghost" onclick="loadKonvo()">${kBusy?'Loading…':'Refresh'}</button></div>
-    <div class="kgrid">
-      ${card(n('Application Installed'), 'installs')}
-      ${card(started, 'started onboarding')}
-      ${card(finished, 'reached paywall')}
-      ${card(n('purchase_succeeded'), 'purchased')}
-    </div>
-    <div class="sect"><h3>Onboarding, screen by screen</h3>
-      <p>${started? Math.round(100*finished/started):0}% of the people who opened the app reached the paywall.
-         Rows in red lose more than a fifth of the row above.</p>
-      <div class="kfun">${rows}</div></div>
-    ${spark}
-    <div class="sect"><h3>What they did</h3><div class="kfun">${
-      ['diagnostic_completed','demo_reply_scored','paywall_viewed','paywall_plan_selected',
-       'purchase_attempted','purchase_succeeded','drill_started','drill_completed']
-      .map(k=>`<div class="row"><span class="nm">${esc(k.replace(/_/g,' '))}</span>
-        <span class="tr"><span class="fl" style="width:${started?Math.round(100*n(k)/started):0}%"></span></span>
-        <span class="vv">${n(k)}</span></div>`).join('')}</div></div>
-    ${countries}
-    ${fails}`;
-}
 
 function render_(){
   const view=document.getElementById('view');
-  if(app === 'konvo'){
-    document.getElementById('ttl').textContent = 'Konvo';
-    document.getElementById('cnt').textContent = kData && !kData.error ? kData.days + ' days' : '';
-    view.innerHTML = konvoView();
-    return;
-  }
   const pageName = cur ? cur : (FILTERS.find(f=>f[0]===filter)||[])[1];
   document.getElementById('ttl').textContent = pageName;
   const mb = document.getElementById('menubtn');
@@ -5871,19 +7415,38 @@ function render_(){
       stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M3 12h18"/>
       <path d="M3 18h18"/></svg>`;
   if (cur) return detail();
+  if(filter==='ideas'){
+    // A poll landing mid-drag, or mid-sentence, must not replace the node the
+    // pointer is holding or the box being typed into.
+    if(mmDrag || (noteEdit && document.activeElement
+                           && document.activeElement.id === 'bed')){
+      drawLinks();
+      return;
+    }
+    view.innerHTML = ideasView();
+    // The edges are measured from the laid-out bubbles, so they can only be
+    // drawn once the browser has placed them.
+    if(NOTES) requestAnimationFrame(() => { drawLinks(); focusEditor(); });
+    else loadNotes();
+    return;
+  }
   if(filter==='new'){
     document.getElementById('cnt').textContent = '';
     view.innerHTML = composeView();
     if(!HOOKS) loadHooks();
     return;
   }
-  if(filter === 'users'){
+  if(filter === 'ig'){
     document.getElementById('cnt').textContent = '';
-    view.innerHTML = usersView();
+    view.innerHTML = schedView();
     return;
   }
-  if(filter==='post'){
-    view.innerHTML = postView();
+  if(filter === 'tiktok'){
+    view.innerHTML = tiktokView();
+    return;
+  }
+  if(filter === 'lib'){
+    view.innerHTML = libraryView();
     return;
   }
   if(filter==='stats'){
@@ -5899,6 +7462,69 @@ function render_(){
   const running = (DATA.builds||[]).some(b=>['queued','running'].includes(b.status));
   clearTimeout(window._poll);
   if(running) window._poll = setTimeout(()=>load().then(render), 6000);
+}
+
+// One number per tab, and only where a number means "this is waiting on
+// you". Library and Analytics are places you go to look, not queues.
+function tabCount(k){
+  if(k === 'ideas'){
+    // Unused codes are the only thing here with a deadline on it.
+    const n = (NOTES||[]).filter(r => r.kind==='code' && !r.used).length;
+    return n || '';
+  }
+  if(k === 'tiktok'){
+    const n = DATA.posts.filter(p => needsPublish(p) || stateOf(p)==='review').length;
+    return n || '';
+  }
+  if(k === 'ig'){
+    // Empty slots in the next seven days: the "am I behind" number.
+    if(!IG || !IG.queue) return '';
+    const now = Date.now()/1000, end = now + 7*86400;
+    const taken = IG.queue.filter(r =>
+      (r.status==='queued'||r.status==='publishing') && r.at>=now && r.at<end).length;
+    const holes = Math.max(0, igSlotCount(now, end) - taken);
+    return holes || '';
+  }
+  return '';
+}
+
+// TikTok, in the order the work happens: what is sitting in your phone's
+// inbox waiting to be published, then what is waiting to be drafted. The
+// slot line is the constraint that decides how much you can do today.
+function tiktokView(){
+  const todo = DATA.posts.filter(p=>stateOf(p)==='review').sort((a,b)=>whenOf(b)-whenOf(a));
+  document.getElementById('cnt').textContent = `${todo.length} to draft`;
+  return `<h4 class="csub">Built, not drafted</h4>
+    ${todo.length ? groups(todo)
+      : '<div class="empty">Review is clear — build more.</div>'}`;
+}
+
+// Everything that exists, one grid, sliced by a segmented control. It was
+// four tabs holding four views of the same list.
+function libraryView(){
+  const list = DATA.posts.filter(p =>
+      libTab==='liked' ? p.liked
+    : libTab==='out'   ? isOut(p)
+    : libTab==='unsent'? (!isOut(p) && p.slides && p.slides.length)
+    : true).sort((a,b)=>whenOf(b)-whenOf(a));
+  document.getElementById('cnt').textContent = `${list.length} post${list.length===1?'':'s'}`;
+  // Two rows of identical chips said nothing about which one filtered and
+  // which one sorted. The labels do that; the second row is also smaller,
+  // because sorting is the lesser decision.
+  return `<div class="libbar">
+      <span class="lbl">Show</span>
+      <div class="segs multi">${LIBS.map(([k,lab])=>
+        `<button class="seg ${libTab===k?'on':''}"
+          onclick="libTab='${k}';saveHash();render()">${lab}</button>`).join('')}</div>
+    </div>
+    ${libTab==='liked' ? `<div class="libbar sort">
+      <span class="lbl">Rank by</span>
+      <div class="segs multi">${
+        [['views','Best account'],['total','All accounts'],['new','Newest']].map(([v,l])=>
+          `<button class="seg ${perfSort===v?'on':''}"
+            onclick="perfSort='${v}';saveHash();render()">${l}</button>`).join('')}</div>
+    </div>` : ''}
+    ${list.length ? groups(list) : '<div class="empty">Nothing here yet.</div>'}`;
 }
 
 // The one timestamp that matters for a post: when it was published, else
@@ -5918,6 +7544,25 @@ function whenOf(p){
 const two = n => String(n).padStart(2,'0');
 function dstamp(ts){ const d=new Date(ts*1000);
   return `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}`; }
+// A date and a time in one pill, coloured by the day. The time alone made
+// every row look like the same afternoon; a colour per day means a batch
+// posted together reads as a batch without anyone counting dates.
+function dayHue(ts){
+  const d = new Date(ts*1000);
+  const key = d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate();
+  // Golden-angle steps: consecutive days land far apart on the wheel rather
+  // than shading into each other.
+  return Math.round((key * 137.508) % 360);
+}
+function dayPill(ts){
+  if(!ts) return '';
+  const d = new Date(ts*1000), h = dayHue(ts);
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  return `<span class="daypill" style="color:hsl(${h} 70% 72%);
+    background:hsl(${h} 60% 72% / .13);border-color:hsl(${h} 60% 72% / .3)">${dd}.${mm}. ${hm(ts)}</span>`;
+}
+
 function hm(ts){ const d=new Date(ts*1000);
   return `${two(d.getHours())}:${two(d.getMinutes())}`; }
 function ago(ts){
@@ -5954,16 +7599,13 @@ function groups(list){
   }
   // Performing is a ranking, not a feed: the question is which post did best,
   // so it opens on views and can fall back to recency.
-  if(filter==='liked'){
+  if(filter==='lib' && libTab==='liked'){
     const by = {
       views: (a,b) => bestViews(b) - bestViews(a),
       total: (a,b) => totals(b).v - totals(a).v,
       new:   (a,b) => whenOf(b) - whenOf(a),
     }[perfSort] || ((a,b) => bestViews(b) - bestViews(a));
-    return `<div class="mxbar"><div class="segs">${
-      [['views','Best account'],['total','All accounts'],['new','Newest']].map(([v,l])=>
-        `<button class="seg ${perfSort===v?'on':''}" onclick="perfSort='${v}';saveHash();render()">${l}</button>`).join('')
-      }</div></div><div class="grid">${list.slice().sort(by).map(card).join('')}</div>`;
+    return `<div class="grid">${list.slice().sort(by).map(card).join('')}</div>`;
   }
   return `<div class="grid">${list.slice().sort((a,b)=>whenOf(b)-whenOf(a))
     .map(card).join('')}</div>`;
@@ -6321,7 +7963,7 @@ function analyticsView(){
           (pa[y.key].wins / Math.max(1, pa[y.key].posts)) -
           (pa[x.key].wins / Math.max(1, pa[x.key].posts)));
         const tag = a.key === rank[0].key
-          ? '<span class="best">publish here first</span>'
+          ? '<span class="best">publish first</span>'
           : a.key === rank[rank.length - 1].key
             ? `<span class="worst">${Math.round(
                 (pa[rank[0].key].wins / Math.max(1, pa[rank[0].key].posts)) /
@@ -6410,7 +8052,7 @@ function analyticsView(){
         if(v==null) return '<td class="n"><span class="cell none">–</span></td>';
         const cls = v>=T?'win':(v<100 && r.best>=T)?'dead':'';
         const alpha = (lg(v)*0.42).toFixed(3);
-        return `<td class="n"><a class="cell ${cls}" style="background:rgba(56,189,248,${alpha})"
+        return `<td class="n"><a class="cell ${cls}" style="background:rgba(var(--accent-rgb),${alpha})"
           href="${r.urls[a.key]||'#'}" target="_blank" rel="noreferrer">${fmt(v)}</a></td>`;
       }).join('')}
       <td class="n"><span class="sp ${r.spread>10?'wide':''}">${r.spread}x</span></td>
@@ -6505,12 +8147,12 @@ function analyticsView(){
       const dots = sv.pts.map((p,i)=>`<circle cx="${px(i).toFixed(1)}" cy="${py(p.g).toFixed(1)}"
         r="4.5" fill="${ACOL[sv.a.key]}" stroke="var(--bg)" stroke-width="2"/>
         <text x="${px(i).toFixed(1)}" y="${(py(p.g)-12).toFixed(1)}" text-anchor="middle"
-          font-size="13" font-weight="700" fill="${ACOL[sv.a.key]}">${p.g>0?'+':''}${p.g}</text>`).join('');
+          font-size="15" font-weight="700" fill="${ACOL[sv.a.key]}">${p.g>0?'+':''}${p.g}</text>`).join('');
       return `<path d="${d}" fill="none" stroke="${ACOL[sv.a.key]}" stroke-width="2.5"
         stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
     }).join('');
     const labels = dayList.map(([d],i)=>`<text x="${px(i).toFixed(1)}" y="${H-12}"
-      fill="var(--dim)" font-size="10" text-anchor="middle">${dmy(d)}</text>`).join('');
+      fill="var(--dim)" font-size="12" text-anchor="middle">${dmy(d)}</text>`).join('');
     // One hit area per day rather than per point: at this density the points
     // of three accounts overlap, and aiming at a 3.5px dot is not a thing
     // anyone should have to do.
@@ -6527,8 +8169,8 @@ function analyticsView(){
         stroke="var(--line-2)" stroke-width="1" opacity="0"/>
       <line x1="${L}" y1="${zeroY.toFixed(1)}" x2="${W-R}" y2="${zeroY.toFixed(1)}"
         stroke="var(--line-2)" stroke-dasharray="3 4"/>
-      <text x="${L-10}" y="${(zeroY+4).toFixed(1)}" fill="var(--dim)" font-size="12" text-anchor="end">0</text>
-      <text x="${L-10}" y="${(py(hi)+4).toFixed(1)}" fill="var(--dim)" font-size="12" text-anchor="end">+${hi}</text>
+      <text x="${L-10}" y="${(zeroY+4).toFixed(1)}" fill="var(--dim)" font-size="14" text-anchor="end">0</text>
+      <text x="${L-10}" y="${(py(hi)+4).toFixed(1)}" fill="var(--dim)" font-size="14" text-anchor="end">+${hi}</text>
       ${lines}${labels}${cols}</svg><div class="ctip" hidden></div></div>`;
   }
 
@@ -6556,7 +8198,7 @@ function analyticsView(){
   // Four screens rather than one long scroll. Each fits without scrolling,
   // which is the point: analytics you have to scroll through does not get read.
   const TABS = [['published','Posts'],['accounts','Accounts'],
-                ['posts','Compare'],['todo','Act']];
+                ['posts','Compare'],['todo','Act'],['app','App']];
   // Four tabs fit a desktop and do not fit a phone, where they became a
   // sideways scroll that hid the section you were not on. Same state, two
   // controls: the buttons on wide screens, one picker on narrow ones.
@@ -6657,7 +8299,7 @@ function analyticsView(){
           <b>${r.untracked ? `<span class="unk"
               title="Live on the account but not one of our posts: published before the pipeline, or its caption was rewritten. Named from its opening words.">?</span>` : ''}${
             esc(r.name || r.topic)}</b>
-          <span>${hm(r.first_at)}${r.pillar?' · '+esc(r.pillar):''}${r.promoted?' · <i class="paid">$</i>':''}</span>
+          <span>${dayPill(r.first_at)}${r.pillar?' '+esc(r.pillar):''}${r.promoted?' · <i class="paid">$</i>':''}</span>
         </div>
         <div class="pcells">${accs.map(a=>cell(r,a)).join('')}</div>
         <div class="peng" title="likes · comments · shares, all accounts">
@@ -6691,13 +8333,19 @@ function analyticsView(){
              <span class="ir hit">${fmt(x.views)}</span>
              <span class="is">${x.rate}% liked</span></li>`).join('')
           : '<li class="none">Nothing yet</li>'}</ul></div>`;}).join('')}</div>`;
-    body = rangeChips() + compare + trendCard;
+    body = rangeChips() + `<div class="duo">${compare}${trendCard}</div>`;
   } else if(anTab==='posts'){
     body = sect('Every post, every account',
            'Shade is log-scaled views. Click a number to open it on TikTok. '
            + '$ marks a promoted post so paid reach stays out of the medians. '
            + 'Last posted turns green once a post is old enough to run again.')
          + matrix;
+  } else if(anTab==='app'){
+    // The app's own numbers belong beside the posts that sell it: a week of
+    // reach that moves no installs is a content problem, and installs that
+    // never turn blocking on are a product one.
+    if(!USERS) loadUsers();
+    body = usersView();
   } else if(anTab==='todo'){
     const stale = AN.stale || [];
     const stalePanel = `<div class="pcard"><h4>Drafts holding a slot</h4>
@@ -6844,8 +8492,7 @@ function card(p){
   if(st==='review' || st==='failed')
     act = `<span class="acts">${p.approved
       ? `<button class="cta sec" onclick="approve(event,'${p.topic}',false)"
-           title="Take it back off the Post page">Approved</button>`
-      : `<button class="cta" onclick="approve(event,'${p.topic}',true)">Approve</button>`}
+           title="Take it back off the Post page">Approved</button>` : ''}
       <button class="cta sec" onclick="cardDraft(event,'${p.topic}')">Draft to all</button></span>`;
   // No Mark published button: the sync reads the account back and sets it.
   else if(st==='published' && p.days_since>=7)
@@ -6857,11 +8504,12 @@ function card(p){
     ${(() => { const t = tierOf(bestViews(p));
       return t ? `<span class="tier t${t.lvl}"
         title="Best account: ${fmtn(bestViews(p))} views">${t.label}</span>` : ''; })()}
-    <button class="del" onclick="del(event,'${p.topic}')"
-      aria-label="Delete ${esc(p.topic)}">${TRASH}</button>
     <button class="card" onclick="open_('${p.topic}')">
       <div class="thumb"><img loading="lazy" src="/slide/${p.topic}/${p.slides[0]}"
-        alt="First slide of ${esc(p.topic)}"></div>
+        alt="First slide of ${esc(p.topic)}">
+        <span class="dots" role="button" tabindex="0" title="More"
+          onclick="event.stopPropagation();cardMenu('${esc(p.topic)}',event)"
+          onkeydown="if(event.key==='Enter'){event.stopPropagation();cardMenu('${esc(p.topic)}',event)}">⋯</span></div>
       <div class="meta">
         <div class="tt">${esc(p.topic)}${busy?' <span class="spin"></span>':''}</div>
         <div class="tms">${p.registered?'':'<span style="color:var(--warn)">no caption · </span>'}${times(p)}</div>
@@ -7433,13 +9081,21 @@ function cardRepost(e, topic){
   const p=DATA.posts.find(x=>x.topic===topic);
   const was = DATA.accounts.filter(a=>((p.delivery||{})[a.key]||{}).published).map(a=>a.key);
   const pick = was.length?was:DATA.accounts.map(a=>a.key);
+  const pend = DATA.pending || {};
   showModal({
-    title:'Repost '+topic, ok:'Re-draft now',
-    body:'The same slides go out again as fresh inbox drafts. Nothing is rebuilt.',
-    extra:'<div class="sched">'+DATA.accounts.map(a=>
-      `<label style="display:flex;gap:9px;align-items:center;margin:7px 0">
-         <input type="checkbox" class="rp" value="${a.key}" ${pick.includes(a.key)?'checked':''}>
-         <span>${esc(a.label)}</span></label>`).join('')+'</div>',
+    title:'Repost', ok:'Re-draft now',
+    body:`<b>${esc(topic)}</b> goes out again as fresh inbox drafts — the same
+      slides, nothing rebuilt. You publish them from the TikTok app as usual.`,
+    extra:`<div class="accpick">${DATA.accounts.map(a=>{
+      const free = Math.max(0, (DATA.cap||5) - (pend[a.key]||0));
+      const went = ((p.delivery||{})[a.key]||{}).published;
+      return `<label class="chk acc ${free?'':'full'}">
+         <input type="checkbox" class="rp" value="${a.key}"
+           ${pick.includes(a.key)&&free?'checked':''} ${free?'':'disabled'}>
+         <span class="nm">${esc(a.label)}</span>
+         <span class="sub">${free ? free+' of '+(DATA.cap||5)+' slots free'
+                                  : 'no slots left today'}${went?' · went out before':''}</span>
+       </label>`}).join('')}</div>`,
     action: async()=>{
       const keys=[...document.querySelectorAll('.rp:checked')].map(x=>x.value);
       if(!keys.length) return;
@@ -7455,7 +9111,7 @@ function fmt(ts){ const d=new Date(ts*1000);
 let onOK=null;
 function showModal({title, body='', extra='', ok='Confirm', danger=false, action}){
   document.getElementById('mt').textContent=title;
-  document.getElementById('mb').textContent=body;
+  document.getElementById('mb').innerHTML=body;
   document.getElementById('mx').innerHTML=extra;
   const b=document.getElementById('mok');
   b.textContent=ok; b.className='btn'+(danger?' danger':'');
@@ -7716,23 +9372,17 @@ document.addEventListener('mousemove', e => {
   tip.style.top  = (28 / vb.height * box.height) + 'px';
 });
 
-// Which machine is serving this page. Both dashboards are deliberately
-// identical, so without this there is no way to tell whether an action is
-// about to run on the laptop or on the mini.
-fetch('/api/host').then(r=>r.json()).then(h=>{
-  const el = document.getElementById('host');
-  if(!el) return;
-  el.className = h.owns ? 'hostb' : 'hostb local';
-  el.textContent = h.name;
-  el.insertAdjacentHTML('beforebegin', '<span style="color:var(--line-2)">·</span>');
-  el.title = h.owns
-    ? 'This machine holds the data and runs the schedule'
-    : 'Serving the page only — data and every action go to ' + h.upstream;
-}).catch(()=>{});
+// One boot sequence, then never again: the class comes off as soon as it
+// has played, so a re-render cannot replay it.
+document.body.classList.add('boot');
+setTimeout(() => document.body.classList.remove('boot'), 1100);
 
-load().then(()=>{
+load().then(() => {
   restoreHash();
-  setApp(app);
+  // restoreHash only sets state; something has to draw it. This used to be
+  // setApp(), which rendered as a side effect of picking the app — so
+  // removing the app switcher left the page permanently blank.
+  render();
 });
 </script></body></html>"""
 
