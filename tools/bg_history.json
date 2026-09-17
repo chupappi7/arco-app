@@ -791,5 +791,38 @@
    "bg-h45.jpg",
    "bg-h22.jpg"
   ]
+ },
+ {
+  "topic": "pay-for-twelve",
+  "bgs": [
+   "bg-h53.jpg",
+   "bg-h29.jpg",
+   "bg-h34.jpg",
+   "bg-h35.jpg",
+   "bg-h49.jpg",
+   "bg-h24.jpg"
+  ]
+ },
+ {
+  "topic": "best-for-last-4",
+  "bgs": [
+   "bg-h59.jpg",
+   "bg-h36.jpg",
+   "bg-n05.jpg",
+   "bg-h38.jpg",
+   "bg-h50.jpg",
+   "bg-h21.jpg"
+  ]
+ },
+ {
+  "topic": "4x-productivity-8",
+  "bgs": [
+   "bg-h62.jpg",
+   "bg-h39.jpg",
+   "bg-n06.jpg",
+   "bg-h88.jpg",
+   "bg-h52.jpg",
+   "bg-n03.jpg"
+  ]
  }
 ]

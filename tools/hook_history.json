@@ -406,13 +406,6 @@
   ]
  },
  {
-  "topic": "ship-weekend-4",
-  "hook": [
-   "how i ship in a weekend",
-   "what used to take a month"
-  ]
- },
- {
   "topic": "4x-productivity-7",
   "hook": [
    "the tools i used to",
@@ -427,24 +420,10 @@
   ]
  },
  {
-  "topic": "five-of-twelve",
-  "hook": [
-   "i pay for 12 apps",
-   "these 5 do all the work"
-  ]
- },
- {
   "topic": "keep-five-4",
   "hook": [
    "the 5 apps i would keep",
    "if i deleted everything else"
-  ]
- },
- {
-  "topic": "study-four-hours-2",
-  "hook": [
-   "how i study 4 hours",
-   "without touching my phone"
   ]
  },
  {
@@ -459,6 +438,34 @@
   "hook": [
    "the tools i use to do",
    "a full day of work by noon"
+  ]
+ },
+ {
+  "topic": "study-four-hours-2",
+  "hook": [
+   "how i study 4 hours",
+   "without touching my phone"
+  ]
+ },
+ {
+  "topic": "pay-for-twelve",
+  "hook": [
+   "i pay for 12 apps",
+   "these 5 do all the work"
+  ]
+ },
+ {
+  "topic": "best-for-last-4",
+  "hook": [
+   "5 tools to stay productive",
+   "i saved the best for last"
+  ]
+ },
+ {
+  "topic": "4x-productivity-8",
+  "hook": [
+   "the tools i used to",
+   "4x my productivity"
   ]
  }
 ]
