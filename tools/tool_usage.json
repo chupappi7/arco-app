@@ -1104,5 +1104,35 @@
    "Canva",
    "Superwhisper"
   ]
+ },
+ {
+  "topic": "4x-productivity-9",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Raycast",
+   "Loom",
+   "Zapier"
+  ]
+ },
+ {
+  "topic": "wish-i-knew-at-17-5",
+  "tools": [
+   "ARCO",
+   "Antigravity",
+   "GitHub",
+   "Canva",
+   "Figma"
+  ]
+ },
+ {
+  "topic": "keep-five-6",
+  "tools": [
+   "ARCO",
+   "Perplexity",
+   "Supabase",
+   "Obsidian",
+   "ClickUp"
+  ]
  }
 ]
