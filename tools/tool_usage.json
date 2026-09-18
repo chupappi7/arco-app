@@ -1074,5 +1074,35 @@
    "Loom",
    "Descript"
   ]
+ },
+ {
+  "topic": "work-by-noon-7",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "GitHub",
+   "Granola",
+   "ElevenLabs"
+  ]
+ },
+ {
+  "topic": "pay-for-twelve-2",
+  "tools": [
+   "ARCO",
+   "Cursor",
+   "Notion",
+   "Firebase",
+   "Runway"
+  ]
+ },
+ {
+  "topic": "best-for-last-5",
+  "tools": [
+   "ARCO",
+   "Codex",
+   "Linear",
+   "Canva",
+   "Superwhisper"
+  ]
  }
 ]
