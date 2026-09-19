@@ -29,9 +29,16 @@
  *   --redirected "<url>"   Finish the exchange using the URL you were redirected
  *                          to. Consumes tools/.auth-state.json.
  *
- * The refresh token is written straight into .env (TIKTOK_REFRESH_TOKEN=) rather
- * than printed, so it never lands in a scrollback buffer or a transcript. Pass
- * --print-token if you'd rather see it.
+ * Which account:
+ *   --account KEY          The token lands in TIKTOK_REFRESH_TOKEN_<KEY>, to
+ *                          match ACCOUNT_ENV in autopost.js. Omitting it (or
+ *                          passing vn) writes the bare TIKTOK_REFRESH_TOKEN,
+ *                          which is arco.app's — so authorising a second
+ *                          account without naming it overwrites the first.
+ *
+ * The refresh token is written straight into .env rather than printed, so it
+ * never lands in a scrollback buffer or a transcript. Pass --print-token if
+ * you'd rather see it.
  */
 
 const http = require('http');
@@ -55,6 +62,7 @@ const ENV_FILE = path.join(__dirname, '..', '.env');
 
 function parseArgs(argv) {
   const opts = {
+    account: null,
     redirectUri: process.env.TIKTOK_REDIRECT_URI || null,
     scope: process.env.TIKTOK_SCOPE || DEFAULT_SCOPE,
     pkce: false,
@@ -70,6 +78,7 @@ function parseArgs(argv) {
       case '--print-url': opts.printUrl = true; break;
       case '--redirected': opts.redirected = argv[++i]; break;
       case '--print-token': opts.printToken = true; break;
+      case '--account': opts.account = argv[++i]; break;
       case '-h':
       case '--help': opts.help = true; break;
       default: throw new Error(`unknown option: ${argv[i]}`);
@@ -206,20 +215,33 @@ function codeFromRedirectUrl(raw, expectedState) {
 }
 
 /**
- * Set TIKTOK_REFRESH_TOKEN= in .env, replacing any existing line.
+ * The variable one account's refresh token lives in. Must agree with
+ * ACCOUNT_ENV in autopost.js, which is what actually reads them.
+ */
+function envVarFor(account) {
+  if (!account || account === 'vn') return 'TIKTOK_REFRESH_TOKEN';
+  if (!/^[a-z0-9_]+$/.test(account)) {
+    throw new Error(`--account must be lowercase letters, digits or _: ${account}`);
+  }
+  return `TIKTOK_REFRESH_TOKEN_${account.toUpperCase()}`;
+}
+
+/**
+ * Set the account's refresh-token line in .env, replacing any existing one.
  *
  * Writing rather than printing keeps a 365-day credential out of terminal
  * scrollback. The file is already gitignored and chmod 600.
  */
-function writeRefreshTokenToEnv(token) {
+function writeRefreshTokenToEnv(token, account) {
   let text = '';
   try {
     text = fs.readFileSync(ENV_FILE, 'utf8');
   } catch {
     /* no .env yet — we'll create one */
   }
-  const line = `TIKTOK_REFRESH_TOKEN=${token}`;
-  const existing = /^TIKTOK_REFRESH_TOKEN=.*$/m;
+  const name = envVarFor(account);
+  const line = `${name}=${token}`;
+  const existing = new RegExp(`^${name}=.*$`, 'm');
   text = existing.test(text)
     ? text.replace(existing, line)
     : `${text.replace(/\n*$/, '')}\n${line}\n`;
@@ -242,10 +264,10 @@ function reportTokens(tokens, opts) {
   }
 
   if (opts.printToken) {
-    console.log(`\n    export TIKTOK_REFRESH_TOKEN='${tokens.refresh_token}'\n`);
+    console.log(`\n    export ${envVarFor(opts.account)}='${tokens.refresh_token}'\n`);
   } else {
-    const written = writeRefreshTokenToEnv(tokens.refresh_token);
-    console.log(`\n  Refresh token written to ${written} (not printed).`);
+    const written = writeRefreshTokenToEnv(tokens.refresh_token, opts.account);
+    console.log(`\n  ${envVarFor(opts.account)} written to ${written} (not printed).`);
   }
 }
 
@@ -318,7 +340,10 @@ async function main() {
       { mode: 0o600 }
     );
     console.log('  After approving, re-run with:');
-    console.log('    node tools/tiktok-auth.js --redirected "<the URL you landed on>"\n');
+    // Carry the account through: without it the exchange writes the bare
+    // TIKTOK_REFRESH_TOKEN, which belongs to a different account.
+    const acct = opts.account ? ` --account ${opts.account}` : '';
+    console.log(`    node tools/tiktok-auth.js${acct} --redirected "<the URL you landed on>"\n`);
     return;
   }
 

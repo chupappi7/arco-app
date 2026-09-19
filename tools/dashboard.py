@@ -140,6 +140,8 @@ ACCOUNTS = [
     {'key': 'vn', 'label': 'arco.app', 'short': 'arco.app'},
     {'key': 'getarco', 'label': 'getarcoapp', 'short': 'getarco'},
     {'key': 'us', 'label': 'emiliagonzalez389', 'short': 'emilia'},
+    {'key': 'max', 'label': 'maxmilian.dev', 'short': 'maxmilian'},
+    {'key': 'prodgod', 'label': 'productivity_god', 'short': 'prodgod'},
 ]
 CAP = 5                      # pending shares per account per rolling 24h
 TOKEN_FILE = os.path.join(REPO, 'tools', '.dashboard_token')
@@ -355,6 +357,7 @@ def account_summary():
     interesting fact about an account.
     """
     stats = load(ACCT_STATS, {})
+    last = last_posted()
     out = {}
     for a in ACCOUNTS:
         v = stats.get(a['key']) or {}
@@ -367,7 +370,27 @@ def account_summary():
             'days': len(hist),
             'total_likes': v.get('likes_count'),
             'posts': v.get('video_count'),
+            'last_at': (last.get(a['key']) or {}).get('at'),
+            'last_topic': (last.get(a['key']) or {}).get('topic'),
         }
+    return out
+
+
+def last_posted():
+    """When each account last published, from TikTok's own timestamps.
+
+    The sync records posted_at per post per account, so the newest of those is
+    the real answer — not when a draft was sent, which can sit in the inbox
+    for hours.
+    """
+    out = {}
+    for topic, per in load(STATS, {}).items():
+        for key, rec in (per or {}).items():
+            at = rec.get('posted_at')
+            if not at:
+                continue
+            if key not in out or at > out[key]['at']:
+                out[key] = {'at': at, 'topic': topic}
     return out
 
 
@@ -4613,6 +4636,25 @@ nav{display:flex;flex-direction:column;gap:2px}
   transition:border-color .18s,color .18s}
 .acct button:hover{border-color:var(--accent);color:var(--text)}
 
+/* The cadence line. One post an hour is the target, so the only question the
+   sidebar has to answer is "can I post to this account yet" — the colour is
+   the answer and the elapsed time is the evidence. */
+.cad{display:flex;align-items:center;gap:7px;margin-top:8px;
+  font:600 10px/1 "Fira Code",monospace;letter-spacing:.06em;text-transform:uppercase}
+.cad::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--cc);
+  box-shadow:0 0 9px -1px var(--cc);flex:none}
+.cad b{font-weight:700;color:var(--cc)}
+.cad span{margin-left:auto;color:var(--dim);font-weight:500;letter-spacing:.04em;
+  text-transform:none}
+/* Both ends of the range are mistakes, so both pulse. The middle sits still. */
+@keyframes cadpulse{0%,100%{opacity:1}50%{opacity:.45}}
+.cad.soon::before,.cad.over::before{animation:cadpulse 1.8s ease-in-out infinite}
+.cad.soon{--cc:#7DA2FF}
+.cad.now{--cc:var(--ok)}
+.cad.late{--cc:#F5B945}
+.cad.over{--cc:var(--bad)}
+.cad.never{--cc:var(--dim)}
+
 /* ---------- main ---------- */
 main{overflow:auto}
 .bar{position:sticky;top:0;z-index:10;background:rgba(var(--ink-rgb),.92);backdrop-filter:blur(10px);
@@ -7186,7 +7228,7 @@ async function load(quiet){
       const t = (DATA.published_today||{})[a.key]||0;
       const st = AST[a.key] || {};
       const d = st.delta;
-      return `<a class="acct" href="#" onclick="filter='stats';anTab='accounts';
+      return `<a class="acct" data-k="${a.key}" href="#" onclick="filter='stats';anTab='accounts';
                 anAccs=new Set(['${a.key}']);AN=null;saveHash();loadAnalytics();return false"
                 title="See only ${esc(a.label)} in Analytics">
         <div class="top">${tk('#F8FAFC')}<span class="h">@${esc(a.label)}</span></div>
@@ -7194,6 +7236,7 @@ async function load(quiet){
           <b>${st.followers ?? '–'}</b><span>followers</span>
           ${d ? `<i class="${d>0?'up':'down'}">${d>0?'+':''}${d}</i>` : ''}
         </div>
+        ${cadence(st.last_at)}
       </a>`;}).join('');
   if(!quiet) render();
 
@@ -7466,6 +7509,48 @@ function render_(){
 
 // One number per tab, and only where a number means "this is waiting on
 // you". Library and Analytics are places you go to look, not queues.
+// Posting rhythm. An hour between posts is the target and two is still
+// healthy; under an hour reads as a burst, and a long gap is the thing that
+// actually costs reach. Both ends are wrong, so both are coloured and both
+// pulse — only the window in between is allowed to sit quiet.
+const CADENCE = [
+  [60,   'soon', 'too soon'],
+  [150,  'now',  'post now'],
+  [300,  'late', 'slipping'],
+  [1e9,  'over', 'overdue'],
+];
+
+// The elapsed time is the whole point, so it cannot wait for the next stats
+// sync to move. Only the .cad line is rewritten — repainting the sidebar would
+// throw away the follower counts mid-animation.
+function paintCadence(){
+  const AST = (DATA && DATA.account_stats) || {};
+  document.querySelectorAll('.acct[data-k] .cad').forEach(c => {
+    const key = c.closest('.acct').dataset.k;
+    c.outerHTML = cadence((AST[key] || {}).last_at);
+  });
+}
+
+// Half a minute: the line is written in whole minutes, so anything faster
+// redraws the same string.
+setInterval(paintCadence, 30000);
+
+function cadence(at){
+  if(!at) return `<div class="cad never"><b>no posts yet</b></div>`;
+  const mins = Math.max(0, Math.round(Date.now()/1000 - at) / 60);
+  const [, cls, label] = CADENCE.find(([m]) => mins < m);
+  return `<div class="cad ${cls}"><b>${label}</b><span>${sinceMins(mins)}</span></div>`;
+}
+
+function sinceMins(mins){
+  if(mins < 1) return 'just now';
+  if(mins < 60) return `${Math.round(mins)}m ago`;
+  const h = Math.floor(mins/60), m = Math.round(mins % 60);
+  if(h < 24) return m ? `${h}h ${m}m ago` : `${h}h ago`;
+  const days = Math.floor(h/24);
+  return days === 1 ? '1 day ago' : `${days} days ago`;
+}
+
 function tabCount(k){
   if(k === 'ideas'){
     // Unused codes are the only thing here with a deadline on it.
@@ -7684,7 +7769,8 @@ function offlineNote(e){
 }
 let anAccs = null;   // null = all three; otherwise a Set of account keys
 const AN_TOP = 20;
-const ACOL = {vn:'#38BDF8', getarco:'#A78BFA', us:'#22C55E'};
+const ACOL = {vn:'#38BDF8', getarco:'#A78BFA', us:'#22C55E', max:'#F59E0B',
+              prodgod:'#F472B6'};
 
 // Three states so the button says what it is doing: idle, working, done.
 // It used to relabel the element it was clicked on, which the re-render then
