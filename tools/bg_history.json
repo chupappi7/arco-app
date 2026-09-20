@@ -967,5 +967,16 @@
    "bg-h22.jpg",
    "bg-h35.jpg"
   ]
+ },
+ {
+  "topic": "best-for-last-6",
+  "bgs": [
+   "bg-h72.jpg",
+   "bg-h20.jpg",
+   "bg-h24.jpg",
+   "bg-h29.jpg",
+   "bg-h31.jpg",
+   "bg-h32.jpg"
+  ]
  }
 ]
