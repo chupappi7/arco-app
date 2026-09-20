@@ -128,6 +128,14 @@
    ],
    "used": true,
    "pillar": "screentime"
+  },
+  {
+   "lines": [
+    "5 apps i will use",
+    "for the rest of my life"
+   ],
+   "used": true,
+   "pillar": "tools"
   }
  ]
 }

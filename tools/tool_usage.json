@@ -1134,5 +1134,45 @@
    "Obsidian",
    "ClickUp"
   ]
+ },
+ {
+  "topic": "run-it-all-at-19-2",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "Figma",
+   "Framer",
+   "Firebase"
+  ]
+ },
+ {
+  "topic": "rest-of-my-life",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "Obsidian",
+   "GitHub",
+   "Raycast"
+  ]
+ },
+ {
+  "topic": "ten-x-8",
+  "tools": [
+   "ARCO",
+   "Cursor",
+   "Airtable",
+   "Superwhisper",
+   "Make"
+  ]
+ },
+ {
+  "topic": "work-by-noon-8",
+  "tools": [
+   "ARCO",
+   "Manus",
+   "Sentry",
+   "Cloudflare",
+   "Higgsfield"
+  ]
  }
 ]

@@ -690,20 +690,6 @@
    "_note": "tools listicle, stacked hook with icon shelf, 6th outing of the by-noon hook; Cursor the LLM; rendered by tools/gen-work-by-noon-6.py"
   },
   {
-   "topic": "study-four-hours-2",
-   "title": "how i study 4 hours without touching my phone",
-   "caption": "four hours with the phone face down and never picked up, this is the whole setup. arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs, my holy grail. water, charger, calculator and the textbook are on the desk before i sit, because every trip to the kitchen is where the phone gets picked up. a reply to send or a thing to look up goes on a sheet of paper, so the thought is parked and the list gets dealt with at the break. four hours is the container but a finished past paper is the finish, so there is no checking how long is left, and the clock lives on the phone. ten minutes every fifty, and the break is a walk or a window, because a feed break resets attention to zero and a walk keeps the thread. #studytok #studytips #focus #exams #creatorsearchinsights",
-   "slides": [
-    "01.jpg",
-    "02.jpg",
-    "03.jpg",
-    "04.jpg",
-    "05.jpg",
-    "06.jpg"
-   ],
-   "_note": "built 2026-09-17. learn pillar, method post: rule_slide steps, no roster, no icon shelf (a lone ARCO icon would mark the post as the advert). second outing of the hook (first was study-four-hours, a listicle before the pillar guard existed). ARCO leads on angle f1 via next_arco_angle('study'). rule slides in the screentime-100h style Thinh asked for: no badge, yellow titles. backgrounds bg-h51/h31/h37/n04/h45/h22 by the gen-daily-batch walk. rebuild: python3 tools/gen-study-four-hours-2.py"
-  },
-  {
    "topic": "pay-for-twelve",
    "title": "i pay for 12 apps, these 5 do all the work",
    "caption": "twelve subscriptions, five carry the load. i keep every task in arco and plan tomorrow in 30 seconds, then focus mode puts every distraction away the moment it starts, the one i would not delete. the codex sandbox reaches only the folder you opened with the network off, so you leave it on a task all afternoon and it cannot touch anything else. a zapier formatter step reshapes data on its way between two apps, so the date a form collects lands in the invoice format with nothing typed. canva magic expand paints past the edge of a photo in any direction, so a landscape shot becomes a full 9:16 story with nothing cropped. supabase storage resizes an image straight from the url with the width in the link, so one original goes up and every thumbnail is a link and not a file. #productivity #apps #aitools #tools #creatorsearchinsights",
@@ -774,6 +760,62 @@
    "title": "the 5 apps i would keep if i deleted everything else",
    "caption": "five apps survive the reset, everything else goes. one app holds the plan and the block that protects it: tasks get a time on arco's timeline and focus mode shuts the apps for it, my holy grail. perplexity comet is a browser whose assistant does the task on the page itself, so it fills the form and books the table while you watch it type. supabase branching gives each pull request a database of its own, so a schema change is tried on the branch and merged, never run on the live one. put three dashes between the sections of an obsidian note and the slides plugin presents it, so the revision notes become the talk with nothing rebuilt. record a clip inside a clickup task and it transcribes what you said, so feedback on a screen is a video in the task and not a paragraph under it. #productivity #apps #aitools #tools #creatorsearchinsights",
    "_note": "built 2026-09-18 by gen-keep-five-6.py. tools listicle, stacked hook with icon shelf, 6th outing of the keep-five hook (keep-five-5, five posts back). Perplexity the LLM (third least recently used model; this hook last carried Manus). ARCO angle v14 via next_arco_angle('planning'). Teaching points checked against every caption and verified by search: Perplexity Comet acting on the page, Supabase branching per pull request, Obsidian Slides core plugin, ClickUp Clips transcribed in a task. BGs h64 hook, h88/h32/h37/n01/h21: one person (h32, slide 3), no adjacent vibe, nothing from wish-i-knew-at-17-5. n06 and h34 rendered first for Perplexity and Obsidian and replaced: monitor bezels through the first paragraph. All six slides read back. rebuild: python3 tools/gen-keep-five-6.py"
+  },
+  {
+   "topic": "run-it-all-at-19-2",
+   "title": "everything i run my business on at 19",
+   "caption": "five apps and nothing else runs it. habits repeat into the day in arco and take their own slot on the timeline, so the plan is half built before i open it and focus mode guards each block, my holy grail. a hook in claude code runs a command of yours after every edit it makes, so the formatter and the tests run before you ever review the change. figma buzz fills one template from a spreadsheet, one row per asset, so fifty ad variants with their own names and prices land in one go. framer localization translates the site into a second language and gives each one its own url, so a second market opens without building a second site. a firebase cloud function can fire the moment a new account is created, so the welcome email sends itself and no server has to stay running. #buildinpublic #indiedev #solofounder #aitools #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-18 by gen-run-it-all-at-19-2.py. Replication of month-in-a-weekend: same build-pillar shape (ARCO leading, exactly one LLM, three build-lane tools, one per slide, no CTA). Hook is the pool's 'everything i run my business on / at 19', the least recently used build hook, so the source's hook is not repeated. Roster ARCO, Claude, Figma, Framer, Firebase (the suggested roster; Claude the LLM). Teaching points checked against every prior caption: Claude Code hooks, Figma Buzz bulk create, Framer localization, Firebase auth-triggered Cloud Function are all new. Photos disjoint from keep-five-6, the source post and both earlier outings of this hook."
+  },
+  {
+   "topic": "rest-of-my-life",
+   "title": "5 apps i will use for the rest of my life",
+   "caption": "five apps that are staying, whatever else gets deleted. i manage all my tasks in arco and plan the day in 30 seconds, then focus mode puts every distraction away, my holy grail. any message in a chatgpt chat can branch into a new chat from that point, so two directions get tried from one setup with nothing pasted twice. obsidian sync is end to end encrypted with your own password, so notes move between devices and nobody in between can read a line. github push protection scans every commit for api keys before it lands, so a leaked key stops at the push and not at the bill a month later. the raycast calculator takes plain words like 3pm in tokyo or in six weeks, so the time zone maths is done in the search bar with no app opened. #productivity #apps #aitools #tools #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-20 by gen-rest-of-my-life.py. tools listicle, stacked hook with icon shelf, first outing of Thinh's new hook '5 apps i will use / for the rest of my life' (added to hook_pool.json as a tools hook in this build). ChatGPT the LLM (with Manus the least recently used model; last on ten-x-7). ARCO angle v1 via next_arco_angle('planning') after the planning rotation reset. Teaching points checked against every caption: ChatGPT branching, Obsidian Sync end to end encryption, GitHub push protection, Raycast calculator time zones and dates (deep research skipped: burned on Gemini and Perplexity). BGs h66 hook, h36/h22/h31/n06/h32: one person (h32, slide 6), no adjacent vibe, nothing from run-it-all-at-19-2. n05 rendered first for GitHub and replaced (copy over lit monitors). All six slides read back. rebuild: python3 tools/gen-rest-of-my-life.py"
+  },
+  {
+   "topic": "ten-x-8",
+   "title": "how i 10x'd my productivity",
+   "caption": "five apps, ten times the output. every task i have is in arco and the day gets planned in 30 seconds, then focus mode puts every distraction away while i work, my holy grail. cmd k in the cursor terminal writes the shell command from a sentence, so find every file over 100mb runs without remembering a single flag. link two airtable tables and a lookup field pulls any column across the link, so the client's email sits on every invoice and is never typed twice. a superwhisper mode can read the text you have selected before you speak, so you highlight an email, say the answer, and the reply comes out written. a make data store is a small database that lives inside your scenario, so it remembers what it already sent and no row goes out twice. #productivity #aitools #apps #tools #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-20 by gen-ten-x-8.py. tools listicle, stacked hook with icon shelf, 8th outing of the 10x hook (ten-x-7, eight posts back). Cursor the LLM (third least recently used model; this hook last carried it on ten-x-5 with tab predictions). ARCO angle v2 via next_arco_angle('planning'). Teaching points checked against every caption: Cmd K in Cursor's terminal, Airtable lookup fields, Superwhisper selected-text context, Make data store (Cursor checkpoints skipped: burned on Claude Code). BGs h67 hook, h37/n01/h24/h34/h88: no person, no adjacent vibe, nothing from rest-of-my-life. All six slides read back. rebuild: python3 tools/gen-ten-x-8.py"
+  },
+  {
+   "topic": "work-by-noon-8",
+   "title": "the tools i use to do a full day of work by noon",
+   "caption": "the day's work is done by lunch when the tools start before you do. i manage all my tasks in arco and the day takes 30 seconds to plan, then focus mode puts every distraction away and blocked hours does it on a schedule. give manus the csv and it writes the analysis with the charts drawn, so the weekly numbers come back as a page to read and not a file to open. sentry seer reads the stack trace and the code and writes the root cause, then opens the fix as a pull request, so last night's crash is a diff waiting at 9. the cloudflare ai gateway sits in front of your model calls and caches answers, so the same prompt asked twice is billed once and answered at once. higgsfield marketing studio takes one product photo and builds the ad around it, so a tiktok ready ad exists before anything has been filmed. #productivity #apps #aitools #tools #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-20 by gen-work-by-noon-8.py. tools listicle, stacked hook with icon shelf, 8th outing of the by-noon hook (work-by-noon-7, seven posts back). Manus the LLM (least recently used model; this hook carried it once on the first work-by-noon with a different point). ARCO angle v3 via next_arco_angle('planning'). Teaching points checked against every caption: Manus csv to charts, Sentry Seer root cause and fix PR, Cloudflare AI gateway caching, Higgsfield Marketing Studio product ads (confirmed in the Higgsfield model catalogue; cron triggers skipped as scheduling is burned across three tools). BGs h68 hook, h38/n03/h21/h22/h35: no person, no adjacent vibe, nothing from ten-x-8 (h22 also in rest-of-my-life two posts back, allowed by BG_COOLDOWN 1). n06 rendered first for Cloudflare and moved to rest-of-my-life. All six slides read back. rebuild: python3 tools/gen-work-by-noon-8.py"
   }
  ]
 }

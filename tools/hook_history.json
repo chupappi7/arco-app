@@ -441,13 +441,6 @@
   ]
  },
  {
-  "topic": "study-four-hours-2",
-  "hook": [
-   "how i study 4 hours",
-   "without touching my phone"
-  ]
- },
- {
   "topic": "pay-for-twelve",
   "hook": [
    "i pay for 12 apps",
@@ -529,6 +522,34 @@
   "hook": [
    "the 5 apps i would keep",
    "if i deleted everything else"
+  ]
+ },
+ {
+  "topic": "run-it-all-at-19-2",
+  "hook": [
+   "everything i run my business on",
+   "at 19"
+  ]
+ },
+ {
+  "topic": "rest-of-my-life",
+  "hook": [
+   "5 apps i will use",
+   "for the rest of my life"
+  ]
+ },
+ {
+  "topic": "ten-x-8",
+  "hook": [
+   "how i 10x'd",
+   "my productivity"
+  ]
+ },
+ {
+  "topic": "work-by-noon-8",
+  "hook": [
+   "the tools i use to do",
+   "a full day of work by noon"
   ]
  }
 ]
