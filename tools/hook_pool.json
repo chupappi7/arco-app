@@ -136,6 +136,15 @@
    ],
    "used": true,
    "pillar": "tools"
+  },
+  {
+   "lines": [
+    "launch an app",
+    "in one weekend"
+   ],
+   "used": true,
+   "pillar": "build",
+   "_note": "shipped 2026-08-24 as launch-weekend, before the pool existed; added 2026-09-21 so the launch-weekend-3 re-shoot could reuse it verbatim and the cooldown counts it"
   }
  ]
 }
