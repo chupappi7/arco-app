@@ -1505,10 +1505,6 @@ def _published_cohort(rows, flat, lo, hi, keys):
         return None
     hi = hi if hi is not None else time.time()
 
-    def at_of(r):
-        ats = [t for t in r['at'].values() if t]
-        return min(ats) if ats else (r.get('posted_at') or 0)
-
     out = []
     for r in rows:
         when = r.get('out') or r['at']
@@ -1526,13 +1522,18 @@ def _published_cohort(rows, flat, lo, hi, keys):
             # a total hides the only thing worth seeing.
             'cells': {k: r['cells'].get(k) for k in ats},
             'urls': {k: r['urls'].get(k) for k in ats},
-            'at': ats, 'first_at': min(ats.values()),
+            'per': {k: {'likes': r['likes'].get(k) or 0,
+                        'comments': r['comments'].get(k) or 0,
+                        'shares': r['shares'].get(k) or 0} for k in ats},
+            'at': ats,
+            # When it last went out, not when it first did.
+            'last_at': max(ats.values()), 'first_at': min(ats.values()),
             'views': tot['cells'], 'likes': tot['likes'],
             'comments': tot['comments'], 'shares': tot['shares'],
             'best': max(vs) if vs else 0,
             'rate': round(100 * tot['likes'] / max(1, tot['cells']), 1),
         })
-    out.sort(key=lambda x: -x['first_at'])
+    out.sort(key=lambda x: -x['last_at'])
 
     org = [x for x in out if not x['promoted']]
     ups = [(x, k) for x in org for k in x['at']]
@@ -4616,6 +4617,9 @@ nav{display:flex;flex-direction:column;gap:2px}
   border:1px solid var(--line-2);border-radius:var(--r);padding:11px 12px;
   transition:border-color .15s}
 .acct:hover{border-color:var(--accent)}
+/* The card is a filter, so it has to look switched on when it is one. */
+.acct.sel{border-color:var(--accent);
+  box-shadow:0 0 0 1px var(--accent) inset,0 0 22px -12px var(--glow)}
 .astat{display:flex;align-items:baseline;gap:6px;margin-top:7px}
 .astat b{font:600 20px/1 "Fira Code",monospace;color:var(--text)}
 .astat span{font-size:10.5px;color:var(--dim)}
@@ -7228,9 +7232,11 @@ async function load(quiet){
       const t = (DATA.published_today||{})[a.key]||0;
       const st = AST[a.key] || {};
       const d = st.delta;
-      return `<a class="acct" data-k="${a.key}" href="#" onclick="filter='stats';anTab='accounts';
-                anAccs=new Set(['${a.key}']);AN=null;saveHash();loadAnalytics();return false"
-                title="See only ${esc(a.label)} in Analytics">
+      const only = anAccs && anAccs.size === 1 && anAccs.has(a.key);
+      return `<a class="acct ${only?'sel':''}" data-k="${a.key}" href="#"
+                onclick="pickAccount('${a.key}');return false"
+                title="${only ? 'Show every account again'
+                             : 'See only ' + esc(a.label) + ' in Analytics'}">
         <div class="top">${tk('#F8FAFC')}<span class="h">@${esc(a.label)}</span></div>
         <div class="astat">
           <b>${st.followers ?? '–'}</b><span>followers</span>
@@ -7639,6 +7645,17 @@ function dayHue(ts){
   // than shading into each other.
   return Math.round((key * 137.508) % 360);
 }
+// When a post went out. With one account selected that is exactly that
+// account's time; otherwise it is the most recent, which is the same thing
+// the sidebar means by "last published".
+function postedAt(r){
+  if(anAccs && anAccs.size === 1){
+    const k = [...anAccs][0];
+    if(r.at && r.at[k]) return r.at[k];
+  }
+  return r.last_at;
+}
+
 function dayPill(ts){
   if(!ts) return '';
   const d = new Date(ts*1000), h = dayHue(ts);
@@ -7930,7 +7947,33 @@ async function loadAnalytics(){
 function toggleAcct(k){
   const solo = anAccs && anAccs.size === 1 && anAccs.has(k);
   anAccs = solo ? null : new Set([k]);
-  AN = null; saveHash(); loadAnalytics();
+  AN = null; paintAccountSel(); saveHash(); loadAnalytics();
+}
+
+// The sidebar card is the same filter as the chip above the charts, so it
+// toggles the same way. Arriving from another page always selects, though —
+// a filter left over from an earlier visit should not make the first click
+// read as a deselect.
+function pickAccount(k){
+  const arriving = filter !== 'stats' || anTab !== 'accounts';
+  filter = 'stats'; anTab = 'accounts';
+  if(arriving){
+    anAccs = new Set([k]);
+    AN = null; paintAccountSel(); saveHash(); loadAnalytics(); render();
+  } else {
+    toggleAcct(k);
+  }
+}
+
+// Only the class changes. Repainting the sidebar would restart the cadence
+// pulse and drop the follower numbers for a frame.
+function paintAccountSel(){
+  document.querySelectorAll('.acct[data-k]').forEach(el => {
+    const only = anAccs && anAccs.size === 1 && anAccs.has(el.dataset.k);
+    el.classList.toggle('sel', !!only);
+    el.title = only ? 'Show every account again'
+                    : 'See only @' + el.dataset.k + ' in Analytics';
+  });
 }
 
 function setPeriod(p){ anPeriod = p; AN = null; saveHash(); loadAnalytics(); }
@@ -8353,7 +8396,7 @@ function analyticsView(){
     const rowsAll = P.rows.slice().sort((a,b)=>
       pubSort==='views' ? b.views-a.views
       : pubSort==='rate' ? b.rate-a.rate
-      : b.first_at-a.first_at);
+      : postedAt(b)-postedAt(a));
     const shown = pubAll ? rowsAll : rowsAll.slice(0,20);
 
     const cell = (r,a) => {
@@ -8361,8 +8404,13 @@ function analyticsView(){
       if(v==null) return `<span class="pc none" title="not published to ${esc(a.label)}">–</span>`;
       const u = r.urls[a.key];
       const hot = v >= T;
+      // The columns to the right are sums; this is the one account.
+      const p = (r.per || {})[a.key] || {};
+      const rate = v ? (100 * (p.likes||0) / v).toFixed(1) : '0.0';
+      const tip = `${a.label}\n${fmt(v)} views · ${fmt(p.likes||0)} likes · `
+        + `${fmt(p.comments||0)} comments · ${fmt(p.shares||0)} shares\n${rate}% like rate`;
       return `<a class="pc ${hot?'hot':''}" ${u?`href="${u}" target="_blank" rel="noopener"`:''}
-        title="${esc(a.label)} · ${fmt(v)} views" onclick="event.stopPropagation()">
+        title="${esc(tip)}" onclick="event.stopPropagation()">
         <i style="background:${ACOL[a.key]}"></i>${fmt(v)}</a>`;
     };
 
@@ -8385,7 +8433,7 @@ function analyticsView(){
           <b>${r.untracked ? `<span class="unk"
               title="Live on the account but not one of our posts: published before the pipeline, or its caption was rewritten. Named from its opening words.">?</span>` : ''}${
             esc(r.name || r.topic)}</b>
-          <span>${dayPill(r.first_at)}${r.pillar?' '+esc(r.pillar):''}${r.promoted?' · <i class="paid">$</i>':''}</span>
+          <span>${dayPill(postedAt(r))}${r.pillar?' '+esc(r.pillar):''}${r.promoted?' · <i class="paid">$</i>':''}</span>
         </div>
         <div class="pcells">${accs.map(a=>cell(r,a)).join('')}</div>
         <div class="peng" title="likes · comments · shares, all accounts">
