@@ -1184,5 +1184,15 @@
    "Loom",
    "Raycast"
   ]
+ },
+ {
+  "topic": "saved-hours-3",
+  "tools": [
+   "Perplexity",
+   "ARCO",
+   "Make",
+   "Photoroom",
+   "ElevenLabs"
+  ]
  }
 ]
