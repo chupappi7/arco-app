@@ -31,12 +31,17 @@ and changes everything that would make it a repeat:
             month-in-a-weekend recorded that daylight frames passing the
             luma gate still failed the read.
 
-  01 hook    bg-h70  desk-led-neon
+  01 hook    bg-h70  desk-led-neon, roster icons on the shelf under the hook
   02 ARCO    bg-h31  lounge-night       copy_band_luma 19.7
   03 Codex   bg-h38  supercars-dusk     copy_band_luma 21.2
   04 GitHub  bg-h22  lounge-day         copy_band_luma 53.5
   05 Figma   bg-h39  supercars-dusk     copy_band_luma 35.8
   06 Framer  bg-h45  window-silhouette  copy_band_luma 54.3, the one person
+
+Redo 2026-09-21: the hook slide went out bare and Thinh asked for the app
+icons on it, so 01 now carries the roster's icon shelf (ARCO, Codex, GitHub,
+Figma, Framer, 3 over 2) the way the other five-app posts do. Slides 02-06 are
+untouched.
 
 Usage:
     python3 tools/gen-launch-weekend-2.py            # every slide
@@ -48,6 +53,7 @@ import sys
 
 sys.path.insert(0, '/Users/thinh/SIXSIX/arco-app/tools')
 import compose as c
+import hook_rules
 from compose import (app_slide, hook_slide, mark_hook_used, next_arco_angle,
                      preflight, record_post_bgs, record_post_tools)
 
@@ -125,6 +131,7 @@ def main(only=None):
             raise SystemExit(f'{bg} copy band is {luma:.1f}, over '
                              f'{c.BAND_MAX_LUMA}')
 
+    icons = json.load(open(c.TOOL_POOL))['icons']
     if only in (None, 1):
         # Logged by hand: pick_hook_bg narrows to unused night-desk frames and
         # can log one this post never rendered.
@@ -132,10 +139,13 @@ def main(only=None):
         if BGS[0] not in log:
             json.dump(log + [BGS[0]], open(f'{c.SP}/hook_usage.json', 'w'),
                       indent=1)
-        hook_slide(BGS[0], HOOK, f'{OUT}/01.jpg')
-        mark_hook_used(HOOK, TOPIC)
+        # Roster order, ARCO first: what the shelf under the hook shows.
+        shelf = [icons[t] for t in TOOLS]
+        hook_slide(BGS[0], HOOK, f'{OUT}/01.jpg', icons=shelf)
+        # A redo of 01 must not log a second outing of the hook.
+        if not any(e.get('topic') == TOPIC for e in hook_rules.history()):
+            mark_hook_used(HOOK, TOPIC)
 
-    icons = json.load(open(c.TOOL_POOL))['icons']
     for i, tool in enumerate(TOOLS):
         n, bg = i + 1, BGS[i + 1]
         if only not in (None, n + 1):
