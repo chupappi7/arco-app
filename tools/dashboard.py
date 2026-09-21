@@ -1308,7 +1308,7 @@ def analytics(period='7', only=None, frm=None, to=None):
     # Worth replicating: broke out on more than one account, and has not been
     # used as a source already.
     already = {r['source'] for r in rows if r['source']}
-    queued = {q['from'] for q in replicate_queue() if not q.get('done')}
+    queued = {q['from'] for q in replicate_queue() if replicate_busy(q['from'])}
     suggest = [r['topic'] for r in rows
                if r['breakouts'] >= 2 and r['topic'] not in already
                and r['topic'] not in queued][:6]
@@ -3062,6 +3062,35 @@ def save_schedules(sc):
         json.dump(sc, fh, indent=1)
 
 
+def replicate_busy(topic):
+    """Whether a replicate for this topic is genuinely still in flight.
+
+    `done` was the wrong test. A job that failed or was interrupted never sets
+    it, and settle_orphans only rescues rows still marked `running` — so one
+    dead run left a permanent `done: False` row that blocked that topic from
+    ever being replicated again. Ten topics were stuck this way, some of them
+    the best-performing posts in the library.
+
+    In flight means: not finished, and either no pid yet (queued moments ago)
+    or a pid that is still alive.
+    """
+    for x in replicate_queue():
+        if x.get('from') != topic or x.get('done'):
+            continue
+        if x.get('status') in ('done', 'failed', 'interrupted', 'cancelled'):
+            continue
+        pid = x.get('pid')
+        if pid:
+            if _alive(pid):
+                return True
+            continue
+        # No pid and no terminal status: either it was queued seconds ago, or
+        # the server died between the append and the spawn.
+        if time.time() - (x.get('at') or 0) < 900:
+            return True
+    return False
+
+
 def settle_orphans():
     """Finish rows whose agent is gone but whose watcher never noticed.
 
@@ -3756,9 +3785,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             src = idx.get(topic, {})
             tools = roster_for(topic)
             with _lock:
-                q = replicate_queue()
-                if any(x['from'] == topic and not x.get('done') for x in q):
+                if replicate_busy(topic):
                     return self._send(200, {'ok': True, 'already': True})
+                q = replicate_queue()
                 q.append({
                     'from': topic,
                     'mode': body.get('mode') or 'new',
