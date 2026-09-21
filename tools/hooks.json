@@ -858,6 +858,20 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-21 by gen-keep-five-7.py. mechanical re-shoot of keep-five: identical words (title, caption, hook, every slide, roster), new backgrounds bg-h69/h20/h24/h32/h34/h35 picked with the gen-daily-batch walk (no hook-only vibe off the hook, copy_band_luma under 70, no adjacent vibe repeat, one person max at h32, cooldown respected, none of the keep-five photos). ARCO stays on angle v1 written out literally. hook outing recorded via mark_hook_used, 7th outing of the keep-five hook (keep-five-6, seven posts back). rebuild: python3 tools/gen-keep-five-7.py"
+  },
+  {
+   "topic": "launch-weekend-2",
+   "title": "how i ship in a weekend what used to take a month",
+   "caption": "a month of work now fits between friday night and sunday. all my tasks live in arco and i plan the whole day in 30 seconds, and focus mode puts every distraction away, my holy grail. write one setup script and codex runs it before every cloud task, so every job starts in a project that already builds and tests. mark a github repo as a template and one click copies the whole setup, so the next app starts with ci, lint and folders already in place. add 1x, 2x and 3x export settings to a figma frame and export once, so every icon and screenshot size comes out in one go. a framer form block stores submissions in the site with no backend, so the waitlist is live on the landing page saturday night. #buildinpublic #indiedev #tools #shipping #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-21 by gen-launch-weekend-2.py. Replicate of launch-weekend: same weekend-launch hook shape and roster pattern, everything else new. Hook from hook_pool (build pillar), roster ARCO, Codex, GitHub, Figma, Framer with ARCO at #1 and Codex the one LLM, six fresh backgrounds (bg-h70/31/38/22/39/45), teaching points checked against every prior caption."
   }
  ]
 }
