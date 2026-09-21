@@ -4950,7 +4950,12 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .mx.cmp .t{font-weight:600;font-size:13.5px}
 .mx.cmp th{font-size:10px;letter-spacing:.1em;padding-bottom:10px;white-space:nowrap}
 .mx.cmp .hr{font:700 17px/1 "Fira Code",monospace;color:var(--text)}
-.mx.cmp tr.lead .hr{color:var(--accent)}
+/* Green down to red on the figure itself, so the column can be read at a
+   glance without comparing rows to each other. */
+.mx.cmp .hr.r4{color:var(--ok)}
+.mx.cmp .hr.r3{color:#A3E635}
+.mx.cmp .hr.r2{color:#F5B945}
+.mx.cmp .hr.r1{color:var(--bad)}
 .best{margin-left:9px;padding:3px 7px;border-radius:5px;vertical-align:2px;
   font:600 9px/1 system-ui;letter-spacing:.07em;text-transform:uppercase;
   white-space:nowrap;
@@ -5194,8 +5199,17 @@ tr:hover .ad{opacity:.9}
   background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;
   padding:8px 11px;box-shadow:0 12px 28px rgba(0,0,0,.55);white-space:nowrap}
 .ctip[hidden]{display:none}
-.ctip b{display:block;font:600 11px/1.4 "Fira Code",monospace;color:var(--text)}
-.ctip span{font:500 11px/1.5 "Fira Code",monospace;color:var(--muted)}
+.ctip>b{display:block;font:600 11px/1.4 "Fira Code",monospace;color:var(--text);
+  margin-bottom:5px}
+/* Name in one column, figure right-aligned in the other, so the numbers line
+   up whatever the account is called. */
+.ctip .tr{display:grid;grid-template-columns:auto auto;gap:2px 14px;
+  font:500 11px/1.5 "Fira Code",monospace}
+.ctip .tr i{font-style:normal;color:var(--c)}
+.ctip .tr b{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.ctip .tr b.up{color:var(--ok)}
+.ctip .tr b.dn{color:var(--bad)}
+.ctip .tr b.z{color:var(--dim)}
 .legend{display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--muted)}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
 #menubtn,#refreshbtn{display:none}
@@ -7656,6 +7670,25 @@ function postedAt(r){
   return r.last_at;
 }
 
+// A round number near the target spacing — the axis should read 5, 10, 20,
+// never 7 or 13.
+function niceStep(span, want = 16){
+  if(span <= want) return 1;
+  const raw = Math.max(1, span) / want;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  return [1, 2, 5, 10].map(m => m * mag).find(v => v >= raw) || 10 * mag;
+}
+
+// Hit rate is the share of uploads that cleared the performing threshold, so
+// the bands are absolutes rather than a ranking — an account is not doing well
+// because the others are worse.
+function rateBand(hr){
+  if(hr >= 40) return 'r4';
+  if(hr >= 25) return 'r3';
+  if(hr >= 12) return 'r2';
+  return 'r1';
+}
+
 function dayPill(ts){
   if(!ts) return '';
   const d = new Date(ts*1000), h = dayHue(ts);
@@ -8092,7 +8125,7 @@ function analyticsView(){
           (pa[y.key].wins / Math.max(1, pa[y.key].posts)) -
           (pa[x.key].wins / Math.max(1, pa[x.key].posts)));
         const tag = a.key === rank[0].key
-          ? '<span class="best">publish first</span>'
+          ? ''
           : a.key === rank[rank.length - 1].key
             ? `<span class="worst">${Math.round(
                 (pa[rank[0].key].wins / Math.max(1, pa[rank[0].key].posts)) /
@@ -8101,7 +8134,7 @@ function analyticsView(){
         return `<tr class="${a.key===rank[0].key?'lead':''}">
           <td class="t"><i style="background:${ACOL[a.key]}"></i>${esc(a.label)}${tag}</td>
           <td class="n"><span class="sp">${v.posts}</span></td>
-          <td class="n"><span class="hr">${hr}%</span></td>
+          <td class="n"><span class="hr ${rateBand(hr)}">${hr}%</span></td>
           <td class="n"><span class="sp">${fmt(v.median)}</span></td>
           <td class="n"><span class="sp">${fmt(v.total)}</span></td>
           <td class="n"><span class="sp">${v.followers??'–'}</span></td></tr>`;
@@ -8269,14 +8302,23 @@ function analyticsView(){
                         : i * (W-L-R)/(dayList.length-1));
     const py = g => TOP + (hi-g)/Math.max(1,(hi-lo)) * (H-TOP-BOT);
     const zeroY = py(0);
+    const step = niceStep(hi - lo);
+    const ticks = [];
+    for(let v = Math.ceil(lo/step)*step; v <= hi + 1e-9; v += step) ticks.push(Math.round(v));
+    // Horizontal rules carry the value; zero is the one that means something,
+    // so it is drawn solid while the rest stay hairlines.
+    const yrules = ticks.map(v => `<line x1="${L}" y1="${py(v).toFixed(1)}"
+        x2="${W-R}" y2="${py(v).toFixed(1)}" stroke="var(--line${v===0?'-2':''})"
+        stroke-width="1" ${v===0?'':'stroke-dasharray="2 5"'}/>
+      <text x="${L-9}" y="${(py(v)+4).toFixed(1)}" fill="var(--dim)" font-size="12"
+        text-anchor="end">${v>0?'+':''}${v}</text>`).join('');
+
     const lines = gains.map(sv=>{
       const d = sv.pts.map((p,i)=>`${i?'L':'M'}${px(i).toFixed(1)},${py(p.g).toFixed(1)}`).join('');
       // The number sits on the point. Three accounts on one axis means the
       // shape alone cannot tell you whether a rise is +2 or +23.
       const dots = sv.pts.map((p,i)=>`<circle cx="${px(i).toFixed(1)}" cy="${py(p.g).toFixed(1)}"
-        r="4.5" fill="${ACOL[sv.a.key]}" stroke="var(--bg)" stroke-width="2"/>
-        <text x="${px(i).toFixed(1)}" y="${(py(p.g)-12).toFixed(1)}" text-anchor="middle"
-          font-size="15" font-weight="700" fill="${ACOL[sv.a.key]}">${p.g>0?'+':''}${p.g}</text>`).join('');
+        r="3.5" fill="${ACOL[sv.a.key]}" stroke="var(--bg)" stroke-width="1.5"/>`).join('');
       return `<path d="${d}" fill="none" stroke="${ACOL[sv.a.key]}" stroke-width="2.5"
         stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
     }).join('');
@@ -8287,20 +8329,20 @@ function analyticsView(){
     // anyone should have to do.
     const cols = dayList.map(([d, v], i) => {
       const w = (W - L - R) / Math.max(1, dayList.length);
-      const rows = accs.map(a => `${esc(a.short)} ${(v[a.key]||0) > 0 ? '+' : ''}${v[a.key]||0}`);
+      const rows = accs.map(a => {
+        const g = v[a.key] || 0;
+        return `<i style="--c:${ACOL[a.key]}">${esc(a.short)}</i>`
+             + `<b class="${g>0?'up':g<0?'dn':'z'}">${g>0?'+':''}${g}</b>`;
+      }).join('');
       return `<rect class="hitc" x="${(px(i) - w/2).toFixed(1)}" y="${TOP}"
         width="${w.toFixed(1)}" height="${H-TOP-BOT}" fill="transparent"
         data-x="${px(i).toFixed(1)}" data-day="${dmy(d)}"
-        data-rows="${esc(rows.join(' · '))}"/>`;
+        data-rows="${esc(rows)}"/>`;
     }).join('');
     trend = `<div class="chartwrap"><svg viewBox="0 0 ${W} ${H}" id="trendsvg">
       <line class="guide" x1="0" y1="${TOP}" x2="0" y2="${H-BOT}"
         stroke="var(--line-2)" stroke-width="1" opacity="0"/>
-      <line x1="${L}" y1="${zeroY.toFixed(1)}" x2="${W-R}" y2="${zeroY.toFixed(1)}"
-        stroke="var(--line-2)" stroke-dasharray="3 4"/>
-      <text x="${L-10}" y="${(zeroY+4).toFixed(1)}" fill="var(--dim)" font-size="14" text-anchor="end">0</text>
-      <text x="${L-10}" y="${(py(hi)+4).toFixed(1)}" fill="var(--dim)" font-size="14" text-anchor="end">+${hi}</text>
-      ${lines}${labels}${cols}</svg><div class="ctip" hidden></div></div>`;
+      ${yrules}${lines}${labels}${cols}</svg><div class="ctip" hidden></div></div>`;
   }
 
   const trendCard = `<div class="chart wide"><h4>Followers gained per day</h4>
@@ -9500,7 +9542,7 @@ document.addEventListener('mousemove', e => {
   const x = +col.dataset.x;
   guide.setAttribute('x1', x); guide.setAttribute('x2', x);
   guide.setAttribute('opacity', '.8');
-  tip.innerHTML = `<b>${col.dataset.day}</b><span>${col.dataset.rows}</span>`;
+  tip.innerHTML = `<b>${col.dataset.day}</b><div class="tr">${col.dataset.rows}</div>`;
   tip.hidden = false;
   tip.style.left = (x / vb.width * box.width) + 'px';
   tip.style.top  = (28 / vb.height * box.height) + 'px';
