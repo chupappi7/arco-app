@@ -1105,8 +1105,10 @@ def sync_account(key):
             for e in extra:
                 for ours, theirs in FIELDS:
                     cell[ours] = (cell.get(ours) or 0) + (e.get(theirs) or 0)
-            cell['runs'] = [{'id': str(e.get('id')), 'views': e.get('view_count', 0),
-                             'posted_at': e.get('create_time')} for e in extra]
+            cell['runs'] = [dict({'id': str(e.get('id')),
+                                  'posted_at': e.get('create_time')},
+                                 **{ours: e.get(theirs) or 0
+                                    for ours, theirs in FIELDS}) for e in extra]
             # When it FIRST went out and when it was LAST out are different
             # dates, and folding a repost into its original row kept only the
             # first. A post reposted today then sorted to nine days ago and
@@ -1197,6 +1199,24 @@ PERIODS = {'1': 1, '7': 7, '28': 28, '60': 60, '365': 365}
 
 
 
+def outings(cell):
+    """Every time one post went out on one account, oldest first.
+
+    A repost is folded into the original's row and its numbers added to the
+    total, which is right for "what has this post earned" and wrong for "what
+    went out on Monday". The runs list keeps each outing, so the original is
+    whatever the total has left once the reruns are taken off it.
+    """
+    runs = sorted(cell.get('runs') or [], key=lambda r: r.get('posted_at') or 0)
+    FIELDS = ('views', 'likes', 'comments', 'shares')
+    first = {f: (cell.get(f) or 0) - sum(r.get(f) or 0 for r in runs) for f in FIELDS}
+    out = [dict(first, at=cell.get('posted_at') or 0, id=cell.get('id'))]
+    for r in runs:
+        out.append(dict({f: r.get(f) or 0 for f in FIELDS},
+                        at=r.get('posted_at') or 0, id=r.get('id')))
+    return sorted(out, key=lambda o: o['at'])
+
+
 def analytics(period='7', only=None, frm=None, to=None):
     """Everything the Analytics tab needs, computed here rather than in JS.
 
@@ -1275,6 +1295,7 @@ def analytics(period='7', only=None, frm=None, to=None):
             'mode': (st.get(topic) or {}).get('replicate_mode'),
             'source': (st.get(topic) or {}).get('from_replicate'),
             'posted_at': max((per[k].get('posted_at') or 0) for k in per),
+            'outs': {k: outings(per[k]) for k in per},
         })
         for k, v in cells.items():
             if v is not None:
@@ -1511,20 +1532,35 @@ def _published_cohort(rows, flat, lo, hi, keys):
         ats = {k: t for k, t in when.items() if t and lo <= t < hi}
         if not ats:
             continue
-        tot = {m: sum((r[m].get(k) or 0) for k in ats)
-               for m in ('cells', 'likes', 'comments', 'shares')}
-        vs = [r['cells'][k] for k in ats if r['cells'].get(k) is not None]
+        # Count the outing that lands in this window, not the post's whole
+        # life. A post on its sixth run showed its lifetime total against the
+        # date of the sixth run, which read as one enormous day.
+        win = {}
+        for k in ats:
+            outs = [o for o in (r.get('outs') or {}).get(k, []) if lo <= o['at'] < hi]
+            win[k] = {'views': sum(o['views'] for o in outs),
+                      'likes': sum(o['likes'] for o in outs),
+                      'comments': sum(o['comments'] for o in outs),
+                      'shares': sum(o['shares'] for o in outs)} if outs else None
+        tot = {m: sum((win[k] or {}).get(f, 0) if win.get(k) else (r[m].get(k) or 0)
+                      for k in ats)
+               for m, f in (('cells', 'views'), ('likes', 'likes'),
+                            ('comments', 'comments'), ('shares', 'shares'))}
+        cells = {k: ((win[k] or {}).get('views') if win.get(k) else r['cells'].get(k))
+                 for k in ats}
+        vs = [cells[k] for k in ats if cells.get(k) is not None]
         out.append({
             'topic': r['topic'], 'thumb': r['thumb'], 'title': r['title'],
             'untracked': r['untracked'], 'promoted': r['promoted'],
             'pillar': r['pillar'],
             # Per account, never summed: one post swings 30x between them and
             # a total hides the only thing worth seeing.
-            'cells': {k: r['cells'].get(k) for k in ats},
+            'cells': cells,
             'urls': {k: r['urls'].get(k) for k in ats},
-            'per': {k: {'likes': r['likes'].get(k) or 0,
-                        'comments': r['comments'].get(k) or 0,
-                        'shares': r['shares'].get(k) or 0} for k in ats},
+            'per': {k: (win[k] if win.get(k) else
+                        {'likes': r['likes'].get(k) or 0,
+                         'comments': r['comments'].get(k) or 0,
+                         'shares': r['shares'].get(k) or 0}) for k in ats},
             'at': ats,
             # When it last went out, not when it first did.
             'last_at': max(ats.values()), 'first_at': min(ats.values()),
