@@ -60,16 +60,20 @@ for i, ((src, crop, num, title, body), bg) in enumerate(zip(SLIDES, BGS), 2):
                 f'{OUT}/{i:02d}.jpg', style=STYLE)
 
 # The closing card goes back to the hook's photograph: the villa and the two
-# cars. The card sits in the sky, where the hook copy sat, with the sky
-# scrimmed from the top edge down so there is no seam, and the cars are
-# left clear beneath the badge. The post closes on the picture it opened on.
+# cars. Icon, name and pitch sit low in the sky so the subtitle ends just
+# above the roofline, the sky scrimmed from the top edge down so there is no
+# seam, and the badge drops onto the driveway beneath the cars. Read top to
+# bottom: the pitch, the cars, the store. The post closes on the picture it
+# opened on.
 CTA_BG = base_photo('bg-h35.jpg', (1.0, 1.0, 0, 1))
 adaptive_scrim(CTA_BG, 0, 940, target=60, strength_cap=0.62)
 
+# The badge's y is `text bottom + badge_gap`; the text bottom lands at 862
+# with this box, so 548 puts the badge at 1410, clear of the cars' bumpers.
 cta_slide(None, f'{OUT}/06.jpg',
           subtitle=['Plan the day, block the rest.',
                     'The plan does the work. The block holds the line.'],
           badge=True, card=CTA_BG,
-          style={'icon': 240, 'box': (96, 984, 130, 960), 'name_size': 62,
+          style={'icon': 240, 'box': (96, 984, 270, 1100), 'name_size': 62,
                  'ink': (248, 248, 250), 'sub': (166, 166, 174),
-                 'badge_gap': 40})
+                 'badge_gap': 548})
