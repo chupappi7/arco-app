@@ -24,7 +24,7 @@
  "defaults": {
   "cta": {
    "icon": "icon.png",
-   "appName": "ARCO: Day Planner & Focus",
+   "appName": "App Blocker & Focus: ARCO",
    "subtitle": "Comment “ARCO” — I’ll send you the promo code. First 50 only: first month of Pro free."
   }
  },
@@ -820,7 +820,7 @@
   {
    "topic": "best-for-last-6",
    "title": "5 tools to stay productive, i saved the best for last",
-   "caption": "five tools to stay productive, and the best one is last. all of my tasks sit in arco and planning the day takes 30 seconds, then focus mode puts every distraction away and blocked hours repeats it every weekday, my holy grail. manus writes the plan as a checklist and takes new instructions mid run, so you correct step two while it works instead of rerunning the whole job. endel generates the sound against the time of day and your heart rate, so hour three is not hour one looping and it still works late in a session. a loom share link is live the second you stop recording, mid upload, so you send the walkthrough as you finish it. give an app a hotkey in raycast and the same keys put it away again, so your inbox opens and closes on two keys and you never pass the dock. #productivity #apps #aitools #buildinpublic",
+   "caption": "five tools to stay productive, and the best one is last. all of my tasks sit in arco and planning the day takes 30 seconds, then focus mode puts every distraction away and blocked hours repeats it every weekday, my holy grail. manus writes the plan as a checklist and takes new instructions mid run, so you correct step two while it works instead of rerunning the whole job. endel generates the sound against the time of day and your heart rate, so hour three is not hour one looping and it still works late in a session. a loom share link is live the second you stop recording, mid upload, so you send the walkthrough as you finish it. give an app a hotkey in raycast and the same keys put it away again, so your inbox opens and closes on two keys and you never pass the dock. #productivity #apps #aitools #buildinpublic #creatorsearchinsights",
    "slides": [
     "01.jpg",
     "02.jpg",
@@ -834,7 +834,7 @@
   {
    "topic": "saved-hours-3",
    "title": "5 tools that saved me hours this week",
-   "caption": "perplexity lets you aim a search at academic papers or reddit alone, so the answer stops averaging the whole internet. all my tasks live in arco and i plan the whole day in 30 seconds, with focus mode putting every distraction away. a make scenario shows the data moving through every step, so you watch where it breaks instead of reading a log. photoroom cuts the background from a whole folder in one pass. elevenlabs clones a voice from about a minute of clean audio and reads anything you write in it. #productivity #aitools #apps #automation",
+   "caption": "perplexity lets you aim a search at academic papers or reddit alone, so the answer stops averaging the whole internet. all my tasks live in arco and i plan the whole day in 30 seconds, with focus mode putting every distraction away. a make scenario shows the data moving through every step, so you watch where it breaks instead of reading a log. photoroom cuts the background from a whole folder in one pass. elevenlabs clones a voice from about a minute of clean audio and reads anything you write in it. #productivity #aitools #apps #automation #creatorsearchinsights",
    "slides": [
     "01.jpg",
     "02.jpg",
@@ -844,20 +844,6 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-21 by gen-saved-hours-3.py. mechanical re-shoot of saved-hours: identical words (title, caption, hook, every slide, roster), new backgrounds bg-h12/h21/h22/h36/h49/h88 picked with the gen-daily-batch walk (no hook-only vibe off the hook, copy_band_luma under 70, no adjacent vibe repeat, one person max at h12, cooldown respected, none of the saved-hours or saved-hours-2 photos). ARCO stays on angle v4 written out literally. hook outing recorded via mark_hook_used. rebuild: python3 tools/gen-saved-hours-3.py"
-  },
-  {
-   "topic": "keep-five-7",
-   "title": "the 5 apps i would keep if i deleted everything else",
-   "caption": "in claude code you can define your own agents and run them at the same time, one building and one reviewing, each with its own clean context window. arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. a notion database automation fires when a property changes and not on a timer, so flipping status to done stamps the date and files the page itself. github actions can run on a schedule and not only when you push, so a nightly scraper or weekly report runs on their machines. capcut can read your auto captions out loud with text to speech, so a faceless video gets a voiceover without recording anything. #productivity #apps #aitools #buildinpublic",
-   "slides": [
-    "01.jpg",
-    "02.jpg",
-    "03.jpg",
-    "04.jpg",
-    "05.jpg",
-    "06.jpg"
-   ],
-   "_note": "built 2026-09-21 by gen-keep-five-7.py. mechanical re-shoot of keep-five: identical words (title, caption, hook, every slide, roster), new backgrounds bg-h69/h20/h24/h32/h34/h35 picked with the gen-daily-batch walk (no hook-only vibe off the hook, copy_band_luma under 70, no adjacent vibe repeat, one person max at h32, cooldown respected, none of the keep-five photos). ARCO stays on angle v1 written out literally. hook outing recorded via mark_hook_used, 7th outing of the keep-five hook (keep-five-6, seven posts back). rebuild: python3 tools/gen-keep-five-7.py"
   },
   {
    "topic": "launch-weekend-2",
@@ -876,7 +862,7 @@
   {
    "topic": "launch-weekend-3",
    "title": "launch an app in one weekend",
-   "caption": "the stack that makes a weekend launch real. claude code runs in the terminal, reads the whole project and edits files directly. arco keeps the weekend on rails, tasks, plan and app blocking in one place, my holy grail. supabase gives you a real database with auth in an afternoon and the free tier covers an mvp. vercel puts the site live seconds after you push. revenuecat handles subscriptions without a payment server. #buildinpublic #indiedev #appdevelopment #coding",
+   "caption": "the stack that makes a weekend launch real. claude code runs in the terminal, reads the whole project and edits files directly. arco keeps the weekend on rails, tasks, plan and app blocking in one place, my holy grail. supabase gives you a real database with auth in an afternoon and the free tier covers an mvp. vercel puts the site live seconds after you push. revenuecat handles subscriptions without a payment server. #buildinpublic #indiedev #appdevelopment #coding #creatorsearchinsights",
    "slides": [
     "01.jpg",
     "02.jpg",

@@ -6,6 +6,7 @@ Backgrounds in tools/slides/bg (BANDS maps caption zones needing inpainting;
 bg-dNN.jpg files are clean). Icons in tools/slides/icons."""
 import os
 import re
+import textwrap
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 SF = '/System/Library/Fonts/SFNS.ttf'
@@ -180,7 +181,7 @@ def record_post_tools(topic, tools):
 # exempt from the cooldown. Everything AROUND it must be new — a feed where
 # Claude, Codex and ClickUp show up every time teaches nothing after the
 # first post, and that is what costs followers.
-ALWAYS_ALLOWED = {'ARCO', 'ARCO: Day Planner & Focus'}
+ALWAYS_ALLOWED = {'ARCO', 'App Blocker & Focus: ARCO', 'ARCO: Day Planner & Focus'}
 
 ARCO_ANGLES = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            'arco_angles.json')
@@ -985,20 +986,112 @@ def shot_slide(src, crop_top, lines, out, dark_text=False):
     canvas.save(out, quality=92)
     print('wrote', out)
 
+def phone_slide(bg, src, crop_top, number, title, body, out,
+                grad=(1.0, 0.98, 300, 1250), app='App Blocker & Focus: ARCO'):
+    """A screenshot in a drawn handset, copy beside it.
+
+    shot_slide puts a bare crop under a line of text, which reads as a
+    screenshot rather than as a product. Framing the same crop in a device and
+    setting the copy alongside it is how app posts look in the wild — the
+    phone carries the proof and the column carries the argument.
+
+    The handset is drawn rather than composited from a mockup PNG: it is a
+    rounded rect, a rim, a screen and an island, and drawing it keeps the
+    corner radius exact at whatever width the layout needs.
+    """
+    im = base_photo(bg, grad)
+    # Bright photo, black type. The scrim lifts the left column off the image
+    # without washing the whole slide out.
+    wash = Image.new('RGBA', im.size, (0, 0, 0, 0))
+    ImageDraw.Draw(wash).rectangle((0, 620, 500, im.height), fill=(255, 255, 255, 225))
+    im.paste(Image.new('RGB', im.size, (255, 255, 255)),
+             (0, 0), wash.filter(ImageFilter.GaussianBlur(70)).split()[3])
+
+    # --- the handset -------------------------------------------------------
+    PW = 516                       # body width; height follows the real ratio
+    PH = round(PW * 2622 / 1206)
+    R = round(PW * 0.125)
+    px, py = 528, 672
+
+    shadow = Image.new('RGBA', im.size, (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).rounded_rectangle(
+        (px + 12, py + 26, px + PW + 12, py + PH + 26), radius=R, fill=(0, 0, 0, 190))
+    im.paste(Image.new('RGB', im.size, (0, 0, 0)),
+             (0, 0), shadow.filter(ImageFilter.GaussianBlur(34)).split()[3])
+
+    body_im = Image.new('RGBA', (PW, PH), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(body_im)
+    bd.rounded_rectangle((0, 0, PW - 1, PH - 1), radius=R, fill=(26, 26, 30, 255))
+    # A titanium rim is a light edge on one side and a dark one on the other;
+    # without it the body reads as a flat grey rectangle.
+    bd.rounded_rectangle((0, 0, PW - 1, PH - 1), radius=R, outline=(122, 122, 130, 255), width=3)
+    bd.rounded_rectangle((3, 3, PW - 4, PH - 4), radius=R - 3, outline=(38, 38, 44, 255), width=2)
+
+    INSET = 13
+    sw, sh = PW - INSET * 2, PH - INSET * 2
+    shot = Image.open(src).convert('RGB')
+    shot = shot.crop((0, crop_top, shot.width, shot.height))
+    scale = sw / shot.width
+    shot = shot.resize((sw, round(shot.height * scale)), Image.LANCZOS)
+    if shot.height >= sh:
+        shot = shot.crop((0, 0, sw, sh))
+    else:
+        plate = Image.new('RGB', (sw, sh), shot.load()[sw // 2, shot.height - 2])
+        plate.paste(shot, (0, 0))
+        shot = plate
+    screen = Image.new('RGBA', (sw, sh), (0, 0, 0, 0))
+    mask = Image.new('L', (sw * 4, sh * 4), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, sw * 4 - 1, sh * 4 - 1),
+                                           radius=(R - INSET) * 4, fill=255)
+    screen.paste(shot, (0, 0))
+    screen.putalpha(mask.resize((sw, sh), Image.LANCZOS))
+    body_im.alpha_composite(screen, (INSET, INSET))
+
+    isl_w, isl_h = round(PW * 0.30), round(PW * 0.065)
+    ImageDraw.Draw(body_im).rounded_rectangle(
+        ((PW - isl_w) // 2, INSET + 16, (PW + isl_w) // 2, INSET + 16 + isl_h),
+        radius=isl_h // 2, fill=(0, 0, 0, 255))
+    im.paste(body_im, (px, py), body_im)
+
+    # --- the column --------------------------------------------------------
+    COL = 430
+    INK, SUB = (14, 14, 16), (66, 66, 72)
+    items = []
+    y = 700
+    if app:
+        items.append((76, y, app, font(30, 'Semibold'), 'la', SUB))
+        y += 52
+    head = f'{number}. {title}' if number else title
+    tf = font(58, 'Bold')
+    for ln in textwrap.wrap(head, width=max(10, int(COL / (tf.size * 0.50)))):
+        items.append((76, y, ln, tf, 'la', INK))
+        y += round(tf.size * 1.16)
+    y += 18
+    bf = font(40, 'Semibold')
+    for ln in textwrap.wrap(body, width=max(12, int(COL / (bf.size * 0.48)))):
+        items.append((76, y, ln, bf, 'la', SUB))
+        y += 54
+    draw_text_block(im, items, shadow_alpha=0)
+    im.save(out, quality=92)
+    print('wrote', out)
+
+
 def closing_slide(bg, lines, out):
     hook_slide(bg, lines, out)
 
 
 
 def cta_slide(bg, out, subtitle='Planner and app blocker in one.',
-              store_line='On the App Store', promo=None):
+              store_line='On the App Store', promo=None, badge=False):
     """Closing card for story posts: app icon, full store name, the pitch.
 
     `subtitle` takes a string or a list of lines — a post that has just named
     five reasons usually needs more than one to answer them.
 
     `store_line=None` drops the yellow store line; `promo` (list of lines)
-    draws a comment-gated offer in its place. Promo copy is opt-in per post
+    draws a comment-gated offer in its place. `badge=True` draws Apple's
+    Download on the App Store lockup where the store line would sit — the
+    mark people already recognise does more than the words do. Promo copy is opt-in per post
     and only on Thinh's explicit ask — he asked for the "locked" comment CTA
     on screentime-100h. Defaults keep every other post's rebuild identical."""
     im = base_photo(bg, (0.72, 0.5, 300, 1250))
@@ -1014,12 +1107,25 @@ def cta_slide(bg, out, subtitle='Planner and app blocker in one.',
     sub_f = font(42, 'Semibold')
     store_f = font(36, 'Medium')
     subs = [subtitle] if isinstance(subtitle, str) else list(subtitle)
-    items = [(540, 940, 'ARCO: Day Planner & Focus', name_f, 'ma', (255, 255, 255))]
+    items = [(540, 940, 'App Blocker & Focus: ARCO', name_f, 'ma', (255, 255, 255))]
     y = 1035
     for ln in subs:
         items.append((540, y, ln, sub_f, 'ma', (235, 235, 235)))
         y += 62
-    if store_line:
+    if badge:
+        bdg = Image.open(f'{ICONS}/appstore-badge.png').convert('RGBA')
+        bw = 440
+        bdg = bdg.resize((bw, round(bdg.height * bw / bdg.width)), Image.LANCZOS)
+        # The badge is black on black, so it needs its own edge to sit on.
+        pad, rad = 10, 26
+        plate = Image.new('RGBA', (bw + pad*2, bdg.height + pad*2), (0, 0, 0, 0))
+        ImageDraw.Draw(plate).rounded_rectangle(
+            (0, 0, plate.width-1, plate.height-1), radius=rad,
+            fill=(0, 0, 0, 235), outline=(255, 255, 255, 70), width=2)
+        plate.alpha_composite(bdg, (pad, pad))
+        im.paste(plate, (540 - plate.width//2, y + 14), plate)
+        y += plate.height + 6
+    elif store_line:
         items.append((540, y + 18, store_line, store_f, 'ma', (255, 214, 10)))
     if promo:
         py = y + 30
