@@ -69,11 +69,13 @@ CTA_BG = base_photo('bg-h35.jpg', (1.0, 1.0, 0, 1))
 adaptive_scrim(CTA_BG, 0, 940, target=60, strength_cap=0.62)
 
 # The badge's y is `text bottom + badge_gap`; the text bottom lands at 862
-# with this box, so 548 puts the badge at 1410, clear of the cars' bumpers.
+# with this box, so 72 tucks the badge straight under the subtitle at 934,
+# over the roofline. A white ring gives the black lockup an edge against the
+# house, which the sky-scrim never reaches.
 cta_slide(None, f'{OUT}/06.jpg',
           subtitle=['Plan the day, block the rest.',
                     'The plan does the work. The block holds the line.'],
           badge=True, card=CTA_BG,
           style={'icon': 240, 'box': (96, 984, 270, 1100), 'name_size': 62,
                  'ink': (248, 248, 250), 'sub': (166, 166, 174),
-                 'badge_gap': 548})
+                 'badge_gap': 72, 'badge_outline': 4})

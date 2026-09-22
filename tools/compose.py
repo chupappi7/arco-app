@@ -1261,6 +1261,16 @@ def cta_slide(bg, out, subtitle='Planner and app blocker in one.',
         bdg = bdg.resize((bw, round(bdg.height * bw / bdg.width)), Image.LANCZOS)
         bx = (X0 + 64) if left else cx - bw // 2
         by = (y + st.get('badge_gap', 62)) if flat else (Y1 - bdg.height - 86)
+        # `badge_outline` (px) rings the lockup in white, following its rounded
+        # shape: the black badge on a dark photograph has no edge of its own.
+        ow = st.get('badge_outline', 0)
+        if ow:
+            pad = ow + 2
+            ring = Image.new('L', (bdg.width + 2 * pad, bdg.height + 2 * pad), 0)
+            ring.paste(bdg.split()[3], (pad, pad))
+            ring = ring.filter(ImageFilter.MaxFilter(2 * ow + 1))
+            im.paste(Image.new('RGB', ring.size, (255, 255, 255)),
+                     (bx - pad, by - pad), ring)
         im.paste(bdg, (bx, by), bdg)
     elif store_line:
         draw_text_block(im, [(cx, Y1 - 124, store_line,
