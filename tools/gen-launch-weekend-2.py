@@ -26,12 +26,14 @@ and changes everything that would make it a repeat:
             publish, CMS collections, analytics, A/B tests, localization.
   photos    none of the six frames launch-weekend was shot on (bg-h17, h21,
             h16, h09, h02, h04) and none from the post before this one.
-            Hook on bg-h70, the first desk-led-neon frame with no person that
-            the hook log has not used. App slides on the dark set:
+            Hook on bg-h48, a daylight desk-city-day frame with no person that
+            the hook log has not used (was bg-h70, a night neon desk, until
+            Thinh asked for a brighter one on 2026-09-22). App slides on the
+            dark set:
             month-in-a-weekend recorded that daylight frames passing the
             luma gate still failed the read.
 
-  01 hook    bg-h70  desk-led-neon, roster icons on the shelf under the hook
+  01 hook    bg-h48  desk-city-day, roster icons on the shelf under the hook
   02 ARCO    bg-h31  lounge-night       copy_band_luma 19.7
   03 Codex   bg-h38  supercars-dusk     copy_band_luma 21.2
   04 GitHub  bg-h22  lounge-day         copy_band_luma 53.5
@@ -42,6 +44,11 @@ Redo 2026-09-21: the hook slide went out bare and Thinh asked for the app
 icons on it, so 01 now carries the roster's icon shelf (ARCO, Codex, GitHub,
 Figma, Framer, 3 over 2) the way the other five-app posts do. Slides 02-06 are
 untouched.
+
+Redo 2026-09-22: Thinh asked for a brighter background on the hook slide, so
+01 moved from bg-h70 (night neon desk) to bg-h48 (daylight desk, city view),
+the brightest desk frame the hook log had not used. Slides 02-06 are untouched
+again.
 
 Usage:
     python3 tools/gen-launch-weekend-2.py            # every slide
@@ -76,7 +83,7 @@ SOURCE_BGS = ['bg-h17.jpg', 'bg-h21.jpg', 'bg-h16.jpg',
               'bg-h09.jpg', 'bg-h02.jpg', 'bg-h04.jpg']
 
 # index 0 is the hook, 1..5 are the app slides in order.
-BGS = ['bg-h70.jpg',   # 01 hook    desk-led-neon
+BGS = ['bg-h48.jpg',   # 01 hook    desk-city-day, brighter than the h70 it replaced
        'bg-h31.jpg',   # 02 ARCO    lounge-night       band luma 19.7
        'bg-h38.jpg',   # 03 Codex   supercars-dusk     band luma 21.2
        'bg-h22.jpg',   # 04 GitHub  lounge-day         band luma 53.5

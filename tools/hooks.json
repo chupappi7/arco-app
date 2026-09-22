@@ -871,7 +871,7 @@
     "05.jpg",
     "06.jpg"
    ],
-   "_note": "built 2026-09-21 by gen-launch-weekend-2.py. Replicate of launch-weekend: same weekend-launch hook shape and roster pattern, everything else new. Hook from hook_pool (build pillar), roster ARCO, Codex, GitHub, Figma, Framer with ARCO at #1 and Codex the one LLM, six fresh backgrounds (bg-h70/31/38/22/39/45), teaching points checked against every prior caption."
+   "_note": "built 2026-09-21 by gen-launch-weekend-2.py. Replicate of launch-weekend: same weekend-launch hook shape and roster pattern, everything else new. Hook from hook_pool (build pillar), roster ARCO, Codex, GitHub, Figma, Framer with ARCO at #1 and Codex the one LLM, six fresh backgrounds (bg-h48/31/38/22/39/45; the hook moved from bg-h70 to the brighter daylight desk bg-h48 on 2026-09-22 at Thinh's request, slides 02-06 untouched), teaching points checked against every prior caption."
   },
   {
    "topic": "launch-weekend-3",
