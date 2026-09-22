@@ -872,6 +872,20 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-21 by gen-launch-weekend-3.py. mechanical re-shoot of launch-weekend: identical words (title, caption, hook, every slide, roster), new backgrounds bg-h14/h20/h24/h29/h34/h35 picked with the gen-daily-batch walk (no hook-only vibe off the hook, copy_band_luma under 70, no adjacent vibe repeat, one person max at h14, cooldown respected, none of the launch-weekend or launch-weekend-2 photos). hook added to hook_pool.json (build) and its outing recorded via mark_hook_used. rebuild: python3 tools/gen-launch-weekend-3.py"
+  },
+  {
+   "topic": "under-an-hour",
+   "title": "4 things that cut my screen time",
+   "caption": "i never deleted an app. the blocks run on a schedule, the day is planned so there are no gaps to fill, and i can finally see where the hours go. 57 hours in a week, 24 of them on tiktok — that number is what made me change it. ARCO is free on the App Store. #screentime #focus #productivity #digitaldetox #creatorsearchinsights",
+   "_note": "Shot on the app itself: a handset per screen on a dark fade, the reason beside it. Built by tools/gen-under-an-hour.py.",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ]
   }
  ]
 }

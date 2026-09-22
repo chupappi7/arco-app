@@ -986,93 +986,169 @@ def shot_slide(src, crop_top, lines, out, dark_text=False):
     canvas.save(out, quality=92)
     print('wrote', out)
 
-def phone_slide(bg, src, crop_top, number, title, body, out,
-                grad=(1.0, 0.98, 300, 1250), app='App Blocker & Focus: ARCO'):
-    """A screenshot in a drawn handset, copy beside it.
+def linear_ground(top, bot, size=(1080, 1920)):
+    """A vertical fade, built once and handed to a slide as its ground.
 
-    shot_slide puts a bare crop under a line of text, which reads as a
-    screenshot rather than as a product. Framing the same crop in a device and
-    setting the copy alongside it is how app posts look in the wild — the
-    phone carries the proof and the column carries the argument.
-
-    The handset is drawn rather than composited from a mockup PNG: it is a
-    rounded rect, a rim, a screen and an island, and drawing it keeps the
-    corner radius exact at whatever width the layout needs.
+    Lives here rather than in a generator because every slide in a post has to
+    use the identical ramp or the set reads as eight different backgrounds.
     """
-    im = base_photo(bg, grad)
-    # Bright photo, black type. The scrim lifts the left column off the image
-    # without washing the whole slide out.
-    wash = Image.new('RGBA', im.size, (0, 0, 0, 0))
-    ImageDraw.Draw(wash).rectangle((0, 620, 500, im.height), fill=(255, 255, 255, 225))
-    im.paste(Image.new('RGB', im.size, (255, 255, 255)),
-             (0, 0), wash.filter(ImageFilter.GaussianBlur(70)).split()[3])
+    w, h = size
+    strip = Image.new('RGB', (1, h))
+    px = strip.load()
+    for i in range(h):
+        t = i / (h - 1)
+        px[0, i] = tuple(round(top[k] + (bot[k] - top[k]) * t) for k in range(3))
+    return strip.resize((w, h))
+
+
+def phone_slide(bg, src, crop_top, number, title, body, out,
+                grad=(1.0, 0.98, 300, 1250), app='App Blocker & Focus: ARCO',
+                style=None):
+    """A screenshot in a handset on a plain ground, copy beside it.
+
+    Shaped after the app-listing posts that work on TikTok: flat off-white,
+    device on the left at real proportions, and a column on the right that
+    reads top-down — source line, name, what it does. No photograph, because
+    a photo behind a product shot is two subjects competing.
+
+    `bg` may be a hex colour or the filename of a background photo.
+    """
+    st = {'ground': '#F4F4F4', 'ink': (17, 17, 19), 'sub': (92, 92, 98),
+          'eyebrow': (17, 17, 19), 'title_size': 74, 'body_size': 44,
+          'app_size': 34, 'lead': 1.1, 'phone_w': 524, 'phone_y': 372,
+          'col_x': 626, 'col_w': 400, 'col_y': 880,
+          'side': 'left', 'title_face': 'Bold', 'body_face': 'Regular',
+          'app_face': 'Regular'}
+    st.update(style or {})
+
+    if isinstance(bg, Image.Image):
+        im = bg.convert('RGB').copy()
+    elif isinstance(bg, str) and bg.startswith('#'):
+        im = Image.new('RGB', (1080, 1920), bg)
+    elif isinstance(bg, str) and bg.endswith(('.jpg', '.png')):
+        im = base_photo(bg, grad)
+    else:
+        im = Image.new('RGB', (1080, 1920), st['ground'])
 
     # --- the handset -------------------------------------------------------
-    PW = 516                       # body width; height follows the real ratio
+    PW = st['phone_w']
     PH = round(PW * 2622 / 1206)
     R = round(PW * 0.125)
-    px, py = 528, 672
+    py = st['phone_y']
+    px = 52 if st['side'] == 'left' else 1080 - 52 - PW
 
     shadow = Image.new('RGBA', im.size, (0, 0, 0, 0))
     ImageDraw.Draw(shadow).rounded_rectangle(
-        (px + 12, py + 26, px + PW + 12, py + PH + 26), radius=R, fill=(0, 0, 0, 190))
+        (px + 6, py + 20, px + PW + 6, py + PH + 20), radius=R, fill=(0, 0, 0, 90))
     im.paste(Image.new('RGB', im.size, (0, 0, 0)),
-             (0, 0), shadow.filter(ImageFilter.GaussianBlur(34)).split()[3])
+             (0, 0), shadow.filter(ImageFilter.GaussianBlur(30)).split()[3])
 
-    body_im = Image.new('RGBA', (PW, PH), (0, 0, 0, 0))
+    body_im = Image.new('RGBA', (PW + 12, PH), (0, 0, 0, 0))
     bd = ImageDraw.Draw(body_im)
-    bd.rounded_rectangle((0, 0, PW - 1, PH - 1), radius=R, fill=(26, 26, 30, 255))
-    # A titanium rim is a light edge on one side and a dark one on the other;
-    # without it the body reads as a flat grey rectangle.
-    bd.rounded_rectangle((0, 0, PW - 1, PH - 1), radius=R, outline=(122, 122, 130, 255), width=3)
-    bd.rounded_rectangle((3, 3, PW - 4, PH - 4), radius=R - 3, outline=(38, 38, 44, 255), width=2)
+    # Buttons first, so the rim overlaps them the way a real edge does.
+    for y0, y1 in ((round(PH * 0.20), round(PH * 0.26)),
+                   (round(PH * 0.29), round(PH * 0.37))):
+        bd.rounded_rectangle((0, y0, 7, y1), radius=3, fill=(152, 152, 158, 255))
+    bd.rounded_rectangle((PW + 5, round(PH * 0.26), PW + 11, round(PH * 0.38)),
+                         radius=3, fill=(152, 152, 158, 255))
 
-    INSET = 13
+    # Metal is not a grey outline, it is a sequence of tones across the width
+    # of the band: a bright outer lip, a darker body, a light catch, then a
+    # dark line where it meets the glass. Drawn as concentric rings, each one
+    # vertically graded so the edge is brighter at the ends than the middle —
+    # that gradient along the length is what stops it reading as a stroke.
+    def graded(lo, hi, gamma=0.7):
+        col = Image.new('L', (1, PH))
+        for yy in range(PH):
+            t = yy / (PH - 1)
+            col.putpixel((0, yy), hi - int((hi - lo) * (1 - abs(t - 0.5) * 2) ** gamma))
+        return col.resize((PW, PH))
+
+    RINGS = [(0, graded(150, 246), R),          # outer lip, catches most light
+             (3, graded(96, 198), R - 3),       # body of the band
+             (7, graded(188, 252), R - 7),      # the catch line
+             (9, graded(40, 96), R - 9)]        # shadow where it meets glass
+    for inset, col, rad in RINGS:
+        ring = Image.new('L', (PW, PH), 0)
+        ImageDraw.Draw(ring).rounded_rectangle(
+            (inset, inset, PW - 1 - inset, PH - 1 - inset), radius=max(2, rad), fill=255)
+        tone = Image.merge('RGBA', (col, col, col, ring))
+        body_im.alpha_composite(tone, (6, 0))
+
+    # Specular streaks down the long sides, where a real edge picks up the room.
+    spec = Image.new('RGBA', (PW, PH), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(spec)
+    for sx in (2, PW - 4):
+        sd.rounded_rectangle((sx, round(PH * 0.10), sx + 2, round(PH * 0.42)),
+                             radius=1, fill=(255, 255, 255, 120))
+        sd.rounded_rectangle((sx, round(PH * 0.56), sx + 2, round(PH * 0.86)),
+                             radius=1, fill=(255, 255, 255, 90))
+    body_im.alpha_composite(spec.filter(ImageFilter.GaussianBlur(1.4)), (6, 0))
+
+    EDGE = 11
+    bd.rounded_rectangle((6 + EDGE, EDGE, PW + 5 - EDGE, PH - 1 - EDGE),
+                         radius=R - EDGE, fill=(8, 8, 10, 255))
+    INSET = 17
     sw, sh = PW - INSET * 2, PH - INSET * 2
     shot = Image.open(src).convert('RGB')
     shot = shot.crop((0, crop_top, shot.width, shot.height))
-    scale = sw / shot.width
-    shot = shot.resize((sw, round(shot.height * scale)), Image.LANCZOS)
-    if shot.height >= sh:
-        shot = shot.crop((0, 0, sw, sh))
-    else:
-        plate = Image.new('RGB', (sw, sh), shot.load()[sw // 2, shot.height - 2])
-        plate.paste(shot, (0, 0))
-        shot = plate
+    scale = max(sw / shot.width, sh / shot.height)
+    shot = shot.resize((round(shot.width * scale), round(shot.height * scale)),
+                       Image.LANCZOS)
+    x = (shot.width - sw) // 2
+    shot = shot.crop((x, 0, x + sw, sh))
     screen = Image.new('RGBA', (sw, sh), (0, 0, 0, 0))
     mask = Image.new('L', (sw * 4, sh * 4), 0)
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, sw * 4 - 1, sh * 4 - 1),
                                            radius=(R - INSET) * 4, fill=255)
     screen.paste(shot, (0, 0))
     screen.putalpha(mask.resize((sw, sh), Image.LANCZOS))
-    body_im.alpha_composite(screen, (INSET, INSET))
+    body_im.alpha_composite(screen, (6 + INSET, INSET))
 
-    isl_w, isl_h = round(PW * 0.30), round(PW * 0.065)
+    isl_w, isl_h = round(PW * 0.30), round(PW * 0.068)
     ImageDraw.Draw(body_im).rounded_rectangle(
-        ((PW - isl_w) // 2, INSET + 16, (PW + isl_w) // 2, INSET + 16 + isl_h),
+        (6 + (PW - isl_w) // 2, INSET + 14, 6 + (PW + isl_w) // 2, INSET + 14 + isl_h),
         radius=isl_h // 2, fill=(0, 0, 0, 255))
-    im.paste(body_im, (px, py), body_im)
+    im.paste(body_im, (px - 6, py), body_im)
 
     # --- the column --------------------------------------------------------
-    COL = 430
-    INK, SUB = (14, 14, 16), (66, 66, 72)
-    items = []
-    y = 700
-    if app:
-        items.append((76, y, app, font(30, 'Semibold'), 'la', SUB))
-        y += 52
     head = f'{number}. {title}' if number else title
-    tf = font(58, 'Bold')
-    for ln in textwrap.wrap(head, width=max(10, int(COL / (tf.size * 0.50)))):
-        items.append((76, y, ln, tf, 'la', INK))
-        y += round(tf.size * 1.16)
-    y += 18
-    bf = font(40, 'Semibold')
-    for ln in textwrap.wrap(body, width=max(12, int(COL / (bf.size * 0.48)))):
-        items.append((76, y, ln, bf, 'la', SUB))
-        y += 54
+    COL, CX = st['col_w'], st['col_x']
+
+    def wrap_px(text, f, width):
+        words, lines, cur = text.split(), [], ''
+        for w in words:
+            trial = f'{cur} {w}'.strip()
+            if cur and f.getlength(trial) > width:
+                lines.append(cur)
+                cur = w
+            else:
+                cur = trial
+        if cur:
+            lines.append(cur)
+        return lines
+
+    for size in range(st['title_size'], st['title_size'] - 22, -2):
+        tf = font(size, st['title_face'])
+        tlines = wrap_px(head, tf, COL)
+        if len(tlines) <= 3:
+            break
+    bf = font(st['body_size'], st['body_face'])
+
+    items, y = [], st['col_y']
+    if app:
+        items.append((CX, y, app, font(st['app_size'], st['app_face']), 'la',
+                      st['eyebrow']))
+        y += 60
+    for ln in tlines:
+        items.append((CX, y, ln, tf, 'la', st['ink']))
+        y += round(tf.size * st['lead'])
+    y += 26
+    for ln in wrap_px(body, bf, COL):
+        items.append((CX, y, ln, bf, 'la', st['sub']))
+        y += round(bf.size * 1.32)
     draw_text_block(im, items, shadow_alpha=0)
-    im.save(out, quality=92)
+    im.save(out, quality=94)
     print('wrote', out)
 
 
@@ -1082,7 +1158,8 @@ def closing_slide(bg, lines, out):
 
 
 def cta_slide(bg, out, subtitle='Planner and app blocker in one.',
-              store_line='On the App Store', promo=None, badge=False):
+              store_line='On the App Store', promo=None, badge=False,
+              card=False, style=None):
     """Closing card for story posts: app icon, full store name, the pitch.
 
     `subtitle` takes a string or a list of lines — a post that has just named
@@ -1094,45 +1171,100 @@ def cta_slide(bg, out, subtitle='Planner and app blocker in one.',
     mark people already recognise does more than the words do. Promo copy is opt-in per post
     and only on Thinh's explicit ask — he asked for the "locked" comment CTA
     on screentime-100h. Defaults keep every other post's rebuild identical."""
-    im = base_photo(bg, (0.72, 0.5, 300, 1250))
-    im = frame_for_band(im, 600, 1300)
-    adaptive_scrim(im, 560, 1340, target=88)
-    ic, mask = rounded_icon(f'{ICONS}/icon-arco.png', size=250, radius=56)
-    sh = Image.new('RGBA', im.size, (0, 0, 0, 0))
-    ImageDraw.Draw(sh).rounded_rectangle((415, 625, 665, 875), radius=56, fill=(0, 0, 0, 170))
-    sh = sh.filter(ImageFilter.GaussianBlur(20))
-    im.paste(Image.new('RGB', im.size, (0, 0, 0)), (0, 0), sh.split()[3])
-    im.paste(ic, (415, 610), mask)
-    name_f = font(58, 'Bold')
-    sub_f = font(42, 'Semibold')
-    store_f = font(36, 'Medium')
+    if not card:
+        im = base_photo(bg, (0.72, 0.5, 300, 1250))
+        im = frame_for_band(im, 600, 1300)
+        adaptive_scrim(im, 560, 1340, target=88)
+        ic, mask = rounded_icon(f'{ICONS}/icon-arco.png', size=250, radius=56)
+        sh = Image.new('RGBA', im.size, (0, 0, 0, 0))
+        ImageDraw.Draw(sh).rounded_rectangle((415, 625, 665, 875), radius=56,
+                                             fill=(0, 0, 0, 170))
+        sh = sh.filter(ImageFilter.GaussianBlur(20))
+        im.paste(Image.new('RGB', im.size, (0, 0, 0)), (0, 0), sh.split()[3])
+        im.paste(ic, (415, 610), mask)
+        name_f, sub_f = font(58, 'Bold'), font(42, 'Semibold')
+        store_f = font(36, 'Medium')
+        subs = [subtitle] if isinstance(subtitle, str) else list(subtitle)
+        items = [(540, 940, 'App Blocker & Focus: ARCO', name_f, 'ma', (255, 255, 255))]
+        y = 1035
+        for ln in subs:
+            items.append((540, y, ln, sub_f, 'ma', (235, 235, 235)))
+            y += 62
+        if store_line:
+            items.append((540, y + 18, store_line, store_f, 'ma', (255, 214, 10)))
+        if promo:
+            py_, promo_f = y + 30, font(40, 'Bold')
+            for ln in promo:
+                items.append((540, py_, ln, promo_f, 'ma', YELLOW))
+                py_ += 60
+        draw_text_block(im, items)
+        im.save(out, quality=92)
+        print('wrote', out)
+        return
+
+    # A product card, not four things floating on a scrim. The photo stays a
+    # photo, and everything you act on sits on one panel — the only slide in
+    # the post that is not a screenshot in a handset, so it should look like
+    # a different object rather than a dimmer version of the same one.
+    st = {'panel': (255, 255, 255, 246), 'ink': (13, 13, 15), 'sub': (78, 78, 84),
+          'align': 'center', 'icon': 236, 'box': (96, 984, 470, 1450), 'radius': 52,
+          'name_size': 54, 'grad': (1.0, 0.94)}
+    st.update(style or {})
+    # `card` as a colour means no panel and no photograph: the same flat ground
+    # the slides sit on, so the closing card belongs to the set rather than
+    # arriving as a different kind of object.
+    flat = isinstance(card, (str, Image.Image))
+    if flat:
+        im = (card.convert('RGB').copy() if isinstance(card, Image.Image)
+              else Image.new('RGB', (1080, 1920), card))
+    else:
+        im = base_photo(bg, (st['grad'][0], st['grad'][1], 300, 1250))
+    X0, X1, Y0, Y1 = st['box']
+    R = st['radius']
+    if not flat:
+        sh = Image.new('RGBA', im.size, (0, 0, 0, 0))
+        ImageDraw.Draw(sh).rounded_rectangle((X0 + 6, Y0 + 22, X1 + 6, Y1 + 22),
+                                             radius=R, fill=(0, 0, 0, 150))
+        im.paste(Image.new('RGB', im.size, (0, 0, 0)),
+                 (0, 0), sh.filter(ImageFilter.GaussianBlur(40)).split()[3])
+        panel = Image.new('RGBA', (X1 - X0, Y1 - Y0), (0, 0, 0, 0))
+        ImageDraw.Draw(panel).rounded_rectangle(
+            (0, 0, panel.width - 1, panel.height - 1), radius=R, fill=st['panel'])
+        im.paste(panel, (X0, Y0), panel)
+
+    left = st['align'] == 'left'
+    cx = (X0 + 64) if left else (X0 + X1) // 2
+    anch = 'la' if left else 'ma'
+    ics = st['icon']
+    im.paste(*( (lambda ic, mask: (ic, ((X0 + 64) if left else cx - ics // 2, Y0 + 84), mask))(
+        *rounded_icon(f'{ICONS}/icon-arco.png', size=ics, radius=int(ics * 0.225)))))
+
+    INK, SUB = st['ink'], st['sub']
+    ny = Y0 + 132 + ics
+    items = [(cx, ny, 'App Blocker & Focus: ARCO',
+              font(st['name_size'], 'Semi Condensed Bold'), anch, INK)]
+    y = ny + st.get('name_gap', 108)
     subs = [subtitle] if isinstance(subtitle, str) else list(subtitle)
-    items = [(540, 940, 'App Blocker & Focus: ARCO', name_f, 'ma', (255, 255, 255))]
-    y = 1035
     for ln in subs:
-        items.append((540, y, ln, sub_f, 'ma', (235, 235, 235)))
-        y += 62
+        items.append((cx, y, ln, font(38, 'Semi Condensed Medium'), anch, SUB))
+        y += 56
+    if promo:
+        y += 8
+        for ln in promo:
+            items.append((cx, y, ln, font(38, 'Semi Condensed Bold'), anch, INK))
+            y += 54
+    draw_text_block(im, items, shadow_alpha=0)
+
     if badge:
         bdg = Image.open(f'{ICONS}/appstore-badge.png').convert('RGBA')
-        bw = 440
+        bw = st.get('badge_w', 440)
         bdg = bdg.resize((bw, round(bdg.height * bw / bdg.width)), Image.LANCZOS)
-        # The badge is black on black, so it needs its own edge to sit on.
-        pad, rad = 10, 26
-        plate = Image.new('RGBA', (bw + pad*2, bdg.height + pad*2), (0, 0, 0, 0))
-        ImageDraw.Draw(plate).rounded_rectangle(
-            (0, 0, plate.width-1, plate.height-1), radius=rad,
-            fill=(0, 0, 0, 235), outline=(255, 255, 255, 70), width=2)
-        plate.alpha_composite(bdg, (pad, pad))
-        im.paste(plate, (540 - plate.width//2, y + 14), plate)
-        y += plate.height + 6
+        bx = (X0 + 64) if left else cx - bw // 2
+        by = (y + st.get('badge_gap', 62)) if flat else (Y1 - bdg.height - 86)
+        im.paste(bdg, (bx, by), bdg)
     elif store_line:
-        items.append((540, y + 18, store_line, store_f, 'ma', (255, 214, 10)))
-    if promo:
-        py = y + 30
-        promo_f = font(40, 'Bold')
-        for ln in promo:
-            items.append((540, py, ln, promo_f, 'ma', YELLOW))
-            py += 60
-    draw_text_block(im, items)
+        draw_text_block(im, [(cx, Y1 - 124, store_line,
+                              font(36, 'Semi Condensed Semibold'), anch,
+                              (120, 120, 126))], shadow_alpha=0)
     im.save(out, quality=92)
     print('wrote', out)

@@ -9,7 +9,8 @@ same picture, which is the whole reason to shoot it this way.
 import os
 import sys
 sys.path.insert(0, '/Users/thinh/SIXSIX/arco-app/tools')
-from compose import hook_slide, phone_slide, cta_slide
+from compose import (hook_slide, phone_slide, cta_slide, linear_ground,
+                     base_photo, adaptive_scrim)
 
 REPO = '/Users/thinh/SIXSIX/arco-app'
 SHOTS = '/Users/thinh/Desktop/appstore screens'
@@ -19,39 +20,56 @@ os.makedirs(OUT, exist_ok=True)
 SIM = 'Simulator Screenshot - iPhone 17 Pro - 2026-09-21 at'
 
 hook_slide('bg-h35.jpg',
-           ['i cut 3 hours of screen time', 'without deleting a single app'],
+           ['4 things that cut my screen time', 'not one of them is willpower'],
            f'{OUT}/01.jpg')
 
 # crop_top clears the status bar without eating the page title.
 SLIDES = [
-    ('Screenshot 2026-09-21 at 2.35.22.png', 60, None,
-     'This was the week that started it.',
-     '57 hours. 24 of them on TikTok alone.'),
-    (f'{SIM} 02.48.07.png', 150, '1',
-     'Plan tomorrow the night before.',
-     'A day with no gaps has nowhere to scroll.'),
+    ('Screenshot 2026-09-21 at 2.37.56.png', 40, '1',
+     'The apps lock on a schedule.',
+     'Blocked hours run themselves. The feed does not open during them.'),
     (f'{SIM} 03.09.49.png', 150, '2',
-     'Every hour already has a job.',
-     'You do not reach for it when you know what is next.'),
-    ('IMG_4283.PNG', 120, '3',
-     'The apps lock while you work.',
-     'Thirty minutes at a time. TikTok and Instagram, gone.'),
-    ('Screenshot 2026-09-21 at 2.37.56.png', 40, '4',
-     'Try anyway and it asks why.',
-     'That one question ends most of the attempts.'),
-    (f'{SIM} 02.52.56.png', 150, '5',
-     'Chase the other number instead.',
-     '14 hours focused this week. 20 days straight reading.'),
+     'A planned day keeps me on the work.',
+     'Without a plan I scroll all day. With one, every hour already has a job.'),
+    ('Screenshot 2026-09-21 at 2.35.22.png', 60, '3',
+     'I can see where the hours went.',
+     '57 in a week. 24 of them on TikTok. Seeing it is what made me change it.'),
+    ('IMG_4283.PNG', 120, '4',
+     'Focus mode and the distractions are gone.',
+     'When I need to lock in, one session takes TikTok and Instagram away.'),
 ]
 
-# Bright frames only — black type needs a light picture under it.
-BGS = ['bg-n02.jpg', 'bg-h48.jpg', 'bg-h52.jpg',
-       'bg-n03.jpg', 'bg-h50.jpg', 'bg-h51.jpg']
+# A dark fade, not a photograph: a picture behind a product shot is two
+# subjects competing, and the handset's metal edge has nothing to catch
+# against on a light ground.
+GROUND = linear_ground((26, 28, 33), (9, 9, 11))
+BGS = [GROUND] * len(SLIDES)
+
+# Copy on the left, handset on the right, on a flat ground. Semi Condensed
+# Heavy cuts harder at thumbnail size than SF Bold does, and the column sits
+# above the phone's midline rather than on it.
+STYLE = {'side': 'right', 'col_x': 72, 'col_w': 392, 'col_y': 665,
+         'title_face': 'Semi Condensed Heavy', 'body_face': 'Semi Condensed Medium',
+         'app_face': 'Semi Condensed Bold',
+         'title_size': 62, 'body_size': 35, 'app_size': 28, 'lead': 1.05,
+         'ink': (248, 248, 250), 'sub': (166, 166, 174),
+         'eyebrow': (248, 248, 250)}
 
 for i, ((src, crop, num, title, body), bg) in enumerate(zip(SLIDES, BGS), 2):
-    phone_slide(bg, f'{SHOTS}/{src}', crop, num, title, body, f'{OUT}/{i:02d}.jpg')
+    phone_slide(bg, f'{SHOTS}/{src}', crop, num, title, body,
+                f'{OUT}/{i:02d}.jpg', style=STYLE)
 
-cta_slide('bg-h34.jpg', f'{OUT}/08.jpg',
-          subtitle=['plan the day, block the rest.',
-                    'the plan does the work — the block holds the line.'],
-          badge=True)
+# The closing card goes back to the hook's photograph: the villa and the two
+# cars. The card sits in the sky, where the hook copy sat, with the sky
+# scrimmed from the top edge down so there is no seam, and the cars are
+# left clear beneath the badge. The post closes on the picture it opened on.
+CTA_BG = base_photo('bg-h35.jpg', (1.0, 1.0, 0, 1))
+adaptive_scrim(CTA_BG, 0, 940, target=60, strength_cap=0.62)
+
+cta_slide(None, f'{OUT}/06.jpg',
+          subtitle=['Plan the day, block the rest.',
+                    'The plan does the work. The block holds the line.'],
+          badge=True, card=CTA_BG,
+          style={'icon': 240, 'box': (96, 984, 130, 960), 'name_size': 62,
+                 'ink': (248, 248, 250), 'sub': (166, 166, 174),
+                 'badge_gap': 40})
