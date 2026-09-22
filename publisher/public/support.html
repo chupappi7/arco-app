@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+<link rel="icon" type="image/png" sizes="1024x1024" href="/icon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Support · ARCO Publisher</title>
+<style>
+:root{
+  --bg:#F4F4F5; --surface:#FFFFFF; --surface-2:#E4E4E7; --line:#E4E4E7; --line-2:#D4D4D8; --well:#FAFAFA;
+  --text:#18181B; --muted:#52525B; --dim:#71717A;
+  --accent:#0284C7; --ok:#22C55E; --warn:#F59E0B; --bad:#F43F5E;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+a{color:var(--accent)}
+.wrap{max-width:880px;margin:0 auto;padding:0 20px 64px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:28px;padding:22px 0;border-bottom:1px solid var(--line)}
+header h1{font-size:17px;font-weight:600;margin:0;letter-spacing:-.01em}
+header .sp{margin-left:auto}
+.badge{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);
+  border:1px solid var(--line-2);border-radius:999px;padding:4px 10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  overflow:hidden;margin-bottom:18px}
+.sec{padding:22px 26px;border-bottom:1px solid var(--line)}
+.sec:last-child{border-bottom:0}
+.cap{display:block;font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:14px}
+label{display:block;font-size:12px;color:var(--muted);margin:0 0 7px}
+select,input{width:100%;background:var(--well);color:var(--text);border:1px solid var(--line-2);
+  border-radius:9px;padding:12px 13px;font:inherit;min-height:46px}
+select:focus,input:focus{border-color:var(--accent);outline:none}
+.req{color:var(--bad)}
+.note{display:block;font-size:12.5px;color:var(--dim);line-height:1.55;margin-top:9px}
+.note.warn{color:var(--warn)}
+.note.bad{color:var(--bad)}
+/* who we are posting as */
+.who{display:flex;align-items:center;gap:13px}
+.who img{width:44px;height:44px;min-width:44px;max-width:44px;border-radius:50%;
+  object-fit:cover;display:block;border:1px solid var(--line-2)}
+.who b{display:block;font-size:15px;font-weight:600;line-height:1.35}
+.who span{display:block;font-size:13px;color:var(--muted);margin-top:1px}
+/* one control per row */
+.row{display:flex;align-items:flex-start;gap:18px;padding:17px 0;
+  border-bottom:1px solid var(--line)}
+.row:first-of-type{padding-top:0}
+.row:last-child{padding-bottom:0;border-bottom:0}
+.row .txt{flex:1;min-width:0}
+.row .t{display:block;font-size:14px;font-weight:600;line-height:1.4}
+.row .d{display:block;font-size:12.5px;color:var(--dim);line-height:1.55;margin-top:4px}
+.row.muted .t{color:var(--muted)}
+/* switch, with a real checkbox underneath for keyboard and screen readers */
+.sw{position:relative;width:46px;height:27px;min-width:46px;margin-top:1px}
+.sw input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;z-index:2;cursor:pointer}
+.sw i{position:absolute;inset:0;border-radius:999px;background:#C9C9CF;
+  transition:background .2s ease;pointer-events:none}
+.sw i::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;
+  border-radius:50%;background:#F8FAFC;transition:transform .2s ease;
+  box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.sw input:checked~i{background:var(--accent)}
+.sw input:checked~i::after{transform:translateX(19px)}
+.sw input:focus-visible~i{outline:2px solid var(--accent);outline-offset:2px}
+.sw input:disabled{cursor:not-allowed}
+.sw input:disabled~i{opacity:.35}
+/* commercial disclosure */
+.disc{margin-top:16px;padding:16px;border-radius:10px;background:var(--well);border:1px solid var(--line)}
+.opts{display:flex;gap:10px;flex-wrap:wrap}
+.chk{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-2);
+  background:var(--surface);border-radius:9px;padding:9px 13px;font-size:13px;
+  cursor:pointer;min-height:42px}
+.chk input{width:auto;min-height:0;margin:0;padding:0}
+/* preview */
+.prev{display:flex;gap:9px;overflow-x:auto;padding-bottom:4px}
+.prev img{width:56px;height:100px;min-width:56px;object-fit:cover;display:block;
+  border-radius:7px;border:1px solid var(--line-2);background:var(--well)}
+.cap-t{margin-top:15px;font-size:13px;font-weight:600;line-height:1.45}
+.cap-b{margin-top:6px;font-size:12.5px;color:var(--muted);line-height:1.6}
+.consent{padding:15px 26px;background:var(--well);border-top:1px solid var(--line);
+  font-size:12.5px;color:var(--muted);line-height:1.65}
+.foot{padding:20px 26px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;background:var(--accent);color:#FFFFFF;border-radius:9px;padding:11px 18px;
+  font-weight:600;font-size:13px;min-height:44px}
+.btn.sec{background:#FFFFFF;color:var(--text);border:1px solid var(--line-2)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.hint{flex-basis:100%;font-size:12px;color:var(--dim);line-height:1.55;margin:0}
+.empty{padding:44px 26px;text-align:center;color:var(--dim)}
+.status{margin-top:14px;padding:13px 15px;border-radius:9px;background:var(--well);
+  border:1px solid var(--line);font-size:13px;line-height:1.6;color:var(--muted)}
+.status b{color:var(--text)}
+.status.ok{border-color:#86efac;color:#166534;background:#f0fdf4}
+.status.err{border-color:#fca5a5;color:#991b1b;background:#fef2f2}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line-2);
+  border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;
+  vertical-align:-2px;margin-right:7px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* site chrome */
+header nav{display:flex;gap:18px;flex-wrap:wrap;margin-left:auto}
+header nav a{color:var(--muted);text-decoration:none;font-size:13px}
+header nav a:hover{color:var(--text)}
+.hero{padding:56px 0 40px}
+.hero h2{font-size:34px;line-height:1.15;letter-spacing:-.02em;margin:0 0 16px;max-width:640px}
+.hero p{font-size:16px;color:var(--muted);line-height:1.65;max-width:600px;margin:0 0 24px}
+.cta{display:flex;gap:10px;flex-wrap:wrap}
+.cta a{text-decoration:none}
+.tool{max-width:640px}
+section.s{padding:44px 0;border-top:1px solid var(--line)}
+section.s h3{font-size:22px;letter-spacing:-.015em;margin:0 0 6px}
+section.s>p.lead{color:var(--muted);margin:0 0 26px;line-height:1.6;max-width:600px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+.step .n{display:inline-block;width:26px;height:26px;border-radius:50%;background:#E0F2FE;
+  color:var(--accent);font-weight:600;font-size:13px;text-align:center;line-height:26px;margin-bottom:12px}
+.step b{display:block;font-size:14px;margin-bottom:6px}
+.step span{display:block;font-size:13px;color:var(--muted);line-height:1.55}
+table.acc{width:100%;border-collapse:collapse;font-size:13.5px}
+table.acc th,table.acc td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
+table.acc th{color:var(--dim);font-weight:500;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+table.acc td:first-child{white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--accent)}
+table.acc td:nth-child(2){color:var(--text)}
+table.acc td:nth-child(3){color:var(--muted)}
+.faq details{border-bottom:1px solid var(--line);padding:14px 0}
+.faq summary{cursor:pointer;font-weight:600;font-size:14px;list-style:none;display:flex;justify-content:space-between;gap:12px}
+.faq summary::after{content:"+";color:var(--dim)}
+.faq details[open] summary::after{content:"–"}
+.faq p{margin:10px 0 0;color:var(--muted);line-height:1.6;font-size:13.5px}
+footer{border-top:1px solid var(--line);padding:26px 0 0;display:flex;gap:18px;flex-wrap:wrap;align-items:center;
+  font-size:12.5px;color:var(--dim)}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--text)}
+footer .sp{margin-left:auto}
+.doc{max-width:680px}
+.doc h2{font-size:28px;letter-spacing:-.02em;margin:48px 0 8px}
+.doc .date{color:var(--dim);font-size:13px;margin-bottom:28px}
+.doc h3{font-size:16px;margin:28px 0 8px}
+.doc p,.doc li{color:var(--muted);line-height:1.7;font-size:14.5px}
+.doc ul{padding-left:20px}
+@media(max-width:600px){.hero h2{font-size:27px} header{flex-wrap:wrap} header nav{margin-left:0;flex-basis:100%}}
+/* icon: white-on-black asset on a dark page needs a ring and a glow to read */
+.logo{width:30px;height:30px;border-radius:8px;display:block;
+  box-shadow:0 1px 2px rgba(0,0,0,.2),0 6px 18px -6px rgba(0,0,0,.35)}
+/* a quiet halo behind the hero */
+.hero{position:relative}
+.hero::before{content:"";position:absolute;left:-120px;top:-60px;width:520px;height:360px;
+  border-radius:50%;pointer-events:none;z-index:-1;
+  background:radial-gradient(closest-side,rgba(2,132,199,.10),rgba(2,132,199,.03) 55%,transparent 75%)}
+body{background:radial-gradient(1200px 600px at 20% -10%,rgba(2,132,199,.06),transparent 60%),var(--bg)}
+.card{box-shadow:0 1px 2px rgba(0,0,0,.04),0 12px 32px -20px rgba(0,0,0,.25)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><a href="/" style="color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:10px"><img src="/icon.png" alt="" class="logo" width="30" height="30">ARCO Publisher</a></h1>
+    <nav>
+      <a href="/#how">How it works</a>
+      <a href="/#access">What we access</a>
+      <a href="/#faq">FAQ</a>
+      <a href="/support.html">Support</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+    </nav>
+  </header>
+  <article class="doc">
+
+    <h2>Support</h2>
+    <div class="date">We answer within two business days.</div>
+    <h3>Something did not post</h3>
+    <p>The status box under the Post button shows TikTok's own processing result. The most common
+      causes are: the TikTok token expired (press <b>Disconnect</b>, then sign in again), the
+      account has reached TikTok's limit of five pending posts in 24 hours, or a transient
+      <i>internal_error</i> from TikTok, which clears on the next attempt.</p>
+    <h3>The privacy dropdown is missing an option</h3>
+    <p>We show exactly the privacy levels your TikTok account allows, read fresh on every page load.
+      A private account, for example, cannot post to "Everyone". "Only me" disappears when
+      Branded Content is selected, because TikTok does not allow branded content to be private.</p>
+    <h3>Disconnecting and revoking access</h3>
+    <p><b>Disconnect</b> on the posting page deletes the session cookie in your browser. To revoke
+      the app entirely, open TikTok, go to <i>Settings and privacy › Security &amp; permissions › Apps and services</i>,
+      and remove ARCO Publisher.</p>
+    <h3>Contact</h3>
+    <p>Email <a href="mailto:thinht7110@gmail.com?subject=ARCO%20Publisher%20support">thinht7110@gmail.com</a>
+      with the account username and the time of the attempt. For the ARCO iOS app itself, see the
+      <a href="https://chupappi7.github.io/arco-app/support.html">ARCO support page</a>.</p>
+
+  </article>
+  <footer style="margin-top:56px">
+    <span>© 2026 ARCO Publisher</span>
+    <span class="sp"></span>
+    <a href="/support.html">Support</a>
+    <a href="/privacy.html">Privacy</a>
+    <a href="/terms.html">Terms</a>
+    <a href="https://apps.apple.com/app/id6761037446" target="_blank" rel="noopener">ARCO for iOS</a>
+  </footer>
+</div>
+</body>
+</html>
