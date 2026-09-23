@@ -1041,6 +1041,20 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-23 by gen-lock-in-screens.py on _veiled_screens (Thinh: the new screentime way, hook and copy aligned to discipline, list reasons). discipline hook from hook_pool, four ARCO screens on veiled photos, icon card closing on ARCO angle s2 from next_arco_angle('discipline'). Each claim checked in the iOS source; none repeats a caption, lock-in-anyway or today's screens posts."
+  },
+  {
+   "topic": "boring-phone-screens",
+   "title": "my phone is boring now and it changed everything",
+   "caption": "my phone is boring now and it changed everything, here is why. the blocked app has no ignore button, screen time limits give you ignore limit but this screen has one button and it keeps the app shut. block the whole social category instead of app by app, so every app in it locks, not only the ones you remembered. after 25 minutes in one app it asks if that is still why you opened it, and block for today shuts it till midnight. and the timeline widget puts today's habits on the home screen, so you start, pause or check one off without opening an app. all of it is arco. ARCO is free on the App Store. #screentime #digitaldetox #phoneaddiction #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-23 by gen-boring-phone-screens.py (shared build in tools/_veiled_screens.py). screentime pillar on veiled photos: hook 'my phone is boring now' from hook_rules.eligible('screentime'), least recently used, with the 'here is why' kicker; four ARCO screens as reasons (shield has no bypass button, category blocking, 25 minute check with Block for today, Timeline widget), each checked in the iOS source; closer is ARCO angle f1 via next_arco_angle('screentime'); card icon and badge outlined. Backgrounds bg-h43/h36/h48/n04/n06/h31, today's screens posts excluded. rebuild: python3 tools/gen-boring-phone-screens.py"
   }
  ]
 }
