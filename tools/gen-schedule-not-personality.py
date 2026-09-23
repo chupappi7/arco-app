@@ -14,8 +14,14 @@ a hooks.json caption, no-willpower-screens or hundred-hours-screens.
 The closer is ARCO angle s1, drawn once by next_arco_angle('discipline') and
 frozen here. Backgrounds picked by the gen-daily-batch rules with today's
 screens posts excluded, then frozen.
+
+Thinh's fix the same day: "here is why" under the hook, and a thin white
+outline on the card's icon and App Store badge. Only 01 and 06 changed;
+`python3 gen-schedule-not-personality.py 1 6` re-renders just those.
 """
-from _veiled_screens import build, PLAN_DAY, TODAY, GOOD_HABITS, CONTROL
+import sys
+from _veiled_screens import (build, PLAN_DAY, TODAY, GOOD_HABITS, CONTROL,
+                             KICKER, CARD_OUTLINE)
 
 build(
     topic='schedule-not-personality',
@@ -42,4 +48,7 @@ build(
     ],
     closer=['Blocked Hours closes the apps on a schedule I set once.',
             '9am arrives and the feeds simply do not open.'],
-    pillar='discipline')
+    pillar='discipline',
+    kicker=KICKER,
+    card_style=CARD_OUTLINE,
+    only={int(a) for a in sys.argv[1:]} or None)

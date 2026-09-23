@@ -6,6 +6,11 @@ Thinh's note (2026-09-23): same concept, but on normal backgrounds with the
 opacity turned down so only a little of the photo shows. The fade stays as
 the base and the photo is laid over it at VEIL, so every slide keeps the
 fade's legibility while no two slides look identical.
+
+Thinh's note on schedule-not-personality (2026-09-23), for every post built
+from here on: end the hook with "here is why" (`kicker`), and ring the card's
+icon and App Store badge in a thin white outline (`CARD_OUTLINE`). Both are
+opt-in so the posts already out rebuild unchanged.
 """
 import json
 import os
@@ -30,6 +35,9 @@ TODAY = (f'{SIM} 03.09.49.png', 150)
 FADE = linear_ground((26, 28, 33), (9, 9, 11))
 VEIL = 0.22          # ceiling on how much of the photograph shows through
 VEIL_LUMA = 11       # the light a photo may add, so bright frames stay faint
+
+KICKER = 'here is why'
+CARD_OUTLINE = {'icon_outline': 3, 'badge_outline': 3}
 
 STYLE = {'side': 'right', 'col_x': 72, 'col_w': 392, 'col_y': 665,
          'title_face': 'Semi Condensed Heavy', 'body_face': 'Semi Condensed Medium',
@@ -88,9 +96,13 @@ def pick_bgs(topic, n, exclude=()):
     return [hook] + out
 
 
-def build(topic, hook, bgs, slides, closer, pillar='screentime'):
+def build(topic, hook, bgs, slides, closer, pillar='screentime', kicker=None,
+          card_style=None, only=None):
     """bgs: hook, one per screen, then the closing card's. `pillar` is the
-    hook's own tag; discipline posts use the same screens."""
+    hook's own tag; discipline posts use the same screens. `kicker` is the
+    line under the hook, `card_style` extends the closing card's style.
+    `only` (slide numbers) re-renders just those slides and leaves the rest,
+    and the hook and background histories, untouched."""
     out = f'{c.REPO}/drafts/{topic}'
     os.makedirs(out, exist_ok=True)
     if len(bgs) != len(slides) + 2:
@@ -101,19 +113,27 @@ def build(topic, hook, bgs, slides, closer, pillar='screentime'):
     for (_, _, title, body) in slides:
         assert_teaches(title, [body])
 
-    hook_slide(bgs[0], hook, f'{out}/01.jpg')
-    if not any(e.get('topic') == topic for e in hook_rules.history()):
+    want = (lambda n: only is None or n in only)
+    if want(1):
+        hook_slide(bgs[0], hook, f'{out}/01.jpg', kicker=kicker)
+    if only is None and not any(e.get('topic') == topic for e in hook_rules.history()):
         mark_hook_used(hook, topic)
 
     for i, (((src, crop), num, title, body), bg) in enumerate(zip(slides, bgs[1:-1]), 2):
+        if not want(i):
+            continue
         phone_slide(veiled(bg), f'{SHOTS}/{src}', crop, num, title, body,
                     f'{out}/{i:02d}.jpg', style=STYLE)
 
-    cta_slide(None, f'{out}/{len(slides) + 2:02d}.jpg', subtitle=closer,
-              badge=True, card=veiled(bgs[-1]),
-              style={'icon': 240, 'box': (96, 984, 520, 1400), 'name_size': 62,
-                     'ink': (248, 248, 250), 'sub': (176, 176, 184)})
+    if want(len(slides) + 2):
+        cta_slide(None, f'{out}/{len(slides) + 2:02d}.jpg', subtitle=closer,
+                  badge=True, card=veiled(bgs[-1]),
+                  style={'icon': 240, 'box': (96, 984, 520, 1400), 'name_size': 62,
+                         'ink': (248, 248, 250), 'sub': (176, 176, 184),
+                         **(card_style or {})})
 
+    if only is not None:
+        return
     if not any(e.get('topic') == topic for e in c.tool_history()):
         record_post_tools(topic, ['ARCO'])
     record_post_bgs(topic, bgs)

@@ -686,7 +686,7 @@ def icon_shelf(im, icons, top=ICON_SHELF_TOP, size=ICON_SIZE, gap=ICON_GAP):
 
 
 def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
-               accent=YELLOW, icons=None):
+               accent=YELLOW, icons=None, kicker=None):
     """Stacked uppercase hook: big headline, smaller line under it.
 
     `lines[0]` is the headline and should be SHORT (two or three words); it
@@ -696,6 +696,10 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
     Sizes shrink to fit the safe width but never grow past the ceilings, so a
     long headline gets smaller rather than running off the slide. If line 1
     lands far under its ceiling the headline is too long: shorten it.
+
+    `kicker` is a short white line under the hook ("here is why"), a push to
+    swipe rather than part of the hook, so the pool hook stays the hook the
+    guards check. Opt-in: without it every rebuild is identical.
     """
     assert_hook_approved(lines)
     # drafts/<topic>/01.jpg — the topic is already in the path, so the guard
@@ -703,7 +707,8 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
     assert_hook_fresh(lines, os.path.basename(os.path.dirname(os.path.abspath(out))))
     im = base_photo(bg, grad)
     im = frame_for_band(im, HOOK_BAND[0], HOOK_BAND[1])
-    adaptive_scrim(im, HOOK_BAND[0], HOOK_BAND[1], target=88, strength_cap=0.62)
+    adaptive_scrim(im, HOOK_BAND[0], HOOK_BAND[1] + (90 if kicker else 0),
+                   target=88, strength_cap=0.62)
 
     l1, l2 = lines[0].upper(), lines[1].upper()
     f2 = _fit_display(l2, 'Condensed Bold', HOOK_L2_SIZE, HOOK_MAX_W)
@@ -746,7 +751,9 @@ def hook_slide(bg, lines, out, grad=(0.85, 0.72, 300, 1300), style=None,
         # land on second, and yellow on a dark photo does that without moving
         # anything. Geometry stays frozen; only the fill changes.
         (540, HOOK_L2_TOP + (b2[3] - b2[1]) / 2, l2, f2, 'mm', accent),
-    ])
+    ] + ([(540, HOOK_L2_TOP + (b2[3] - b2[1]) + 40, kicker.upper(),
+           _fit_display(kicker.upper(), 'Condensed Bold', 62, HOOK_MAX_W),
+           'ma', WHITE)] if kicker else []))
     icon_shelf(im, icons)
     _json.dump({'hook': list(lines), 'pillar': hook_rules.pillar_of(lines)},
                open(os.path.join(os.path.dirname(os.path.abspath(out)),
@@ -1236,8 +1243,18 @@ def cta_slide(bg, out, subtitle='Planner and app blocker in one.',
     cx = (X0 + 64) if left else (X0 + X1) // 2
     anch = 'la' if left else 'ma'
     ics = st['icon']
-    im.paste(*( (lambda ic, mask: (ic, ((X0 + 64) if left else cx - ics // 2, Y0 + 84), mask))(
-        *rounded_icon(f'{ICONS}/icon-arco.png', size=ics, radius=int(ics * 0.225)))))
+    ic, mask = rounded_icon(f'{ICONS}/icon-arco.png', size=ics, radius=int(ics * 0.225))
+    ix, iy = ((X0 + 64) if left else cx - ics // 2), Y0 + 84
+    # `icon_outline` (px): the same white ring as `badge_outline`, for a black
+    # icon that otherwise has no edge on a dark ground.
+    iow = st.get('icon_outline', 0)
+    if iow:
+        pad = iow + 2
+        ring = Image.new('L', (ics + 2 * pad, ics + 2 * pad), 0)
+        ring.paste(mask, (pad, pad))
+        ring = ring.filter(ImageFilter.MaxFilter(2 * iow + 1))
+        im.paste(Image.new('RGB', ring.size, (255, 255, 255)), (ix - pad, iy - pad), ring)
+    im.paste(ic, (ix, iy), mask)
 
     INK, SUB = st['ink'], st['sub']
     ny = Y0 + 132 + ics
