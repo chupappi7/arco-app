@@ -914,6 +914,76 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-23 by gen-run-it-all-at-19-3.py. build pillar, stacked hook with icon shelf, third outing of the run-it-all hook. Roster ARCO, ChatGPT, n8n, Canva, Cloudflare with ARCO at #1 and ChatGPT the one LLM. ARCO angle v8 drawn via next_arco_angle('business') and pinned in the generator. Teaching points checked against every caption: ChatGPT transparent PNGs, n8n error workflow, Canva websites, Cloudflare R2 no egress fees. Backgrounds bg-h17/h35/h49/h31/h52/h37, hook from pick_hook_bg, none shared with business-at-19-3. rebuild: python3 tools/gen-run-it-all-at-19-3.py"
+  },
+  {
+   "topic": "boring-phone-2",
+   "title": "my phone is boring now and it changed everything",
+   "caption": "my phone is boring now and it changed everything. arco blocks the feeds on a timetable, not on willpower, so there is no decision left to make when the hour starts, my holy grail. raise to wake is off, so lifting the phone shows a black screen instead of a pile of alerts. the feed apps are hidden behind face id, so they drop off the home screen and out of search. a focus shows one home screen page of tools, so the page with the feeds is not there to swipe to. and badges are off for every app, so no icon sits there with a red number asking to be opened. #screentime #digitaldetox #focus #iphonetips #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-23 by gen-boring-phone-2.py (shared build in tools/_screentime_common.py). screentime method post: hook from hook_pool (screentime pillar, least recently used eligible), ARCO leads at 1 with angle s2 via next_arco_angle('screentime'), four stock iOS settings as steps 2-5, rule_slide with no badge and yellow titles per Thinh's screentime-100h notes. No icon shelf: a screentime post has no roster. Backgrounds bg-h30/h20/h21/h22/h24/h29 from the gen-daily-batch walk. Teaching points checked against every caption."
+  },
+  {
+   "topic": "three-hours-back-2",
+   "title": "i cut 3 hours of screen time without deleting a single app",
+   "caption": "i cut 3 hours of screen time and every app is still on my phone. arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs, my holy grail. the feed apps go into the scheduled summary at noon and 8pm, so the pings arrive together instead of forty times a day. youtube watch history is paused, so the home feed is blank and you search the one video you came for. siri suggestions are off for the feeds, so the phone stops offering tiktok at the hour you usually open it. and each feed is signed out but installed, so opening it starts at a login screen instead of a video. #screentime #digitaldetox #focus #iphonetips #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-23 by gen-three-hours-back-2.py (shared build in tools/_screentime_common.py). screentime method post: hook from hook_pool (screentime pillar), ARCO leads at 1 with angle f1 via next_arco_angle('screentime'), four no-delete steps. No icon shelf: no roster. Backgrounds bg-h71/h31/h32/h37/n04/h35; bg-h34 and bg-h46 were swapped out after the first render put the copy over monitors. Teaching points checked against every caption."
+  },
+  {
+   "topic": "pay-for-twelve-3",
+   "title": "i pay for 12 apps, these 5 do all the work",
+   "caption": "twelve subscriptions, and these five are the ones doing the work. i keep every task in arco and plan tomorrow in 30 seconds, then focus mode puts every distraction away the moment it starts, the one i would not delete. gemini audio overview turns an uploaded doc into a two host podcast, so 40 pages of notes get covered on a walk with the screen off. zapier copilot builds the whole zap from one sentence, so you check the apps it picked and switch it on. descript remove retakes finds every line you restarted and keeps one take, so a recording full of false starts comes back as one clean read. the notion agent builds a database and fills it from your own pages, so a content calendar arrives with the posts already in it. #productivity #aitools #apps #automation #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-23 by gen-pay-for-twelve-3.py. tools pillar, stacked hook with icon shelf. Roster ARCO, Gemini, Zapier, Descript, Notion; ARCO #1, Gemini the one LLM. ARCO angle v5 via next_arco_angle('planning'). Teaching points checked against every caption: Gemini Audio Overview, Zapier Copilot, Descript Remove retakes, Notion agent. Gemini moved off Canvas-to-web-page after business-at-19-3 took it. Frames bg-h75/h22/h37/n01/h52/h88; desk-city frames with bright monitors behind the copy were swapped out after reading the renders. rebuild: python3 tools/gen-pay-for-twelve-3.py"
+  },
+  {
+   "topic": "4x-productivity-10",
+   "title": "the tools i used to 4x my productivity",
+   "caption": "the tools behind the 4x, and the one thing each does that most people skip. i manage all my tasks in arco and plan the day in 30 seconds, focus mode puts every distraction away and blocked hours keeps them away on its own. chatgpt on a mac reads the code editor or terminal you have open and writes the fix into the file, so there is no block to paste. write fixes #12 in a github pull request and merging it closes the issue, so the to do list updates itself as the code lands. put ! before a link in obsidian and the whole note shows inline, so one checklist lives in every project note and one edit updates them all. the n8n template library has community workflows you import in one click, so the automation starts nearly finished. #productivity #tools #aitools #buildinpublic #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-23 by gen-4x-productivity-10.py. tools pillar, stacked hook with icon shelf. Roster ARCO, ChatGPT, GitHub, Obsidian, n8n; ARCO #1, ChatGPT the one LLM. ARCO angle v6 via next_arco_angle('planning'). Teaching points checked against every caption: ChatGPT work with apps on Mac, GitHub closing keywords, Obsidian embeds, n8n template library. Frames bg-h77/h20/h38/n03/h39/h51; h38 and h39 on the darker ramp because a white car sits under the body copy. rebuild: python3 tools/gen-4x-productivity-10.py"
+  },
+  {
+   "topic": "wish-i-knew-at-17-6",
+   "title": "5 apps i wish someone showed me at 17",
+   "caption": "five apps i wish someone had shown me at 17. i start a session in arco and every app on the list locks itself, four hours later the phone has not been picked up once, my holy grail. antigravity lets you choose whether its agent may run terminal commands without asking, so nothing installs or deletes until you say yes. canva magic grab lifts the person out of a photo onto their own layer, so you can move them or put the title behind them. a capcut template keeps the cuts and effects and you drop in your clips, so a trending edit is yours in a minute. figma select matching layers grabs every copy of a style at once, so one edit restyles forty buttons. #apps #productivity #student #aitools #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-23 by gen-wish-i-knew-at-17-6.py. tools pillar, stacked hook with icon shelf. Roster ARCO, Antigravity, Canva, CapCut, Figma; ARCO #1, Antigravity the one LLM. ARCO angle f2 via next_arco_angle('focus'): the hook is about being 17, so the slide answers with the phone locked through a session. Teaching points checked against every caption: Antigravity terminal policy, Canva Magic Grab, CapCut templates, Figma select matching layers (moved off the student plan, which echoed the GitHub student pack caption). Frames bg-h74/n06/h88/h31/n04/h32. rebuild: python3 tools/gen-wish-i-knew-at-17-6.py"
   }
  ]
 }

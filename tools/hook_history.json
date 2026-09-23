@@ -567,13 +567,6 @@
   ]
  },
  {
-  "topic": "keep-five-7",
-  "hook": [
-   "the 5 apps i would keep",
-   "if i deleted everything else"
-  ]
- },
- {
   "topic": "launch-weekend-2",
   "hook": [
    "how i ship in a weekend",
@@ -588,6 +581,34 @@
   ]
  },
  {
+  "topic": "under-an-hour",
+  "hook": [
+   "4 things that cut my screen time",
+   "not one of them is willpower"
+  ]
+ },
+ {
+  "topic": "pay-for-twelve-3",
+  "hook": [
+   "i pay for 12 apps",
+   "these 5 do all the work"
+  ]
+ },
+ {
+  "topic": "4x-productivity-10",
+  "hook": [
+   "the tools i used to",
+   "4x my productivity"
+  ]
+ },
+ {
+  "topic": "wish-i-knew-at-17-6",
+  "hook": [
+   "5 apps i wish someone",
+   "showed me at 17"
+  ]
+ },
+ {
   "topic": "business-at-19-3",
   "hook": [
    "the tools i use to run my business",
@@ -599,6 +620,20 @@
   "hook": [
    "everything i run my business on",
    "at 19"
+  ]
+ },
+ {
+  "topic": "boring-phone-2",
+  "hook": [
+   "my phone is boring now",
+   "and it changed everything"
+  ]
+ },
+ {
+  "topic": "three-hours-back-2",
+  "hook": [
+   "i cut 3 hours of screen time",
+   "without deleting a single app"
   ]
  }
 ]

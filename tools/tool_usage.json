@@ -1216,6 +1216,36 @@
   ]
  },
  {
+  "topic": "pay-for-twelve-3",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Zapier",
+   "Descript",
+   "Notion"
+  ]
+ },
+ {
+  "topic": "4x-productivity-10",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "GitHub",
+   "Obsidian",
+   "n8n"
+  ]
+ },
+ {
+  "topic": "wish-i-knew-at-17-6",
+  "tools": [
+   "ARCO",
+   "Antigravity",
+   "Canva",
+   "CapCut",
+   "Figma"
+  ]
+ },
+ {
   "topic": "business-at-19-3",
   "tools": [
    "ARCO",
@@ -1233,6 +1263,24 @@
    "n8n",
    "Canva",
    "Cloudflare"
+  ]
+ },
+ {
+  "topic": "boring-phone-2",
+  "tools": [
+   "ARCO"
+  ]
+ },
+ {
+  "topic": "three-hours-back-2",
+  "tools": [
+   "ARCO"
+  ]
+ },
+ {
+  "topic": "screentime-100h-2",
+  "tools": [
+   "ARCO"
   ]
  }
 ]

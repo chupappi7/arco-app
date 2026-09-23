@@ -1024,6 +1024,61 @@
   ]
  },
  {
+  "topic": "pay-for-twelve-3",
+  "bgs": [
+   "bg-h75.jpg",
+   "bg-h22.jpg",
+   "bg-h37.jpg",
+   "bg-n01.jpg",
+   "bg-h52.jpg",
+   "bg-h88.jpg"
+  ]
+ },
+ {
+  "topic": "4x-productivity-10",
+  "bgs": [
+   "bg-h77.jpg",
+   "bg-h20.jpg",
+   "bg-h38.jpg",
+   "bg-n03.jpg",
+   "bg-h39.jpg",
+   "bg-h51.jpg"
+  ]
+ },
+ {
+  "topic": "wish-i-knew-at-17-6",
+  "bgs": [
+   "bg-h74.jpg",
+   "bg-n06.jpg",
+   "bg-h88.jpg",
+   "bg-h31.jpg",
+   "bg-n04.jpg",
+   "bg-h32.jpg"
+  ]
+ },
+ {
+  "topic": "boring-phone-2",
+  "bgs": [
+   "bg-h30.jpg",
+   "bg-h20.jpg",
+   "bg-h21.jpg",
+   "bg-h22.jpg",
+   "bg-h24.jpg",
+   "bg-h29.jpg"
+  ]
+ },
+ {
+  "topic": "three-hours-back-2",
+  "bgs": [
+   "bg-h71.jpg",
+   "bg-h31.jpg",
+   "bg-h32.jpg",
+   "bg-h37.jpg",
+   "bg-n04.jpg",
+   "bg-h35.jpg"
+  ]
+ },
+ {
   "topic": "business-at-19-3",
   "bgs": [
    "bg-h16.jpg",
@@ -1043,6 +1098,17 @@
    "bg-h31.jpg",
    "bg-h52.jpg",
    "bg-h37.jpg"
+  ]
+ },
+ {
+  "topic": "screentime-100h-2",
+  "bgs": [
+   "bg-n10.jpg",
+   "bg-h36.jpg",
+   "bg-h24.jpg",
+   "bg-h88.jpg",
+   "bg-n01.jpg",
+   "bg-h22.jpg"
   ]
  }
 ]
