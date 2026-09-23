@@ -930,20 +930,6 @@
    "_note": "built 2026-09-23 by gen-boring-phone-2.py (shared build in tools/_screentime_common.py). screentime method post: hook from hook_pool (screentime pillar, least recently used eligible), ARCO leads at 1 with angle s2 via next_arco_angle('screentime'), four stock iOS settings as steps 2-5, rule_slide with no badge and yellow titles per Thinh's screentime-100h notes. No icon shelf: a screentime post has no roster. Backgrounds bg-h30/h20/h21/h22/h24/h29 from the gen-daily-batch walk. Teaching points checked against every caption."
   },
   {
-   "topic": "three-hours-back-2",
-   "title": "i cut 3 hours of screen time without deleting a single app",
-   "caption": "i cut 3 hours of screen time and every app is still on my phone. arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs, my holy grail. the feed apps go into the scheduled summary at noon and 8pm, so the pings arrive together instead of forty times a day. youtube watch history is paused, so the home feed is blank and you search the one video you came for. siri suggestions are off for the feeds, so the phone stops offering tiktok at the hour you usually open it. and each feed is signed out but installed, so opening it starts at a login screen instead of a video. #screentime #digitaldetox #focus #iphonetips #creatorsearchinsights",
-   "slides": [
-    "01.jpg",
-    "02.jpg",
-    "03.jpg",
-    "04.jpg",
-    "05.jpg",
-    "06.jpg"
-   ],
-   "_note": "built 2026-09-23 by gen-three-hours-back-2.py (shared build in tools/_screentime_common.py). screentime method post: hook from hook_pool (screentime pillar), ARCO leads at 1 with angle f1 via next_arco_angle('screentime'), four no-delete steps. No icon shelf: no roster. Backgrounds bg-h71/h31/h32/h37/n04/h35; bg-h34 and bg-h46 were swapped out after the first render put the copy over monitors. Teaching points checked against every caption."
-  },
-  {
    "topic": "pay-for-twelve-3",
    "title": "i pay for 12 apps, these 5 do all the work",
    "caption": "twelve subscriptions, and these five are the ones doing the work. i keep every task in arco and plan tomorrow in 30 seconds, then focus mode puts every distraction away the moment it starts, the one i would not delete. gemini audio overview turns an uploaded doc into a two host podcast, so 40 pages of notes get covered on a walk with the screen off. zapier copilot builds the whole zap from one sentence, so you check the apps it picked and switch it on. descript remove retakes finds every line you restarted and keeps one take, so a recording full of false starts comes back as one clean read. the notion agent builds a database and fills it from your own pages, so a content calendar arrives with the posts already in it. #productivity #aitools #apps #automation #creatorsearchinsights",
@@ -984,6 +970,20 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-23 by gen-wish-i-knew-at-17-6.py. tools pillar, stacked hook with icon shelf. Roster ARCO, Antigravity, Canva, CapCut, Figma; ARCO #1, Antigravity the one LLM. ARCO angle f2 via next_arco_angle('focus'): the hook is about being 17, so the slide answers with the phone locked through a session. Teaching points checked against every caption: Antigravity terminal policy, Canva Magic Grab, CapCut templates, Figma select matching layers (moved off the student plan, which echoed the GitHub student pack caption). Frames bg-h74/n06/h88/h31/n04/h32. rebuild: python3 tools/gen-wish-i-knew-at-17-6.py"
+  },
+  {
+   "topic": "three-hours-back-2",
+   "title": "i cut 3 hours of screen time without deleting a single app",
+   "caption": "every app is still on my phone. they just lock. blocked hours shut the feeds on a schedule i set once, a focus session keeps tiktok and instagram closed until the timer ends, the day gets planned before it starts so no hour is left empty, and insights show where the hours went instead. ARCO is free on the App Store. #screentime #digitaldetox #focus #productivity #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "rebuilt 2026-09-23 by gen-three-hours-back-2.py in the under-an-hour concept on Thinh's note (use the screenshots): hook slide unchanged, four ARCO screens in a handset on the dark fade, flat icon card with the store badge. First version (ARCO + four iOS steps on photos) is at 0ece2e7."
   }
  ]
 }
