@@ -1214,5 +1214,25 @@
    "Figma",
    "Framer"
   ]
+ },
+ {
+  "topic": "business-at-19-3",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Stripe",
+   "PostHog",
+   "Airtable"
+  ]
+ },
+ {
+  "topic": "run-it-all-at-19-3",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "n8n",
+   "Canva",
+   "Cloudflare"
+  ]
  }
 ]

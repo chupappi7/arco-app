@@ -886,6 +886,34 @@
     "05.jpg",
     "06.jpg"
    ]
+  },
+  {
+   "topic": "business-at-19-3",
+   "title": "the tools i use to run my business at 19 years old",
+   "caption": "the whole business runs on five apps at 19. every task and every habit sits in arco and gets planned in 30 seconds, then focus mode puts every distraction away, my holy grail. gemini audio overview turns a doc you upload into a two host podcast, so a 30 page contract gets heard on a walk and not read at a desk. stripe smart retries charge a failed card again when it is most likely to go through, so a declined renewal comes back as revenue with no email from you. a posthog funnel shows the exact step where people drop out of signup, so you fix the one screen losing the most users. an airtable ai field fills a column by reading every row, so 200 customer messages get tagged by topic without reading one. #entrepreneur #buildinpublic #aitools #tools #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-23 by gen-business-at-19-3.py. build pillar, stacked hook with icon shelf, third outing of the business-at-19 hook. Roster ARCO, Gemini, Stripe, PostHog, Airtable with ARCO at #1 and Gemini the one LLM. ARCO angle v7 drawn via next_arco_angle('business') and pinned in the generator. Teaching points checked against every caption and the posts built alongside: Gemini Audio Overview, Stripe Smart Retries, PostHog funnels, Airtable AI fields. Backgrounds bg-h16/h24/h50/h29/h34/h21, hook from pick_hook_bg. rebuild: python3 tools/gen-business-at-19-3.py"
+  },
+  {
+   "topic": "run-it-all-at-19-3",
+   "title": "everything i run my business on at 19",
+   "caption": "everything the business runs on at 19. i manage all my tasks in arco and the day is planned in half a minute, then focus mode puts every distraction away until i am done, my holy grail. ask chatgpt for a transparent background and it hands back a clean png, so the logo drops straight onto the site with nothing to cut out. an n8n error workflow runs whenever any other workflow fails, so a broken automation messages you instead of failing quietly for days. any canva design publishes as a website on a free canva domain, so the link in your bio is the same file you designed the post in. cloudflare r2 stores your files with no fee for the bandwidth they use, so a video that blows up on your site does not come back as a bill. #entrepreneur #buildinpublic #aitools #automation #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-23 by gen-run-it-all-at-19-3.py. build pillar, stacked hook with icon shelf, third outing of the run-it-all hook. Roster ARCO, ChatGPT, n8n, Canva, Cloudflare with ARCO at #1 and ChatGPT the one LLM. ARCO angle v8 drawn via next_arco_angle('business') and pinned in the generator. Teaching points checked against every caption: ChatGPT transparent PNGs, n8n error workflow, Canva websites, Cloudflare R2 no egress fees. Backgrounds bg-h17/h35/h49/h31/h52/h37, hook from pick_hook_bg, none shared with business-at-19-3. rebuild: python3 tools/gen-run-it-all-at-19-3.py"
   }
  ]
 }
