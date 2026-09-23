@@ -88,15 +88,16 @@ def pick_bgs(topic, n, exclude=()):
     return [hook] + out
 
 
-def build(topic, hook, bgs, slides, closer):
-    """bgs: hook, one per screen, then the closing card's."""
+def build(topic, hook, bgs, slides, closer, pillar='screentime'):
+    """bgs: hook, one per screen, then the closing card's. `pillar` is the
+    hook's own tag; discipline posts use the same screens."""
     out = f'{c.REPO}/drafts/{topic}'
     os.makedirs(out, exist_ok=True)
     if len(bgs) != len(slides) + 2:
         raise SystemExit('need a background for the hook, each screen and the card')
-    if not any(h['lines'] == hook for h in hook_rules.eligible(topic, 'screentime')):
+    if not any(h['lines'] == hook for h in hook_rules.eligible(topic, pillar)):
         raise SystemExit(f'hook not eligible: {hook}')
-    preflight(topic, ['ARCO'], bgs, pillar='screentime', hook=hook)
+    preflight(topic, ['ARCO'], bgs, pillar=pillar, hook=hook)
     for (_, _, title, body) in slides:
         assert_teaches(title, [body])
 

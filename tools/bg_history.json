@@ -1128,5 +1128,27 @@
    "bg-h88.jpg",
    "bg-n01.jpg"
   ]
+ },
+ {
+  "topic": "schedule-not-personality",
+  "bgs": [
+   "bg-h42.jpg",
+   "bg-h37.jpg",
+   "bg-h49.jpg",
+   "bg-n04.jpg",
+   "bg-n06.jpg",
+   "bg-h38.jpg"
+  ]
+ },
+ {
+  "topic": "lock-in-screens",
+  "bgs": [
+   "bg-h73.jpg",
+   "bg-h39.jpg",
+   "bg-h50.jpg",
+   "bg-n03.jpg",
+   "bg-n05.jpg",
+   "bg-h51.jpg"
+  ]
  }
 ]

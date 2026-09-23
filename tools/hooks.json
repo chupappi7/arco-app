@@ -1013,6 +1013,34 @@
     "07.jpg"
    ],
    "_note": "built 2026-09-23 by gen-hundred-hours-screens.py (via _veiled_screens.py): the under-an-hour screens concept on Thinh's note, normal pool backgrounds veiled over the dark fade so only a little of each photo shows."
+  },
+  {
+   "topic": "schedule-not-personality",
+   "title": "discipline is a schedule, not a personality",
+   "caption": "four reasons discipline is a schedule, and the screen that runs each one. the day starts at a set time, because putting wake up on the plan sets a real alarm that moves when the block moves. every task gets a slot, because the plan your day card keeps counting tasks with no time until nothing is waiting. the bar is your own best day, because insights put your average day next to your best one. and quitting early costs you, because ending blocked hours early is a 30 second wait that resets if you leave. all of it is arco. ARCO is free on the App Store. #discipline #productivity #lockin #selfimprovement #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-23 by gen-schedule-not-personality.py on _veiled_screens (Thinh: the new screentime way, hook and copy aligned to discipline, list reasons). discipline hook from hook_pool, four ARCO screens on veiled photos, icon card closing on ARCO angle s1 from next_arco_angle('discipline'). Each claim checked in the iOS source; none repeats a caption or today's screens posts."
+  },
+  {
+   "topic": "lock-in-screens",
+   "title": "this is how you lock in when you don't feel like it",
+   "caption": "how to lock in on the days you don't feel like it. five minutes still counts, because a stopwatch habit has no target and any time on it marks the day done. push it, don't skip it: plus and minus move a block 15 minutes at a time so the habit slides later instead of dropping off. come back early and keep the minutes, because ending a break early puts the unused minutes back in the bank. and the empty day shows up, because each habit card draws a bar for every day of the week. all of it is arco. ARCO is free on the App Store. #discipline #lockin #productivity #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-23 by gen-lock-in-screens.py on _veiled_screens (Thinh: the new screentime way, hook and copy aligned to discipline, list reasons). discipline hook from hook_pool, four ARCO screens on veiled photos, icon card closing on ARCO angle s2 from next_arco_angle('discipline'). Each claim checked in the iOS source; none repeats a caption, lock-in-anyway or today's screens posts."
   }
  ]
 }
