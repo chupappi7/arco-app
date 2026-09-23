@@ -101,11 +101,24 @@ async function fetchWithRetry(url, options, { label = 'request', maxAttempts = M
  * Parse a TikTok JSON envelope. TikTok returns HTTP 200 with a populated
  * `error` object for most business failures, so status alone is not enough.
  */
+/**
+ * TikTok ids are 19-digit integers, which is past what an IEEE-754 double can
+ * hold exactly: JSON.parse turns 7688269443708783902 into 7688269443708784000
+ * and the last three digits are gone for good. Quote any bare integer of 16
+ * digits or more before parsing, so ids arrive as strings. Nothing else in a
+ * TikTok envelope is that large — view counts and timestamps are far shorter.
+ */
+function quoteBigInts(text) {
+  return text
+    .replace(/:\s*(\d{16,})(?=\s*[,}\]])/g, ': "$1"')
+    .replace(/([[,]\s*)(\d{16,})(?=\s*[,\]])/g, '$1"$2"');
+}
+
 async function parseEnvelope(res, label) {
   const text = await res.text();
   let body;
   try {
-    body = JSON.parse(text);
+    body = JSON.parse(quoteBigInts(text));
   } catch {
     throw new TikTokError(`${label}: non-JSON response (HTTP ${res.status}) — ${text.slice(0, 300)}`, {
       status: res.status,

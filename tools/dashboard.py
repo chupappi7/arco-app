@@ -1535,40 +1535,63 @@ def _published_cohort(rows, flat, lo, hi, keys):
         # Count the outing that lands in this window, not the post's whole
         # life. A post on its sixth run showed its lifetime total against the
         # date of the sixth run, which read as one enormous day.
-        win = {}
-        for k in ats:
-            outs = [o for o in (r.get('outs') or {}).get(k, []) if lo <= o['at'] < hi]
-            win[k] = {'views': sum(o['views'] for o in outs),
-                      'likes': sum(o['likes'] for o in outs),
-                      'comments': sum(o['comments'] for o in outs),
-                      'shares': sum(o['shares'] for o in outs)} if outs else None
-        tot = {m: sum((win[k] or {}).get(f, 0) if win.get(k) else (r[m].get(k) or 0)
-                      for k in ats)
-               for m, f in (('cells', 'views'), ('likes', 'likes'),
-                            ('comments', 'comments'), ('shares', 'shares'))}
-        cells = {k: ((win[k] or {}).get('views') if win.get(k) else r['cells'].get(k))
-                 for k in ats}
-        vs = [cells[k] for k in ats if cells.get(k) is not None]
-        out.append({
-            'topic': r['topic'], 'thumb': r['thumb'], 'title': r['title'],
-            'untracked': r['untracked'], 'promoted': r['promoted'],
-            'pillar': r['pillar'],
-            # Per account, never summed: one post swings 30x between them and
-            # a total hides the only thing worth seeing.
-            'cells': cells,
-            'urls': {k: r['urls'].get(k) for k in ats},
-            'per': {k: (win[k] if win.get(k) else
-                        {'likes': r['likes'].get(k) or 0,
-                         'comments': r['comments'].get(k) or 0,
-                         'shares': r['shares'].get(k) or 0}) for k in ats},
-            'at': ats,
-            # When it last went out, not when it first did.
-            'last_at': max(ats.values()), 'first_at': min(ats.values()),
-            'views': tot['cells'], 'likes': tot['likes'],
-            'comments': tot['comments'], 'shares': tot['shares'],
-            'best': max(vs) if vs else 0,
-            'rate': round(100 * tot['likes'] / max(1, tot['cells']), 1),
-        })
+        # One row per outing, not one per topic. A post that went out on the
+        # 17th and again on the 21st is two things that happened, with their
+        # own dates and their own numbers; collapsing them gave a row dated by
+        # the newer one and counted by both. Accounts publish minutes apart,
+        # so outings within a few hours of each other are the same outing.
+        GAP = 6 * 3600
+        marks = sorted((o['at'], k, o)
+                       for k in ats
+                       for o in (r.get('outs') or {}).get(k, [])
+                       if lo <= o['at'] < hi)
+        if not marks:
+            # No run detail — an untracked post, or one synced before runs
+            # were recorded. One row, lifetime numbers, as before.
+            groups = [[(t, k, {'views': r['cells'].get(k),
+                               'likes': r['likes'].get(k) or 0,
+                               'comments': r['comments'].get(k) or 0,
+                               'shares': r['shares'].get(k) or 0})
+                       for k, t in ats.items()]]
+        else:
+            groups, cur = [], [marks[0]]
+            for m in marks[1:]:
+                if m[0] - cur[-1][0] <= GAP:
+                    cur.append(m)
+                else:
+                    groups.append(cur)
+                    cur = [m]
+            groups.append(cur)
+
+        for g in groups:
+            gat = {k: t for t, k, _ in g}
+            cells, per = {}, {}
+            for _, k, o in g:
+                cells[k] = (cells.get(k) or 0) + (o.get('views') or 0)
+                acc = per.setdefault(k, {'likes': 0, 'comments': 0, 'shares': 0})
+                for f in acc:
+                    acc[f] += o.get(f) or 0
+            for k, acc in per.items():
+                acc['views'] = cells[k]
+            tot = {f: sum(v.get(f) or 0 for v in per.values())
+                   for f in ('views', 'likes', 'comments', 'shares')}
+            vs = [v for v in cells.values() if v is not None]
+            out.append({
+                'topic': r['topic'], 'thumb': r['thumb'], 'title': r['title'],
+                'untracked': r['untracked'], 'promoted': r['promoted'],
+                'pillar': r['pillar'],
+                # Per account, never summed: one post swings 30x between them
+                # and a total hides the only thing worth seeing.
+                'cells': cells,
+                'urls': {k: r['urls'].get(k) for k in gat},
+                'per': per,
+                'at': gat,
+                'last_at': max(gat.values()), 'first_at': min(gat.values()),
+                'views': tot['views'], 'likes': tot['likes'],
+                'comments': tot['comments'], 'shares': tot['shares'],
+                'best': max(vs) if vs else 0,
+                'rate': round(100 * tot['likes'] / max(1, tot['views']), 1),
+            })
     out.sort(key=lambda x: -x['last_at'])
 
     org = [x for x in out if not x['promoted']]
@@ -5389,6 +5412,16 @@ tr:hover .ad{opacity:.9}
   padding:15px 17px;box-shadow:0 18px 44px rgba(0,0,0,.55);
   animation:rise .22s ease-out}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+/* Collapsed: one line, sized to its contents, same corner. */
+.toast.small{width:auto;padding:10px 14px;display:flex;align-items:center;gap:10px}
+.toast.small b{font:600 13px/1 system-ui;color:var(--text)}
+.toast.small .dt{font-size:11px;color:var(--dim)}
+.toast.small .x{position:static;margin-left:2px}
+.toast .mini{position:absolute;top:10px;right:38px;width:22px;height:22px;
+  background:none;border:0;color:var(--dim);cursor:pointer;font-size:11px;
+  line-height:1;border-radius:6px}
+.toast .mini:hover{color:var(--text);background:rgba(var(--accent-rgb),.10)}
+.toast.small .mini{position:static;width:auto;height:auto;font-size:10px}
 .toast h5{margin:0 0 3px;font-size:14px;font-weight:600;color:var(--text);
   display:flex;align-items:center;gap:9px}
 .toast .trow{display:flex;align-items:center;gap:9px;margin-top:9px;font-size:12px;
@@ -7127,6 +7160,10 @@ const match = p => filter==='all' ? true
                  : stateOf(p)===filter;
 
 let lastRuns = 0, notifyOK = false, jobsOpen = true;
+// Collapsed is not closed: a build takes minutes and the panel covers the
+// bottom-right corner the whole time, but closing it outright means the only
+// way back is the pill in the bar. Small keeps it on screen and out of the way.
+let jobsSmall = false;
 
 function elapsed(ts){
   const s = Math.max(0, Math.round(Date.now()/1000 - ts));
@@ -7197,8 +7234,23 @@ function paintRuns(){
                           : 'Waiting for the current run to finish.'}</div>`
       : `<h5><span class="ok">&#10003;</span>Done, ${batchTotal} built</h5>
          <div class="sub" style="font-size:11px">They are in Review.</div>`;
+    if (jobsSmall && runs.length) {
+      box.innerHTML = `<div class="toast small">
+        <button class="mini" onclick="jobsSmall=false;paintRuns()"
+          title="Expand">&#9650;</button>
+        <span class="spin"></span>
+        <b>${Math.min(batchDone + 1, batchTotal)} of ${batchTotal}</b>
+        <span class="dt">${running.length ? 'building' : 'waiting'}</span>
+        <button class="x" onclick="jobsOpen=false;paintRuns()">&times;</button>
+      </div>`;
+      document.title = (running.length ? '\u25cf ' : '') +
+        (runs.length ? runs.length + ' building — ' : '') + 'ARCO pipeline';
+      return;
+    }
     box.innerHTML = `<div class="toast">
-      ${runs.length ? `<button class="x" onclick="jobsOpen=false;paintRuns()">&times;</button>` : ''}
+      ${runs.length ? `<button class="x" onclick="jobsOpen=false;paintRuns()">&times;</button>
+         <button class="mini" onclick="jobsSmall=true;paintRuns()"
+           title="Collapse">&#9472;</button>` : ''}
       ${head}
       ${justDone.map(w => `<div class="trow">
          <span class="mk"><span class="ok">&#10003;</span></span>
@@ -8410,6 +8462,87 @@ function analyticsView(){
       ${yrules}${lines}${labels}${cols}</svg><div class="ctip" hidden></div></div>`;
   }
 
+  // The running total, not the daily change. Gained-per-day answers "was
+  // yesterday good"; this answers "is the account growing", and a day of -2
+  // reads very differently against a line that is still climbing.
+  const countCard = (() => {
+    const W = 720, H = 380, L = 68, R = 26, TOP = 30, BOT = 44;
+    const series = accs.map(a => ({key: a.key, label: a.short,
+                                   pts: (pa[a.key].history || [])}))
+                       .filter(sv => sv.pts.length);
+    if (!series.length) return '';
+    // One point per calendar day per account: the sync can run twice in a day
+    // and two dots on one date is not a trend, it is a wobble.
+    const [rLo, rHi] = rangeBounds();
+    const dayOf = ts => { const d = new Date(ts*1000);
+      return d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate()); };
+    const days = new Set();
+    series.forEach(sv => sv.pts.forEach(p => {
+      if ((rLo == null || p.at >= rLo) && (rHi == null || p.at < rHi)) days.add(dayOf(p.at));
+    }));
+    const dayList = [...days].sort().slice(-30);
+    if (dayList.length < 2) return '';
+    const byDay = series.map(sv => {
+      const last = {};
+      sv.pts.forEach(p => { last[dayOf(p.at)] = p.followers; });
+      let carry = null;
+      return {sv, vals: dayList.map(d => {
+        if (last[d] != null) carry = last[d];
+        return carry;                       // hold the last known count forward
+      })};
+    });
+    const all = byDay.flatMap(x => x.vals).filter(v => v != null);
+    const hi = Math.max(1, ...all), lo = Math.min(...all);
+    const px = i => L + i * (W-L-R)/(dayList.length-1);
+    const py = v => TOP + (hi-v)/Math.max(1, hi-lo) * (H-TOP-BOT);
+    const step = niceStep(hi - lo);
+    const ticks = [];
+    for(let v = Math.ceil(lo/step)*step; v <= hi + 1e-9; v += step) ticks.push(Math.round(v));
+    const yrules = ticks.map(v => `<line x1="${L}" y1="${py(v).toFixed(1)}"
+        x2="${W-R}" y2="${py(v).toFixed(1)}" stroke="var(--line)" stroke-width="1"
+        stroke-dasharray="2 5"/>
+      <text x="${L-9}" y="${(py(v)+4).toFixed(1)}" fill="var(--dim)" font-size="14"
+        text-anchor="end">${v}</text>`).join('');
+    const lines = byDay.map(({sv, vals}) => {
+      const d = vals.map((v, i) => v == null ? '' :
+        `${i && vals[i-1] != null ? 'L' : 'M'}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join('');
+      const dots = vals.map((v, i) => v == null ? '' :
+        `<circle cx="${px(i).toFixed(1)}" cy="${py(v).toFixed(1)}" r="3.5"
+           fill="${ACOL[sv.key]}" stroke="var(--bg)" stroke-width="1.5"/>`).join('');
+      return `<path d="${d}" fill="none" stroke="${ACOL[sv.key]}" stroke-width="2.5"
+        stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
+    }).join('');
+    const dmy = d => { const [,m,dd] = d.split('-'); return `${+dd}.${+m}`; };
+    const labs = dayList.map((d, i) => (i % Math.ceil(dayList.length/7)) ? '' :
+      `<text x="${px(i).toFixed(1)}" y="${H-12}" fill="var(--dim)" font-size="12"
+         text-anchor="middle">${dmy(d)}</text>`).join('');
+    // One hit area per day rather than per point, for the same reason as the
+    // other chart: five lines overlap and a 3.5px dot is not a target.
+    const cols = dayList.map((d, i) => {
+      const w = (W - L - R) / Math.max(1, dayList.length);
+      const rows = byDay.map(({sv, vals}) => {
+        const v = vals[i], prev = i ? vals[i-1] : null;
+        const d = (v == null || prev == null) ? 0 : v - prev;
+        return `<i style="--c:${ACOL[sv.key]}">${esc(sv.label)}</i>` +
+          `<b class="${d > 0 ? 'up' : d < 0 ? 'dn' : 'z'}">${v == null ? '–' : v}</b>`;
+      }).join('');
+      return `<rect class="hitc" x="${(px(i) - w/2).toFixed(1)}" y="${TOP}"
+        width="${w.toFixed(1)}" height="${H-TOP-BOT}" fill="transparent"
+        data-x="${px(i).toFixed(1)}" data-day="${dmy(d)}"
+        data-rows="${esc(rows)}"/>`;
+    }).join('');
+    const total = accs.reduce((n, a) => n + (pa[a.key].followers || 0), 0);
+    return `<div class="chart wide"><h4>Followers, running total</h4>
+      <p class="why">Where each account actually is. A bad day is only a bad day
+        if this line stops climbing.</p>
+      <div class="chartwrap"><svg viewBox="0 0 ${W} ${H}">
+        <line class="guide" x1="0" y1="${TOP}" x2="0" y2="${H-BOT}"
+          stroke="var(--line-2)" stroke-width="1" opacity="0"/>
+        ${yrules}${lines}${labs}${cols}</svg><div class="ctip" hidden></div></div>
+      <div class="legend"><span><b style="color:var(--text)">${fmt(total)}</b>
+        across ${accs.length} accounts</span></div></div>`;
+  })();
+
   const trendCard = `<div class="chart wide"><h4>Followers gained per day</h4>
     <p class="why">One line per account. Views reset with every post; followers
       are the only thing that accumulates.</p>${trend}
@@ -8574,7 +8707,8 @@ function analyticsView(){
              <span class="ir hit">${fmt(x.views)}</span>
              <span class="is">${x.rate}% liked</span></li>`).join('')
           : '<li class="none">Nothing yet</li>'}</ul></div>`;}).join('')}</div>`;
-    body = rangeChips() + `<div class="duo">${compare}${trendCard}</div>`;
+    body = rangeChips() + compare
+         + `<div class="duo">${trendCard}${countCard}</div>`;
   } else if(anTab==='posts'){
     body = sect('Every post, every account',
            'Shade is log-scaled views. Click a number to open it on TikTok. '
@@ -9595,12 +9729,18 @@ async function draft(accts){
 // The chart's hover. Delegated from the document because the SVG is redrawn
 // on every render and a bound listener would not survive it.
 document.addEventListener('mousemove', e => {
-  const wrap = document.querySelector('.chartwrap');
-  if(!wrap) return;
+  const col = e.target.closest && e.target.closest('.hitc');
+  const wrap = col && col.closest('.chartwrap');
+  if(!wrap){
+    document.querySelectorAll('.chartwrap').forEach(w => {
+      const t = w.querySelector('.ctip'), g = w.querySelector('.guide');
+      if(t) t.hidden = true;
+      if(g) g.setAttribute('opacity', '0');
+    });
+    return;
+  }
   const tip = wrap.querySelector('.ctip');
   const guide = wrap.querySelector('.guide');
-  const col = e.target.closest && e.target.closest('.hitc');
-  if(!col){ if(tip) tip.hidden = true; if(guide) guide.setAttribute('opacity','0'); return; }
   const svg = wrap.querySelector('svg');
   const box = svg.getBoundingClientRect();
   const vb = svg.viewBox.baseVal;
