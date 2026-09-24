@@ -1069,6 +1069,19 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-24 by gen-ship-weekend-5.py. build pillar, stacked hook with icon shelf, fifth outing of the ship-in-a-weekend hook (least recently used of hook_rules.eligible(pillar='build')). Roster ARCO, Cursor, Supabase, Stripe, TestFlight with ARCO at #1 and Cursor the one LLM (least recently used model). ARCO angle v9 drawn via next_arco_angle('build') and pinned in the generator. Teaching points checked against every caption: Cursor custom slash commands, Supabase generated types, Stripe CLI webhook forwarding, TestFlight screenshot feedback. Backgrounds bg-h76/h29/h22/h32/h24/h38, hook from pick_hook_bg, h32 the one person, none shared with boring-phone-screens. rebuild: python3 tools/gen-ship-weekend-5.py"
+  },
+  {
+   "topic": "three-hours-screens",
+   "title": "i cut 3 hours of screen time without deleting a single app",
+   "caption": "i cut 3 hours of screen time without deleting a single app, here is why. insights rank every app by its hours for the week, so you lock the one at the top and leave the rest open. a timer habit with auto-start focus locks the apps the moment you tap play, so read before bed runs its 30 minutes with the feeds shut. and a focus session counts down on the lock screen and the dynamic island, so checking how long is left never means unlocking the phone. all of it is arco. ARCO is free on the App Store. #screentime #digitaldetox #phoneaddiction #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg"
+   ],
+   "_note": "built 2026-09-24 by gen-three-hours-screens.py (shared build in tools/_veiled_screens.py). screentime pillar on veiled photos: hook 'i cut 3 hours of screen time' from hook_rules.eligible('screentime'), least recently used, with the 'here is why' kicker; three ARCO screens as reasons (Bad Habits ranks apps by hours, Auto-start Focus on a timer habit, focus Live Activity countdown on the lock screen), each checked in the iOS source on pivot-timer and shipped since June; closer is the Blocked Hours angle via next_arco_angle('screentime'); card icon and badge outlined. Backgrounds bg-h78/h20/h21/h34/h35 via pick_bgs. rebuild: python3 tools/gen-three-hours-screens.py"
   }
  ]
 }
