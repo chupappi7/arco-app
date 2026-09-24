@@ -1217,6 +1217,56 @@ def outings(cell):
     return sorted(out, key=lambda o: o['at'])
 
 
+def _audience(flat, keys, accts, lo, hi):
+    """What can honestly be said about the people watching.
+
+    TikTok's Display API has no demographics: the scopes this app holds are
+    user.info.basic, user.info.stats, video.list, video.publish and
+    video.upload. Country, age and gender live behind the Research API and
+    the Business API's user.insights, neither of which a sandbox Display app
+    can request. So this is not "who they are" — it is when they showed up,
+    what they showed up for, and whether they stayed.
+    """
+    organic = [f for f in flat if not f['promoted'] and f.get('at')]
+
+    def med(vals):
+        v = sorted(vals)
+        if not v:
+            return 0
+        m = len(v) // 2
+        return v[m] if len(v) % 2 else (v[m - 1] + v[m]) // 2
+
+    hours, days = {}, {}
+    for f in organic:
+        t = time.localtime(f['at'])
+        hours.setdefault(t.tm_hour, []).append(f['views'])
+        days.setdefault(t.tm_wday, []).append(f['views'])
+
+    # Followers gained across the window against the views that earned them:
+    # the closest thing to "did this audience actually want more".
+    convert = []
+    for k in keys:
+        hist = (accts.get(k) or {}).get('history') or []
+        inside = [h for h in hist
+                  if (lo is None or h['at'] >= lo) and (hi is None or h['at'] < hi)]
+        gained = (inside[-1]['followers'] - inside[0]['followers']) if len(inside) > 1 else None
+        views = sum(f['views'] for f in organic if f['account'] == k)
+        convert.append({
+            'key': k, 'views': views, 'gained': gained,
+            'per_1k': round(1000 * gained / views, 2) if gained is not None and views else None,
+        })
+
+    return {
+        'hours': [{'h': h, 'posts': len(v), 'median': med(v), 'views': sum(v)}
+                  for h, v in sorted(hours.items())],
+        'days': [{'d': d, 'posts': len(v), 'median': med(v), 'views': sum(v)}
+                 for d, v in sorted(days.items())],
+        'convert': sorted(convert, key=lambda c: -(c['per_1k'] or -1)),
+        # Said plainly in the UI rather than left for someone to wonder about.
+        'no_demographics': True,
+    }
+
+
 def analytics(period='7', only=None, frm=None, to=None):
     """Everything the Analytics tab needs, computed here rather than in JS.
 
@@ -1397,6 +1447,7 @@ def analytics(period='7', only=None, frm=None, to=None):
         'stale': _stale_drafts(),
         'undelivered': _undelivered(),
         'top_per_account': _top_per_account(rows, keys),
+        'audience': _audience(flat, keys, accts, frm, to),
         'accounts': [a for a in ACCOUNTS if a['key'] in keys],
         'all_accounts': ACCOUNTS, 'selected': keys,
         'period': period, 'days': days,
@@ -7789,6 +7840,27 @@ function postedAt(r){
 
 // A round number near the target spacing — the axis should read 5, 10, 20,
 // never 7 or 13.
+// Catmull-Rom through the points, written as cubic Béziers. The control
+// points are clamped inside each segment's own range so the curve never
+// overshoots a value that was never reached — a followers line that dips
+// below its own minimum between two days is a lie the eye believes.
+function smoothPath(pts){
+  if(pts.length < 2) return pts.length ? `M${pts[0][0]},${pts[0][1]}` : '';
+  const clamp = (v, a, b) => Math.max(Math.min(a, b), Math.min(Math.max(a, b), v));
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for(let i = 0; i < pts.length - 1; i++){
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i];
+    const p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6,
+                clamp(p1[1] + (p2[1] - p0[1]) / 6, p1[1], p2[1])];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6,
+                clamp(p2[1] - (p3[1] - p1[1]) / 6, p1[1], p2[1])];
+    d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)}`
+       + ` ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+
 function niceStep(span, want = 16){
   if(span <= want) return 1;
   const raw = Math.max(1, span) / want;
@@ -8431,7 +8503,7 @@ function analyticsView(){
         text-anchor="end">${v>0?'+':''}${v}</text>`).join('');
 
     const lines = gains.map(sv=>{
-      const d = sv.pts.map((p,i)=>`${i?'L':'M'}${px(i).toFixed(1)},${py(p.g).toFixed(1)}`).join('');
+      const d = smoothPath(sv.pts.map((p, i) => [px(i), py(p.g)]));
       // The number sits on the point. Three accounts on one axis means the
       // shape alone cannot tell you whether a rise is +2 or +23.
       const dots = sv.pts.map((p,i)=>`<circle cx="${px(i).toFixed(1)}" cy="${py(p.g).toFixed(1)}"
@@ -8466,7 +8538,7 @@ function analyticsView(){
   // yesterday good"; this answers "is the account growing", and a day of -2
   // reads very differently against a line that is still climbing.
   const countCard = (() => {
-    const W = 720, H = 380, L = 68, R = 26, TOP = 30, BOT = 44;
+    const W = 720, H = 380, L = 68, R = 74, TOP = 30, BOT = 44;
     const series = accs.map(a => ({key: a.key, label: a.short,
                                    pts: (pa[a.key].history || [])}))
                        .filter(sv => sv.pts.length);
@@ -8504,13 +8576,31 @@ function analyticsView(){
       <text x="${L-9}" y="${(py(v)+4).toFixed(1)}" fill="var(--dim)" font-size="14"
         text-anchor="end">${v}</text>`).join('');
     const lines = byDay.map(({sv, vals}) => {
-      const d = vals.map((v, i) => v == null ? '' :
-        `${i && vals[i-1] != null ? 'L' : 'M'}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join('');
+      const runs = [];
+      vals.forEach((v, i) => {
+        if(v == null){ runs.push([]); return; }
+        (runs[runs.length - 1] || runs[runs.push([]) - 1]).push([px(i), py(v)]);
+      });
+      const d = runs.filter(r => r.length).map(smoothPath).join(' ');
       const dots = vals.map((v, i) => v == null ? '' :
         `<circle cx="${px(i).toFixed(1)}" cy="${py(v).toFixed(1)}" r="3.5"
            fill="${ACOL[sv.key]}" stroke="var(--bg)" stroke-width="1.5"/>`).join('');
       return `<path d="${d}" fill="none" stroke="${ACOL[sv.key]}" stroke-width="2.5"
         stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
+    }).join('');
+    // Where each line ends is the number you actually want off this chart, so
+    // it goes on the line rather than in a legend under it. Nudged apart when
+    // two accounts land within a few followers of each other.
+    const ends = byDay
+      .map(({sv, vals}) => ({sv, v: [...vals].reverse().find(v => v != null)}))
+      .filter(e => e.v != null)
+      .sort((a, b) => py(a.v) - py(b.v));
+    let lastY = -1e9;
+    const endLabels = ends.map(e => {
+      const y = Math.max(py(e.v), lastY + 17);
+      lastY = y;
+      return `<text x="${W - R + 10}" y="${(y + 5).toFixed(1)}"
+        fill="${ACOL[e.sv.key]}" font-size="16" font-weight="700">${e.v}</text>`;
     }).join('');
     const dmy = d => { const [,m,dd] = d.split('-'); return `${+dd}.${+m}`; };
     const labs = dayList.map((d, i) => (i % Math.ceil(dayList.length/7)) ? '' :
@@ -8538,7 +8628,8 @@ function analyticsView(){
       <div class="chartwrap"><svg viewBox="0 0 ${W} ${H}">
         <line class="guide" x1="0" y1="${TOP}" x2="0" y2="${H-BOT}"
           stroke="var(--line-2)" stroke-width="1" opacity="0"/>
-        ${yrules}${lines}${labs}${cols}</svg><div class="ctip" hidden></div></div>
+        ${yrules}${lines}${endLabels}${labs}${cols}</svg>
+        <div class="ctip" hidden></div></div>
       <div class="legend"><span><b style="color:var(--text)">${fmt(total)}</b>
         across ${accs.length} accounts</span></div></div>`;
   })();
@@ -8567,7 +8658,7 @@ function analyticsView(){
   // Four screens rather than one long scroll. Each fits without scrolling,
   // which is the point: analytics you have to scroll through does not get read.
   const TABS = [['published','Posts'],['accounts','Accounts'],
-                ['posts','Compare'],['todo','Act'],['app','App']];
+                ['audience','Audience']];
   // Four tabs fit a desktop and do not fit a phone, where they became a
   // sideways scroll that hid the section you were not on. Same state, two
   // controls: the buttons on wide screens, one picker on narrow ones.
@@ -8694,7 +8785,71 @@ function analyticsView(){
   }
 
   let body;
-  if(anTab==='published'){
+  if(anTab==='audience'){
+    const A = AN.audience || {};
+    const bar = (rows, labelOf, keyOf) => {
+      const max = Math.max(1, ...rows.map(r => r.median));
+      return rows.map(r => `<div class="pbar ${r.posts < 3 ? 'thin' : ''}"
+          title="${r.posts} upload${r.posts===1?'':'s'}">
+          <span class="pn">${labelOf(r)}</span>
+          <span class="pt"><i style="width:${Math.round(100*r.median/max)}%"></i></span>
+          <span class="pv">${fmt(r.median)}</span>
+          <span class="ps">${r.posts}</span></div>`).join('');
+    };
+    const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const hh = h => String(h).padStart(2,'0') + ':00';
+
+    // Median, not total: an hour with thirty uploads will always win a sum,
+    // and the question is what one post does at that hour.
+    const whenCard = `<div class="chart"><h4>When an upload does best</h4>
+      <p class="why">Median views per upload by the hour it went out, your time.
+        Bars thinner than three uploads are not worth reading yet.</p>
+      ${(A.hours||[]).length ? bar(A.hours, r => hh(r.h)) : '<p class="why">No data yet.</p>'}</div>`;
+
+    const dayCard = `<div class="chart"><h4>Which day</h4>
+      <p class="why">Same measure, by weekday.</p>
+      ${(A.days||[]).length ? bar(A.days, r => DAYS[r.d]) : '<p class="why">No data yet.</p>'}</div>`;
+
+    const pl = Object.entries(AN.pillars || {})
+      .map(([name, v]) => ({name, ...v,
+            rate: Math.round(100 * v.broke_out / Math.max(1, v.posts))}))
+      .sort((a, b) => b.rate - a.rate);
+    const pmax = Math.max(1, ...pl.map(x => x.rate));
+    const whatCard = `<div class="chart"><h4>What they turn up for</h4>
+      <p class="why">Share of posts clearing ${fmt(T)} views on at least one
+        account, by pillar.</p>
+      ${pl.length ? pl.map(x => `<div class="pbar ${x.posts<5?'thin':''}">
+          <span class="pn">${esc(x.name)}</span>
+          <span class="pt"><i style="width:${Math.round(100*x.rate/pmax)}%"></i></span>
+          <span class="pv">${x.rate}%</span>
+          <span class="ps">${x.posts}</span></div>`).join('')
+        : '<p class="why">No pillars tagged yet.</p>'}</div>`;
+
+    const cv = A.convert || [];
+    const convCard = `<div class="chart"><h4>Who actually follows</h4>
+      <p class="why">Followers gained per 1,000 views. Reach that converts is a
+        different thing from reach.</p>
+      <table class="mx cmp"><thead><tr><th>account</th><th class="n">views</th>
+        <th class="n">followers</th><th class="n">per 1k</th></tr></thead><tbody>
+        ${cv.map(c => {
+          const a = (AN.all_accounts||[]).find(x => x.key === c.key) || {label: c.key};
+          return `<tr><td class="t"><i style="background:${ACOL[c.key]}"></i>${esc(a.label)}</td>
+            <td class="n"><span class="sp">${fmt(c.views)}</span></td>
+            <td class="n"><span class="sp">${c.gained == null ? '–'
+              : (c.gained > 0 ? '+' : '') + c.gained}</span></td>
+            <td class="n"><span class="hr ${c.per_1k >= 1 ? 'r4' : c.per_1k >= 0.5 ? 'r3'
+              : c.per_1k >= 0.25 ? 'r2' : 'r1'}">${c.per_1k == null ? '–' : c.per_1k}</span></td>
+          </tr>`;
+        }).join('')}</tbody></table></div>`;
+
+    body = rangeChips()
+      + `<p class="why" style="margin:0 0 12px">TikTok's API gives no country, age
+         or gender: those live behind the Research and Business APIs, which a
+         sandbox app cannot request. This is when they showed up, what for, and
+         whether they stayed.</p>`
+      + `<div class="duo">${whenCard}${dayCard}</div>`
+      + `<div class="duo">${whatCard}${convCard}</div>`;
+  } else if(anTab==='published'){
     body = publishedView();
   } else if(anTab==='accounts'){
     const topThree = `<div class="panelrow">${accs.map(a=>{
