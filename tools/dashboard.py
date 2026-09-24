@@ -142,6 +142,7 @@ ACCOUNTS = [
     {'key': 'us', 'label': 'emiliagonzalez389', 'short': 'emilia'},
     {'key': 'max', 'label': 'maxmilian.dev', 'short': 'maxmilian'},
     {'key': 'prodgod', 'label': 'productivity_god', 'short': 'prodgod'},
+    {'key': 'jackson', 'label': 'jackson21.dev', 'short': 'jackson21'},
 ]
 CAP = 5                      # pending shares per account per rolling 24h
 TOKEN_FILE = os.path.join(REPO, 'tools', '.dashboard_token')
@@ -1147,6 +1148,9 @@ def sync_account(key):
 
 
 ACCT_STATS = os.path.join(REPO, 'tools', 'account_stats.json')
+# When the last reconcile with TikTok finished. Kept on disk rather than in
+# memory so a restart does not claim the numbers are fresh when they are not.
+SYNC_STATE = os.path.join(REPO, 'tools', '.sync_state.json')
 
 
 def sync_account_stats(key):
@@ -1192,6 +1196,11 @@ def sync_all():
         print('[sync] %s: %s' % (a['key'], r.get('error') or
               'matched %d of %d, published %d' % (r['matched'], r['seen'],
                                                   len(r['newly_published']))), flush=True)
+    try:
+        with open(SYNC_STATE, 'w') as fh:
+            json.dump({'at': time.time()}, fh)
+    except IOError:
+        pass
     return out
 
 
@@ -1457,6 +1466,7 @@ def analytics(period='7', only=None, frm=None, to=None):
                    'from': cut, 'to': now,
                    'daily': _daily_views(rows, cut, now, keys, stats)},
         'per_account': per_account,
+        'synced_at': load(SYNC_STATE, {}).get('at'),
         'threshold': PERFORMING_VIEWS,
         'kpi': {
             'hit_rate': round(100 * sum(1 for f in organic if f['views'] >= PERFORMING_VIEWS)
@@ -5204,8 +5214,14 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
   padding:9px 14px;border-radius:8px;cursor:pointer}
 .sub:hover{color:var(--text);background:var(--surface)}
 .sub.on{background:var(--surface-2);color:var(--accent)}
-.sub.ghost{margin-left:auto;font-size:11.5px;color:var(--dim);
+.sub.ghost{font-size:11.5px;color:var(--dim);
   border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:7px}
+/* The stamp carries the push-right so it sits against the button rather than
+   at the far end of the row, and it holds its width while the label changes
+   so the button does not slide left every time the numbers come back. */
+.syncat{margin-left:auto;font:500 11px/1 system-ui;color:var(--dim);
+  white-space:nowrap;padding-right:9px}
+.syncat b{font-weight:600;color:var(--muted)}
 .sub.ghost:hover{color:var(--text)}
 .sub.ghost:disabled{opacity:.85;cursor:default}
 .sub.ghost .spin{width:11px;height:11px;border-width:2px}
@@ -7721,7 +7737,8 @@ function paintCadence(){
 
 // Half a minute: the line is written in whole minutes, so anything faster
 // redraws the same string.
-setInterval(paintCadence, 30000);
+// Both are relative times, so both go stale sitting on screen.
+setInterval(() => { paintCadence(); paintSyncedAt(); }, 30000);
 
 function cadence(at){
   if(!at) return `<div class="cad never"><b>no posts yet</b></div>`;
@@ -8009,7 +8026,7 @@ function offlineNote(e){
 let anAccs = null;   // null = all three; otherwise a Set of account keys
 const AN_TOP = 20;
 const ACOL = {vn:'#38BDF8', getarco:'#A78BFA', us:'#22C55E', max:'#F59E0B',
-              prodgod:'#F472B6'};
+              prodgod:'#F472B6', jackson:'#F87171'};
 
 // Three states so the button says what it is doing: idle, working, done.
 // It used to relabel the element it was clicked on, which the re-render then
@@ -8032,6 +8049,7 @@ async function resync(){
 }
 
 function paintSync(){
+  paintSyncedAt();
   const b = document.getElementById('syncbtn');
   if(!b) return;
   if(syncState === 'busy'){
@@ -8041,6 +8059,19 @@ function paintSync(){
   } else {
     b.textContent = 'Sync now'; b.disabled = false;
   }
+}
+
+// The button says what it is doing; this says when it last did it. The
+// timestamp is the server's, written when the reconcile finished, so it
+// survives a restart rather than resetting to "never synced".
+function paintSyncedAt(){
+  const el = document.getElementById('syncedat');
+  if(!el) return;
+  const at = AN && AN.synced_at;
+  if(!at){ el.textContent = 'never synced'; el.title = ''; return; }
+  el.innerHTML = 'synced <b>' + ago(at) + '</b>';
+  el.title = 'Last reconcile with TikTok: '
+    + new Date(at * 1000).toLocaleString();
 }
 
 // The panels used to tell you what to do and leave you to go and do it.
@@ -8668,6 +8699,7 @@ function analyticsView(){
       `<option value="${v}" ${anTab===v?'selected':''}>${l}</option>`).join('')}</select>
     ${TABS.map(([v,l])=>
     `<button class="sub ${anTab===v?'on':''}" onclick="anTab='${v}';saveHash();render()">${l}</button>`).join('')}
+    <span class="syncat" id="syncedat"></span>
     <button class="sub ghost" id="syncbtn" onclick="resync()"
       title="Pull fresh numbers from TikTok">Sync now</button></div>`;
 

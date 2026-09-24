@@ -259,6 +259,7 @@ const ACCOUNT_ENV = {
   getarco: { env: 'TIKTOK_REFRESH_TOKEN_GETARCO', label: 'getarcoapp' },
   max: { env: 'TIKTOK_REFRESH_TOKEN_MAX', label: 'maxmilian.dev' },
   prodgod: { env: 'TIKTOK_REFRESH_TOKEN_PRODGOD', label: 'productivity_god' },
+  jackson: { env: 'TIKTOK_REFRESH_TOKEN_JACKSON', label: 'jackson21.dev' },
 };
 
 async function main() {

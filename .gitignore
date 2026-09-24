@@ -18,6 +18,7 @@ tools/redo_queue.json
 tools/post_status.json
 tools/schedule.json
 tools/.dashboard_token
+tools/.sync_state.json
 tools/build_queue.json
 tools/account_stats.json
 tools/post_stats.json
