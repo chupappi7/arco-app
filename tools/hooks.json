@@ -1055,6 +1055,20 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-23 by gen-boring-phone-screens.py (shared build in tools/_veiled_screens.py). screentime pillar on veiled photos: hook 'my phone is boring now' from hook_rules.eligible('screentime'), least recently used, with the 'here is why' kicker; four ARCO screens as reasons (shield has no bypass button, category blocking, 25 minute check with Block for today, Timeline widget), each checked in the iOS source; closer is ARCO angle f1 via next_arco_angle('screentime'); card icon and badge outlined. Backgrounds bg-h43/h36/h48/n04/n06/h31, today's screens posts excluded. rebuild: python3 tools/gen-boring-phone-screens.py"
+  },
+  {
+   "topic": "ship-weekend-5",
+   "title": "how i ship in a weekend what used to take a month",
+   "caption": "how i ship in a weekend what used to take a month. all of my tasks sit in arco and planning the day takes 30 seconds, then focus mode puts every distraction away and blocked hours repeats it every weekday, my holy grail. save a prompt in .cursor/commands and cursor turns it into a slash command, so the whole release checklist runs from typing /ship in the chat. one supabase cli command generates the typescript types from your tables, so a renamed column breaks the build on your laptop and not the live app. the stripe cli forwards webhook events to the app on your laptop, so you test a paid signup end to end before anything is deployed. testflight testers screenshot the beta and send feedback from inside the app, and it lands in app store connect with the device and build attached. #buildinpublic #indiehacker #solofounder #coding #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-24 by gen-ship-weekend-5.py. build pillar, stacked hook with icon shelf, fifth outing of the ship-in-a-weekend hook (least recently used of hook_rules.eligible(pillar='build')). Roster ARCO, Cursor, Supabase, Stripe, TestFlight with ARCO at #1 and Cursor the one LLM (least recently used model). ARCO angle v9 drawn via next_arco_angle('build') and pinned in the generator. Teaching points checked against every caption: Cursor custom slash commands, Supabase generated types, Stripe CLI webhook forwarding, TestFlight screenshot feedback. Backgrounds bg-h76/h29/h22/h32/h24/h38, hook from pick_hook_bg, h32 the one person, none shared with boring-phone-screens. rebuild: python3 tools/gen-ship-weekend-5.py"
   }
  ]
 }
