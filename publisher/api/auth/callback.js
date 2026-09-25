@@ -27,7 +27,12 @@ export default async function handler(req, res) {
   clearCookie(res, 'tt_verifier');
 
   if (!code) return back(res, 'no authorization code came back');
-  // A missing or mismatched state means this callback was not started by us.
+  // No state cookie at all: the sign-in was started by the command-line token
+  // tool, which holds its own state and PKCE verifier. The production app has
+  // only this one redirect URI, so the tool lands here too. Leave the code
+  // unspent and the address bar untouched so it can be copied back.
+  if (!expected) return handoff(res);
+  // A mismatched state means this callback was not started by us.
   if (!expected || state !== expected) return back(res, 'state mismatch, start over');
   if (!verifier) return back(res, 'the login attempt expired, start over');
 
@@ -62,4 +67,16 @@ export default async function handler(req, res) {
 
 function back(res, why) {
   res.redirect(302, '/?auth_error=' + encodeURIComponent(why));
+}
+
+function handoff(res) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.status(200).send(`<!doctype html><meta charset="utf-8">
+<meta name="robots" content="noindex"><title>ARCO Publisher</title>
+<body style="font:15px/1.6 -apple-system,sans-serif;max-width:560px;margin:15vh auto;padding:0 20px;color:#18181B;background:#F4F4F5">
+<h1 style="font-size:20px">Authorized</h1>
+<p>Copy the full address from the address bar and paste it back into the terminal
+that started this sign-in. This page has not used the code.</p></body>`);
 }

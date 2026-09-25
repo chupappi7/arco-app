@@ -262,6 +262,26 @@ const ACCOUNT_ENV = {
   jackson: { env: 'TIKTOK_REFRESH_TOKEN_JACKSON', label: 'jackson21.dev' },
 };
 
+// Two TikTok apps, two credential sets. The production app is approved to
+// post; only the sandbox app holds the scopes that read an account's own
+// stats (user.info.stats, video.list). So reading goes through the sandbox
+// key and its tokens, and everything that posts goes through production.
+// Collapse this once production is approved for the stats scopes.
+function credsFor(account, purpose) {
+  const key = ACCOUNT_ENV[account];
+  if (!key) throw new Error(`--account must be one of ${Object.keys(ACCOUNT_ENV).join('/')}`);
+  const stats = purpose === 'stats';
+  const tokenVar = stats ? key.env.replace(/^TIKTOK_/, 'TIKTOK_STATS_') : key.env;
+  return {
+    tokenVar,
+    creds: {
+      clientKey: requireEnv(stats ? 'TIKTOK_STATS_CLIENT_KEY' : 'TIKTOK_CLIENT_KEY'),
+      clientSecret: requireEnv(stats ? 'TIKTOK_STATS_CLIENT_SECRET' : 'TIKTOK_CLIENT_SECRET'),
+      refreshToken: requireEnv(tokenVar),
+    },
+  };
+}
+
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
 
@@ -274,25 +294,13 @@ async function main() {
   // --creator-info asks about the account, not about a post, so it runs before
   // any topic is resolved and never touches drafts/.
   if (opts.accountStats) {
-    const key = ACCOUNT_ENV[opts.account];
-    if (!key) throw new Error(`--account must be one of ${Object.keys(ACCOUNT_ENV).join('/')}`);
-    const tokens = await refreshAccessToken({
-      clientKey: requireEnv('TIKTOK_CLIENT_KEY'),
-      clientSecret: requireEnv('TIKTOK_CLIENT_SECRET'),
-      refreshToken: requireEnv(key.env),
-    });
+    const tokens = await refreshAccessToken(credsFor(opts.account, 'stats').creds);
     console.log(JSON.stringify(await fetchUserInfo({ accessToken: tokens.accessToken }), null, 2));
     return;
   }
 
   if (opts.listPosts) {
-    const key = ACCOUNT_ENV[opts.account];
-    if (!key) throw new Error(`--account must be one of ${Object.keys(ACCOUNT_ENV).join('/')}`);
-    const tokens = await refreshAccessToken({
-      clientKey: requireEnv('TIKTOK_CLIENT_KEY'),
-      clientSecret: requireEnv('TIKTOK_CLIENT_SECRET'),
-      refreshToken: requireEnv(key.env),
-    });
+    const tokens = await refreshAccessToken(credsFor(opts.account, 'stats').creds);
     // The endpoint pages at 20; accounts here have 29-49 posts, so one page
     // was quietly hiding half the history from the analytics.
     const videos = [];
@@ -314,27 +322,22 @@ async function main() {
   // response carries the real post id, which is the only handle on a post
   // that cannot drift: captions get edited, ids do not.
   if (opts.statusOf) {
-    const key = ACCOUNT_ENV[opts.account];
-    if (!key) throw new Error(`--account must be one of ${Object.keys(ACCOUNT_ENV).join('/')}`);
-    const tokens = await refreshAccessToken({
-      clientKey: requireEnv('TIKTOK_CLIENT_KEY'),
-      clientSecret: requireEnv('TIKTOK_CLIENT_SECRET'),
-      refreshToken: requireEnv(key.env),
-    });
-    const data = await fetchPostStatus({
-      accessToken: tokens.accessToken, publishId: opts.statusOf });
+    // Drafts sent before the production switch belong to the sandbox app,
+    // and a publish id only resolves under the app that created it.
+    let data;
+    try {
+      const tokens = await refreshAccessToken(credsFor(opts.account, 'post').creds);
+      data = await fetchPostStatus({ accessToken: tokens.accessToken, publishId: opts.statusOf });
+    } catch (err) {
+      const tokens = await refreshAccessToken(credsFor(opts.account, 'stats').creds);
+      data = await fetchPostStatus({ accessToken: tokens.accessToken, publishId: opts.statusOf });
+    }
     console.log(JSON.stringify(data, null, 2));
     return;
   }
 
   if (opts.creatorInfo) {
-    const key = ACCOUNT_ENV[opts.account];
-    if (!key) throw new Error(`--account must be one of ${Object.keys(ACCOUNT_ENV).join('/')}`);
-    const tokens = await refreshAccessToken({
-      clientKey: requireEnv('TIKTOK_CLIENT_KEY'),
-      clientSecret: requireEnv('TIKTOK_CLIENT_SECRET'),
-      refreshToken: requireEnv(key.env),
-    });
+    const tokens = await refreshAccessToken(credsFor(opts.account, 'post').creds);
     const info = await fetchCreatorInfo({ accessToken: tokens.accessToken });
     console.log(JSON.stringify({ scope: tokens.scope, ...info }, null, 2));
     return;
@@ -370,13 +373,7 @@ async function main() {
   }
   const tokenVar = ACCOUNTS[opts.account].env;
   console.log(`  account: ${ACCOUNTS[opts.account].label}`);
-  const creds = opts.dryRun
-    ? null
-    : {
-        clientKey: requireEnv('TIKTOK_CLIENT_KEY'),
-        clientSecret: requireEnv('TIKTOK_CLIENT_SECRET'),
-        refreshToken: requireEnv(tokenVar),
-      };
+  const creds = opts.dryRun ? null : credsFor(opts.account, 'post').creds;
 
   await preflight(urls);
 
