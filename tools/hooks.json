@@ -1082,6 +1082,20 @@
     "05.jpg"
    ],
    "_note": "built 2026-09-24 by gen-three-hours-screens.py (shared build in tools/_veiled_screens.py). screentime pillar on veiled photos: hook 'i cut 3 hours of screen time' from hook_rules.eligible('screentime'), least recently used, with the 'here is why' kicker; three ARCO screens as reasons (Bad Habits ranks apps by hours, Auto-start Focus on a timer habit, focus Live Activity countdown on the lock screen), each checked in the iOS source on pivot-timer and shipped since June; closer is the Blocked Hours angle via next_arco_angle('screentime'); card icon and badge outlined. Backgrounds bg-h78/h20/h21/h34/h35 via pick_bgs. rebuild: python3 tools/gen-three-hours-screens.py"
+  },
+  {
+   "topic": "wish-i-knew-at-17-7",
+   "title": "5 apps i wish someone showed me at 17",
+   "caption": "five apps i wish someone had put in front of me at 17. arco keeps the study block in the plan and the distracting apps close with it, so the session ends when the timer does and not when i give in, my holy grail. a finished perplexity thread turns into a page written up with its sources, so a night of research ends as a link you can send. the notion web clipper drops any page into a database with your own fields, so every source for the essay lands in one table instead of thirty tabs. put a caret and an id after a line in obsidian and you can link to that line, so the essay points at the exact sentence and not the whole note. canva bulk create builds one design per row of a spreadsheet, so a list of forty terms comes back as forty finished cards. #productivity #studytok #apps #tools #aitools",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-26 by gen-wish-i-knew-at-17-7.py. mechanical re-shoot of wish-i-knew-at-17: identical words (title, caption, hook, every slide, roster), new backgrounds only. ARCO on angle l1 via next_arco_angle('study'), same as the source. BGs from the gen-daily-batch walk excluding the source's six: hook bg-h79, then h32 (the one person)/h36/n06/h88/n01. The walk gave h46 for Notion; it was rendered, read back and replaced with n06 because the monitor wall sat under the copy. hook outing recorded via mark_hook_used. rebuild: python3 tools/gen-wish-i-knew-at-17-7.py"
   }
  ]
 }
