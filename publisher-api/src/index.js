@@ -3,6 +3,7 @@ import { tkFor, TikTokError } from './tiktok.js';
 import { oauthIntake, resolveCaller, rotateApiKey, logout } from './auth.js';
 import { listAccounts, creatorInfoFor, disconnect } from './accounts.js';
 import * as L from './limits.js';
+import { uploadMedia, serveMedia } from './media.js';
 
 async function me(req, env, { ws }) {
   const row = await env.DB.prepare('SELECT api_key_hash FROM workspaces WHERE id = ?').bind(ws).first();
@@ -25,6 +26,8 @@ export const ROUTES = [
   ['GET', '/v1/accounts', async (req, env, { ws }) => json({ accounts: await listAccounts(env, ws) }), 'user'],
   ['DELETE', '/v1/accounts/:id', async (req, env, { ws, params }) => { await disconnect(env, ws, params.id); return json({ ok: true }); }, 'user'],
   ['GET', '/v1/accounts/:id/creator-info', async (req, env, { ws, params, tk }) => json(await creatorInfoFor(env, tk, ws, params.id)), 'user'],
+  ['POST', '/v1/media', async (req, env, { ws }) => json(await uploadMedia(env, ws, req)), 'user'],
+  ['GET', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`), 'public'],
 ];
 
 function sameSecret(a, b) {
