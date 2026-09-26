@@ -135,4 +135,30 @@ describe('posts routes', () => {
     expect(res.status).toBe(409);
     expect((await res.json()).error).toMatch(/check the profile/i);
   });
+
+  it('replaces a scheduled post only when the new one is saved', async () => {
+    const { h, account_id, keys } = await setup();
+    const at = Math.floor(Date.now() / 1000) + 3600;
+    const a = await (await callWorker('/v1/posts', { method: 'POST', headers: h,
+      body: { account_id, image_keys: keys, settings, scheduled_at: at } })).json();
+    const res = await callWorker('/v1/posts', { method: 'POST', headers: h,
+      body: { account_id, image_keys: keys, settings, scheduled_at: at + 600, title: 'edited', replaces: a.id } });
+    expect(res.status).toBe(200);
+    const b = await res.json();
+    const old = await env.DB.prepare('SELECT status FROM posts WHERE id = ?').bind(a.id).first();
+    expect(old.status).toBe('cancelled');
+    const m = await env.DB.prepare('SELECT post_id, delete_after FROM media WHERE key = ?').bind(keys[0]).first();
+    expect(m).toEqual({ post_id: b.id, delete_after: null });
+  });
+
+  it('a failed replacement leaves the original scheduled', async () => {
+    const { h, account_id, keys } = await setup();
+    const at = Math.floor(Date.now() / 1000) + 3600;
+    const a = await (await callWorker('/v1/posts', { method: 'POST', headers: h,
+      body: { account_id, image_keys: keys, settings, scheduled_at: at } })).json();
+    const res = await callWorker('/v1/posts', { method: 'POST', headers: h,
+      body: { account_id, image_keys: keys, settings, scheduled_at: 5, replaces: a.id } });
+    expect(res.status).toBe(400);
+    expect((await env.DB.prepare('SELECT status FROM posts WHERE id = ?').bind(a.id).first()).status).toBe('queued');
+  });
 });

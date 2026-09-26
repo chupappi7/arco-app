@@ -68,7 +68,9 @@ function composeView() {
   const opts = (i?.privacy_level_options || []).filter(o => !(o === 'SELF_ONLY' && S.set.branded));
   const label = S.set.branded ? 'Paid partnership' : S.set.brand ? 'Promotional content' : '';
   const need = missing();
-  return `<div class="card">
+  return `${S.replaces ? `<div class="status">Editing a scheduled post. The original stays scheduled until you save this one.
+      <button class="btn sec" id="stopedit" style="margin-left:8px">Stop editing</button></div>` : ''}
+  <div class="card">
     <div class="sec"><span class="cap">Photos</span>
       <div class="thumbs">${S.images.map((m, n) => `<div class="th ${n === S.cover ? 'cover' : ''}">
           ${n === S.cover ? '<span class="badge">Cover</span>' : ''}
@@ -220,6 +222,7 @@ async function submit() {
       settings: { privacy_level: S.set.privacy, disable_comment: !S.set.comment || !!S.info?.comment_disabled,
         auto_add_music: S.set.music, brand_organic: S.set.disclose && S.set.brand, branded_content: S.set.disclose && S.set.branded },
       scheduled_at: S.when === 'later' ? Math.floor(new Date(S.at).getTime() / 1000) : null,
+      replaces: S.replaces || undefined,
     }) });
     resetComposer();
     if (p.scheduled_at > Date.now() / 1000 + 60) {
@@ -246,7 +249,7 @@ async function watch(id) {
 }
 
 function resetComposer() {
-  Object.assign(S, { images: [], cover: 0, title: '', caption: '', when: 'now', at: '', status: null });
+  Object.assign(S, { images: [], cover: 0, title: '', caption: '', when: 'now', at: '', status: null, replaces: null });
   S.set = { privacy: '', comment: false, music: false, disclose: false, brand: false, branded: false };
 }
 
@@ -302,8 +305,9 @@ function calendarView() {
 async function edit(id) {
   const p = S.posts.find(x => x.id === id);
   if (!p) return;
-  if (p.status === 'queued') await api(`/posts/${id}`, { method: 'DELETE' });
   resetComposer();
+  // A queued post stays scheduled until the edited version is saved.
+  S.replaces = p.status === 'queued' ? p.id : null;
   Object.assign(S, { images: p.image_keys.map((k, n) => ({ key: k, url: p.images[n] })), cover: p.cover_index,
     title: p.title, caption: p.caption, when: 'later', at: localInput(Math.max(p.scheduled_at * 1000, Date.now() + 10 * 60e3)) });
   const s = p.settings;
@@ -363,6 +367,7 @@ function bind() {
   on('input[name=when]', 'change', e => { S.when = e.target.value; render(); });
   on('#at', 'change', e => { S.at = e.target.value; render(); });
   on('#go', 'click', submit);
+  on('#stopedit', 'click', () => { resetComposer(); location.hash = '#calendar'; });
   on('[data-f]', 'click', e => { S.filter = e.target.dataset.f; render(); });
   on('[data-wk]', 'click', e => { S.week += Number(e.target.dataset.wk); loadWeek(); });
   on('[data-cancel]', 'click', async e => { try { await api(`/posts/${e.target.dataset.cancel}`, { method: 'DELETE' }); } catch (x) { S.flash = { kind: 'err', text: x.message }; } loadWeek(); });

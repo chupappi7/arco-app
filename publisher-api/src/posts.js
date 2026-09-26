@@ -65,15 +65,23 @@ export async function createPost(env, tk, ws, input) {
   const account = await getAccount(env, ws, p.account_id);
   if (account.needs_reconnect) throw new HttpError(409, 'Reconnect this account before posting', 'needs_reconnect');
 
+  // Edit = a new post that replaces a queued one, which stays scheduled
+  // until this one is saved.
+  const replaces = typeof input?.replaces === 'string' && input.replaces ? input.replaces : null;
+  if (replaces) {
+    const old = await loadPost(env, ws, replaces);
+    if (old.status !== 'queued') throw new HttpError(409, 'That post has already started or finished, so it cannot be edited');
+  }
+
   const { n } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM posts WHERE workspace_id = ? AND status = 'queued'`).bind(ws).first();
-  if (n >= MAX_QUEUED) throw new HttpError(409, `You can have at most ${MAX_QUEUED} posts waiting at a time`);
+  if (n - (replaces ? 1 : 0) >= MAX_QUEUED) throw new HttpError(409, `You can have at most ${MAX_QUEUED} posts waiting at a time`);
 
   const marks = p.image_keys.map(() => '?').join(',');
   // Images may come fresh from upload, or from a cancelled/failed post being
   // edited into a new one. Images of a queued or published post are taken.
   const { results } = await env.DB.prepare(`SELECT key FROM media WHERE workspace_id = ? AND key IN (${marks})
-      AND (post_id IS NULL OR post_id IN (SELECT id FROM posts WHERE status IN ('cancelled', 'failed')))`)
-    .bind(ws, ...p.image_keys).all();
+      AND (post_id IS NULL OR post_id = ? OR post_id IN (SELECT id FROM posts WHERE status IN ('cancelled', 'failed')))`)
+    .bind(ws, ...p.image_keys, replaces).all();
   if (results.length !== new Set(p.image_keys).size || results.length !== p.image_keys.length) {
     bad('One or more images are missing, already used by another post, or listed twice. Upload them again.');
   }
@@ -86,6 +94,13 @@ export async function createPost(env, tk, ws, input) {
   }
 
   const id = 'pst_' + randomToken('', 8), t = now();
+  if (replaces) {
+    // Conditional, so a post the cron claimed a moment ago is not replaced
+    // (and so not published twice).
+    const r = await env.DB.prepare(`UPDATE posts SET status = 'cancelled', fail_reason = 'Replaced by an edit',
+        updated_at = ? WHERE id = ? AND workspace_id = ? AND status = 'queued'`).bind(t, replaces, ws).run();
+    if (!r.meta.changes) throw new HttpError(409, 'That post has just started publishing, so it cannot be edited');
+  }
   await env.DB.batch([
     env.DB.prepare(`INSERT INTO posts (id, workspace_id, account_id, status, title, caption, image_keys, cover_index,
         settings, scheduled_at, next_attempt_at, created_at, updated_at)
