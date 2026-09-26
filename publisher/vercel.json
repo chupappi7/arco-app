@@ -1,5 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/api/v1/:path*", "destination": "https://arco-publisher-api.thinht7110.workers.dev/v1/:path*" },
+    { "source": "/media/:path*", "destination": "https://arco-publisher-api.thinht7110.workers.dev/media/:path*" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

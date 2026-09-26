@@ -1,72 +1,54 @@
-// Step two: TikTok sends the operator back here with ?code=. Exchange it for
-// an access token, drop the token in an httpOnly cookie, and return to the
-// page. The token never reaches page scripts and is never written to disk.
+// Step two: TikTok sends the browser back with ?code=. The Worker does the
+// exchange and keeps the tokens; this function only proves the round trip
+// was ours (state + PKCE verifier cookies) and hands over the session cookie.
 
 import {
-  OAUTH_TOKEN_URL,
-  clearCookie,
-  env,
-  envelope,
-  readCookie,
-  redirectUri,
-  setCookie,
+  clearCookie, readCookie, rawCookie, redirectUri, env, setSessionCookie, workerFetch, SESSION_COOKIE,
 } from '../_lib.js';
 
 export default async function handler(req, res) {
   const url = new URL(req.url, 'https://placeholder.invalid');
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
-
-  // The operator tapped Cancel on TikTok's consent screen.
   const denied = url.searchParams.get('error');
   if (denied) return back(res, `TikTok returned ${denied}`);
 
   const expected = readCookie(req, 'tt_state');
   const verifier = readCookie(req, 'tt_verifier');
+  const adding = readCookie(req, 'tt_add') === '1';
   clearCookie(res, 'tt_state');
   clearCookie(res, 'tt_verifier');
+  clearCookie(res, 'tt_add');
 
   if (!code) return back(res, 'no authorization code came back');
   // No state cookie at all: the sign-in was started by the command-line token
-  // tool, which holds its own state and PKCE verifier. The production app has
-  // only this one redirect URI, so the tool lands here too. Leave the code
-  // unspent and the address bar untouched so it can be copied back.
+  // tool, which keeps its own state and verifier. Leave the code unspent.
   if (!expected) return handoff(res);
-  // A mismatched state means this callback was not started by us.
-  if (!expected || state !== expected) return back(res, 'state mismatch, start over');
-  if (!verifier) return back(res, 'the login attempt expired, start over');
+  if (state !== expected) return back(res, 'state mismatch, start over');
+  if (!verifier) return back(res, 'the sign-in attempt expired, start over');
 
   let body;
   try {
-    const r = await fetch(OAUTH_TOKEN_URL, {
+    const r = await workerFetch('/internal/oauth', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_key: env('TIKTOK_CLIENT_KEY'),
-        client_secret: env('TIKTOK_CLIENT_SECRET'),
-        code,
-        grant_type: 'authorization_code',
-        redirect_uri: redirectUri(req),
-        code_verifier: verifier,
+      headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': env('INTERNAL_SECRET') },
+      body: JSON.stringify({
+        code, code_verifier: verifier, redirect_uri: redirectUri(req),
+        session_id: adding ? rawCookie(req, SESSION_COOKIE) || undefined : undefined,
       }),
     });
-    body = await envelope(r, 'code exchange');
+    body = await r.json();
+    if (!r.ok) return back(res, body.error || `sign-in failed (${r.status})`);
   } catch (err) {
-    return back(res, err.message);
+    return back(res, 'could not reach the ARCO Publisher service, try again');
   }
 
-  if (!body.access_token) return back(res, 'no access token in the response');
-
-  // Expire the cookie with the token so a dead session logs out by itself
-  // rather than failing every call until someone notices.
-  setCookie(res, 'tt_at', body.access_token, {
-    maxAge: Math.max(60, Number(body.expires_in) || 86400),
-  });
-  res.redirect(302, '/');
+  setSessionCookie(res, body.session_id);
+  res.redirect(302, adding ? '/app.html#settings' : '/app.html');
 }
 
 function back(res, why) {
-  res.redirect(302, '/?auth_error=' + encodeURIComponent(why));
+  res.redirect(302, '/app.html?auth_error=' + encodeURIComponent(why));
 }
 
 function handoff(res) {

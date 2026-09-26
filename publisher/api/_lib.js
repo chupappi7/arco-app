@@ -10,12 +10,6 @@ import crypto from 'node:crypto';
 
 export const AUTHORIZE_URL = 'https://www.tiktok.com/v2/auth/authorize/';
 export const OAUTH_TOKEN_URL = 'https://open.tiktokapis.com/v2/oauth/token/';
-export const CREATOR_INFO_URL =
-  'https://open.tiktokapis.com/v2/post/publish/creator_info/query/';
-export const CONTENT_INIT_URL =
-  'https://open.tiktokapis.com/v2/post/publish/content/init/';
-export const STATUS_FETCH_URL =
-  'https://open.tiktokapis.com/v2/post/publish/status/fetch/';
 
 // video.publish is what the audit is for; user.info.basic comes with Login Kit.
 export const SCOPE = 'user.info.basic,video.publish,video.upload';
@@ -90,36 +84,22 @@ export function readCookie(req, name) {
   return value;
 }
 
-// --- TikTok --------------------------------------------------------------
+// --- the Worker ------------------------------------------------------------
 
-/** Unwrap TikTok's {data, error} envelope and throw on a real error. */
-export async function envelope(res, label) {
-  const text = await res.text();
-  let body;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    throw new Error(`${label}: response was not JSON — ${text.slice(0, 200)}`);
-  }
-  const err = body.error;
-  // OAuth errors are flat strings; API errors are objects with a code.
-  if (typeof err === 'string' && err && err !== 'ok') {
-    throw new Error(`${label}: ${err} — ${body.error_description || ''}`);
-  }
-  if (err && typeof err === 'object' && err.code && err.code !== 'ok') {
-    const e = new Error(`${label}: ${err.code} — ${err.message || ''}`);
-    e.code = err.code;
-    throw e;
-  }
-  return body;
+export const SESSION_COOKIE = 'tt_sid';
+const SESSION_MAX_AGE = 30 * 86400;
+
+/** The Worker's session id, as the browser holds it (plain, not signed:
+ *  the Worker stores only its hash and is the one that checks it). */
+export function rawCookie(req, name) {
+  const raw = (req.headers.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith(`${name}=`));
+  return raw ? decodeURIComponent(raw.slice(name.length + 1)) : null;
 }
 
-export async function accessTokenFrom(req) {
-  const token = readCookie(req, 'tt_at');
-  if (!token) return null;
-  return token;
+export function setSessionCookie(res, id) {
+  append(res, `${SESSION_COOKIE}=${encodeURIComponent(id)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_MAX_AGE}`);
 }
 
-export function fail(res, status, message, code) {
-  res.status(status).json({ error: message, code });
+export async function workerFetch(path, init = {}) {
+  return fetch(`${env('WORKER_ORIGIN')}${path}`, init);
 }

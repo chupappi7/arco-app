@@ -6,7 +6,7 @@
 // callback refuses anything that does not match.
 
 import crypto from 'node:crypto';
-import { AUTHORIZE_URL, SCOPE, b64url, env, redirectUri, setCookie } from '../_lib.js';
+import { AUTHORIZE_URL, SCOPE, b64url, clearCookie, env, redirectUri, setCookie } from '../_lib.js';
 
 export default function handler(req, res) {
   const state = b64url(crypto.randomBytes(16));
@@ -17,6 +17,10 @@ export default function handler(req, res) {
   // that an abandoned attempt cannot be resumed later.
   setCookie(res, 'tt_state', state, { maxAge: 600 });
   setCookie(res, 'tt_verifier', verifier, { maxAge: 600 });
+  // "Add account" keeps the current workspace; a plain sign-in does not.
+  const add = new URL(req.url, 'https://x').searchParams.get('add') === '1';
+  if (add) setCookie(res, 'tt_add', '1', { maxAge: 600 });
+  else clearCookie(res, 'tt_add');
 
   const u = new URL(AUTHORIZE_URL);
   u.searchParams.set('client_key', env('TIKTOK_CLIENT_KEY'));
