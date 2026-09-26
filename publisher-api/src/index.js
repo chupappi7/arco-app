@@ -5,6 +5,7 @@ import { listAccounts, creatorInfoFor, disconnect } from './accounts.js';
 import * as L from './limits.js';
 import { uploadMedia, serveMedia } from './media.js';
 import { createPost, listPosts, cancelPost, retryPost } from './posts.js';
+import { tick } from './publisher.js';
 
 async function me(req, env, { ws }) {
   const row = await env.DB.prepare('SELECT api_key_hash FROM workspaces WHERE id = ?').bind(ws).first();
@@ -84,6 +85,9 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    // Filled in by Task 6 (publisher) and Task 7 (cleanup).
+    ctx.waitUntil((async () => {
+      const counts = await tick(env, tkFor(env));
+      if (counts.started || counts.published || counts.failed) console.log('tick', JSON.stringify(counts));
+    })());
   },
 };
