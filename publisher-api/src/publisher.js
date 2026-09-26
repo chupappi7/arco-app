@@ -1,5 +1,5 @@
 import { now } from './http.js';
-import { accessTokenFor } from './accounts.js';
+import { accessTokenFor, forgetAccessToken } from './accounts.js';
 import { buildPhotoBody } from './tiktok.js';
 import { mediaUrl } from './media.js';
 import { RETRY_DELAYS, PER_ACCOUNT_PER_TICK, KEEP_AFTER_DONE, PUBLISH_TIMEOUT } from './limits.js';
@@ -68,6 +68,16 @@ async function start(env, tk, post, token, t) {
     return 'started';
   } catch (err) {
     if (err.code === 'needs_reconnect') {
+      await forgetAccessToken(env, post.account_id);
+      const acc = await env.DB.prepare('SELECT needs_reconnect FROM accounts WHERE id = ?').bind(post.account_id).first();
+      // Only a failed refresh proves the grant is gone. A cached access token
+      // TikTok rejected is retried once with a freshly refreshed one.
+      if (acc && !acc.needs_reconnect && post.attempts < RETRY_DELAYS.length) {
+        await env.DB.prepare(`UPDATE posts SET status = 'queued', publish_id = NULL, next_attempt_at = ?,
+            fail_reason = ?, updated_at = ? WHERE id = ?`)
+          .bind(t + RETRY_DELAYS[post.attempts], 'Retrying with a fresh TikTok token', t, post.id).run();
+        return 'requeued';
+      }
       await fail(env, post.id, t, 'Reconnect this account');
       const { results } = await env.DB.prepare(`SELECT id FROM posts WHERE account_id = ? AND status = 'queued'`)
         .bind(post.account_id).all();
@@ -105,6 +115,7 @@ async function poll(env, tk, post, token, t) {
     // Only a lost account ends polling early; anything else is retried on the
     // next tick until the timeout below.
     if (err.code === 'needs_reconnect') {
+      await forgetAccessToken(env, post.account_id);
       await fail(env, post.id, t, 'Lost access to this account while TikTok was processing the post. ' +
         'Check the profile before posting it again.');
       return 'failed';

@@ -71,7 +71,8 @@ export async function oauthIntake(env, tk, { code, code_verifier, redirect_uri, 
   const profile = [info.creator_username || '', info.creator_nickname || '', info.creator_avatar_url || ''];
   let accountId = existing?.id;
   if (existing) {
-    await env.DB.prepare(`UPDATE accounts SET refresh_token_enc = ?, needs_reconnect = 0, username = ?,
+    await env.DB.prepare(`UPDATE accounts SET refresh_token_enc = ?, access_token_enc = NULL, access_expires_at = NULL,
+        needs_reconnect = 0, username = ?,
         display_name = ?, avatar_url = ?, token_updated_at = ? WHERE id = ?`)
       .bind(enc, ...profile, t, accountId).run();
   } else {

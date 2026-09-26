@@ -14,21 +14,43 @@ export async function getAccount(env, ws, id) {
   return row;
 }
 
-export async function accessTokenFor(env, tk, account) {
+// Access tokens live 24 hours; reuse one until 5 minutes before it expires.
+// Refreshing on every call made concurrent callers race TikTok's token
+// rotation, and the loser looked exactly like a revoked account.
+const EARLY = 300;
+
+export async function accessTokenFor(env, tk, account, retried = false) {
+  const t = now();
+  if (account.access_token_enc && account.access_expires_at > t + EARLY) {
+    return decrypt(account.access_token_enc, env.TOKEN_KEY);
+  }
   const refreshToken = await decrypt(account.refresh_token_enc, env.TOKEN_KEY);
+  let tokens;
   try {
-    const t = await tk.refresh(refreshToken);
-    if (t.refresh_token && t.refresh_token !== refreshToken) {
-      await env.DB.prepare('UPDATE accounts SET refresh_token_enc = ?, token_updated_at = ? WHERE id = ?')
-        .bind(await encrypt(t.refresh_token, env.TOKEN_KEY), now(), account.id).run();
-    }
-    return t.access_token;
+    tokens = await tk.refresh(refreshToken);
   } catch (err) {
     if (err.code === 'needs_reconnect') {
+      const fresh = await env.DB.prepare('SELECT * FROM accounts WHERE id = ?').bind(account.id).first();
+      // Someone else rotated the token after we read it: use theirs.
+      if (!retried && fresh && fresh.refresh_token_enc !== account.refresh_token_enc) {
+        return accessTokenFor(env, tk, fresh, true);
+      }
       await env.DB.prepare('UPDATE accounts SET needs_reconnect = 1 WHERE id = ?').bind(account.id).run();
     }
     throw err;
   }
+  const rotated = tokens.refresh_token && tokens.refresh_token !== refreshToken;
+  await env.DB.prepare(`UPDATE accounts SET refresh_token_enc = ?, access_token_enc = ?, access_expires_at = ?,
+      token_updated_at = ? WHERE id = ?`)
+    .bind(rotated ? await encrypt(tokens.refresh_token, env.TOKEN_KEY) : account.refresh_token_enc,
+          await encrypt(tokens.access_token, env.TOKEN_KEY), t + Number(tokens.expires_in || 86400), t, account.id)
+    .run();
+  return tokens.access_token;
+}
+
+export async function forgetAccessToken(env, accountId) {
+  await env.DB.prepare('UPDATE accounts SET access_token_enc = NULL, access_expires_at = NULL WHERE id = ?')
+    .bind(accountId).run();
 }
 
 export async function creatorInfoFor(env, tk, ws, id) {

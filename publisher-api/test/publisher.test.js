@@ -164,7 +164,9 @@ describe('publisher', () => {
   it('losing access while polling fails with a check-the-profile message', async () => {
     await seed();
     await tick(env, fakeTk({ status: async () => ({ status: 'PROCESSING_DOWNLOAD' }) }), T);
-    const revoked = fakeTk({ refresh: async () => { throw new TikTokError('Reconnect this account', { code: 'needs_reconnect' }); } });
+    // With the access token cached, a revoked grant shows up as an invalid
+    // token on the status call itself.
+    const revoked = fakeTk({ status: async () => { throw new TikTokError('Reconnect this account', { code: 'needs_reconnect' }); } });
     await tick(env, revoked, T + 60);
     const p = await post('pst_acc_1_0');
     expect(p.status).toBe('failed');
@@ -177,5 +179,22 @@ describe('publisher', () => {
     const p = await post('pst_acc_1_0');
     expect(p.status).toBe('failed');
     expect(p.publish_id).toBeNull();
+  });
+
+  it('a rejected cached access token is refreshed and retried, not treated as revoked', async () => {
+    await seed({ posts: 2 });
+    let first = true;
+    const tk = fakeTk({ creatorInfo: async () => {
+      if (first) { first = false; throw new TikTokError('Reconnect this account', { code: 'needs_reconnect' }); }
+      return { privacy_level_options: ['PUBLIC_TO_EVERYONE'] };
+    } });
+    await tick(env, tk, T);
+    const a = await post('pst_acc_1_0');
+    expect(a.status).toBe('queued');
+    expect((await post('pst_acc_1_1')).status).not.toBe('failed');
+    const acc = await env.DB.prepare('SELECT needs_reconnect FROM accounts WHERE id = ?').bind('acc_1').first();
+    expect(acc.needs_reconnect).toBe(0);
+    await tick(env, tk, a.next_attempt_at);
+    expect((await post('pst_acc_1_0')).status).toBe('published');
   });
 });

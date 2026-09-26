@@ -84,3 +84,36 @@ describe('accessTokenFor', () => {
     expect(after.needs_reconnect).toBe(1);
   });
 });
+
+describe('access token reuse and rotation races', () => {
+  beforeEach(() => resetDb(env));
+
+  it('reuses a fresh access token instead of refreshing every call', async () => {
+    const { account_id } = await intake(fakeTk());
+    let refreshes = 0;
+    const tk = fakeTk({ refresh: async () => { refreshes++; return { access_token: 'at-x', refresh_token: 'rt-1', expires_in: 86400 }; } });
+    const load = () => env.DB.prepare('SELECT * FROM accounts WHERE id = ?').bind(account_id).first();
+    expect(await accessTokenFor(env, tk, await load())).toBe('at-x');
+    expect(await accessTokenFor(env, tk, await load())).toBe('at-x');
+    expect(refreshes).toBe(1);
+    const row = await load();
+    expect(row.access_token_enc).not.toContain('at-x');
+  });
+
+  it('does not flag an account when a parallel refresh already rotated its token', async () => {
+    const { account_id } = await intake(fakeTk());
+    const stale = await env.DB.prepare('SELECT * FROM accounts WHERE id = ?').bind(account_id).first();
+    // Another caller refreshed first and stored rt-2; our rt-1 is now dead.
+    const { encrypt } = await import('../src/crypto.js');
+    await env.DB.prepare('UPDATE accounts SET refresh_token_enc = ? WHERE id = ?')
+      .bind(await encrypt('rt-2', env.TOKEN_KEY), account_id).run();
+    const tk = fakeTk({ refresh: async rt => {
+      if (rt === 'rt-1') { const e = new Error('Reconnect this account'); e.code = 'needs_reconnect'; throw e; }
+      return { access_token: 'at-2', refresh_token: 'rt-2', expires_in: 86400 };
+    } });
+    expect(await accessTokenFor(env, tk, stale)).toBe('at-2');
+    const row = await env.DB.prepare('SELECT needs_reconnect FROM accounts WHERE id = ?').bind(account_id).first();
+    expect(row.needs_reconnect).toBe(0);
+  });
+});
+

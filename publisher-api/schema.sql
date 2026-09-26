@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   display_name TEXT NOT NULL DEFAULT '',
   avatar_url TEXT NOT NULL DEFAULT '',
   refresh_token_enc TEXT NOT NULL,
+  access_token_enc TEXT,
+  access_expires_at INTEGER,
   needs_reconnect INTEGER NOT NULL DEFAULT 0,
   connected_at INTEGER NOT NULL,
   token_updated_at INTEGER NOT NULL
