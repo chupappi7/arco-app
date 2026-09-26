@@ -124,4 +124,15 @@ describe('posts routes', () => {
       body: { account_id, image_keys: [key], settings, scheduled_at: at } });
     expect(res.status).toBe(409);
   });
+
+  it('refuses Retry when TikTok may already have published the post', async () => {
+    const { h, account_id, keys } = await setup();
+    const at = Math.floor(Date.now() / 1000) + 3600;
+    const p = await (await callWorker('/v1/posts', { method: 'POST', headers: h,
+      body: { account_id, image_keys: keys, settings, scheduled_at: at } })).json();
+    await env.DB.prepare(`UPDATE posts SET status = 'failed', publish_id = 'pub-7' WHERE id = ?`).bind(p.id).run();
+    const res = await callWorker(`/v1/posts/${p.id}/retry`, { method: 'POST', headers: h });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/check the profile/i);
+  });
 });

@@ -119,6 +119,9 @@ export async function cancelPost(env, ws, id) {
 export async function retryPost(env, ws, id) {
   const row = await loadPost(env, ws, id);
   if (row.status !== 'failed') throw new HttpError(409, 'Only failed posts can be retried');
+  if (row.publish_id !== null) {
+    throw new HttpError(409, 'TikTok may already have published this post. Check the profile, then use Edit to post it again.');
+  }
   const keys = JSON.parse(row.image_keys);
   const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM media WHERE post_id = ?').bind(id).first();
   if (n !== keys.length) throw new HttpError(409, 'The images for this post were already deleted. Create it again.');

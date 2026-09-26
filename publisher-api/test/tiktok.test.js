@@ -72,4 +72,19 @@ describe('tiktok client', () => {
         photo_cover_index: 1 },
     });
   });
+
+  it('network failures become transient TikTokErrors', async () => {
+    const tk = tiktok({ clientKey: 'ck', clientSecret: 'cs', fetch: async () => { throw new TypeError('fetch failed'); } });
+    const err = await tk.initPhoto('at', {}).catch(e => e);
+    expect(err).toBeInstanceOf(TikTokError);
+    expect(err.transient).toBe(true);
+    const err2 = await tk.refresh('rt').catch(e => e);
+    expect(err2.transient).toBe(true);
+  });
+
+  it('every request carries a timeout signal', async () => {
+    const f = fakeFetch([{ body: { data: { publish_id: 'p' }, error: { code: 'ok' } } }]);
+    await tiktok({ clientKey: 'ck', clientSecret: 'cs', fetch: f }).initPhoto('at', {});
+    expect(f.calls[0].init.signal).toBeInstanceOf(AbortSignal);
+  });
 });

@@ -133,4 +133,49 @@ describe('publisher', () => {
     await tick(env, fakeTk({ status: async () => ({ status: 'PROCESSING_DOWNLOAD' }) }), T + 601);
     expect((await post('pst_acc_1_0')).publish_id).toBe('pub-1');   // re-queued, then started again
   });
+
+  it('marks the post as in flight before asking TikTok to publish', async () => {
+    await seed();
+    let seen;
+    const tk = fakeTk({ initPhoto: async () => { seen = (await post('pst_acc_1_0')).publish_id; return { publish_id: 'pub-1' }; } });
+    await tick(env, tk, T);
+    expect(seen).toBe('');
+  });
+
+  it('fails, rather than resends, a post whose publish request may have gone out', async () => {
+    await seed({ status: 'publishing' });
+    await env.DB.prepare(`UPDATE posts SET publish_id = '', attempts = 1 WHERE id = 'pst_acc_1_0'`).run();
+    let inited = false;
+    await tick(env, fakeTk({ initPhoto: async () => { inited = true; return { publish_id: 'x' }; } }), T + 601);
+    const p = await post('pst_acc_1_0');
+    expect(inited).toBe(false);
+    expect(p.status).toBe('failed');
+    expect(p.fail_reason).toMatch(/check the profile/i);
+  });
+
+  it('a network error while polling keeps the post publishing', async () => {
+    await seed();
+    await tick(env, fakeTk({ status: async () => ({ status: 'PROCESSING_DOWNLOAD' }) }), T);
+    const flaky = fakeTk({ status: async () => { throw new TikTokError('status fetch: fetch failed', { code: 'network', transient: true }); } });
+    await tick(env, flaky, T + 60);
+    expect((await post('pst_acc_1_0')).status).toBe('publishing');
+  });
+
+  it('losing access while polling fails with a check-the-profile message', async () => {
+    await seed();
+    await tick(env, fakeTk({ status: async () => ({ status: 'PROCESSING_DOWNLOAD' }) }), T);
+    const revoked = fakeTk({ refresh: async () => { throw new TikTokError('Reconnect this account', { code: 'needs_reconnect' }); } });
+    await tick(env, revoked, T + 60);
+    const p = await post('pst_acc_1_0');
+    expect(p.status).toBe('failed');
+    expect(p.fail_reason).toMatch(/check the profile/i);
+  });
+
+  it('a post TikTok explicitly rejected can be retried', async () => {
+    await seed();
+    await tick(env, fakeTk({ status: async () => ({ status: 'FAILED', fail_reason: 'picture_size_check_failed' }) }), T);
+    const p = await post('pst_acc_1_0');
+    expect(p.status).toBe('failed');
+    expect(p.publish_id).toBeNull();
+  });
 });

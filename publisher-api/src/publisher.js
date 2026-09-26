@@ -5,6 +5,10 @@ import { mediaUrl } from './media.js';
 import { RETRY_DELAYS, PER_ACCOUNT_PER_TICK, KEEP_AFTER_DONE, PUBLISH_TIMEOUT } from './limits.js';
 
 const STUCK_AFTER = 600;
+// publish_id = '' marks a content/init call in flight: TikTok may have
+// accepted it even if we never heard back, so such a post is never resent.
+const IN_FLIGHT = '';
+const UNKNOWN = 'The publish request may have reached TikTok, but no answer came back. Check the profile before posting it again.';
 
 export async function claimDue(env, t, limit = 25) {
   const { results } = await env.DB.prepare(`UPDATE posts SET status = 'publishing', updated_at = ?
@@ -41,6 +45,7 @@ function tokenCache(env, tk) {
 
 async function start(env, tk, post, token, t) {
   const settings = JSON.parse(post.settings);
+  await env.DB.prepare('UPDATE posts SET attempts = attempts + 1, updated_at = ? WHERE id = ?').bind(t, post.id).run();
   try {
     const access = await token(post.account_id);
     const info = await tk.creatorInfo(access);
@@ -53,12 +58,13 @@ async function start(env, tk, post, token, t) {
       return 'failed';
     }
     const keys = JSON.parse(post.image_keys);
+    await env.DB.prepare('UPDATE posts SET publish_id = ?, updated_at = ? WHERE id = ?').bind(IN_FLIGHT, t, post.id).run();
     const { publish_id } = await tk.initPhoto(access, buildPhotoBody({
       title: post.title, caption: post.caption, coverIndex: post.cover_index, settings,
       imageUrls: keys.map(k => mediaUrl(env, k)),
     }));
-    await env.DB.prepare(`UPDATE posts SET publish_id = ?, attempts = attempts + 1, fail_reason = NULL, updated_at = ?
-        WHERE id = ?`).bind(publish_id, t, post.id).run();
+    await env.DB.prepare(`UPDATE posts SET publish_id = ?, fail_reason = NULL, updated_at = ? WHERE id = ?`)
+      .bind(publish_id, t, post.id).run();
     return 'started';
   } catch (err) {
     if (err.code === 'needs_reconnect') {
@@ -69,7 +75,9 @@ async function start(env, tk, post, token, t) {
       return 'failed';
     }
     if (err.transient && post.attempts < RETRY_DELAYS.length) {
-      await env.DB.prepare(`UPDATE posts SET status = 'queued', attempts = attempts + 1, next_attempt_at = ?,
+      // A transient error means TikTok refused or never got the request, so
+      // clearing the in-flight mark and trying again cannot double-post.
+      await env.DB.prepare(`UPDATE posts SET status = 'queued', publish_id = NULL, next_attempt_at = ?,
           fail_reason = ?, updated_at = ? WHERE id = ?`)
         .bind(t + RETRY_DELAYS[post.attempts], `Retrying: ${err.message}`, t, post.id).run();
       return 'requeued';
@@ -88,11 +96,19 @@ async function poll(env, tk, post, token, t) {
       return 'published';
     }
     if (s.status === 'FAILED') {
-      await fail(env, post.id, t, `TikTok rejected the post: ${s.fail_reason || 'no reason given'}`);
+      // A definite rejection: nothing went live, so Retry is safe.
+      await finish(env, post.id, t, { status: 'failed', publish_id: null,
+        fail_reason: `TikTok rejected the post: ${s.fail_reason || 'no reason given'}` });
       return 'failed';
     }
   } catch (err) {
-    if (!err.transient) { await fail(env, post.id, t, err.message); return 'failed'; }
+    // Only a lost account ends polling early; anything else is retried on the
+    // next tick until the timeout below.
+    if (err.code === 'needs_reconnect') {
+      await fail(env, post.id, t, 'Lost access to this account while TikTok was processing the post. ' +
+        'Check the profile before posting it again.');
+      return 'failed';
+    }
   }
   if (t - post.updated_at > PUBLISH_TIMEOUT) {
     await fail(env, post.id, t, 'TikTok did not confirm the post within an hour. Check the profile before retrying.');
@@ -105,9 +121,13 @@ export async function tick(env, tk, t = now()) {
   const counts = { started: 0, published: 0, failed: 0, requeued: 0 };
   const token = tokenCache(env, tk);
 
-  // Recover posts claimed by a tick that died before sending content/init.
+  // Recover posts left by a tick that died. Not yet sent: safe to queue again.
+  // Sent but unanswered: fail, because resending could post it twice.
   await env.DB.prepare(`UPDATE posts SET status = 'queued', updated_at = ?
       WHERE status = 'publishing' AND publish_id IS NULL AND updated_at < ?`).bind(t, t - STUCK_AFTER).run();
+  const { results: lost } = await env.DB.prepare(`SELECT id FROM posts
+      WHERE status = 'publishing' AND publish_id = ? AND updated_at < ?`).bind(IN_FLIGHT, t - STUCK_AFTER).all();
+  for (const r of lost) { await fail(env, r.id, t, UNKNOWN); counts.failed++; }
 
   const claimed = await claimDue(env, t);
   const perAccount = new Map();
@@ -123,7 +143,7 @@ export async function tick(env, tk, t = now()) {
   }
 
   const { results: publishing } = await env.DB.prepare(`SELECT * FROM posts
-      WHERE status = 'publishing' AND publish_id IS NOT NULL ORDER BY updated_at LIMIT 25`).all();
+      WHERE status = 'publishing' AND publish_id IS NOT NULL AND publish_id != '' ORDER BY updated_at LIMIT 25`).all();
   for (const p of publishing) {
     const r = await poll(env, tk, p, token, t);
     if (r === 'published') counts.published++;
