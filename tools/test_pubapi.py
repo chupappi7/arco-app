@@ -26,7 +26,8 @@ class Fake(BaseHTTPRequestHandler):
         n = int(self.headers.get('Content-Length') or 0)
         raw = self.rfile.read(n) if n else b''
         Fake.calls.append({'method': self.command, 'path': self.path, 'auth': self.headers.get('Authorization'),
-                           'type': self.headers.get('Content-Type'), 'raw': raw})
+                           'type': self.headers.get('Content-Type'), 'raw': raw,
+                           'ua': self.headers.get('User-Agent')})
         return raw
 
     def do_GET(self):
@@ -64,6 +65,11 @@ class PubApiTest(unittest.TestCase):
     def setUp(self):
         Fake.calls.clear()
 
+
+    def test_sends_its_own_user_agent(self):
+        # Cloudflare's bot check answers 403 to the default Python-urllib agent.
+        self.api.accounts()
+        self.assertTrue(Fake.calls[-1]['ua'].startswith('ARCO-Dashboard/'))
     def test_account_ids_match_on_username(self):
         ids = pubapi.account_ids(self.api, [{'key': 'vn', 'label': 'arco.app'},
                                             {'key': 'getarco', 'label': 'getarcoapp'},
@@ -127,6 +133,14 @@ class ScheduleManyTest(unittest.TestCase):
     def test_no_error_when_all_succeed(self):
         sent, error = pubapi.schedule_many(lambda *a: {'id': 'p'}, 't', ['vn'], 5, 0, {})
         self.assertEqual((list(sent), error), (['vn'], None))
+
+
+class Tls(unittest.TestCase):
+    def test_uses_certifi_roots_so_python_org_builds_can_verify_https(self):
+        # python.org builds ship no system roots: a default context has 0 CAs
+        # and every HTTPS call fails with CERTIFICATE_VERIFY_FAILED.
+        ctx = pubapi.PubAPI('https://example.test', 'k').ssl_context
+        self.assertGreater(ctx.cert_store_stats()['x509_ca'], 50)
 
 
 if __name__ == '__main__':

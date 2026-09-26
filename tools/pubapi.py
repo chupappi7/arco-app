@@ -7,6 +7,7 @@ time with no laptop involved. Standard library only, like the dashboard.
 import json
 import os
 import re
+import ssl
 import urllib.error
 import urllib.request
 
@@ -19,21 +20,32 @@ class PubError(Exception):
         self.status = status
 
 
+def _ssl_context():
+    # python.org builds do not read the system keychain, so use certifi's
+    # roots when it is installed (it is, alongside the dashboard).
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
 class PubAPI:
     def __init__(self, base, key, timeout=60):
         self.base = base.rstrip('/')
         self.key = key
         self.timeout = timeout
+        self.ssl_context = _ssl_context()
 
     def _call(self, method, path, body=None, data=None, ctype=None):
-        headers = {'Authorization': f'Key {self.key}'}
+        headers = {'Authorization': f'Key {self.key}', 'User-Agent': 'ARCO-Dashboard/1.0'}
         if body is not None:
             data, ctype = json.dumps(body).encode(), 'application/json'
         if ctype:
             headers['Content-Type'] = ctype
         req = urllib.request.Request(self.base + path, data=data, method=method, headers=headers)
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+            with urllib.request.urlopen(req, timeout=self.timeout, context=self.ssl_context) as r:
                 raw = r.read()
                 return json.loads(raw) if raw else {}
         except urllib.error.HTTPError as e:
