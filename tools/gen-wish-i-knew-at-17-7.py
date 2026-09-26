@@ -27,12 +27,16 @@ lounge-night, so they have to sit at positions 1, 3 and 5 and the only choice
 left is which lounge-night leads. bg-h31 leads because it has the darkest copy
 band and slide 02 is the longest block in the post.
 
-  01 hook        bg-h79  desk-led-neon
+  01 hook        bg-h52  desk-city-day
   02 ARCO        bg-h32  window-silhouette  band luma 38.8, the one person
   03 Perplexity  bg-h36  supercars-dusk     band luma 20.3
   04 Notion      bg-n06  desk-empty-day     band luma 53.6
   05 Obsidian    bg-h88  supercars-dusk     band luma 28.2
   06 Canva       bg-n01  villa-day          band luma 66.3
+
+Redo: the hook moved from bg-h79 (night desk) to bg-h52, a bright
+day desk, and the ARCO title now carries the current store name,
+App Blocker & Focus: ARCO. Slides 03-06 are untouched.
 
 Usage:
     python3 tools/gen-wish-i-knew-at-17-7.py            # every slide
@@ -44,8 +48,8 @@ import sys
 
 sys.path.insert(0, '/Users/thinh/SIXSIX/arco-app/tools')
 import compose as c
-from compose import (app_slide, hook_slide, mark_hook_used, next_arco_angle,
-                     preflight, record_post_bgs, record_post_tools)
+from compose import (app_slide, hook_slide, mark_hook_used, preflight,
+                     record_post_bgs, record_post_tools)
 
 REPO = '/Users/thinh/SIXSIX/arco-app'
 TOPIC = 'wish-i-knew-at-17-7'
@@ -56,9 +60,12 @@ PILLAR = 'tools'
 # 17 means school, so ARCO answers on the study block and the apps that close
 # with it, not on planning a work day.
 THEME = 'study'
+# Pinned to the angle this post shipped with. next_arco_angle rotates on
+# every call, so a redo would otherwise swap the copy he already approved.
+ARCO_ANGLE = 'l1'
 
 TOOLS = ['ARCO', 'Perplexity', 'Notion', 'Obsidian', 'Canva']
-TITLES = ['1. ARCO: Day Planner & Focus', '2. Perplexity', '3. Notion',
+TITLES = ['1. App Blocker & Focus: ARCO', '2. Perplexity', '3. Notion',
           '4. Obsidian', '5. Canva']
 
 # Roster order, ARCO first. This is what the hook slide's shelf shows.
@@ -66,7 +73,7 @@ SHELF = ['icon-arco.png', 'icon-perplexity.png', 'icon-notion.jpg',
          'icon-obsidian.jpg', 'icon-canva.png']
 
 # index 0 is the hook, 1..5 are the app slides in order.
-BGS = ['bg-h79.jpg',   # 01 hook        desk-led-neon
+BGS = ['bg-h52.jpg',   # 01 hook        desk-city-day
        'bg-h32.jpg',   # 02 ARCO        window-silhouette  band luma 38.8
        'bg-h36.jpg',   # 03 Perplexity  supercars-dusk     band luma 20.3
        'bg-n06.jpg',   # 04 Notion      desk-empty-day     band luma 53.6
@@ -117,8 +124,11 @@ def main(only=None):
 
     if only in (None, 1):
         log = json.load(open(f'{c.SP}/hook_usage.json'))
+        # pick_hook_bg only honours prefer= once the night desks are used
+        # up, so a day frame chosen on purpose is logged directly.
         if BGS[0] not in log:
-            c.pick_hook_bg(prefer=BGS[0])
+            log.append(BGS[0])
+            json.dump(log, open(f'{c.SP}/hook_usage.json', 'w'), indent=1)
         hook_slide(BGS[0], HOOK, f'{OUT}/01.jpg', icons=SHELF)
         mark_hook_used(HOOK, TOPIC)
 
@@ -127,7 +137,13 @@ def main(only=None):
         n, bg = i + 1, BGS[i + 1]
         if only not in (None, n + 1):
             continue
-        body = next_arco_angle(THEME) if tool == 'ARCO' else BODY[tool]
+        if tool == 'ARCO':
+            angles = json.load(open(c.ARCO_ANGLES))['angles']
+            body = next(a['lines'] for a in angles if a['id'] == ARCO_ANGLE)
+            assert THEME in next(a['themes'] for a in angles
+                                 if a['id'] == ARCO_ANGLE)
+        else:
+            body = BODY[tool]
         app_slide(bg, icons[tool], TITLES[i], body, f'{OUT}/{n+1:02d}.jpg')
         print(f'  {bg}  {c.VIBES.get(bg):16s} band luma '
               f'{c.copy_band_luma(bg):.1f}')
