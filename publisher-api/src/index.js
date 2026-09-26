@@ -4,6 +4,7 @@ import { oauthIntake, resolveCaller, rotateApiKey, logout } from './auth.js';
 import { listAccounts, creatorInfoFor, disconnect } from './accounts.js';
 import * as L from './limits.js';
 import { uploadMedia, serveMedia } from './media.js';
+import { createPost, listPosts, cancelPost, retryPost } from './posts.js';
 
 async function me(req, env, { ws }) {
   const row = await env.DB.prepare('SELECT api_key_hash FROM workspaces WHERE id = ?').bind(ws).first();
@@ -28,6 +29,16 @@ export const ROUTES = [
   ['GET', '/v1/accounts/:id/creator-info', async (req, env, { ws, params, tk }) => json(await creatorInfoFor(env, tk, ws, params.id)), 'user'],
   ['POST', '/v1/media', async (req, env, { ws }) => json(await uploadMedia(env, ws, req)), 'user'],
   ['GET', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`), 'public'],
+  ['POST', '/v1/posts', async (req, env, { ws, tk }) => json(await createPost(env, tk, ws, await readJson(req))), 'user'],
+  ['GET', '/v1/posts', async (req, env, { ws, url }) => {
+    const from = Number(url.searchParams.get('from')), to = Number(url.searchParams.get('to'));
+    if (!Number.isInteger(from) || !Number.isInteger(to) || to <= from || to - from > 62 * 86400) {
+      throw new HttpError(400, 'from and to must be epoch seconds, at most 62 days apart');
+    }
+    return json({ posts: await listPosts(env, ws, from, to) });
+  }, 'user'],
+  ['DELETE', '/v1/posts/:id', async (req, env, { ws, params }) => json(await cancelPost(env, ws, params.id)), 'user'],
+  ['POST', '/v1/posts/:id/retry', async (req, env, { ws, params }) => json(await retryPost(env, ws, params.id)), 'user'],
 ];
 
 function sameSecret(a, b) {
