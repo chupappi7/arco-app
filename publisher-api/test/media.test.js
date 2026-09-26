@@ -65,4 +65,16 @@ describe('media', () => {
   it('unknown media is 404', async () => {
     expect((await callWorker('/media/ws_x/nope.jpg')).status).toBe(404);
   });
+
+  it('answers HEAD with the type and size and no body, and GET includes the size', async () => {
+    const h = await session();
+    const m = await (await callWorker('/v1/media', { method: 'POST', headers: { ...h, 'Content-Type': 'image/jpeg' }, body: JPEG })).json();
+    const head = await callWorker(`/media/${m.key}`, { method: 'HEAD' });
+    expect(head.status).toBe(200);
+    expect(head.headers.get('Content-Type')).toBe('image/jpeg');
+    expect(head.headers.get('Content-Length')).toBe(String(JPEG.length));
+    const get = await callWorker(`/media/${m.key}`);
+    expect(get.headers.get('Content-Length')).toBe(String(JPEG.length));
+    await get.arrayBuffer();
+  });
 });

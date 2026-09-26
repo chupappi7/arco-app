@@ -36,12 +36,13 @@ export async function uploadMedia(env, ws, req) {
   return { key, url: mediaUrl(env, key), bytes: bytes.length, content_type: contentType };
 }
 
-export async function serveMedia(env, key) {
-  const obj = await env.MEDIA.get(key);
-  if (!obj) return new Response('Not found', { status: 404 });
-  return new Response(obj.body, {
+export async function serveMedia(env, key, method = 'GET') {
+  const obj = method === 'HEAD' ? await env.MEDIA.head(key) : await env.MEDIA.get(key);
+  if (!obj) return new Response(null, { status: 404 });
+  return new Response(method === 'HEAD' ? null : obj.body, {
     headers: {
       'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+      'Content-Length': String(obj.size),
       'Cache-Control': 'public, max-age=3600',
       'X-Content-Type-Options': 'nosniff',
     },

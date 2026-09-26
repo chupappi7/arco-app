@@ -32,6 +32,8 @@ export const ROUTES = [
   ['GET', '/v1/accounts/:id/creator-info', async (req, env, { ws, params, tk }) => json(await creatorInfoFor(env, tk, ws, params.id)), 'user'],
   ['POST', '/v1/media', async (req, env, { ws }) => json(await uploadMedia(env, ws, req)), 'user'],
   ['GET', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`), 'public'],
+  // TikTok's fetcher, or a CDN in front of it, may check an image with HEAD first.
+  ['HEAD', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`, 'HEAD'), 'public'],
   ['POST', '/v1/posts', async (req, env, { ws, tk }) => json(await createPost(env, tk, ws, await readJson(req))), 'user'],
   ['GET', '/v1/posts', async (req, env, { ws, url }) => {
     const from = Number(url.searchParams.get('from')), to = Number(url.searchParams.get('to'));
