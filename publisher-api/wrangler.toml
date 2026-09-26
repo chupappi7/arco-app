@@ -1,0 +1,21 @@
+name = "arco-publisher-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+PUBLIC_ORIGIN = "https://arco-publisher.vercel.app"
+REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/callback"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "arco-publisher"
+database_id = "local-dev"
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "arco-publisher-media"
+
+# Every minute: publish what is due, poll what is publishing, clean up.
+[triggers]
+crons = ["* * * * *"]
