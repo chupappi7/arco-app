@@ -31,6 +31,7 @@ import urllib.parse
 import urllib.request
 
 import hook_rules
+import pubapi
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DRAFTS = os.path.join(REPO, 'drafts')
@@ -697,6 +698,34 @@ def _env():
     return env
 
 
+PUBLISHER_API = 'https://arco-publisher.vercel.app/api/v1'
+_pub_ids = {'at': 0, 'map': {}}
+
+
+def pub_api():
+    key = _env().get('PUBLISHER_API_KEY')
+    if not key:
+        raise pubapi.PubError('Add PUBLISHER_API_KEY to .env (ARCO Publisher > Settings > API key).')
+    return pubapi.PubAPI(_env().get('PUBLISHER_API') or PUBLISHER_API, key)
+
+
+def pub_account_id(api, key):
+    # The mapping only changes when an account is connected or removed.
+    if time.time() - _pub_ids['at'] > 600 or key not in _pub_ids['map']:
+        _pub_ids['map'] = pubapi.account_ids(api, ACCOUNTS)
+        _pub_ids['at'] = time.time()
+    if key not in _pub_ids['map']:
+        label = next((a['label'] for a in ACCOUNTS if a['key'] == key), key)
+        raise pubapi.PubError(f'@{label} is not connected to ARCO Publisher. Add it there under Settings > Add account.')
+    return _pub_ids['map'][key]
+
+
+def pub_send(topic, key, settings, at=None):
+    api = pub_api()
+    return pubapi.send_topic(api, pub_account_id(api, key), DRAFTS, HOOKS, topic, settings,
+                             int(at) if at else None)
+
+
 _creator_cache = {}
 
 
@@ -757,35 +786,27 @@ def run_publish(topic, key, settings):
     unaudited client has every post forced private, which is why this is a
     separate path from run_draft rather than a flag on it.
     """
-    ok, why = pages_ready(topic)
-    if not ok:
-        return {'status': 'FAILED', 'detail': why, 'at': time.time()}
-    cmd = ['node', 'tools/autopost.js', topic, '--account', key, '--direct-post',
-           '--privacy', settings.get('privacy', ''), '--wait']
-    if settings.get('disable_comment'):
-        cmd.append('--disable-comment')
-    if settings.get('auto_add_music'):
-        cmd.append('--auto-add-music')
-    if settings.get('brand_organic'):
-        cmd.append('--brand-organic')
-    if settings.get('branded_content'):
-        cmd.append('--branded-content')
-    print(f'[publish] {topic} -> {key}: {" ".join(cmd[3:])}', flush=True)
+    # ARCO Publisher does the posting now; this sends the slides and waits a
+    # few minutes for the result so the delivery log can say "published".
     try:
-        p = subprocess.run(cmd, cwd=REPO, env=_env(), capture_output=True,
-                           text=True, timeout=900)
-        out = p.stdout + p.stderr
-    except Exception as exc:
-        out = f'runner error: {exc}'
-    # TikTok reports a finished direct post as PUBLISH_COMPLETE; some
-    # responses use PUBLICLY_AVAILABLE_POST for the same terminal state.
-    if 'PUBLISH_COMPLETE' in out or 'PUBLICLY_AVAILABLE_POST' in out:
-        rec = {'status': 'SENT', 'detail': 'published directly', 'at': time.time(),
-               'published': True, 'published_at': time.time(), 'direct': True}
-    else:
-        reason = [l.strip() for l in out.splitlines() if 'ERROR' in l or 'fail_reason' in l]
-        rec = {'status': 'FAILED', 'detail': (reason[0] if reason else out.strip()[-200:]),
-               'at': time.time()}
+        post = pub_send(topic, key, settings)
+        rec = {'status': 'SENT', 'detail': 'posting via ARCO Publisher', 'at': time.time(),
+               'direct': True, 'pub_post_id': post['id']}
+        api = pub_api()
+        for _ in range(30):
+            time.sleep(10)
+            now_ = time.time()
+            found = next((p for p in api.list_posts(now_ - 3600, now_ + 60) if p['id'] == post['id']), None)
+            if found and found['status'] == 'published':
+                rec.update(detail='published directly', published=True, published_at=time.time(),
+                           post_url=found.get('post_url'))
+                break
+            if found and found['status'] == 'failed':
+                rec = {'status': 'FAILED', 'detail': found.get('fail_reason') or 'TikTok rejected the post',
+                       'at': time.time()}
+                break
+    except pubapi.PubError as exc:
+        rec = {'status': 'FAILED', 'detail': str(exc), 'at': time.time()}
     print(f'[publish] {topic} {key}: {rec["status"]} {rec["detail"][:90]}', flush=True)
     with _lock:
         log = delivery_log()
@@ -3528,6 +3549,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                   mimetypes.guess_type(f)[0] or 'image/png')
         if path == '/api/bgs':
             return self._send(200, bg_catalog())
+        if path == '/api/pub/posts':
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            try:
+                api = pub_api()
+                ids = {v: k for k, v in pubapi.account_ids(api, ACCOUNTS).items()}
+                posts = api.list_posts(float(q['from'][0]), float(q['to'][0]))
+            except (pubapi.PubError, KeyError, ValueError) as exc:
+                return self._send(200, {'posts': [], 'error': str(exc)})
+            for p in posts:
+                p['account'] = ids.get(p['account_id'], '')
+            return self._send(200, {'posts': posts})
         if path == '/api/ig':
             # The queue, plus which posts on this disk are ready to join it.
             q = _metrics('/ig/queue')
@@ -3850,16 +3882,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     mode = 'direct' if body.get('mode') == 'direct' else 'draft'
                     st = body.get('settings') or {}
                     if mode == 'direct':
-                        # Refuse an unpostable job at the point it is made,
-                        # rather than letting it sit until it fires and fails.
-                        for key in (body.get('accounts') or [a['key'] for a in ACCOUNTS]):
-                            why = direct_blocked(key, st)
-                            if why:
-                                return self._send(400, {'error': '%s: %s' % (key, why)})
+                        # Scheduled posts live on ARCO Publisher, which fires
+                        # them with the laptop closed. Nothing is kept here.
+                        try:
+                            at = float(body['at'])
+                            sent = {}
+                            for n, key in enumerate(body.get('accounts') or []):
+                                when = at + n * 60 * int(body.get('stagger_min') or 0)
+                                post = pub_send(body['topic'], key, st, when)
+                                sent[key] = {'status': 'SENT', 'direct': True, 'at': time.time(),
+                                             'pub_post_id': post['id'], 'scheduled_for': when,
+                                             'detail': 'scheduled on ARCO Publisher for '
+                                                       + time.strftime('%a %d %b %H:%M', time.localtime(when))}
+                        except pubapi.PubError as exc:
+                            return self._send(400, {'error': str(exc)})
+                        # Recorded like a send so the post leaves "Built, not scheduled".
+                        log = delivery_log()
+                        log.setdefault(body['topic'], {}).update(sent)
+                        save_log(log)
+                        save_schedules(sc)
+                        return self._send(200, {'ok': True, 'where': 'arco-publisher'})
                     sc.append({'topic': body['topic'], 'at': float(body['at']),
                                'accounts': body.get('accounts') or [],
                                'stagger_min': int(body.get('stagger_min') or 0),
-                               'mode': mode, 'settings': st if mode == 'direct' else {},
+                               'mode': mode, 'settings': {},
                                'done': False})
                 save_schedules(sc)
             return self._send(200, {'ok': True})
@@ -7781,12 +7827,41 @@ function tabCount(k){
 // TikTok, in the order the work happens: what is sitting in your phone's
 // inbox waiting to be published, then what is waiting to be drafted. The
 // slot line is the constraint that decides how much you can do today.
+let tkWeek = 0, tkPosts = null;
+async function loadTkWeek(){
+  const d = new Date(); d.setHours(0,0,0,0);
+  d.setDate(d.getDate() - ((d.getDay()+6)%7) + tkWeek*7);
+  const from = Math.floor(d.getTime()/1000);
+  const r = await (await fetch(`/api/pub/posts?from=${from}&to=${from+7*86400}`)).json();
+  tkPosts = {from, list: r.posts || [], error: r.error};
+  if(filter==='tiktok') render();
+}
 function tiktokView(){
+  if(!tkPosts){ loadTkWeek(); }
   const todo = DATA.posts.filter(p=>stateOf(p)==='review').sort((a,b)=>whenOf(b)-whenOf(a));
-  document.getElementById('cnt').textContent = `${todo.length} to draft`;
-  return `<h4 class="csub">Built, not drafted</h4>
-    ${todo.length ? groups(todo)
-      : '<div class="empty">Review is clear — build more.</div>'}`;
+  document.getElementById('cnt').textContent = `${todo.length} to schedule`;
+  const from = tkPosts ? tkPosts.from : 0;
+  const days = [...Array(7)].map((_,i)=>new Date((from+i*86400)*1000));
+  const cal = !tkPosts ? '<div class="empty">Reading the schedule…</div>'
+    : tkPosts.error ? `<div class="cwarn"><b>ARCO Publisher did not answer.</b> ${esc(tkPosts.error)}</div>`
+    : `<div class="wknav">
+        <button class="wkarr" onclick="tkWeek--;tkPosts=null;render()" ${tkWeek<=0?'disabled':''}>‹</button>
+        <span class="wkr">${days[0].toLocaleDateString('en-GB',{day:'numeric',month:'short'})} – ${days[6].toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span>
+        <button class="wkarr" onclick="tkWeek++;tkPosts=null;render()">›</button></div>
+      <div class="weeklist">${days.map(d=>{
+        const ps = tkPosts.list.filter(p=>new Date(p.scheduled_at*1000).toDateString()===d.toDateString());
+        return `<h4 class="csub">${d.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short'})}</h4>`
+          + (ps.map(p=>`<div class="qrow ${p.status}">
+              <span class="tm">${new Date(p.scheduled_at*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+              <img class="sth" src="${esc(p.images[p.cover_index]||'')}" alt="" loading="lazy">
+              <span class="sw"><b>${esc(p.title||p.id)}</b><i>@${esc(p.username)}${p.fail_reason?' · '+esc(p.fail_reason):''}</i></span>
+              ${p.post_url?`<a class="btn sec sm" href="${esc(p.post_url)}" target="_blank" rel="noopener">View</a>`:''}
+              <span class="st ${p.status}">${esc(p.status)}</span></div>`).join('')
+             || '<div class="qrow empty"><span class="sw"><i>nothing scheduled</i></span></div>');
+      }).join('')}</div>`;
+  return `<h4 class="csub">This week on ARCO Publisher</h4>${cal}
+    <h4 class="csub">Built, not scheduled</h4>
+    ${todo.length ? groups(todo) : '<div class="empty">Nothing waiting — build more.</div>'}`;
 }
 
 // Everything that exists, one grid, sliced by a segmented control. It was
@@ -9052,10 +9127,8 @@ function card(p){
   // One action per card, chosen by where the post actually is.
   let act = '';
   if(st==='review' || st==='failed')
-    act = `<span class="acts">${p.approved
-      ? `<button class="cta sec" onclick="approve(event,'${p.topic}',false)"
-           title="Take it back off the Post page">Approved</button>` : ''}
-      <button class="cta sec" onclick="cardDraft(event,'${p.topic}')">Draft to all</button></span>`;
+    act = `<span class="acts">
+      <button class="cta" onclick="event.stopPropagation();sendTo('${p.topic}')">Schedule</button></span>`;
   // No Mark published button: the sync reads the account back and sets it.
   else if(st==='published' && p.days_since>=7)
     act = `<button class="cta sec" onclick="cardRepost(event,'${p.topic}')">Repost</button>`;
@@ -9550,8 +9623,8 @@ function scheduleDirect(){
   const priv = PRIV_LABEL[dpSet.privacy] || dpSet.privacy;
   showModal({
     title:'Schedule this post',
-    body:`It posts straight to ${a.label} at the time you pick, visible to `
-        +`"${priv}". The dashboard has to be running when it comes due.`,
+    body:`ARCO Publisher posts it to ${a.label} at the time you pick, visible to `
+        +`"${priv}". Your laptop can be closed.`,
     ok:'Schedule',
     extra:`<div class="sched"><div><label for="dpwhen">When</label>
       <input type="datetime-local" id="dpwhen" value="${iso}"></div></div>`,
@@ -9565,9 +9638,9 @@ function scheduleDirect(){
       const r = await res.json().catch(()=>({}));
       if(!res.ok) return say('Not scheduled: '+(r.error||('server returned '+res.status)));
       dpAcct=null; dpInfo=null;
+      tkPosts = null;
       await load(); render();
-      say('Scheduled. It posts to '+key+' at '
-          +new Date(at*1000).toLocaleString()+'.');
+      say('Scheduled on ARCO Publisher for '+new Date(at*1000).toLocaleString()+'.');
     }});
 }
 
@@ -9590,6 +9663,7 @@ async function publishDirect(){
     txt = 'Direct post failed: '+err.message;
   }
   dpBusy = false;
+  tkPosts = null;
   await load();
   say(txt);
 }
