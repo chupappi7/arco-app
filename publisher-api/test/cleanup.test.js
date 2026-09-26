@@ -44,3 +44,27 @@ describe('cleanup', () => {
     }
   });
 });
+
+import { strictDb } from './d1limit.js';
+
+describe('cleanup at production D1 limits', () => {
+  beforeEach(() => resetDb(env));
+
+  it('removes 150 expired images in one pass without exceeding 100 bound parameters', async () => {
+    for (let i = 0; i < 150; i++) await img(`ws_1/e${i}.jpg`, { deleteAfter: T - 1 });
+    const strict = { ...env, DB: strictDb(env.DB) };
+    const r = await runCleanup(strict, T);
+    expect(r.images).toBe(150);
+    const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM media').first();
+    expect(n).toBe(0);
+  });
+
+  it('deleteWorkspace with 150 images leaves no rows behind', async () => {
+    await env.DB.prepare('INSERT INTO workspaces (id, created_at) VALUES (?, ?)').bind('ws_1', T).run();
+    for (let i = 0; i < 150; i++) await img(`ws_1/d${i}.jpg`);
+    await deleteWorkspace({ ...env, DB: strictDb(env.DB) }, 'ws_1');
+    const { n } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM media WHERE workspace_id = 'ws_1'`).first();
+    expect(n).toBe(0);
+    expect(await env.MEDIA.head('ws_1/d0.jpg')).toBeNull();
+  });
+});
