@@ -6,6 +6,7 @@ import * as L from './limits.js';
 import { uploadMedia, serveMedia } from './media.js';
 import { createPost, listPosts, cancelPost, retryPost } from './posts.js';
 import { tick } from './publisher.js';
+import { runCleanup, deleteWorkspace } from './cleanup.js';
 
 async function me(req, env, { ws }) {
   const row = await env.DB.prepare('SELECT api_key_hash FROM workspaces WHERE id = ?').bind(ws).first();
@@ -23,6 +24,7 @@ async function me(req, env, { ws }) {
 export const ROUTES = [
   ['POST', '/internal/oauth', async (req, env, { tk }) => json(await oauthIntake(env, tk, await readJson(req))), 'internal'],
   ['GET', '/v1/me', me, 'user'],
+  ['DELETE', '/v1/me', async (req, env, { ws }) => { await deleteWorkspace(env, ws); return json({ ok: true }); }, 'user'],
   ['POST', '/v1/logout', async (req, env) => { await logout(env, req); return json({ ok: true }); }, 'user'],
   ['POST', '/v1/api-key', async (req, env, { ws }) => json({ api_key: await rotateApiKey(env, ws) }), 'user'],
   ['GET', '/v1/accounts', async (req, env, { ws }) => json({ accounts: await listAccounts(env, ws) }), 'user'],
@@ -88,6 +90,7 @@ export default {
     ctx.waitUntil((async () => {
       const counts = await tick(env, tkFor(env));
       if (counts.started || counts.published || counts.failed) console.log('tick', JSON.stringify(counts));
+      await runCleanup(env);
     })());
   },
 };
