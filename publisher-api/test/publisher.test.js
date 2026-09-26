@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDb, fakeTk } from './helpers.js';
-import { claimDue, tick } from '../src/publisher.js';
+import { claimDue, tick, publishNow } from '../src/publisher.js';
 import { encrypt } from '../src/crypto.js';
 import { TikTokError } from '../src/tiktok.js';
 
@@ -196,5 +196,43 @@ describe('publisher', () => {
     expect(acc.needs_reconnect).toBe(0);
     await tick(env, tk, a.next_attempt_at);
     expect((await post('pst_acc_1_0')).status).toBe('published');
+  });
+});
+
+describe('publishNow', () => {
+  beforeEach(() => resetDb(env));
+  const noSleep = async () => {};
+
+  it('starts a due post right away and confirms it without waiting for the cron', async () => {
+    await seed();
+    let polls = 0;
+    const tk = fakeTk({ status: async () => (++polls < 3 ? { status: 'PROCESSING_DOWNLOAD' }
+      : { status: 'PUBLISH_COMPLETE', publicaly_available_post_id: [] }) });
+    expect(await publishNow(env, tk, 'pst_acc_1_0', { sleep: noSleep, now: () => T })).toBe('published');
+    expect((await post('pst_acc_1_0')).status).toBe('published');
+  });
+
+  it('leaves a post the cron already claimed alone', async () => {
+    await seed();
+    await claimDue(env, T);
+    let inits = 0;
+    const tk = fakeTk({ initPhoto: async () => { inits++; return { publish_id: 'x' }; } });
+    expect(await publishNow(env, tk, 'pst_acc_1_0', { sleep: noSleep, now: () => T })).toBe('skipped');
+    expect(inits).toBe(0);
+  });
+
+  it('does not start a post scheduled for later', async () => {
+    await seed({ at: T + 3600 });
+    expect(await publishNow(env, fakeTk(), 'pst_acc_1_0', { sleep: noSleep, now: () => T })).toBe('skipped');
+    expect((await post('pst_acc_1_0')).status).toBe('queued');
+  });
+
+  it('hands a still-processing post back to the cron after the last check', async () => {
+    await seed();
+    const tk = fakeTk({ status: async () => ({ status: 'PROCESSING_DOWNLOAD' }) });
+    expect(await publishNow(env, tk, 'pst_acc_1_0', { sleep: noSleep, now: () => T, rounds: 3 })).toBe('pending');
+    const p = await post('pst_acc_1_0');
+    expect(p.status).toBe('publishing');
+    expect(p.publish_id).toBe('pub-1');
   });
 });

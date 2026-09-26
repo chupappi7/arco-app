@@ -1,11 +1,11 @@
-import { json, HttpError, match, readJson } from './http.js';
+import { json, HttpError, match, readJson, now } from './http.js';
 import { tkFor, TikTokError } from './tiktok.js';
 import { oauthIntake, resolveCaller, rotateApiKey, logout } from './auth.js';
 import { listAccounts, creatorInfoFor, disconnect } from './accounts.js';
 import * as L from './limits.js';
 import { uploadMedia, serveMedia } from './media.js';
 import { createPost, listPosts, cancelPost, retryPost } from './posts.js';
-import { tick } from './publisher.js';
+import { tick, publishNow } from './publisher.js';
 import { runCleanup, deleteWorkspace } from './cleanup.js';
 
 async function me(req, env, { ws }) {
@@ -34,7 +34,11 @@ export const ROUTES = [
   ['GET', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`), 'public'],
   // TikTok's fetcher, or a CDN in front of it, may check an image with HEAD first.
   ['HEAD', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`, 'HEAD'), 'public'],
-  ['POST', '/v1/posts', async (req, env, { ws, tk }) => json(await createPost(env, tk, ws, await readJson(req))), 'user'],
+  ['POST', '/v1/posts', async (req, env, { ws, tk, ctx }) => {
+    const post = await createPost(env, tk, ws, await readJson(req));
+    if (post.scheduled_at <= now()) ctx.waitUntil(publishNow(env, tk, post.id).catch(e => console.error('publishNow', e)));
+    return json(post);
+  }, 'user'],
   ['GET', '/v1/posts', async (req, env, { ws, url }) => {
     const from = Number(url.searchParams.get('from')), to = Number(url.searchParams.get('to'));
     if (!Number.isInteger(from) || !Number.isInteger(to) || to <= from || to - from > 62 * 86400) {
@@ -71,7 +75,7 @@ export default {
         if (method !== req.method) continue;
         const params = match(pattern, url.pathname);
         if (!params) continue;
-        const context = { params, url, tk: tkFor(env), ws: null };
+        const context = { params, url, tk: tkFor(env), ws: null, ctx };
         if (access === 'internal' && !sameSecret(req.headers.get('X-Internal-Secret') || '', env.INTERNAL_SECRET)) {
           return json({ error: 'forbidden' }, 403);
         }

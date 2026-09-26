@@ -162,3 +162,24 @@ export async function tick(env, tk, t = now()) {
   }
   return counts;
 }
+
+// "Post now": start one post as soon as it is created and watch TikTok for a
+// short while, instead of waiting up to two cron ticks. Claiming uses the
+// same guarded UPDATE as the cron, so the two can never both send a post.
+export async function publishNow(env, tk, id, { sleep = ms => new Promise(r => setTimeout(r, ms)),
+    now: clock = now, rounds = 8, every = 3000 } = {}) {
+  const t = clock();
+  const claimed = await env.DB.prepare(`UPDATE posts SET status = 'publishing', updated_at = ?
+      WHERE id = ? AND status = 'queued' AND next_attempt_at <= ? RETURNING *`).bind(t, id, t).first();
+  if (!claimed) return 'skipped';
+  const token = tokenCache(env, tk);
+  const r = await start(env, tk, claimed, token, t);
+  if (r !== 'started') return r;
+  for (let n = 0; n < rounds; n++) {
+    const p = await env.DB.prepare('SELECT * FROM posts WHERE id = ?').bind(id).first();
+    const s = await poll(env, tk, p, token, clock());
+    if (s !== 'pending') return s;
+    if (n < rounds - 1) await sleep(every);
+  }
+  return 'pending';
+}

@@ -66,6 +66,15 @@ describe('posts routes', () => {
     expect(list.posts.map(x => x.id)).toEqual([p.id]);
   });
 
+  it('a post with no time is sent to TikTok right away, not on the next cron tick', async () => {
+    const { h, account_id, keys } = await setup();
+    const res = await callWorker('/v1/posts', { method: 'POST', headers: h,
+      body: { account_id, image_keys: keys, cover_index: 0, title: 'T', caption: 'C', settings, scheduled_at: null } });
+    const p = await res.json();
+    const row = await env.DB.prepare('SELECT status FROM posts WHERE id = ?').bind(p.id).first();
+    expect(row.status).toBe('published');
+  });
+
   it('rejects a privacy level the creator does not currently offer', async () => {
     const { h, account_id, keys } = await setup();
     const tk = fakeTk({ creatorInfo: async () => ({ privacy_level_options: ['SELF_ONLY'] }) });

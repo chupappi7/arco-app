@@ -237,11 +237,12 @@ async function submit() {
 }
 
 async function watch(id) {
-  for (let n = 0; n < 60; n++) {
-    await new Promise(r => setTimeout(r, 5000));
+  for (let n = 0; n < 100; n++) {
+    await new Promise(r => setTimeout(r, 3000));
     const t = Math.floor(Date.now() / 1000);
-    const { posts } = await api(`/posts?from=${t - 3600}&to=${t + 60}`);
-    const p = posts.find(x => x.id === id);
+    let p;
+    try { p = (await api(`/posts?from=${t - 3600}&to=${t + 60}`)).posts.find(x => x.id === id); }
+    catch { continue; }   // one failed check is not a result; keep watching
     if (p?.status === 'published') { S.status = { kind: 'ok', text: 'Published. It may take a few minutes to appear on the profile.' }; return render(); }
     if (p?.status === 'failed') { S.status = { kind: 'err', text: p.fail_reason || 'TikTok rejected the post.' }; return render(); }
   }
