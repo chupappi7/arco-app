@@ -20,12 +20,17 @@ post (run-it-all-at-19-3, built alongside). The hook frame is the unused desk-le
 with the plainest shelf zone (x100-980, y1105-1447): bg-h75 at 20.8 luma,
 sd 22.6.
 
-  01 hook         bg-h75  desk-led-neon
+  01 hook         bg-n06  desk-empty-day
   02 ARCO         bg-h22  lounge-day
   03 Gemini       bg-h37  supercars-dusk
   04 Zapier       bg-n01  villa-day
   05 Descript     bg-h52  desk-city-day
   06 Notion       bg-h88  supercars-dusk
+
+Redo: the hook moved from bg-h75 (night LED desk) to bg-n06, a bright
+daylight desk with dark monitors, so no screen glows behind the title. The
+ARCO title now carries the current store name, App Blocker & Focus: ARCO.
+Slides 03-06 are untouched.
 
 Usage:
     python3 tools/gen-pay-for-twelve-3.py            # every slide
@@ -49,10 +54,10 @@ PILLAR = 'tools'
 THEME = 'planning'
 
 TOOLS = ['ARCO', 'Gemini', 'Zapier', 'Descript', 'Notion']
-TITLES = ['1. ARCO: Day Planner & Focus', '2. Gemini', '3. Zapier',
+TITLES = ['1. App Blocker & Focus: ARCO', '2. Gemini', '3. Zapier',
           '4. Descript', '5. Notion']
 
-BGS = ['bg-h75.jpg',   # 01 hook        desk-led-neon
+BGS = ['bg-n06.jpg',   # 01 hook        desk-empty-day
        'bg-h22.jpg',   # 02 ARCO        lounge-day
        'bg-h37.jpg',   # 03 Gemini      supercars-dusk
        'bg-n01.jpg',   # 04 Zapier      villa-day
