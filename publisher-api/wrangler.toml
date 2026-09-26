@@ -10,7 +10,7 @@ REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/callback"
 [[d1_databases]]
 binding = "DB"
 database_name = "arco-publisher"
-database_id = "local-dev"
+database_id = "01e34a3d-9c75-427b-9709-3dc6dd89d8ef"
 
 [[r2_buckets]]
 binding = "MEDIA"
