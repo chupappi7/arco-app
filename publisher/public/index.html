@@ -170,87 +170,66 @@ body{background:radial-gradient(1200px 600px at 20% -10%,rgba(2,132,199,.06),tra
 
   <section class="hero">
     <img src="/icon.png" alt="ARCO" class="logo" width="64" height="64" style="width:64px;height:64px;border-radius:16px;margin-bottom:22px">
-    <h2>Post ARCO's photo slideshows to TikTok, with every setting reviewed first.</h2>
-    <p>ARCO Publisher is the TikTok publishing tool for <b>ARCO: Day Planner &amp; Focus</b>,
-      the day planner and app blocker on the App Store. The ARCO team prepares photo
-      slideshows here, reviews every posting option TikTok requires, and publishes them to
-      ARCO's TikTok channels through the official Content Posting API. Nothing is posted
-      that was not reviewed on this page.</p>
+    <h2>Schedule your TikTok photo posts. Review every setting first.</h2>
+    <p>ARCO Publisher is a free tool for creators. Sign in with TikTok, upload your photos, and post them
+      now or at the time you choose. Every post shows your account, who can view it, comments, disclosure and a
+      full preview before it goes out, and it publishes through TikTok's official Content Posting API.</p>
     <div class="cta">
-      <a class="btn" href="#publish">Start publishing</a>
-      <a class="btn sec" href="https://apps.apple.com/app/id6761037446" target="_blank" rel="noopener">ARCO on the App Store</a>
-    </div>
-  </section>
-
-  <section class="s" id="publish">
-    <h3>Publish</h3>
-    <p class="lead">Sign in with the TikTok account you want to post to. There is no
-      separate ARCO login; the TikTok sign-in is the only one.</p>
-    <div class="tool">
-      <div style="display:flex;align-items:center;margin-bottom:12px">
-        <span class="badge" id="mode">Photo post</span>
-      </div>
-      <main id="app"><div class="card"><div class="empty"><span class="spin"></span>Loading…</div></div></main>
+      <a class="btn" href="/app.html">Open ARCO Publisher</a>
+      <a class="btn sec" href="#how">How it works</a>
     </div>
   </section>
 
   <section class="s" id="how">
     <h3>How it works</h3>
-    <p class="lead">Four steps, and the account owner is in control at each one.</p>
+    <p class="lead">Four steps, and you confirm each post yourself.</p>
     <div class="steps">
-      <div class="step"><span class="n">1</span><b>Connect</b>
-        <span>Sign in with TikTok. We read the account's nickname and avatar and show them at
-        the top of the form, so it is always clear which account will post.</span></div>
-      <div class="step"><span class="n">2</span><b>Choose a post</b>
-        <span>Pick one of the prepared ARCO slideshows. The slides are hosted on ARCO's
-        site and shown as a preview before anything is sent.</span></div>
+      <div class="step"><span class="n">1</span><b>Sign in with TikTok</b>
+        <span>No new password. Connect more accounts later with Add account.</span></div>
+      <div class="step"><span class="n">2</span><b>Upload your photos</b>
+        <span>Up to 35 JPG or PNG images per post. Reorder them and pick the cover.</span></div>
       <div class="step"><span class="n">3</span><b>Review the settings</b>
-        <span>Who can view the post is read from your TikTok settings and has no default.
-        Comments, music and commercial disclosure are explicit choices.</span></div>
-      <div class="step"><span class="n">4</span><b>Post</b>
-        <span>The post goes to TikTok through the Content Posting API. The page shows
-        TikTok's processing status until the post is live on the profile.</span></div>
+        <span>Who can view it comes from your TikTok settings and starts empty. Comments, music and disclosure are your choice.</span></div>
+      <div class="step"><span class="n">4</span><b>Post now or schedule</b>
+        <span>We publish at your time and show TikTok's result in your calendar, with a link to the live post.</span></div>
     </div>
   </section>
 
   <section class="s" id="access">
     <h3>What we access</h3>
-    <p class="lead">Only three permissions, and nothing is stored on our side.</p>
+    <p class="lead">Three TikTok permissions, used only for what they say.</p>
     <table class="acc">
       <tr><th>Permission</th><th>Used for</th><th>Details</th></tr>
-      <tr><td>user.info.basic</td><td>Show who you are posting as</td>
-        <td>Nickname, username and avatar, displayed on the form. Never stored.</td></tr>
-      <tr><td>video.publish</td><td>Publish the slideshow you approved</td>
-        <td>Direct post with the privacy level, interaction and disclosure settings you chose.</td></tr>
-      <tr><td>video.upload</td><td>Send a draft to your TikTok inbox instead</td>
-        <td>Used when a post should be finished inside the TikTok app rather than published directly.</td></tr>
+      <tr><td>user.info.basic</td><td>Showing which account you post to</td>
+        <td>Your nickname and avatar, shown on the posting form.</td></tr>
+      <tr><td>video.publish</td><td>Publishing the photo posts you confirm</td>
+        <td>With the privacy, interaction and disclosure settings you chose for that post.</td></tr>
+      <tr><td>video.upload</td><td>Part of TikTok's Content Posting API</td>
+        <td>Granted with the API. ARCO Publisher does not send drafts to your inbox.</td></tr>
     </table>
-    <p class="lead" style="margin-top:22px">Your session is a signed cookie in your own
-      browser that expires with the TikTok access token. There is no database, no
-      analytics and no tracking. <b>Disconnect</b> removes the cookie immediately, and you
-      can revoke access at any time from TikTok's <i>Settings › Security › Apps and services</i>.</p>
+  </section>
+
+  <section class="s" id="limits">
+    <h3>Free, with fair limits</h3>
+    <p class="lead">Up to 10 connected accounts and 30 scheduled posts at a time. Photos are deleted 7 days after their post
+      is published, fails, or is cancelled. You can delete everything at any time in Settings.</p>
   </section>
 
   <section class="s faq" id="faq">
     <h3>FAQ</h3>
-    <details><summary>Do I need an ARCO account or password?</summary>
-      <p>No. The only sign-in is TikTok's own. If you can log in to TikTok, you can use the publisher.</p></details>
-    <details><summary>Which privacy levels can I choose?</summary>
-      <p>Exactly the ones your TikTok account offers. We ask TikTok for them every time the page loads,
-      and the dropdown starts empty so the choice is always yours.</p></details>
+    <details><summary>Do I need a password?</summary>
+      <p>No. You sign in with TikTok. We never see your TikTok password.</p></details>
+    <details><summary>Which privacy options can I choose?</summary>
+      <p>Exactly the ones your TikTok account offers, read from TikTok each time. The choice starts empty so it is always yours.</p></details>
     <details><summary>What do "Promotional content" and "Paid partnership" mean?</summary>
-      <p>They are TikTok's disclosure labels. Turning on <i>Disclose post content</i> and picking
-      <i>Your Brand</i> labels the post as promotional content; picking <i>Branded Content</i> labels it
-      as a paid partnership. Branded content cannot be posted as "Only me".</p></details>
+      <p>They are TikTok's disclosure labels. Your brand labels the post as promotional content; Branded content labels it as a
+      paid partnership and cannot be posted as Only me.</p></details>
     <details><summary>Why are Duet and Stitch off?</summary>
-      <p>They only apply to video posts. This tool publishes photo slideshows, so those controls are
-      shown but cannot be turned on.</p></details>
-    <details><summary>Can I edit or delete a post afterwards?</summary>
-      <p>Once published, the post belongs to your TikTok account. Edit or delete it in the TikTok app
-      as with any other post.</p></details>
-    <details><summary>Who is this for?</summary>
-      <p>The ARCO team, publishing to ARCO's TikTok channels. Every post goes through the same
-      review step on this page before it reaches TikTok.</p></details>
+      <p>They only apply to videos. ARCO Publisher posts photo slideshows.</p></details>
+    <details><summary>Can I change a scheduled post?</summary>
+      <p>Yes, until it starts publishing: edit or cancel it from the calendar.</p></details>
+    <details><summary>Who makes this?</summary>
+      <p>The team behind ARCO: Day Planner &amp; Focus. ARCO's own TikTok accounts post with it too.</p></details>
   </section>
 
   <footer>
@@ -262,307 +241,5 @@ body{background:radial-gradient(1200px 600px at 20% -10%,rgba(2,132,199,.06),tra
     <a href="https://apps.apple.com/app/id6761037446" target="_blank" rel="noopener">ARCO for iOS</a>
   </footer>
 </div>
-
-<script type="module">
-const PRIVACY_LABEL = {
-  PUBLIC_TO_EVERYONE: 'Everyone',
-  MUTUAL_FOLLOW_FRIENDS: 'Friends',
-  FOLLOWER_OF_CREATOR: 'Followers',
-  SELF_ONLY: 'Only me',
-};
-
-const state = {
-  creator: null,      // null = not connected
-  loading: true,
-  topics: [],
-  topic: '',
-  slides: [],
-  set: {
-    privacy: '',           // no default, deliberately
-    disable_comment: false,
-    auto_add_music: false,
-    disclose: false,
-    brand_organic: false,
-    branded_content: false,
-  },
-  busy: false,
-  status: null,          // {kind, text}
-};
-
-const esc = s => String(s ?? '').replace(/[&<>"]/g,
-  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const el = id => document.getElementById(id);
-
-// --- data ---------------------------------------------------------------
-
-async function boot() {
-  const err = new URL(location.href).searchParams.get('auth_error');
-  if (err) {
-    state.status = { kind: 'err', text: err };
-    history.replaceState({}, '', location.pathname);
-  }
-  // The guidelines require the creator's settings to be read every time this
-  // page renders, so this runs on load rather than from anything cached.
-  try {
-    const r = await fetch('/api/creator-info');
-    if (r.ok) state.creator = await r.json();
-  } catch {}
-  if (state.creator) await loadTopics();
-  state.loading = false;
-  render();
-}
-
-async function loadTopics() {
-  try {
-    const r = await fetch('/api/drafts');
-    const j = await r.json();
-    state.topics = j.topics || [];
-  } catch {
-    state.topics = [];
-  }
-}
-
-async function pickTopic(topic) {
-  state.topic = topic;
-  state.slides = [];
-  state.status = null;
-  render();
-  if (!topic) return;
-  try {
-    const r = await fetch('/api/drafts?topic=' + encodeURIComponent(topic));
-    const j = await r.json();
-    state.slides = j.slides || [];
-  } catch {
-    state.slides = [];
-  }
-  render();
-}
-
-function set(key, value) {
-  state.set[key] = value;
-  // Branded content cannot be private: drop the choice rather than let it
-  // sit there invalid, and the option disappears from the list below.
-  if (key === 'branded_content' && value && state.set.privacy === 'SELF_ONLY')
-    state.set.privacy = '';
-  if (key === 'disclose' && !value) {
-    state.set.brand_organic = false;
-    state.set.branded_content = false;
-  }
-  render();
-}
-
-function ready() {
-  if (!state.topic || !state.slides.length) return false;
-  if (!state.set.privacy) return false;
-  if (state.set.disclose && !state.set.brand_organic && !state.set.branded_content)
-    return false;
-  return true;
-}
-
-async function publish() {
-  if (!ready() || state.busy) return;
-  state.busy = true;
-  state.status = { kind: '', text: 'Sending to TikTok…' };
-  render();
-  try {
-    const r = await fetch('/api/publish', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: state.topic.replace(/-/g, ' '),
-        privacy_level: state.set.privacy,
-        photo_images: state.slides,
-        photo_cover_index: 0,
-        disable_comment: state.set.disable_comment,
-        auto_add_music: state.set.auto_add_music,
-        brand_organic_toggle: state.set.disclose && state.set.brand_organic,
-        brand_content_toggle: state.set.disclose && state.set.branded_content,
-      }),
-    });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error || ('server returned ' + r.status));
-    state.status = { kind: '', text: 'Posted. Waiting for TikTok to finish processing…' };
-    render();
-    await poll(j.publish_id);
-  } catch (err) {
-    state.status = { kind: 'err', text: err.message };
-  }
-  state.busy = false;
-  render();
-}
-
-// The guidelines ask for a processing state rather than declaring success the
-// moment the request returns, so the publish is polled to a terminal status.
-async function poll(publishId) {
-  for (let i = 0; i < 30; i++) {
-    await new Promise(r => setTimeout(r, 2000));
-    let j;
-    try {
-      const r = await fetch('/api/status?publish_id=' + encodeURIComponent(publishId));
-      j = await r.json();
-    } catch { continue; }
-    const s = j.status;
-    if (s === 'PUBLISH_COMPLETE' || s === 'PUBLICLY_AVAILABLE_POST') {
-      state.status = { kind: 'ok', text: 'Published. It may take a few minutes to appear on the profile.' };
-      return;
-    }
-    if (s === 'FAILED') {
-      state.status = { kind: 'err', text: 'TikTok rejected it: ' + (j.fail_reason || 'no reason given') };
-      return;
-    }
-    state.status = { kind: '', text: 'Processing on TikTok… (' + (s || 'in progress') + ')' };
-    render();
-  }
-  state.status = { kind: '', text: 'Still processing. It will appear on the profile when TikTok finishes.' };
-}
-
-// --- view ---------------------------------------------------------------
-
-const sw = (on, attrs) =>
-  `<span class="sw"><input type="checkbox" ${on ? 'checked' : ''} ${attrs}><i></i></span>`;
-const row = (t, d, control, cls = '') =>
-  `<div class="row ${cls}"><span class="txt"><span class="t">${t}</span>` +
-  `${d ? `<span class="d">${d}</span>` : ''}</span>${control}</div>`;
-
-function render() {
-  el('app').innerHTML = view();
-  bind();
-}
-
-function view() {
-  if (state.loading)
-    return `<div class="card"><div class="empty"><span class="spin"></span>Loading…</div></div>`;
-
-  if (!state.creator) return `<div class="card">
-    <div class="sec">
-      <span class="cap">Connect</span>
-      <p style="margin:0 0 18px;color:var(--muted);line-height:1.65">
-        Sign in with the TikTok account you want to post to. We read your
-        nickname and avatar so you can confirm the right account, and post only
-        what you approve on the next screen.</p>
-      <button class="btn" id="connect">Continue with TikTok</button>
-      ${statusBox()}
-    </div></div>`;
-
-  const c = state.creator;
-  const opts = (c.privacy_level_options || [])
-    .filter(o => !(o === 'SELF_ONLY' && state.set.branded_content));
-  const label = state.set.branded_content ? 'Paid partnership'
-              : state.set.brand_organic ? 'Promotional content' : '';
-
-  return `<div class="card">
-    <div class="sec">
-      <span class="cap">Posting to TikTok</span>
-      <div class="who">
-        ${c.creator_avatar_url ? `<img src="${esc(c.creator_avatar_url)}" alt="">` : ''}
-        <span><b>${esc(c.creator_nickname || '')}</b>
-          <span>@${esc(c.creator_username || '')}</span></span>
-      </div>
-    </div>
-
-    <div class="sec">
-      <label for="topic">Post</label>
-      <select id="topic">
-        <option value="">Choose a post…</option>
-        ${state.topics.map(t => `<option value="${esc(t)}"${state.topic === t ? ' selected' : ''}>${esc(t)}</option>`).join('')}
-      </select>
-      ${state.topic && !state.slides.length ? `<span class="note">Loading slides…</span>` : ''}
-    </div>
-
-    <div class="sec">
-      <label for="privacy">Who can view this post <span class="req">*</span></label>
-      <select id="privacy">
-        <option value=""${state.set.privacy ? '' : ' selected'}>Select who can view…</option>
-        ${opts.map(o => `<option value="${o}"${state.set.privacy === o ? ' selected' : ''}>${esc(PRIVACY_LABEL[o] || o)}</option>`).join('')}
-      </select>
-      ${state.set.branded_content && (c.privacy_level_options || []).includes('SELF_ONLY')
-        ? `<span class="note">Branded content cannot be private, so "Only me" is unavailable.</span>` : ''}
-    </div>
-
-    <div class="sec">
-      <span class="cap">Interactions</span>
-      ${row('Comment', c.comment_disabled ? 'Turned off by the creator on TikTok.' : '',
-            sw(!state.set.disable_comment,
-               `data-k="disable_comment" data-invert="1" aria-label="Allow comments" ${c.comment_disabled ? 'disabled' : ''}`),
-            c.comment_disabled ? 'muted' : '')}
-      ${row('Duet', 'Video posts only — not available for photo posts.',
-            sw(false, 'disabled aria-label="Duet"'), 'muted')}
-      ${row('Stitch', 'Video posts only — not available for photo posts.',
-            sw(false, 'disabled aria-label="Stitch"'), 'muted')}
-      ${row('Add recommended music', 'Lets TikTok pick a track for the slideshow.',
-            sw(state.set.auto_add_music, `data-k="auto_add_music" aria-label="Add recommended music"`))}
-    </div>
-
-    <div class="sec">
-      <span class="cap">Disclosure</span>
-      ${row('Disclose post content',
-            'Turn on to disclose that this post promotes yourself, a third party, or both.',
-            sw(state.set.disclose, `data-k="disclose" aria-label="Disclose post content"`))}
-      ${state.set.disclose ? `<div class="disc">
-        <div class="opts">
-          <label class="chk"><input type="checkbox" data-k="brand_organic" ${state.set.brand_organic ? 'checked' : ''}> Your Brand</label>
-          <label class="chk"><input type="checkbox" data-k="branded_content" ${state.set.branded_content ? 'checked' : ''}> Branded Content</label>
-        </div>
-        ${label
-          ? `<span class="note warn">Your photo post will be labeled "${label}". This cannot be changed once posted.</span>`
-          : `<span class="note">Pick at least one to continue.</span>`}
-      </div>` : ''}
-    </div>
-
-    <div class="sec">
-      <span class="cap">Preview</span>
-      ${state.slides.length
-        ? `<div class="prev">${state.slides.map((u, i) => `<img loading="lazy" src="${esc(u)}" alt="Slide ${i + 1}">`).join('')}</div>
-           <div class="cap-t">${esc(state.topic.replace(/-/g, ' '))}</div>
-           <div class="cap-b">${state.slides.length} slides · cover is slide 1</div>`
-        : `<span class="note">Choose a post to see its slides.</span>`}
-    </div>
-
-    <div class="consent">By posting, you agree to TikTok's
-      ${state.set.branded_content
-        ? `<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">Branded Content Policy</a> and `
-        : ''}
-      <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">Music Usage Confirmation</a>.</div>
-
-    <div class="foot">
-      <button class="btn" id="post" ${ready() && !state.busy ? '' : 'disabled'}>
-        ${state.busy ? 'Posting…' : 'Post to TikTok'}</button>
-      <button class="btn sec" id="logout">Disconnect</button>
-      <span class="hint">After posting it may take a few minutes for the post to
-        process and appear on the profile.</span>
-      ${statusBox()}
-    </div>
-  </div>`;
-}
-
-function statusBox() {
-  if (!state.status) return '';
-  const busy = state.busy && state.status.kind === '';
-  return `<div class="status ${state.status.kind}">${busy ? '<span class="spin"></span>' : ''}${esc(state.status.text)}</div>`;
-}
-
-function bind() {
-  const connect = el('connect');
-  if (connect) connect.onclick = () => (location.href = '/api/auth/start');
-  const logout = el('logout');
-  if (logout) logout.onclick = () => (location.href = '/api/auth/logout');
-  const post = el('post');
-  if (post) post.onclick = publish;
-
-  const topic = el('topic');
-  if (topic) topic.onchange = e => pickTopic(e.target.value);
-  const privacy = el('privacy');
-  if (privacy) privacy.onchange = e => set('privacy', e.target.value);
-
-  document.querySelectorAll('input[type=checkbox][data-k]').forEach(input => {
-    input.onchange = () => {
-      const k = input.dataset.k;
-      set(k, input.dataset.invert ? !input.checked : input.checked);
-    };
-  });
-}
-
-boot();
-</script>
 </body>
 </html>
