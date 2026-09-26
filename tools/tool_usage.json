@@ -1332,5 +1332,35 @@
    "Obsidian",
    "Canva"
   ]
+ },
+ {
+  "topic": "keep-five-8",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "Notion",
+   "CapCut",
+   "Figma"
+  ]
+ },
+ {
+  "topic": "rest-of-my-life-2",
+  "tools": [
+   "ARCO",
+   "Codex",
+   "Obsidian",
+   "Canva",
+   "n8n"
+  ]
+ },
+ {
+  "topic": "ten-x-9",
+  "tools": [
+   "ARCO",
+   "Manus",
+   "Zapier",
+   "ClickUp",
+   "Descript"
+  ]
  }
 ]

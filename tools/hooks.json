@@ -1096,6 +1096,48 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-26 by gen-wish-i-knew-at-17-7.py. mechanical re-shoot of wish-i-knew-at-17: identical words (title, caption, hook, every slide, roster), new backgrounds only. ARCO on angle l1 via next_arco_angle('study'), same as the source. BGs from the gen-daily-batch walk excluding the source's six: hook bg-h79, then h32 (the one person)/h36/n06/h88/n01. The walk gave h46 for Notion; it was rendered, read back and replaced with n06 because the monitor wall sat under the copy. hook outing recorded via mark_hook_used. rebuild: python3 tools/gen-wish-i-knew-at-17-7.py | redo 2026-09-26: hook moved to bg-h52 (bright day desk, desk-city-day) and slide 02 title now uses the current store name \"1. App Blocker & Focus: ARCO\"; ARCO body pinned to angle l1 so it is unchanged. Slides 03-06 byte-identical."
+  },
+  {
+   "topic": "keep-five-8",
+   "title": "the 5 apps i would keep if i deleted everything else",
+   "caption": "if i deleted everything on my phone tomorrow, these five stay. arco holds every task and plans the day in 30 seconds, and focus mode puts every distraction away, the one i actually open every day. claude makes real excel, word and powerpoint files you download, so the budget and the deck come back as files and not text to paste in. notion mail labels incoming email from a rule you write in plain words, so receipts and newsletters are sorted before you open the inbox. capcut enhance voice turns a phone recording into clean studio audio, so the edit and the sound fix happen in one app with no mic to buy. figma sites publishes a design as a live website from the same file, so the landing page goes up with no site builder and no code. #productivity #apps #aitools #techtok #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-26 by gen-keep-five-8.py. hook: least recently used of hook_rules.eligible(pillar='tools'). roster ARCO/Claude/Notion/CapCut/Figma, Claude the LLM. ARCO title is the current store name \"1. App Blocker & Focus: ARCO\", body angle v10 via next_arco_angle('planning'). every teaching point checked against all captions in this file. BGs h34 (hook, bright, monitors off)/h22/h37/n04/h24/h35, no person. rebuild: python3 tools/gen-keep-five-8.py"
+  },
+  {
+   "topic": "rest-of-my-life-2",
+   "title": "5 apps i will use for the rest of my life",
+   "caption": "five apps i will still be opening in twenty years. arco gives every task a time on the day's timeline instead of a list, and blocked hours shuts the feeds for those windows without me asking, my holy grail. codex in vs code sends a task to the cloud and pulls the diff back, so the laptop stays free while it runs and the change lands in your editor. obsidian file recovery snapshots every note every few minutes while you write, so a paragraph you cut yesterday comes back with no backup set up. canva translates a finished design into another language in one click, so the same post goes out in spanish with the layout left as it was. an n8n webhook node gives a workflow its own link that anything can call, so a form, a button or another app starts the job by opening that link. #productivity #apps #aitools #buildinpublic #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-26 by gen-rest-of-my-life-2.py. hook: second least recently used of hook_rules.eligible(pillar='tools'). roster ARCO/Codex/Obsidian/Canva/n8n, Codex the LLM. ARCO title is the current store name \"1. App Blocker & Focus: ARCO\", body angle v11 via next_arco_angle('planning'). every teaching point checked against all captions in this file. BGs h33 (hook, bright daylight)/h21/h38/n03/h45 (the one person)/h20. rebuild: python3 tools/gen-rest-of-my-life-2.py"
+  },
+  {
+   "topic": "ten-x-9",
+   "title": "how i 10x'd my productivity",
+   "caption": "how i 10x'd my productivity, one app at a time. arco keeps tasks with no time yet in anytime until the day has room, and focus mode blocks the apps i chose for exactly that block, my holy grail. ask manus for a website and it builds it, hosts it and sends a link, so the landing page is live before you open a code editor. zapier email parser gives you an address that pulls fields out of any email, so an order email becomes a row in your sheet with nothing copied over. close a recurring task in clickup and it makes the next one with the date set, so the weekly invoice run never gets written down again. descript eye contact moves your gaze to the lens while you read off the screen, so the script goes down in one take and you still look at the viewer. #productivity #apps #aitools #studentlife #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-26 by gen-ten-x-9.py. hook: third least recently used of hook_rules.eligible(pillar='tools'). roster ARCO/Manus/Zapier/ClickUp/Descript, Manus the LLM. ARCO title is the current store name \"1. App Blocker & Focus: ARCO\", body angle v12 via next_arco_angle('planning'). every teaching point checked against all captions in this file. BGs h51 (hook, daylight city desk)/h31/h29/h24/h22/h36, no person. 04 first drew n06 and put the copy over its monitors; swapped to h24. rebuild: python3 tools/gen-ten-x-9.py"
   }
  ]
 }
