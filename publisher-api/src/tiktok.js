@@ -91,3 +91,6 @@ export function buildPhotoBody({ title, caption, imageUrls, coverIndex, settings
     source_info: { source: 'PULL_FROM_URL', photo_images: imageUrls, photo_cover_index: coverIndex },
   };
 }
+
+// Tests put a fake client on env.__tk; production builds a real one.
+export const tkFor = env => env.__tk || makeTikTok(env);
