@@ -107,5 +107,27 @@ class PubApiTest(unittest.TestCase):
         self.assertEqual(ctx.exception.status, 400)
 
 
+class ScheduleManyTest(unittest.TestCase):
+    def test_keeps_what_went_through_when_a_later_account_fails(self):
+        calls = []
+
+        def send(topic, key, st, when):
+            calls.append((key, when))
+            if key == 'us':
+                raise pubapi.PubError('@emiliagonzalez389 is not connected')
+            return {'id': 'pst_' + key}
+
+        sent, error = pubapi.schedule_many(send, 'my-topic', ['vn', 'getarco', 'us', 'max'], 1000, 2, {})
+        self.assertEqual(sorted(sent), ['getarco', 'vn'])
+        self.assertEqual(sent['getarco']['id'], 'pst_getarco')
+        self.assertIn('us', error)
+        self.assertIn('not connected', error)
+        self.assertEqual(calls, [('vn', 1000), ('getarco', 1120), ('us', 1240)])
+
+    def test_no_error_when_all_succeed(self):
+        sent, error = pubapi.schedule_many(lambda *a: {'id': 'p'}, 't', ['vn'], 5, 0, {})
+        self.assertEqual((list(sent), error), (['vn'], None))
+
+
 if __name__ == '__main__':
     unittest.main()

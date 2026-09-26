@@ -740,19 +740,13 @@ def creator_info(key, max_age=300):
     hit = _creator_cache.get(key)
     if hit and time.time() - hit[0] < max_age:
         return hit[1]
+    # Read through ARCO Publisher, which posts the result: its token is the
+    # one whose settings apply, and the local tokens may be stale once an
+    # account is connected there.
     try:
-        p = subprocess.run(
-            ['node', 'tools/autopost.js', '--creator-info', '--account', key],
-            cwd=REPO, env=_env(), capture_output=True, text=True, timeout=60)
-        out = (p.stdout or '').strip()
-        data = json.loads(out[out.index('{'):]) if '{' in out else {}
-        if not data:
-            # Surface the one line that says what went wrong, not the tail of
-            # a multi-line hint, which is what a slice gives you.
-            blob = ((p.stderr or '') + out).strip()
-            line = next((l.strip() for l in blob.splitlines() if 'ERROR' in l), '')
-            data = {'error': (line or blob[:200] or 'no response')}
-    except Exception as exc:
+        api = pub_api()
+        data = api.creator_info(pub_account_id(api, key))
+    except pubapi.PubError as exc:
         data = {'error': str(exc)}
     _creator_cache[key] = (time.time(), data)
     return data
@@ -3873,39 +3867,41 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     json.dump(st, fh, indent=1)
             return self._send(200, {'ok': True})
         if path == '/api/schedule':
+            if body.get('mode') == 'direct' and not body.get('cancel'):
+                # Scheduled posts live on ARCO Publisher, which fires them with
+                # the laptop closed. The uploads happen outside the lock so the
+                # rest of the dashboard keeps answering meanwhile.
+                try:
+                    at = float(body['at'])
+                except (KeyError, TypeError, ValueError):
+                    return self._send(400, {'error': 'That date could not be read'})
+                sent, error = pubapi.schedule_many(pub_send, body['topic'], body.get('accounts') or [],
+                                                   at, body.get('stagger_min'), body.get('settings') or {})
+                with _lock:
+                    # Whatever went through is real on ARCO Publisher, so it is
+                    # recorded even when a later account failed.
+                    log = delivery_log()
+                    for key, post in sent.items():
+                        log.setdefault(body['topic'], {})[key] = {
+                            'status': 'SENT', 'direct': True, 'at': time.time(),
+                            'pub_post_id': post['id'], 'scheduled_for': post['scheduled_at'],
+                            'detail': 'scheduled on ARCO Publisher for '
+                                      + time.strftime('%a %d %b %H:%M', time.localtime(post['scheduled_at']))}
+                    save_log(log)
+                    sc = [x for x in schedules() if not (x['topic'] == body['topic'] and not x.get('done'))]
+                    save_schedules(sc)
+                if error:
+                    done = ', '.join(sent) or 'none'
+                    return self._send(400, {'error': f"{error.rstrip('.')}. Already scheduled: {done}.", 'sent': list(sent)})
+                return self._send(200, {'ok': True, 'where': 'arco-publisher'})
             with _lock:
                 sc = schedules()
-                if body.get('cancel'):
-                    sc = [x for x in sc if not (x['topic'] == body['topic'] and not x.get('done'))]
-                else:
-                    sc = [x for x in sc if not (x['topic'] == body['topic'] and not x.get('done'))]
-                    mode = 'direct' if body.get('mode') == 'direct' else 'draft'
-                    st = body.get('settings') or {}
-                    if mode == 'direct':
-                        # Scheduled posts live on ARCO Publisher, which fires
-                        # them with the laptop closed. Nothing is kept here.
-                        try:
-                            at = float(body['at'])
-                            sent = {}
-                            for n, key in enumerate(body.get('accounts') or []):
-                                when = at + n * 60 * int(body.get('stagger_min') or 0)
-                                post = pub_send(body['topic'], key, st, when)
-                                sent[key] = {'status': 'SENT', 'direct': True, 'at': time.time(),
-                                             'pub_post_id': post['id'], 'scheduled_for': when,
-                                             'detail': 'scheduled on ARCO Publisher for '
-                                                       + time.strftime('%a %d %b %H:%M', time.localtime(when))}
-                        except pubapi.PubError as exc:
-                            return self._send(400, {'error': str(exc)})
-                        # Recorded like a send so the post leaves "Built, not scheduled".
-                        log = delivery_log()
-                        log.setdefault(body['topic'], {}).update(sent)
-                        save_log(log)
-                        save_schedules(sc)
-                        return self._send(200, {'ok': True, 'where': 'arco-publisher'})
+                sc = [x for x in sc if not (x['topic'] == body['topic'] and not x.get('done'))]
+                if not body.get('cancel'):
                     sc.append({'topic': body['topic'], 'at': float(body['at']),
                                'accounts': body.get('accounts') or [],
                                'stagger_min': int(body.get('stagger_min') or 0),
-                               'mode': mode, 'settings': {},
+                               'mode': 'draft', 'settings': {},
                                'done': False})
                 save_schedules(sc)
             return self._send(200, {'ok': True})

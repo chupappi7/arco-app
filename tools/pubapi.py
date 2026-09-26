@@ -108,3 +108,19 @@ def send_topic(api, account_id, drafts_dir, hooks_path, topic, panel_settings, s
     keys = [api.upload(os.path.join(folder, f)) for f in slides]
     title, caption = title_caption(hooks_path, topic)
     return api.create_post(account_id, keys, title[:90], caption, api_settings(panel_settings), scheduled_at)
+
+
+def schedule_many(send, topic, keys, at, stagger_min, panel_settings):
+    """Schedule one topic on several accounts, stopping at the first failure.
+
+    Returns (sent, error): the posts that went through, keyed by account, and
+    the error for the account that did not (or None). What went through is
+    real on ARCO Publisher either way, so the caller must record it.
+    """
+    sent = {}
+    for n, key in enumerate(keys):
+        try:
+            sent[key] = send(topic, key, panel_settings, at + n * 60 * int(stagger_min or 0))
+        except PubError as exc:
+            return sent, f'{key}: {exc}'
+    return sent, None
