@@ -97,10 +97,11 @@ def pick_bgs(topic, n, exclude=()):
 
 
 def build(topic, hook, bgs, slides, closer, pillar='screentime', kicker=None,
-          card_style=None, only=None):
+          card_style=None, only=None, promo=None):
     """bgs: hook, one per screen, then the closing card's. `pillar` is the
     hook's own tag; discipline posts use the same screens. `kicker` is the
-    line under the hook, `card_style` extends the closing card's style.
+    line under the hook, `card_style` extends the closing card's style,
+    `promo` puts bold call-to-action lines on the card.
     `only` (slide numbers) re-renders just those slides and leaves the rest,
     and the hook and background histories, untouched."""
     out = f'{c.REPO}/drafts/{topic}'
@@ -127,7 +128,7 @@ def build(topic, hook, bgs, slides, closer, pillar='screentime', kicker=None,
 
     if want(len(slides) + 2):
         cta_slide(None, f'{out}/{len(slides) + 2:02d}.jpg', subtitle=closer,
-                  badge=True, card=veiled(bgs[-1]),
+                  promo=promo, badge=True, card=veiled(bgs[-1]),
                   style={'icon': 240, 'box': (96, 984, 520, 1400), 'name_size': 62,
                          'ink': (248, 248, 250), 'sub': (176, 176, 184),
                          **(card_style or {})})

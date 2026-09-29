@@ -17,6 +17,9 @@ or the other screens posts.
 The closer is ARCO angle drawn once by next_arco_angle('build') and frozen
 here. Backgrounds by _veiled_screens.pick_bgs with ship-weekend-screens' set
 excluded, so two screens posts in a row do not share frames, then frozen.
+
+Thinh's fix of 2026-09-29: the card (06) carries the search CTA from
+lock-in-anyway-4, "arco focus" on the App Store, in the bold promo slot.
 """
 import sys
 from _veiled_screens import (build, TODAY, PLAN_DAY, CONTROL, GOOD_HABITS,
@@ -50,4 +53,5 @@ build(
     pillar='build',
     kicker=KICKER,
     card_style=CARD_OUTLINE,
+    promo=['Search “arco focus” on the App Store.'],
     only={int(a) for a in sys.argv[1:]} or None)
