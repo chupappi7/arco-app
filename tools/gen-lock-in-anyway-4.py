@@ -26,6 +26,12 @@ to a dusk frame:
   04 rule 3   bg-h88  supercars-dusk     band luma 28.2
   05 rule 4   bg-n04  villa-day          band luma 57.8
   06 card     bg-h37  supercars-dusk     veiled under the card
+
+Fix pass (2026-09-29), Thinh's note on the first render: "remove the numbers
+and the squares, look at how screentime does it". Slides 02-05 drop the
+numbered badge and take the screentime-100h treatment, the title itself in
+yellow. The titles never carried an "N." so no number is left anywhere.
+Slides 01 and 06 had neither and are untouched.
 """
 import json, os, sys
 sys.path.insert(0, '/Users/thinh/SIXSIX/arco-app/tools')
@@ -93,7 +99,8 @@ if not any(e.get('topic') == TOPIC for e in hook_rules.history()):
     mark_hook_used(HOOK, TOPIC)
 
 for i, (title, body) in enumerate(RULES):
-    rule_slide(BGS[i + 1], i + 1, title, body, f'{OUT}/{i + 2:02d}.jpg')
+    rule_slide(BGS[i + 1], i + 1, title, body, f'{OUT}/{i + 2:02d}.jpg',
+               badge=False, title_fill=c.YELLOW)
 
 cta_slide(None, f'{OUT}/06.jpg', subtitle=CTA, promo=SEARCH, badge=True, card=veiled(BGS[5]),
           style={'icon': 240, 'box': (96, 984, 520, 1400), 'name_size': 62,
