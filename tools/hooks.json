@@ -1184,7 +1184,7 @@
   {
    "topic": "lock-in-anyway-4",
    "title": "this is how you lock in when you don't feel like it",
-   "caption": "this is how you lock in when you don't feel like it, here is why. arco blocked hours closes the apps on a schedule i set once, so 9am arrives and the feeds simply do not open. the only job of the first minute is opening the file or the book, and once it is on the screen carrying on is easier than closing it. leave the phone in another room before the block starts, so checking it takes a walk long enough to say no. and end the session halfway through a sentence you know how to finish, so tomorrow starts with no blank page. search arco focus on the App Store. #discipline #lockin #productivity #focus #creatorsearchinsights",
+   "caption": "this is how you lock in when you don't feel like it, here is why. arco blocked hours closes the apps on a schedule you set once, so at 9am the feeds simply do not open. the only job of the first minute is to tap play on the block, and once the timer runs carrying on is easier than stopping it. leave the phone in another room before the block starts, and if you walk back for it anyway the blocked app opens on a screen asking what it adds to your day. and end halfway through a sentence you know how to finish, then place finishing it as tomorrow's first block, so there is no blank page to face. search arco focus on the App Store. #discipline #lockin #productivity #focus #creatorsearchinsights",
    "slides": [
     "01.jpg",
     "02.jpg",
@@ -1193,7 +1193,7 @@
     "05.jpg",
     "06.jpg"
    ],
-   "_note": "built 2026-09-29 by gen-lock-in-anyway-4.py. discipline pillar: hook 'this is how you lock in / when you don't feel like it', the only hook in hook_rules.eligible(pillar='discipline'), with the 'here is why' kicker. Rules as rule_slide steps, no icon shelf: ARCO at rule 1 on angle s1 via next_arco_angle('discipline'), frozen; then open it nothing else, phone in another room, stop mid-sentence, none in any caption here. Slide 6 is the closing card with Thinh's new CTA: search \"arco focus\" on the App Store, bold, outlined icon and badge; the caption closes on the same line. BGs n09 hook, h36/h32 (the one person)/h88/n04, card on h37 veiled; discipline-timetable's frames excluded. The walk gave h46 for rule 4; its monitors sat under the copy and every other desk frame did the same, so n04. fix pass 2026-09-29, Thinh: \"remove the numbers and the squares, look at how screentime does it\". Slides 02-05 re-rendered with rule_slide badge=False and yellow titles (screentime-100h treatment); 01 and 06 byte-identical. rebuild: python3 tools/gen-lock-in-anyway-4.py"
+   "_note": "built 2026-09-29 by gen-lock-in-anyway-4.py. discipline pillar, hook 'this is how you lock in / when you don't feel like it' from hook_rules.eligible('discipline') with the 'here is why' kicker. Fix pass 2 (2026-09-29), Thinh: 'do it like screentime posts use screenshots, same style of text': slides 02-05 re-rendered as real ARCO screens on veiled photos (_veiled_screens STYLE) - Control Center / Blocked Hours, Today play button, the shield, Plan your day - with the ARCO verdict line dropped; 01 and 06 byte-identical. Card: search 'arco focus' on the App Store, outlined icon and badge. Backgrounds bg-n09/h36/h32/h88/n04/h37. rebuild: python3 tools/gen-lock-in-anyway-4.py (re-render slides only: --only 2 3 4 5)"
   }
  ]
 }

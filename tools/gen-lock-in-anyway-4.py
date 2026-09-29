@@ -32,14 +32,31 @@ and the squares, look at how screentime does it". Slides 02-05 drop the
 numbered badge and take the screentime-100h treatment, the title itself in
 yellow. The titles never carried an "N." so no number is left anywhere.
 Slides 01 and 06 had neither and are untouched.
+
+Second fix pass (2026-09-29), Thinh: "do it like screentime posts use
+screenshots, same style of text". Slides 02-05 move from rule_slide to the
+screens treatment (_veiled_screens): a real ARCO screen in a handset on the
+veiled photo, the number and title and one paragraph beside it in STYLE. Each
+rule is tied to the screen it touches — Control Center for Blocked Hours,
+Today's play button, the shield's "what does this add to your day?", Plan your
+day for tomorrow's first block. The ARCO verdict line ("the one I would not
+delete") is dropped. Same backgrounds, so no vibe changes. Rendered with
+`--only 2 3 4 5`; 01 and 06 were not re-rendered.
 """
 import json, os, sys
 sys.path.insert(0, '/Users/thinh/SIXSIX/arco-app/tools')
 import compose as c
 import hook_rules
-from compose import (rule_slide, hook_slide, cta_slide, preflight,
-                     mark_hook_used, record_post_tools, record_post_bgs)
-from _veiled_screens import KICKER, CARD_OUTLINE, veiled
+from compose import (hook_slide, cta_slide, phone_slide, preflight,
+                     assert_teaches, mark_hook_used, record_post_tools,
+                     record_post_bgs)
+from _veiled_screens import (KICKER, CARD_OUTLINE, STYLE, SHOTS, veiled,
+                             CONTROL, TODAY, SHIELD, PLAN_DAY)
+
+# `--only 2 3` re-renders just those slides and leaves the rest, and the hook
+# and background histories, untouched.
+ONLY = {int(a) for a in sys.argv[sys.argv.index('--only') + 1:]} if '--only' in sys.argv else None
+want = (lambda n: ONLY is None or n in ONLY)
 
 TOPIC = 'lock-in-anyway-4'
 OUT = f'/Users/thinh/SIXSIX/arco-app/drafts/{TOPIC}'
@@ -50,37 +67,19 @@ TOOLS = ['ARCO']
 BGS = ['bg-n09.jpg', 'bg-h36.jpg', 'bg-h32.jpg', 'bg-h88.jpg',
        'bg-n04.jpg', 'bg-h37.jpg']
 
-RULES = [
- ('App Blocker & Focus: ARCO', [
-    'Blocked Hours closes the apps on a',
-    'schedule I set once.',
-    '',
-    '9am arrives and the feeds simply',
-    'do not open.',
-    '',
-    'The one I would not delete.',
- ]),
- ('Open it, nothing else', [
-    'The only job of the first minute is',
-    'to open the file or the book.',
-    '',
-    'Once it is on the screen, carrying',
-    'on is easier than closing it.',
- ]),
- ('Phone in another room', [
-    'Leave the phone in a different room',
-    'before the block starts.',
-    '',
-    'Checking it now takes a walk, and',
-    'the walk is long enough to say no.',
- ]),
- ('Stop mid-sentence', [
-    'End the session halfway through a',
-    'sentence you know how to finish.',
-    '',
-    'Tomorrow starts by finishing it, so',
-    'there is no blank page to face.',
- ]),
+SLIDES = [
+ (CONTROL, '1', 'Set the block once.',
+  'Blocked Hours closes the apps on a schedule you set once. At 9am the '
+  'feeds simply do not open.'),
+ (TODAY, '2', 'Open it, nothing else.',
+  'The only job of the first minute is to tap play on the block. Once the '
+  'timer runs, carrying on is easier than stopping it.'),
+ (SHIELD, '3', 'Phone in another room.',
+  'Leave it there before the block starts. Walk back for it anyway and the '
+  'blocked app opens on a screen asking what it adds to your day.'),
+ (PLAN_DAY, '4', 'Stop mid-sentence.',
+  'End halfway through a sentence you know how to finish, and place '
+  'finishing it as tomorrow\'s first block. No blank page to face.'),
 ]
 
 CTA = 'Planner and app blocker in one.'
@@ -89,23 +88,33 @@ CTA = 'Planner and app blocker in one.'
 SEARCH = ['Search “arco focus” on the App Store.']
 
 preflight(TOPIC, TOOLS, BGS, pillar='discipline', hook=HOOK)
+for b in BGS[1:]:
+    if c.copy_band_luma(b) > c.BAND_MAX_LUMA:
+        raise SystemExit(f'{b}: copy band too bright')
+for (_, _, title, body) in SLIDES:
+    assert_teaches(title, [body])
 
 log = json.load(open(f'{c.SP}/hook_usage.json'))
 if BGS[0] not in log:
     c.pick_hook_bg(prefer=BGS[0])
 
-hook_slide(BGS[0], HOOK, f'{OUT}/01.jpg', kicker=KICKER)
-if not any(e.get('topic') == TOPIC for e in hook_rules.history()):
+if want(1):
+    hook_slide(BGS[0], HOOK, f'{OUT}/01.jpg', kicker=KICKER)
+if ONLY is None and not any(e.get('topic') == TOPIC for e in hook_rules.history()):
     mark_hook_used(HOOK, TOPIC)
 
-for i, (title, body) in enumerate(RULES):
-    rule_slide(BGS[i + 1], i + 1, title, body, f'{OUT}/{i + 2:02d}.jpg',
-               badge=False, title_fill=c.YELLOW)
+for i, ((src, crop), num, title, body) in enumerate(SLIDES, 2):
+    if want(i):
+        phone_slide(veiled(BGS[i - 1]), f'{SHOTS}/{src}', crop, num, title, body,
+                    f'{OUT}/{i:02d}.jpg', style=STYLE)
 
-cta_slide(None, f'{OUT}/06.jpg', subtitle=CTA, promo=SEARCH, badge=True, card=veiled(BGS[5]),
-          style={'icon': 240, 'box': (96, 984, 520, 1400), 'name_size': 62,
-                 'ink': (248, 248, 250), 'sub': (176, 176, 184), **CARD_OUTLINE})
+if want(6):
+    cta_slide(None, f'{OUT}/06.jpg', subtitle=CTA, promo=SEARCH, badge=True, card=veiled(BGS[5]),
+              style={'icon': 240, 'box': (96, 984, 520, 1400), 'name_size': 62,
+                     'ink': (248, 248, 250), 'sub': (176, 176, 184), **CARD_OUTLINE})
 
+if ONLY is not None:
+    sys.exit()
 if not any(e.get('topic') == TOPIC for e in c.tool_history()):
     record_post_tools(TOPIC, TOOLS)
 record_post_bgs(TOPIC, BGS)
