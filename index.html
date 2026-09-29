@@ -9,9 +9,12 @@
 <meta property="og:description" content="Plan a little. Block a lot.">
 <meta property="og:image" content="assets/shot1.jpg">
 <link rel="icon" href="icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<!-- Inter, served from this site rather than Google's, so a visit doesn't hand the visitor's IP to Google (GDPR). OFL 1.1, rsms/inter. -->
+<link rel="preload" href="fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face { font-family: "Inter"; font-style: normal; font-display: swap; font-weight: 100 900;
+  src: url("fonts/inter-latin-wght-normal.woff2") format("woff2"); }
+</style>
 <style>
   :root {
     --amber: #FFD60A; --amber2: #FFB800; --amber-deep: #E8A200;

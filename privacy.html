@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Privacy Policy — ARCO</title>
-<meta name="description" content="ARCO privacy policy — no server, no account, no tracking. Everything stays on your iPhone.">
+<meta name="description" content="ARCO privacy policy — no account, no ads, no tracking. Your plans stay on your devices; only anonymous usage counts leave them.">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <style>
@@ -61,17 +61,17 @@
 
 <div class="eyebrow">Legal</div>
 <h1>Privacy Policy</h1>
-<p class="effective">Effective: 5 July 2026</p>
+<p class="effective">Effective: 29 September 2026</p>
 
 <div class="tldr"><b>TL;DR</b>
-<p>ARCO has no server and no account. Everything stays on your iPhone. Your Screen Time data is read by Apple's framework on-device and physically cannot be exported by the app. We couldn't sell your data if we wanted to — we never have it.</p></div>
+<p>ARCO has no account and no ads. What you plan — habits, tasks, focus sessions — stays on your devices and your own iCloud. ARCO sends anonymous usage counts (like "finished onboarding" or "has 3–5 habits") so we can see what works; they carry a random ID made by the app and nothing that names you. Your Screen Time data is read by Apple's framework on-device and cannot be exported by the app. We don't sell data.</p></div>
 
 <h2>1. Who runs ARCO</h2>
 <p>ARCO is an independent iOS app built by Thinh Tran. Contact: <a href="mailto:thinht7110@gmail.com">thinht7110@gmail.com</a></p>
 
 <h2>2. What data ARCO collects</h2>
-<p>ARCO does not have a backend server. All data you enter into the app — habits, tasks, focus sessions, schedules, app block lists — is stored locally on your iPhone using Apple's SwiftData framework. The data never leaves your device unless you back up your iPhone via iCloud, which is managed by Apple under their privacy policy.</p>
-<p>ARCO collects no personally identifiable information. No email, no name, no phone number, no IP address, no device identifiers are sent anywhere by the app.</p>
+<p>Everything you enter into the app — habits, tasks, focus sessions, schedules, app block lists — is stored on your iPhone using Apple's SwiftData framework. If iCloud is on, it is also synced through your own private iCloud database (Apple CloudKit) so the ARCO Mac app sees the same data. That database belongs to your Apple ID; we cannot read it. Apple handles it under its own privacy policy.</p>
+<p>ARCO collects no personally identifiable information: no email, no name, no phone number, no contacts, no location, and no advertising or vendor device identifiers. The only data that leaves your device for us is the anonymous usage information described in section 6.</p>
 
 <h2>3. Screen Time and Family Controls</h2>
 <p>ARCO uses Apple's Screen Time frameworks (Family Controls + Managed Settings) to power the app blocker. When you grant Screen Time permission, iOS lets ARCO block the specific apps you select. ARCO does not learn which apps you use or what you do in them — it only holds opaque tokens for the apps you picked.</p>
@@ -84,7 +84,13 @@
 <p>If you grant notification permission, ARCO schedules local notifications (morning plan, habit and task reminders, focus updates). They are created and delivered entirely on your device and never touch a server.</p>
 
 <h2>6. Analytics and tracking</h2>
-<p>ARCO uses no analytics SDK (no Firebase, Mixpanel, Amplitude, or similar) and no advertising network. There is nothing to consent to under App Tracking Transparency because no tracking exists.</p>
+<p>ARCO sends a small amount of anonymous usage information so we can tell which parts of the app help people and which don't:</p>
+<ul>
+<li><b>Events</b> — for example "onboarding started", "paywall shown", "focus started" — together with the app version and iOS version. These go to PostHog, an analytics service, on its EU servers (<a href="https://posthog.com/privacy" target="_blank" rel="noopener">PostHog's privacy policy</a>).</li>
+<li><b>A daily snapshot</b> of how the app is set up, in rough buckets only — for example "3–5 habits", "Blocked Hours on" — sent once a day to a small server we run.</li>
+</ul>
+<p>Both are keyed to a random ID the app creates when it is installed. It is not your Apple ID, not the advertising identifier, and not linked to your name, your plans or anything you type — no titles, notes or free text are ever sent. As with any internet request, these services see your IP address when the data arrives; we don't use it to identify you.</p>
+<p>ARCO has no advertising and does not track you across other companies' apps or websites, so App Tracking Transparency does not apply.</p>
 
 <h2>7. Crash reports</h2>
 <p>ARCO does not collect crash reports. If iOS prompts you to share diagnostics with developers, Apple may include anonymized crash logs under their own privacy policy.</p>
@@ -93,7 +99,7 @@
 <p>ARCO is rated 4+ and is not directed at children under 13. ARCO does not knowingly collect any data from anyone.</p>
 
 <h2>9. Your rights</h2>
-<p>Because ARCO stores nothing on any server, there is no data for us to export, correct, or delete. To remove all ARCO data, delete the app — that wipes the local database completely.</p>
+<p>Your plans are on your devices and in your own iCloud, so you control them: deleting the app removes the local data, and you can remove the synced copy in iOS Settings → [your name] → iCloud → Manage Storage. The anonymous usage information in section 6 can't be tied back to you by us. Deleting the app discards the random ID, so nothing sent afterwards joins what came before. Questions: <a href="mailto:thinht7110@gmail.com">thinht7110@gmail.com</a>.</p>
 
 <h2>10. Changes to this policy</h2>
 <p>Material changes will be posted at this URL with an updated effective date. Continued use of ARCO after a change means you accept the updated policy.</p>
