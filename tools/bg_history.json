@@ -1226,5 +1226,16 @@
    "bg-h22.jpg",
    "bg-h36.jpg"
   ]
+ },
+ {
+  "topic": "ship-weekend-screens",
+  "bgs": [
+   "bg-n07.jpg",
+   "bg-h32.jpg",
+   "bg-h37.jpg",
+   "bg-h46.jpg",
+   "bg-h88.jpg",
+   "bg-n01.jpg"
+  ]
  }
 ]

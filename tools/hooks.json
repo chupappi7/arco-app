@@ -1138,6 +1138,20 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-26 by gen-ten-x-9.py. hook: third least recently used of hook_rules.eligible(pillar='tools'). roster ARCO/Manus/Zapier/ClickUp/Descript, Manus the LLM. ARCO title is the current store name \"1. App Blocker & Focus: ARCO\", body angle v12 via next_arco_angle('planning'). every teaching point checked against all captions in this file. BGs h51 (hook, daylight city desk)/h31/h29/h24/h22/h36, no person. 04 first drew n06 and put the copy over its monitors; swapped to h24. rebuild: python3 tools/gen-ten-x-9.py"
+  },
+  {
+   "topic": "ship-weekend-screens",
+   "title": "how i ship in a weekend what used to take a month",
+   "caption": "how i ship in a weekend what used to take a month, here is why. typing \"landing page sat 10am #work\" as a task puts it on saturday at 10:00, filed under work, so the weekend is booked by tuesday. plan your day offers each task the time you gave it last, so the build block goes back to 10:00 in one tap. blocked hours can run on weekends only, so saturday and sunday lock the focus apps and the weekdays stay open. and insights on the day view split the day into two hour blocks, so an afternoon lost to the phone shows up as empty bars. all of it is arco. ARCO is free on the App Store. #buildinpublic #productivity #solofounder #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-29 by gen-ship-weekend-screens.py (shared build in tools/_veiled_screens.py). build pillar on the screentime screens concept per Thinh's request: hook 'how i ship in a weekend' from hook_rules.eligible('build') with the 'here is why' kicker; four ARCO screens as reasons (quick capture parses sat/10am/#Work, Plan your day remembers each task's last time, Blocked Hours on Weekends, Insights D view in two-hour blocks), each checked in the iOS source on pivot-timer; closer is angle v13 via next_arco_angle('build'); card icon and badge outlined. No icon shelf: the screens concept has no roster. Backgrounds bg-n07/h32/h37/h46/h88/n01 via pick_bgs excluding three-hours-screens' set. rebuild: python3 tools/gen-ship-weekend-screens.py"
   }
  ]
 }
