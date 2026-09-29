@@ -1166,6 +1166,20 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-29 by gen-discipline-timetable.py. discipline pillar: hook from hook_pool (eligible, least recently used), 'here is why' kicker, five rule_slide steps with ARCO at rule 1 on angle s2 from next_arco_angle('discipline'), frozen. No icon shelf: no roster under a discipline hook. None of the rules repeats schedule-rules, schedule-not-personality or any caption. rebuild: python3 tools/gen-discipline-timetable.py"
+  },
+  {
+   "topic": "launch-weekend-screens",
+   "title": "launch an app in one weekend",
+   "caption": "launch an app in one weekend, here is why. a blocked hours window can drop my focus apps and lock its own list, so youtube and discord shut for the build days only. holding a timer habit like deep work gives you log time, so the two hours you built without starting the timer still count. tasks you did not finish yesterday open plan your day with the time they had, so saturday's leftovers are the first thing on sunday. and insights name your best focus day of the week, so sunday opens with saturday's hours to beat. all of it is arco. ARCO is free on the App Store. #buildinpublic #productivity #solofounder #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-29 by gen-launch-weekend-screens.py (shared build in tools/_veiled_screens.py). build pillar on the screentime screens concept per Thinh's request, second after ship-weekend-screens: hook 'launch an app / in one weekend' from hook_rules.eligible('build') (least recently used) with the 'here is why' kicker; four ARCO screens as reasons (Blocked Hours window with its own app list instead of Use my Focus apps, hold a timer habit for Log time, Unfinished · yesterday at the top of Plan your day, Insights BEST DAY), each checked in the iOS source on pivot-timer; closer is angle v14 via next_arco_angle('build'), second sentence shortened to fit the card; card icon and badge outlined. No icon shelf: the screens concept has no roster. Backgrounds bg-n08/h31/h34/h35/h45/h48 via pick_bgs excluding ship-weekend-screens' set. rebuild: python3 tools/gen-launch-weekend-screens.py"
   }
  ]
 }
