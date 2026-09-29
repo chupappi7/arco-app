@@ -1180,6 +1180,20 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-29 by gen-launch-weekend-screens.py (shared build in tools/_veiled_screens.py). build pillar on the screentime screens concept per Thinh's request, second after ship-weekend-screens: hook 'launch an app / in one weekend' from hook_rules.eligible('build') (least recently used) with the 'here is why' kicker; four ARCO screens as reasons (Blocked Hours window with its own app list instead of Use my Focus apps, hold a timer habit for Log time, Unfinished · yesterday at the top of Plan your day, Insights BEST DAY), each checked in the iOS source on pivot-timer; closer is angle v14 via next_arco_angle('build'), second sentence shortened to fit the card; card icon and badge outlined. No icon shelf: the screens concept has no roster. Backgrounds bg-n08/h31/h34/h35/h45/h48 via pick_bgs excluding ship-weekend-screens' set. rebuild: python3 tools/gen-launch-weekend-screens.py"
+  },
+  {
+   "topic": "lock-in-anyway-4",
+   "title": "this is how you lock in when you don't feel like it",
+   "caption": "this is how you lock in when you don't feel like it, here is why. arco blocked hours closes the apps on a schedule i set once, so 9am arrives and the feeds simply do not open. the only job of the first minute is opening the file or the book, and once it is on the screen carrying on is easier than closing it. leave the phone in another room before the block starts, so checking it takes a walk long enough to say no. and end the session halfway through a sentence you know how to finish, so tomorrow starts with no blank page. search arco focus on the App Store. #discipline #lockin #productivity #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-09-29 by gen-lock-in-anyway-4.py. discipline pillar: hook 'this is how you lock in / when you don't feel like it', the only hook in hook_rules.eligible(pillar='discipline'), with the 'here is why' kicker. Rules as rule_slide steps, no icon shelf: ARCO at rule 1 on angle s1 via next_arco_angle('discipline'), frozen; then open it nothing else, phone in another room, stop mid-sentence, none in any caption here. Slide 6 is the closing card with Thinh's new CTA: search \"arco focus\" on the App Store, bold, outlined icon and badge; the caption closes on the same line. BGs n09 hook, h36/h32 (the one person)/h88/n04, card on h37 veiled; discipline-timetable's frames excluded. The walk gave h46 for rule 4; its monitors sat under the copy and every other desk frame did the same, so n04. rebuild: python3 tools/gen-lock-in-anyway-4.py"
   }
  ]
 }
