@@ -1194,6 +1194,49 @@
     "06.jpg"
    ],
    "_note": "built 2026-09-29 by gen-launch-weekend-screens.py (shared build in tools/_veiled_screens.py). build pillar on the screentime screens concept per Thinh's request, second after ship-weekend-screens: hook 'launch an app / in one weekend' from hook_rules.eligible('build') (least recently used) with the 'here is why' kicker; four ARCO screens as reasons (Blocked Hours window with its own app list instead of Use my Focus apps, hold a timer habit for Log time, Unfinished · yesterday at the top of Plan your day, Insights BEST DAY), each checked in the iOS source on pivot-timer; closer is angle v14 via next_arco_angle('build'), second sentence shortened to fit the card; card icon and badge outlined. No icon shelf: the screens concept has no roster. Backgrounds bg-n08/h31/h34/h35/h45/h48 via pick_bgs excluding ship-weekend-screens' set. rebuild: python3 tools/gen-launch-weekend-screens.py. fix 2026-09-29 (Thinh): card 06 re-rendered with 'Search “arco focus” on the App Store.' in the promo slot, caption CTA to match; 01-05 byte-identical"
+  },
+  {
+   "topic": "no-willpower-screens-2",
+   "title": "4 things that cut my screen time, not one of them is willpower",
+   "caption": "4 things that cut my screen time, and not one of them is willpower, here is why. pick one hour in focus mode and it shows when the apps unlock before you start, so the finish line is fixed before minute one. when a break ends the lock comes back on its own, even if you are still in the app, so nobody has to remember to close it. pass 45 minutes in your distracting apps and you get one message, once a day, not every hour. and tap the lock on today, pick wind-down, and the apps shut from 21:00 to 23:00 every night after that. all of it is arco. search arco focus on the App Store. #screentime #digitaldetox #phoneaddiction #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-03 by gen-no-willpower-screens-2.py. screentime pillar, screens concept (_veiled_screens), second outing of the 4-things hook on screens. Points: Focus sheet 'Apps unlock at', shield re-arms after a break, 45 minutes today notification, Wind-down preset. ARCO angle s2. Backgrounds bg-h02/h31/h49/h24/h50/h29, hook from pick_hook_bg. Card carries the arco focus search CTA. Teaching points checked against every caption and the iOS source on pivot-timer. rebuild: python3 tools/gen-no-willpower-screens-2.py"
+  },
+  {
+   "topic": "hundred-hours-screens-2",
+   "title": "5 reasons your screen time is still 100+ hours",
+   "caption": "5 reasons your screen time is still 100+ hours, here is why. you blocked the wrong apps: with nothing picked, add my most distracting apps takes them from your last 14 days of social, entertainment and games. your blocks cover two hours: blocked hours draws every window on one 24 hour bar, so 4h protected means 20 hours are not. your breaks never run out: a one hour focus session gets 5 minutes of breaks and force quitting does not refill them. the block is not even on: a green dot sits on the control tab while apps are locked, and if screen time access is off control says not blocking and fixes it in one tap. and you quit halfway and forget: follow-through shows how many of your last 14 focus sessions you finished. all of it is arco. search arco focus on the App Store. #screentime #digitaldetox #phoneaddiction #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg",
+    "07.jpg"
+   ],
+   "_note": "built 2026-10-03 by gen-hundred-hours-screens-2.py. screentime pillar, screens concept (_veiled_screens), second outing of the 100+ hours hook on screens, five reasons so seven slides. Points: most distracting apps suggestion, protected-hours bar, focus break bank, Control tab dot / not blocking, Follow-through tile. ARCO angle i1. Backgrounds bg-h03/h34/h35/h45/h46/n01/n05 (h45 the one person). Card carries the arco focus search CTA. Teaching points checked against every caption and the iOS source on pivot-timer. rebuild: python3 tools/gen-hundred-hours-screens-2.py"
+  },
+  {
+   "topic": "boring-phone-screens-2",
+   "title": "my phone is boring now and it changed everything",
+   "caption": "my phone is boring now and it changed everything, here is why. a break is a number you pick: take a break opens a ruler from 1 to 30 minutes and shows how much break is left after it. each block has its own rules, gentle gives 2 breaks an hour and focused gives 1, so evenings stay loose while work hours stay tight. a streak of 7 days or more sends one afternoon reminder if the habit is still open, with mark done right on the notification. and when a session ends one note says focus done, shield lifted, so you never check the phone to find out. all of it is arco. search arco focus on the App Store. #screentime #digitaldetox #phoneaddiction #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-03 by gen-boring-phone-screens-2.py. screentime pillar, screens concept (_veiled_screens), second outing of the boring-phone hook on screens. Points: break ruler, Gentle/Focused per window, streak-on-the-line notification, Focus done notification. ARCO angle f1. Backgrounds bg-h04/h38/h48/n03/n06/h39. Card carries the arco focus search CTA. Teaching points checked against every caption and the iOS source on pivot-timer. rebuild: python3 tools/gen-boring-phone-screens-2.py"
   }
  ]
 }
