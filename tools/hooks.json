@@ -1265,6 +1265,20 @@
     "06.jpg"
    ],
    "_note": "built 2026-10-04 by gen-ten-x-10.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look per Thinh's request: hook \"how i 10x'd / my productivity\" (second strongest eligible tools hook by median views) with the icon shelf and 'here is why' kicker; ARCO #1 on the real Today screen (timer resumes the minutes left, HabitTimerEngine alreadyDoneToday), ChatGPT Option+Space bar, Obsidian Workspaces, Raycast Quit All Applications; card angle via next_arco_angle('focus') with the arco focus search line."
+  },
+  {
+   "topic": "three-hours-screens-2",
+   "title": "i cut 3 hours of screen time without deleting a single app",
+   "caption": "i cut 3 hours of screen time without deleting a single app, here is why. focus mode starts on until turned off, so the apps stay shut until i stop it, not when a timer runs out. ending a blocked hours window early can be undone: it reads skipped for today, and resume locks the apps again for the rest of it. each insights group card shows its top four apps, and every app in this group lists the rest with their hours, so the small ones get counted too. and a new blocked hours window uses your focus apps by default, so an app added once is locked in every window. all of it is arco. search arco focus on the App Store. #screentime #digitaldetox #phoneaddiction #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-04 by gen-three-hours-screens-2.py. screentime pillar, screens concept (_veiled_screens), second outing of the three-hours hook on screens (the only eligible screentime hook that differs from no-willpower-screens-2 and hundred-hours-screens-2). Points: Focus 'Until turned off' default, Blocked Hours Skipped for today + Resume, Insights 'Every app in this group', new windows use the Focus apps by default. ARCO angle via next_arco_angle('screentime'). Backgrounds bg-h07/h21/h22/h36/h48/n03, hook from pick_hook_bg, both reference posts' sets excluded. Card carries the arco focus search CTA. Teaching points checked against every caption and the committed iOS source on pivot-timer. rebuild: python3 tools/gen-three-hours-screens-2.py"
   }
  ]
 }
