@@ -1237,6 +1237,34 @@
     "06.jpg"
    ],
    "_note": "built 2026-10-03 by gen-boring-phone-screens-2.py. screentime pillar, screens concept (_veiled_screens), second outing of the boring-phone hook on screens. Points: break ruler, Gentle/Focused per window, streak-on-the-line notification, Focus done notification. ARCO angle f1. Backgrounds bg-h04/h38/h48/n03/n06/h39. Card carries the arco focus search CTA. Teaching points checked against every caption and the iOS source on pivot-timer. rebuild: python3 tools/gen-boring-phone-screens-2.py"
+  },
+  {
+   "topic": "work-by-noon-9",
+   "title": "the tools i use to do a full day of work by noon",
+   "caption": "the tools i use to do a full day of work by noon, here is why. arco: open a habit in plan your day, step it to 13:00 and just this once moves it for today only, so the gym leaves the morning and is back at 09:00 tomorrow. gemini: write the update in canvas and pick web page from the create menu, so the client opens one link instead of scrolling ten pages. notion: type @remind tomorrow 9am anywhere in a page and it pings you then with that page open. clickup: give a task an estimate and start its timer, so 2h estimated against 40m tracked plans tomorrow on real numbers. search arco focus on the App Store. #productivity #aitools #apps #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-04 by gen-work-by-noon-9.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look per Thinh's request: hook 'the tools i use to do / a full day of work by noon' (strongest eligible tools hook by median views) with the icon shelf and 'here is why' kicker; ARCO #1 on the real Plan your day screen (Just this once, PlanDayPrototypeView), Gemini Canvas web page, Notion @remind, ClickUp estimate vs tracked; card angle via next_arco_angle('planning') with the arco focus search line."
+  },
+  {
+   "topic": "ten-x-10",
+   "title": "how i 10x'd my productivity",
+   "caption": "how i 10x'd my productivity, here is why. arco: stop a 2 hour deep work timer at 50 minutes and after lunch play counts down only the 70 still left, so the morning's work is never redone. chatgpt: on a mac option + space opens a chatgpt bar over whatever app is in front, so you ask and keep typing in your doc. obsidian: turn on workspaces and save the panes open for a project, so loading it reopens every note where the last session stopped. raycast: run quit all applications before you start, so the screen holds nothing but the app you open next. search arco focus on the App Store. #productivity #aitools #mac #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-04 by gen-ten-x-10.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look per Thinh's request: hook \"how i 10x'd / my productivity\" (second strongest eligible tools hook by median views) with the icon shelf and 'here is why' kicker; ARCO #1 on the real Today screen (timer resumes the minutes left, HabitTimerEngine alreadyDoneToday), ChatGPT Option+Space bar, Obsidian Workspaces, Raycast Quit All Applications; card angle via next_arco_angle('focus') with the arco focus search line."
   }
  ]
 }
