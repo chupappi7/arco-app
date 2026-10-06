@@ -452,7 +452,10 @@ def base_photo(name, grad):
     im = Image.open(f'{SP}/{name}').convert('RGB')
     if im.width < MIN_BG_PX[0] or im.height < MIN_BG_PX[1]:
         raise SystemExit(f'background {name} is {im.size}, below {MIN_BG_PX}: too soft for full bleed')
-    inpaint_band(im, *BANDS[name])
+    # (0, 1) marks a photo with no baked-in text; inpainting it blackened
+    # row 0, a hairline across the top of every bright frame.
+    if tuple(BANDS[name]) != (0, 1):
+        inpaint_band(im, *BANDS[name])
     gradient_darken(im, *grad)
     return im
 

@@ -1279,6 +1279,95 @@
     "06.jpg"
    ],
    "_note": "built 2026-10-04 by gen-three-hours-screens-2.py. screentime pillar, screens concept (_veiled_screens), second outing of the three-hours hook on screens (the only eligible screentime hook that differs from no-willpower-screens-2 and hundred-hours-screens-2). Points: Focus 'Until turned off' default, Blocked Hours Skipped for today + Resume, Insights 'Every app in this group', new windows use the Focus apps by default. ARCO angle via next_arco_angle('screentime'). Backgrounds bg-h07/h21/h22/h36/h48/n03, hook from pick_hook_bg, both reference posts' sets excluded. Card carries the arco focus search CTA. Teaching points checked against every caption and the committed iOS source on pivot-timer. rebuild: python3 tools/gen-three-hours-screens-2.py"
+  },
+  {
+   "topic": "pay-for-twelve-4",
+   "title": "i pay for 12 apps, these 5 do all the work",
+   "caption": "i pay for 12 apps, these 5 do all the work, here is why. arco: plan your day draws every block on one 24 hour bar with the hours booked, and once nothing is waiting it tells you what is first up. chatgpt: start a message with canva and the canva app runs inside the chat, so the drafts show up there and one tap opens your pick in canva. notion: mark a page available offline and you edit it on the train, then it syncs when you are back online. supabase: import a csv in the table editor and the list you kept in a sheet is live data for the app. posthog: switch on the heatmap from the toolbar on your live site and every click shows over the page itself. search app blocker & focus: arco on the App Store. #productivity #aitools #apps #buildinpublic #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg",
+    "07.jpg"
+   ],
+   "_note": "built 2026-10-07 by gen-pay-for-twelve-4.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look: hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker; ARCO PLAN_DAY \"Xh Ym booked\" bar and \"first up at\" (PlanDayPrototypeView dayShape, allDone); ChatGPT apps in chat (Canva); Notion offline pages; Supabase CSV import; PostHog toolbar heatmap. Card angle via next_arco_angle, App Store name App Blocker & Focus: ARCO on the ARCO slide and in the card's search line per Thinh's 2026-10-07 request. Teaching points checked against every caption."
+  },
+  {
+   "topic": "best-for-last-7",
+   "title": "5 tools to stay productive, i saved the best for last",
+   "caption": "5 tools to stay productive, i saved the best for last, here is why. arco: tap mark in progress on a task and it moves above every project, and ticking it done clears the flag. codex: run codex --oss and the cli works with an open model on your laptop, so a flight is not a day off from the build. raycast: select a paragraph and run fix spelling and grammar, and the corrected text replaces it in whatever app you are in. linear: turn on auto-close and issues nobody touched for months close on their own. canva: brush magic eraser over a cable or a stranger and the background fills in. search app blocker & focus: arco on the App Store. #productivity #aitools #apps #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg",
+    "07.jpg"
+   ],
+   "_note": "built 2026-10-07 by gen-best-for-last-7.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look: hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker; ARCO TODAY \"Mark in progress\" (TasksPrototypeView inProgressGroup); Codex --oss; Raycast Fix Spelling and Grammar; Linear auto-close; Canva Magic Eraser. Card angle via next_arco_angle, App Store name App Blocker & Focus: ARCO on the ARCO slide and in the card's search line per Thinh's 2026-10-07 request. Teaching points checked against every caption."
+  },
+  {
+   "topic": "4x-productivity-11",
+   "title": "the tools i used to 4x my productivity",
+   "caption": "the tools i used to 4x my productivity, here is why. arco: open a habit from today and it splits four weeks into on time, late and missed, and if you keep starting late it names the slot that fixes it. manus: it has its own email address, so you forward a thread and the finished file comes back to your inbox. vercel: run vercel env pull and every environment variable lands in .env.local, so a new laptop runs the project in a minute. cleanshot x: the background tool puts a capture on a padded backdrop with a shadow, so the launch shot needs no design app. search app blocker & focus: arco on the App Store. #productivity #aitools #buildinpublic #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-07 by gen-4x-productivity-11.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look: hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker; ARCO TODAY habit page ON TIME + onTimeFix (HabitPage); Manus Mail; vercel env pull; CleanShot X Background tool. Card angle via next_arco_angle, App Store name App Blocker & Focus: ARCO on the ARCO slide and in the card's search line per Thinh's 2026-10-07 request. Teaching points checked against every caption."
+  },
+  {
+   "topic": "keep-five-9",
+   "title": "the 5 apps i would keep if i deleted everything else",
+   "caption": "the 5 apps i would keep if i deleted everything else, here is why. arco: save lunch or commute once as an event in plan your day and every day after one tap blocks that time on the timeline. claude: hit publish on an artifact it built and the tracker gets a public link anyone can open, with nothing to host. obsidian: the audio recorder core plugin records inside the note you are writing, so the memo app can go. figma: paste a frame into figma make and describe how it behaves, and it builds a working prototype. opusclip: type what you want into clipanything, like every time i talk about pricing, and it cuts those moments as clips. search app blocker & focus: arco on the App Store. #productivity #aitools #apps #buildinpublic #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg",
+    "07.jpg"
+   ],
+   "_note": "built 2026-10-07 by gen-keep-five-9.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look: hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker; ARCO PLAN_DAY Events chips (+ New, one tap places an Event card); Claude artifact Publish; Obsidian Audio recorder; Figma Make from a pasted frame; OpusClip ClipAnything. Card angle via next_arco_angle, App Store name App Blocker & Focus: ARCO on the ARCO slide and in the card's search line per Thinh's 2026-10-07 request. Teaching points checked against every caption."
+  },
+  {
+   "topic": "wish-i-knew-at-17-8",
+   "title": "5 apps i wish someone showed me at 17",
+   "caption": "5 apps i wish someone showed me at 17, here is why. arco: open a habit from today and after two weeks it writes one line, like tuesday is your day for this, friday is the weak one. cursor: open any open source project and switch the chat to ask mode, and it explains the app file by file without editing a line. elevenlabs: describe a track to eleven music and paid plans clear it for commercial use, so the video is not muted. capcut: turn on teleprompter in the camera and you read the script while looking into the lens. notion: type /math and write the formula in latex, and your notes read like the textbook. search app blocker & focus: arco on the App Store. #studytok #productivity #aitools #apps #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg",
+    "07.jpg"
+   ],
+   "_note": "built 2026-10-07 by gen-wish-i-knew-at-17-8.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look: hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker; ARCO TODAY habit page weekday sentence (HabitPage sentence); Cursor Ask mode; Eleven Music commercial use; CapCut Teleprompter; Notion /math LaTeX block. Card angle via next_arco_angle, App Store name App Blocker & Focus: ARCO on the ARCO slide and in the card's search line per Thinh's 2026-10-07 request. Teaching points checked against every caption."
+  },
+  {
+   "topic": "rest-of-my-life-3",
+   "title": "5 apps i will use for the rest of my life",
+   "caption": "5 apps i will use for the rest of my life, here is why. arco: the best streak tile on insights rings your top three habits, and each ring closes at that habit's own best. gemini: upload a photo and type the change, and the face stays the same person in every version. github: turn on the auto-add workflow in a project with a filter like label:bug, and every matching issue lands on the board. framer: describe the page to wireframer and you start from a real responsive layout instead of a blank canvas. cloudflare: turnstile replaces the captcha on your signup form, so people get in without clicking traffic lights and bots stay out. search app blocker & focus: arco on the App Store. #productivity #aitools #apps #buildinpublic #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg",
+    "07.jpg"
+   ],
+   "_note": "built 2026-10-07 by gen-rest-of-my-life-3.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look: hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker; ARCO GOOD_HABITS Best streak rings (InsightsPrototypeView streakTile); Gemini photo edit; GitHub Projects Auto-add; Framer Wireframer; Cloudflare Turnstile. Card angle via next_arco_angle, App Store name App Blocker & Focus: ARCO on the ARCO slide and in the card's search line per Thinh's 2026-10-07 request. Teaching points checked against every caption."
   }
  ]
 }

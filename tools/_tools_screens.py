@@ -22,6 +22,8 @@ from compose import (hook_slide, phone_slide, cta_slide, preflight,
 from _veiled_screens import SHOTS, STYLE, KICKER, CARD_OUTLINE, veiled
 
 PROMO = ['Search “arco focus” on the App Store.']
+# Thinh, 2026-10-07: the app is named by its current store name everywhere.
+PROMO_STORE_NAME = ['Search “App Blocker & Focus: ARCO”', 'on the App Store.']
 
 TOOL = {'x': 72, 'w': 936, 'icon': 220, 'icon_y': 560, 'title_size': 76,
         'body_size': 44, 'app_size': 34}
@@ -101,7 +103,7 @@ def tool_slide(ground, icon, name, number, title, body, out):
     print('wrote', out)
 
 
-def build(topic, hook, theme, bgs, arco, tools, closer, only=None):
+def build(topic, hook, theme, bgs, arco, tools, closer, only=None, promo=PROMO):
     """arco: (screen, title, body) for ARCO's slide. tools: [(name, title,
     [mechanism, consequence])] in roster order after ARCO. closer: the card's
     lines, drawn once from next_arco_angle(theme) and frozen in the generator.
@@ -136,7 +138,7 @@ def build(topic, hook, theme, bgs, arco, tools, closer, only=None):
 
     n = len(roster) + 2
     if want(n):
-        cta_slide(None, f'{out}/{n:02d}.jpg', subtitle=closer, promo=PROMO,
+        cta_slide(None, f'{out}/{n:02d}.jpg', subtitle=closer, promo=promo,
                   badge=True, card=veiled(bgs[-1]),
                   style={'icon': 240, 'box': (96, 984, 520, 1400), 'name_size': 62,
                          'ink': (248, 248, 250), 'sub': (176, 176, 184),
