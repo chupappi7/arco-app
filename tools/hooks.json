@@ -1451,7 +1451,7 @@
     "05.jpg",
     "06.jpg"
    ],
-   "_note": "built 2026-10-07 by gen-keep-five-10.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/Gemini/Canva/Cloudflare/Vercel. ARCO angle v11 via next_arco_angle('planning'). every teaching point checked against all captions in this file. BGs h46/n04/h36/h24/h29/h22. rebuild: python3 tools/gen-keep-five-10.py"
+   "_note": "built 2026-10-07 by gen-keep-five-10.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/Gemini/Canva/Cloudflare/Vercel. ARCO angle v11 via next_arco_angle('planning'). every teaching point checked against all captions in this file. BGs h46/h32/h36/h24/h29/h22 (slide 2 swapped from n04, a bright day villa, to h32 to match the dark set). rebuild: python3 tools/gen-keep-five-10.py"
   }
  ]
 }

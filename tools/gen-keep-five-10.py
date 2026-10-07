@@ -29,7 +29,7 @@ main(
     theme='planning',
     bgs=[
          'bg-h46.jpg',    # hook
-         'bg-n04.jpg',    # ARCO
+         'bg-h32.jpg',    # ARCO
          'bg-h36.jpg',    # Gemini
          'bg-h24.jpg',    # Canva
          'bg-h29.jpg',    # Cloudflare
