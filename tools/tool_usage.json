@@ -1487,5 +1487,65 @@
    "Framer",
    "Cloudflare"
   ]
+ },
+ {
+  "topic": "work-by-noon-10",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "Descript",
+   "Notion",
+   "PostHog"
+  ]
+ },
+ {
+  "topic": "ten-x-11",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "Captions",
+   "Higgsfield",
+   "Canva"
+  ]
+ },
+ {
+  "topic": "pay-for-twelve-5",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Stripe",
+   "Supabase",
+   "RevenueCat"
+  ]
+ },
+ {
+  "topic": "best-for-last-8",
+  "tools": [
+   "ARCO",
+   "Raycast",
+   "ClickUp",
+   "Obsidian",
+   "Manus"
+  ]
+ },
+ {
+  "topic": "4x-productivity-12",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "ElevenLabs",
+   "Figma",
+   "Sentry"
+  ]
+ },
+ {
+  "topic": "keep-five-10",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Canva",
+   "Cloudflare",
+   "Vercel"
+  ]
  }
 ]
