@@ -39,6 +39,9 @@ export async function logout(env, req) {
   if (id) await env.DB.prepare('DELETE FROM sessions WHERE id_hash = ?').bind(await sha256Hex(id)).run();
 }
 
+const NOT_YOURS = 'This account was added to someone else\'s ARCO Publisher workspace, so it cannot be used to sign in. ' +
+  'Ask them to disconnect it if you want your own workspace.';
+
 export async function oauthIntake(env, tk, { code, code_verifier, redirect_uri, session_id }) {
   if (!code || !code_verifier) throw new HttpError(400, 'code and code_verifier are required');
   if (redirect_uri !== env.REDIRECT_URI) throw new HttpError(400, 'unexpected redirect_uri');
@@ -46,7 +49,7 @@ export async function oauthIntake(env, tk, { code, code_verifier, redirect_uri, 
   const tokens = await tk.exchangeCode({ code, codeVerifier: code_verifier, redirectUri: redirect_uri });
   const info = await tk.creatorInfo(tokens.access_token);
   const t = now();
-  const existing = await env.DB.prepare('SELECT id, workspace_id FROM accounts WHERE open_id = ?')
+  const existing = await env.DB.prepare('SELECT id, workspace_id, can_sign_in FROM accounts WHERE open_id = ?')
     .bind(tokens.open_id).first();
 
   let ws = session_id ? await sessionWorkspace(env, session_id) : null;
@@ -61,6 +64,10 @@ export async function oauthIntake(env, tk, { code, code_verifier, redirect_uri, 
       if (n >= MAX_ACCOUNTS) throw new HttpError(409, `A workspace can connect up to ${MAX_ACCOUNTS} accounts.`);
     }
   } else if (existing) {
+    // Only an account that signs into its workspace may open it. One that was
+    // added to someone else's workspace (an agency connecting a client) must
+    // not hand that client every other account in it.
+    if (!existing.can_sign_in) throw new HttpError(409, NOT_YOURS);
     ws = existing.workspace_id;
   } else {
     ws = 'ws_' + randomToken('', 8);
@@ -78,8 +85,8 @@ export async function oauthIntake(env, tk, { code, code_verifier, redirect_uri, 
   } else {
     accountId = 'acc_' + randomToken('', 8);
     await env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, username, display_name, avatar_url,
-        refresh_token_enc, connected_at, token_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(accountId, ws, tokens.open_id, ...profile, enc, t, t).run();
+        refresh_token_enc, connected_at, token_updated_at, can_sign_in) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(accountId, ws, tokens.open_id, ...profile, enc, t, t, adding ? 0 : 1).run();
   }
   const sessionId = adding ? session_id : await createSession(env, ws);
   return { session_id: sessionId, workspace_id: ws, account_id: accountId };
@@ -95,16 +102,14 @@ export async function oauthIntake(env, tk, { code, code_verifier, redirect_uri, 
 async function metaWorkspace(env, { sessionId, owner, openIds }) {
   const marks = openIds.map(() => '?').join(',');
   const { results: existing } = await env.DB.prepare(
-    `SELECT id, workspace_id, open_id FROM accounts WHERE open_id IN (${marks})`).bind(...openIds).all();
+    `SELECT id, workspace_id, open_id, can_sign_in FROM accounts WHERE open_id IN (${marks})`).bind(...openIds).all();
   let ws = sessionId ? await sessionWorkspace(env, sessionId) : null;
   const adding = !!ws;
   if (!ws && owner) ws = (await env.DB.prepare(owner.sql).bind(owner.value).first())?.workspace_id || null;
   const t = now();
   if (!ws) {
-    if (existing.length) {
-      throw new HttpError(409, 'This account is already connected to another ARCO Publisher workspace. ' +
-        'Sign in there and disconnect it first.');
-    }
+    if (existing.length) throw new HttpError(409, existing.some(r => !r.can_sign_in) ? NOT_YOURS
+      : 'This account is already connected to another ARCO Publisher workspace. Sign in there and disconnect it first.');
     ws = 'ws_' + randomToken('', 8);
     await env.DB.prepare('INSERT INTO workspaces (id, created_at) VALUES (?, ?)').bind(ws, t).run();
   }
@@ -117,7 +122,7 @@ async function metaWorkspace(env, { sessionId, owner, openIds }) {
   if (n + fresh > MAX_ACCOUNTS) {
     throw new HttpError(409, `A workspace can connect up to ${MAX_ACCOUNTS} accounts. Disconnect some first.`);
   }
-  return { ws, adding, byOpenId: new Map(existing.map(r => [r.open_id, r])) };
+  return { ws, adding, byOpenId: new Map(existing.map(r => [r.open_id, r])), canSignIn: adding ? 0 : 1 };
 }
 
 // Facebook Login: one consent connects every Page the person picked. Page
@@ -134,8 +139,8 @@ export async function metaIntake(env, mt, { code, redirect_uri, session_id }) {
   if (!pages.length) throw new HttpError(400, 'No Facebook Page came back. Pick at least one Page on the Facebook screen.');
 
   const found = pages.map(p => ({ open_id: `fb:${p.id}`, name: p.name || '', avatar: p.picture?.data?.url || '', token: p.access_token }));
-  const { ws, adding, byOpenId } = await metaWorkspace(env, { sessionId: session_id, openIds: found.map(f => f.open_id),
-    owner: { sql: 'SELECT workspace_id FROM accounts WHERE meta_user_id = ? LIMIT 1', value: String(user.id) } });
+  const { ws, adding, byOpenId, canSignIn } = await metaWorkspace(env, { sessionId: session_id, openIds: found.map(f => f.open_id),
+    owner: { sql: 'SELECT workspace_id FROM accounts WHERE meta_user_id = ? AND can_sign_in = 1 LIMIT 1', value: String(user.id) } });
 
   const t = now();
   const statements = [], ids = [];
@@ -149,9 +154,9 @@ export async function metaIntake(env, mt, { code, redirect_uri, session_id }) {
           needs_reconnect = 0, username = ?, display_name = ?, avatar_url = ?, meta_user_id = ?, token_updated_at = ?
           WHERE id = ?`).bind(enc, enc, f.name, f.name, f.avatar, String(user.id), t, id)
       : env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, platform, meta_user_id, username, display_name,
-          avatar_url, refresh_token_enc, access_token_enc, connected_at, token_updated_at)
-          VALUES (?, ?, ?, 'facebook', ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .bind(id, ws, f.open_id, String(user.id), f.name, f.name, f.avatar, enc, enc, t, t));
+          avatar_url, refresh_token_enc, access_token_enc, connected_at, token_updated_at, can_sign_in)
+          VALUES (?, ?, ?, 'facebook', ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(id, ws, f.open_id, String(user.id), f.name, f.name, f.avatar, enc, enc, t, t, canSignIn));
   }
   await env.DB.batch(statements);
   return { session_id: adding ? session_id : await createSession(env, ws), workspace_id: ws, account_ids: ids };
@@ -170,8 +175,8 @@ export async function igIntake(env, mt, { code, redirect_uri, session_id }) {
   const me = await mt.igMe(long.access_token);
   const igId = String(me.user_id || short.user_id || me.id);
   const openId = `ig:${igId}`;
-  const { ws, adding, byOpenId } = await metaWorkspace(env, { sessionId: session_id, openIds: [openId],
-    owner: { sql: 'SELECT workspace_id FROM accounts WHERE open_id = ?', value: openId } });
+  const { ws, adding, byOpenId, canSignIn } = await metaWorkspace(env, { sessionId: session_id, openIds: [openId],
+    owner: { sql: 'SELECT workspace_id FROM accounts WHERE open_id = ? AND can_sign_in = 1', value: openId } });
 
   const t = now();
   const enc = await encrypt(long.access_token, env.TOKEN_KEY);
@@ -185,9 +190,9 @@ export async function igIntake(env, mt, { code, redirect_uri, session_id }) {
       .bind(enc, enc, expires, ...profile, t, id).run();
   } else {
     await env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, platform, username, display_name, avatar_url,
-        refresh_token_enc, access_token_enc, access_expires_at, connected_at, token_updated_at)
-        VALUES (?, ?, ?, 'instagram', ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(id, ws, openId, ...profile, enc, enc, expires, t, t).run();
+        refresh_token_enc, access_token_enc, access_expires_at, connected_at, token_updated_at, can_sign_in)
+        VALUES (?, ?, ?, 'instagram', ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, ws, openId, ...profile, enc, enc, expires, t, t, canSignIn).run();
   }
   return { session_id: adding ? session_id : await createSession(env, ws), workspace_id: ws, account_ids: [id] };
 }

@@ -129,6 +129,12 @@ describe('instagram login', () => {
     expect(n).toBe(2);
   });
 
+  it('an account added to someone else\'s workspace cannot be used to sign into it', async () => {
+    const agency = await intake(fakeMeta());                       // the agency signs in with Facebook
+    await igIn(fakeMeta(), { session_id: agency.session_id });      // and adds the client's Instagram
+    await expect(igIn(fakeMeta())).rejects.toThrow(/someone else/); // the client signs in with it
+  });
+
   it('renews tokens nearing expiry and marks revoked ones for reconnect', async () => {
     await igIn(fakeMeta());
     const t = Math.floor(Date.now() / 1000) + 45 * 86400;   // 15 days left

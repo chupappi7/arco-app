@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   open_id TEXT NOT NULL UNIQUE,         -- TikTok open_id, or ig:<id> / fb:<page id>
   platform TEXT NOT NULL DEFAULT 'tiktok', -- tiktok | instagram | facebook
   meta_user_id TEXT,                       -- the Facebook user who connected it
+  can_sign_in INTEGER NOT NULL DEFAULT 0,  -- 1 if signing in with it opens its workspace
   username TEXT NOT NULL DEFAULT '',
   display_name TEXT NOT NULL DEFAULT '',
   avatar_url TEXT NOT NULL DEFAULT '',

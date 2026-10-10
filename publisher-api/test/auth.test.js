@@ -45,6 +45,14 @@ describe('oauth intake', () => {
     await expect(intake(fakeTk(), { session_id: other.session_id })).rejects.toMatchObject({ status: 409 });
   });
 
+  it('an added account cannot be used to sign into the workspace it was added to', async () => {
+    const a = await intake(fakeTk());
+    await intake(fakeTk({ exchangeCode: async () => ({ access_token: 'at', refresh_token: 'rt-2', open_id: 'open-2' }) }),
+      { session_id: a.session_id });
+    await expect(intake(fakeTk({ exchangeCode: async () => ({ access_token: 'at', refresh_token: 'rt-2', open_id: 'open-2' }) })))
+      .rejects.toThrow(/someone else/);
+  });
+
   it('rejects an unexpected redirect_uri', async () => {
     await expect(oauthIntake(env, fakeTk(), { code: 'c', code_verifier: 'v', redirect_uri: 'https://evil/cb' }))
       .rejects.toMatchObject({ status: 400 });
