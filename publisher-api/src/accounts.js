@@ -3,7 +3,7 @@ import { HttpError, now } from './http.js';
 import { KEEP_AFTER_DONE } from './limits.js';
 
 export async function listAccounts(env, ws) {
-  const { results } = await env.DB.prepare(`SELECT id, username, display_name, avatar_url, needs_reconnect
+  const { results } = await env.DB.prepare(`SELECT id, platform, username, display_name, avatar_url, needs_reconnect
       FROM accounts WHERE workspace_id = ? ORDER BY connected_at`).bind(ws).all();
   return results.map(r => ({ ...r, needs_reconnect: !!r.needs_reconnect }));
 }
@@ -19,7 +19,11 @@ export async function getAccount(env, ws, id) {
 // rotation, and the loser looked exactly like a revoked account.
 const EARLY = 300;
 
+export const isMeta = account => account.platform === 'instagram' || account.platform === 'facebook';
+
 export async function accessTokenFor(env, tk, account, retried = false) {
+  // A Page token does not expire; it only stops working when revoked.
+  if (isMeta(account)) return decrypt(account.access_token_enc, env.TOKEN_KEY);
   const t = now();
   if (account.access_token_enc && account.access_expires_at > t + EARLY) {
     return decrypt(account.access_token_enc, env.TOKEN_KEY);
@@ -55,6 +59,7 @@ export async function forgetAccessToken(env, accountId) {
 
 export async function creatorInfoFor(env, tk, ws, id) {
   const account = await getAccount(env, ws, id);
+  if (isMeta(account)) throw new HttpError(400, 'Creator info is a TikTok setting');
   return tk.creatorInfo(await accessTokenFor(env, tk, account));
 }
 

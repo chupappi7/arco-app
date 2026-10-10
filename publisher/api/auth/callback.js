@@ -44,7 +44,7 @@ export default async function handler(req, res) {
   }
 
   setSessionCookie(res, body.session_id);
-  res.redirect(302, adding ? '/app.html#settings' : '/app.html');
+  res.redirect(302, adding ? '/app.html?connected=1#settings' : '/app.html');
 }
 
 function back(res, why) {

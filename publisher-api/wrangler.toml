@@ -6,6 +6,8 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 PUBLIC_ORIGIN = "https://arco-publisher.vercel.app"
 REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/callback"
+META_REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/meta/callback"
+# META_APP_ID and META_APP_SECRET are secrets: npx wrangler secret put META_APP_ID
 
 [[d1_databases]]
 binding = "DB"

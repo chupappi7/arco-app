@@ -1,24 +1,36 @@
 import { HttpError, now } from './http.js';
 import { randomToken } from './crypto.js';
-import { getAccount, accessTokenFor } from './accounts.js';
+import { getAccount, accessTokenFor, isMeta } from './accounts.js';
 import { mediaUrl } from './media.js';
-import { MAX_IMAGES, MAX_QUEUED, MIN_LEAD_SECONDS, KEEP_AFTER_DONE, PRIVACY } from './limits.js';
+import { MAX_IMAGES, MAX_QUEUED, MIN_LEAD_SECONDS, KEEP_AFTER_DONE, PRIVACY,
+  IG_MAX_IMAGES, IG_MAX_CAPTION, IG_MAX_HASHTAGS } from './limits.js';
 
 const len = s => [...String(s ?? '')].length;
 const bad = msg => { throw new HttpError(400, msg); };
 
-export function validatePost(input, t = now()) {
+export function validatePost(input, t = now(), platform = 'tiktok') {
   const i = input || {};
   if (typeof i.account_id !== 'string' || !i.account_id) bad('Pick an account');
   const keys = Array.isArray(i.image_keys) ? i.image_keys : [];
   if (keys.length < 1) bad('Add at least one image');
   if (keys.length > MAX_IMAGES) bad(`A photo post can have at most ${MAX_IMAGES} images`);
+  if (platform === 'instagram' && keys.length > IG_MAX_IMAGES) bad(`An Instagram post can have at most ${IG_MAX_IMAGES} images`);
   if (!keys.every(k => typeof k === 'string' && k)) bad('Image list is invalid');
   const cover = i.cover_index == null ? 0 : Number(i.cover_index);
   if (!Number.isInteger(cover) || cover < 0 || cover >= keys.length) bad('The cover must be one of the images');
   const title = String(i.title ?? ''), caption = String(i.caption ?? '');
   if (len(title) > 90) bad('The title can be at most 90 characters');
   if (len(caption) > 4000) bad('The caption can be at most 4000 characters');
+  if (platform === 'instagram') {
+    if (len(caption) > IG_MAX_CAPTION) bad(`An Instagram caption can be at most ${IG_MAX_CAPTION} characters`);
+    if ((caption.match(/#[^\s#]+/g) || []).length > IG_MAX_HASHTAGS) bad(`Instagram allows at most ${IG_MAX_HASHTAGS} hashtags`);
+  }
+  const at = scheduledAt(i, t);
+  // Privacy, music and the disclosure toggles are TikTok's; Instagram and
+  // Facebook posts are public on a public profile.
+  if (platform !== 'tiktok') {
+    return { account_id: i.account_id, title, caption, image_keys: keys, cover_index: cover, settings: {}, scheduled_at: at };
+  }
   const s = i.settings || {};
   if (!PRIVACY.includes(s.privacy_level)) bad('Choose who can view this post');
   const settings = {
@@ -31,38 +43,43 @@ export function validatePost(input, t = now()) {
   if (settings.branded_content && settings.privacy_level === 'SELF_ONLY') {
     bad('Branded content cannot be posted as Only me');
   }
-  let at;
-  if (i.scheduled_at === null || i.scheduled_at === undefined) at = t;
-  else {
-    at = Number(i.scheduled_at);
-    if (!Number.isInteger(at)) bad('scheduled_at must be epoch seconds or null');
-    if (at < t + MIN_LEAD_SECONDS) bad('Pick a time at least 5 minutes from now');
-  }
   return { account_id: i.account_id, title, caption, image_keys: keys, cover_index: cover, settings, scheduled_at: at };
+}
+
+function scheduledAt(i, t) {
+  if (i.scheduled_at === null || i.scheduled_at === undefined) return t;
+  const at = Number(i.scheduled_at);
+  if (!Number.isInteger(at)) bad('scheduled_at must be epoch seconds or null');
+  if (at < t + MIN_LEAD_SECONDS) bad('Pick a time at least 5 minutes from now');
+  return at;
+}
+
+function tiktokUrl(row) {
+  return row.public_post_id && row.username ? `https://www.tiktok.com/@${row.username}/photo/${row.public_post_id}` : null;
 }
 
 export function postJson(env, row) {
   const keys = JSON.parse(row.image_keys);
   return {
-    id: row.id, account_id: row.account_id, username: row.username ?? '', status: row.status,
+    id: row.id, account_id: row.account_id, platform: row.platform ?? 'tiktok', username: row.username ?? '', status: row.status,
     title: row.title, caption: row.caption, images: keys.map(k => mediaUrl(env, k)), image_keys: keys,
     cover_index: row.cover_index, settings: JSON.parse(row.settings), scheduled_at: row.scheduled_at,
     attempts: row.attempts, public_post_id: row.public_post_id, fail_reason: row.fail_reason,
-    post_url: row.status === 'published' && row.public_post_id && row.username
-      ? `https://www.tiktok.com/@${row.username}/photo/${row.public_post_id}` : null,
+    post_url: row.status === 'published' ? (row.post_url || tiktokUrl(row)) : null,
   };
 }
 
 async function loadPost(env, ws, id) {
-  const row = await env.DB.prepare(`SELECT p.*, a.username FROM posts p LEFT JOIN accounts a ON a.id = p.account_id
+  const row = await env.DB.prepare(`SELECT p.*, a.username, a.platform FROM posts p LEFT JOIN accounts a ON a.id = p.account_id
       WHERE p.id = ? AND p.workspace_id = ?`).bind(id, ws).first();
   if (!row) throw new HttpError(404, 'Post not found');
   return row;
 }
 
 export async function createPost(env, tk, ws, input) {
-  const p = validatePost(input);
-  const account = await getAccount(env, ws, p.account_id);
+  if (typeof input?.account_id !== 'string' || !input.account_id) bad('Pick an account');
+  const account = await getAccount(env, ws, input.account_id);
+  const p = validatePost(input, now(), account.platform);
   if (account.needs_reconnect) throw new HttpError(409, 'Reconnect this account before posting', 'needs_reconnect');
 
   // Edit = a new post that replaces a queued one, which stays scheduled
@@ -79,18 +96,23 @@ export async function createPost(env, tk, ws, input) {
   const marks = p.image_keys.map(() => '?').join(',');
   // Images may come fresh from upload, or from a cancelled/failed post being
   // edited into a new one. Images of a queued or published post are taken.
-  const { results } = await env.DB.prepare(`SELECT key FROM media WHERE workspace_id = ? AND key IN (${marks})
+  const { results } = await env.DB.prepare(`SELECT key, content_type FROM media WHERE workspace_id = ? AND key IN (${marks})
       AND (post_id IS NULL OR post_id = ? OR post_id IN (SELECT id FROM posts WHERE status IN ('cancelled', 'failed')))`)
     .bind(ws, ...p.image_keys, replaces).all();
   if (results.length !== new Set(p.image_keys).size || results.length !== p.image_keys.length) {
     bad('One or more images are missing, already used by another post, or listed twice. Upload them again.');
   }
+  if (account.platform === 'instagram' && results.some(r => r.content_type !== 'image/jpeg')) {
+    bad('Instagram only accepts JPG images');
+  }
 
   // The panel already limits privacy to what TikTok offers; check again here
   // because the API can be called without the panel.
-  const info = await tk.creatorInfo(await accessTokenFor(env, tk, account));
-  if (!(info.privacy_level_options || []).includes(p.settings.privacy_level)) {
-    bad('That privacy level is not available for this account right now');
+  if (!isMeta(account)) {
+    const info = await tk.creatorInfo(await accessTokenFor(env, tk, account));
+    if (!(info.privacy_level_options || []).includes(p.settings.privacy_level)) {
+      bad('That privacy level is not available for this account right now');
+    }
   }
 
   const id = 'pst_' + randomToken('', 8), t = now();
@@ -114,7 +136,7 @@ export async function createPost(env, tk, ws, input) {
 }
 
 export async function listPosts(env, ws, from, to) {
-  const { results } = await env.DB.prepare(`SELECT p.*, a.username FROM posts p LEFT JOIN accounts a ON a.id = p.account_id
+  const { results } = await env.DB.prepare(`SELECT p.*, a.username, a.platform FROM posts p LEFT JOIN accounts a ON a.id = p.account_id
       WHERE p.workspace_id = ? AND p.scheduled_at >= ? AND p.scheduled_at < ? ORDER BY p.scheduled_at`)
     .bind(ws, from, to).all();
   return results.map(r => postJson(env, r));
@@ -135,7 +157,7 @@ export async function retryPost(env, ws, id) {
   const row = await loadPost(env, ws, id);
   if (row.status !== 'failed') throw new HttpError(409, 'Only failed posts can be retried');
   if (row.publish_id !== null) {
-    throw new HttpError(409, 'TikTok may already have published this post. Check the profile, then use Edit to post it again.');
+    throw new HttpError(409, 'This post may already have been published. Check the profile, then use Edit to post it again.');
   }
   const keys = JSON.parse(row.image_keys);
   const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM media WHERE post_id = ?').bind(id).first();

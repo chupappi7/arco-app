@@ -12,6 +12,8 @@ export default defineWorkersConfig({
             INTERNAL_SECRET: 'test-internal-secret',
             TIKTOK_CLIENT_KEY: 'test-client-key',
             TIKTOK_CLIENT_SECRET: 'test-client-secret',
+            META_APP_ID: 'test-meta-app',
+            META_APP_SECRET: 'test-meta-secret',
           },
         },
       },

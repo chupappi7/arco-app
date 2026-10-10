@@ -2,6 +2,7 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDb, callWorker, fakeTk } from './helpers.js';
 import { validatePost } from '../src/posts.js';
+import { MAX_QUEUED } from '../src/limits.js';
 
 const RU = 'https://arco-publisher.vercel.app/api/auth/callback';
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1]);
@@ -118,12 +119,12 @@ describe('posts routes', () => {
     expect(m.delete_after).toBeGreaterThan(Math.floor(Date.now() / 1000) + 6 * 86400);
   });
 
-  it('enforces 30 queued posts per workspace', async () => {
+  it('enforces the queued-post cap per workspace', async () => {
     const { h, account_id } = await setup();
     const at = Math.floor(Date.now() / 1000) + 3600;
     const t = Math.floor(Date.now() / 1000);
     const ws = (await env.DB.prepare('SELECT workspace_id FROM accounts WHERE id = ?').bind(account_id).first()).workspace_id;
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < MAX_QUEUED; i++) {
       await env.DB.prepare(`INSERT INTO posts (id, workspace_id, account_id, status, image_keys, settings,
           scheduled_at, next_attempt_at, created_at, updated_at) VALUES (?, ?, ?, 'queued', '[]', '{}', ?, ?, ?, ?)`)
         .bind(`pst_${i}`, ws, account_id, at, at, t, t).run();

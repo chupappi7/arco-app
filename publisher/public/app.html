@@ -36,7 +36,7 @@ textarea{min-height:90px;resize:vertical}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .row{display:flex;align-items:flex-start;gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}
 .row:last-child{border-bottom:0}
-.row .txt{flex:1}.row .t{font-weight:600}.row .d{display:block;font-size:12.5px;color:var(--dim)}
+.row{flex-wrap:wrap}.row .txt{flex:1 1 180px}.row .t{font-weight:600}.row .d{display:block;font-size:12.5px;color:var(--dim)}
 .who{display:flex;align-items:center;gap:12px}
 .who img{width:40px;height:40px;border-radius:50%;object-fit:cover;border:1px solid var(--line-2)}
 .thumbs{display:flex;gap:10px;flex-wrap:wrap}
@@ -67,7 +67,25 @@ textarea{min-height:90px;resize:vertical}
 .pill.publishing{color:var(--accent)}.pill.cancelled{color:var(--dim)}
 .pc .acts{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
 .pc .acts button,.pc .acts a{font-size:11px;border:0;background:none;color:var(--accent);padding:0}
-@media (max-width:760px){.week{grid-template-columns:1fr}}
+button.link{border:0;background:none;color:var(--accent);padding:0;margin-left:auto;font-size:12.5px}
+.pgroup{margin-bottom:14px}.pgroup:last-of-type{margin-bottom:4px}
+.phead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.accts{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.acc{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line-2);border-radius:10px;cursor:pointer;background:#fff;min-width:0}
+.acc.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:#F0F9FF}
+.acc.off{opacity:.6;cursor:not-allowed}
+.acc .nm{display:flex;flex-direction:column;min-width:0}
+.acc .nm b,.acc .nm .note{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.av{width:32px;height:32px;border-radius:50%;object-fit:cover;border:1px solid var(--line-2);flex:none}
+.av.ini{display:inline-flex;align-items:center;justify-content:center;background:var(--well);color:var(--muted);font-weight:600;font-size:13px}
+.who .av{width:40px;height:40px}
+.row .t .who{gap:10px}.row .t .av{width:28px;height:28px}
+.ttcard{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:var(--well)}
+.ttcard select{background:#fff}
+.bulk{margin-bottom:12px}.bulk select{max-width:280px;display:block;margin-bottom:4px}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.dot.tiktok{background:#18181B}.dot.instagram{background:#DB2777}.dot.facebook{background:#2563EB}
+@media (max-width:760px){.week{grid-template-columns:1fr}.accts{grid-template-columns:1fr}}
 </style>
 </head>
 <body>

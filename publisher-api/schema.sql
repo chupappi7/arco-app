@@ -8,7 +8,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS workspaces_api_key ON workspaces(api_key_hash)
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
-  open_id TEXT NOT NULL UNIQUE,
+  open_id TEXT NOT NULL UNIQUE,         -- TikTok open_id, or ig:<id> / fb:<page id>
+  platform TEXT NOT NULL DEFAULT 'tiktok', -- tiktok | instagram | facebook
+  meta_user_id TEXT,                       -- the Facebook user who connected it
   username TEXT NOT NULL DEFAULT '',
   display_name TEXT NOT NULL DEFAULT '',
   avatar_url TEXT NOT NULL DEFAULT '',
@@ -20,6 +22,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   token_updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS accounts_ws ON accounts(workspace_id);
+CREATE INDEX IF NOT EXISTS accounts_meta_user ON accounts(meta_user_id);
 
 CREATE TABLE IF NOT EXISTS sessions (
   id_hash TEXT PRIMARY KEY,
@@ -54,6 +57,7 @@ CREATE TABLE IF NOT EXISTS posts (
   attempts INTEGER NOT NULL DEFAULT 0,
   publish_id TEXT,
   public_post_id TEXT,
+  post_url TEXT,
   fail_reason TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL

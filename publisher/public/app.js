@@ -1,15 +1,23 @@
 const PRIVACY_LABEL = { PUBLIC_TO_EVERYONE: 'Everyone', MUTUAL_FOLLOW_FRIENDS: 'Friends',
   FOLLOWER_OF_CREATOR: 'Followers', SELF_ONLY: 'Only me' };
 const MAX_SIDE_W = 1080, MAX_SIDE_H = 1920;
+const PLATFORM = { tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook' };
+// Instagram takes JPEG between 4:5 (portrait) and 1.91:1 (landscape), 10 per post.
+const IG_MIN_RATIO = 4 / 5, IG_MAX_RATIO = 1.91, IG_MAX = 10, IG_CAPTION = 2200;
 
 const S = {
   me: null, view: 'compose', flash: null,
   images: [], cover: 0, title: '', caption: '',
-  account: '', info: null, infoErr: null,
-  set: { privacy: '', comment: false, music: false, disclose: false, brand: false, branded: false },
+  // Every account the post goes to, any platform. TikTok accounts each carry
+  // their own creator info, privacy and comment choice in S.tt.
+  targets: [], tt: {},
+  set: { music: false, disclose: false, brand: false, branded: false },
   when: 'now', at: '', busy: false, status: null,
-  week: 0, filter: 'all', posts: [], apiKey: null,
+  week: 0, fPlat: 'all', fAcct: 'all', posts: [], apiKey: null,
 };
+const ORDER = ['tiktok', 'instagram', 'facebook'];
+const platformOf = a => a?.platform || 'tiktok';
+const SAVED = 'arco-publisher.targets';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -27,11 +35,23 @@ async function api(path, opts = {}) {
 
 async function boot() {
   const q = new URL(location.href).searchParams;
-  if (q.get('auth_error')) { S.flash = { kind: 'err', text: q.get('auth_error') }; history.replaceState({}, '', location.pathname + location.hash); }
+  if (q.get('auth_error')) S.flash = { kind: 'err', text: q.get('auth_error') };
+  else if (q.get('connected')) S.flash = { kind: 'ok', text: `Connected ${q.get('connected')} account${q.get('connected') === '1' ? '' : 's'}.` };
+  if (q.get('auth_error') || q.get('connected')) history.replaceState({}, '', location.pathname + location.hash);
   try { S.me = await api('/me'); } catch (e) { if (e.status !== 401) S.flash = { kind: 'err', text: e.message }; }
+  if (S.me) restoreTargets();
   window.addEventListener('hashchange', route);
   route();
 }
+
+// The accounts last posted to come back preselected: someone running ten
+// accounts posts to the same set most days.
+function restoreTargets() {
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem(SAVED) || '[]'); } catch {}
+  for (const id of saved) { const a = acct(id); if (a && !a.needs_reconnect) toggleTarget(id, true, false); }
+}
+function saveTargets() { try { localStorage.setItem(SAVED, JSON.stringify(S.targets)); } catch {} }
 
 function route() {
   S.view = (location.hash || '#compose').slice(1);
@@ -58,19 +78,21 @@ function signInView() {
       We show your nickname and avatar so you always know which account will post, and we only post what you
       confirm on the next screens. You can connect more accounts afterwards.</p>
     <a class="btn" href="/api/auth/start" style="text-decoration:none;display:inline-block">Continue with TikTok</a>
+    <a class="btn sec" href="/api/auth/meta/start" style="text-decoration:none;display:inline-block;margin-left:8px">Continue with Facebook</a>
+    <p class="note" style="margin-top:14px">Facebook sign-in connects your Facebook Pages and the Instagram
+      professional accounts linked to them. We only post what you confirm.</p>
   </div></div>`;
 }
 
 function composeView() {
-  const accts = S.me.accounts;
-  if (!accts.length) return `<div class="card"><div class="sec">Connect a TikTok account in <a href="#settings">Settings</a> first.</div></div>`;
-  const i = S.info;
-  const opts = (i?.privacy_level_options || []).filter(o => !(o === 'SELF_ONLY' && S.set.branded));
+  if (!S.me.accounts.length) return `<div class="card"><div class="sec">Connect an account in <a href="#settings">Settings</a> first.</div></div>`;
+  const tts = ttTargets();
   const label = S.set.branded ? 'Paid partnership' : S.set.brand ? 'Promotional content' : '';
   const need = missing();
   return `${S.replaces ? `<div class="status">Editing a scheduled post. The original stays scheduled until you save this one.
       <button class="btn sec" id="stopedit" style="margin-left:8px">Stop editing</button></div>` : ''}
   <div class="card">
+    <div class="sec"><span class="cap">Post to</span>${pickerView()}</div>
     <div class="sec"><span class="cap">Photos</span>
       <div class="thumbs">${S.images.map((m, n) => `<div class="th ${n === S.cover ? 'cover' : ''}">
           ${n === S.cover ? '<span class="badge">Cover</span>' : ''}
@@ -80,35 +102,23 @@ function composeView() {
             <button data-mv="${n}:1" aria-label="Move right">›</button></div></div>`).join('')}
       </div>
       <p><input type="file" id="files" accept="image/jpeg,image/png" multiple ${S.images.length >= 35 ? 'disabled' : ''}></p>
-      <span class="note">JPG or PNG, up to 35 images, 5 MB each. Click an image to make it the cover.</span>
+      <span class="note">JPG or PNG, up to ${toInstagram() ? `${IG_MAX} for Instagram` : 35} images, 5 MB each. Click an image to make it the cover.
+        ${toInstagram() ? 'Tall slides are padded to 4:5 for Instagram, never cropped.' : ''}</span>
     </div>
     <div class="sec">
-      <label class="f" for="title">Title</label>
+      ${tts.length ? `<label class="f" for="title">Title <span class="note">(TikTok only)</span></label>
       <input type="text" id="title" maxlength="200" value="${esc(S.title)}">
-      <div class="count ${len(S.title) > 90 ? 'note bad' : ''}">${len(S.title)} / 90</div>
+      <div class="count ${len(S.title) > 90 ? 'note bad' : ''}">${len(S.title)} / 90</div>` : ''}
       <label class="f" for="caption">Caption</label>
       <textarea id="caption">${esc(S.caption)}</textarea>
-      <div class="count ${len(S.caption) > 4000 ? 'note bad' : ''}">${len(S.caption)} / 4000</div>
+      <div class="count ${len(S.caption) > capLimit() ? 'note bad' : ''}">${len(S.caption)} / ${capLimit()}</div>
     </div>
-    <div class="sec"><span class="cap">Posting to TikTok</span>
-      <label class="f" for="acct">Account</label>
-      <select id="acct"><option value="">Choose an account…</option>
-        ${accts.map(a => `<option value="${a.id}" ${S.account === a.id ? 'selected' : ''} ${a.needs_reconnect ? 'disabled' : ''}>@${esc(a.username)}${a.needs_reconnect ? ' (reconnect in Settings)' : ''}</option>`).join('')}
-      </select>
-      ${i ? `<div class="who" style="margin-top:12px">${i.creator_avatar_url ? `<img src="${esc(i.creator_avatar_url)}" alt="">` : ''}
-          <div><b>${esc(i.creator_nickname)}</b><div class="note">@${esc(i.creator_username)}</div></div></div>` : ''}
-      ${S.infoErr ? `<p class="note bad">${esc(S.infoErr)}</p>` : ''}
-    </div>
-    ${i ? `<div class="sec">
-      <label class="f" for="privacy">Who can view this post *</label>
-      <select id="privacy"><option value="" ${S.set.privacy ? '' : 'selected'}>Select who can view…</option>
-        ${opts.map(o => `<option value="${o}" ${S.set.privacy === o ? 'selected' : ''}>${PRIVACY_LABEL[o] || o}</option>`).join('')}
-      </select>
-      ${S.set.branded && (i.privacy_level_options || []).includes('SELF_ONLY') ? '<p class="note">Branded content cannot be private, so "Only me" is unavailable.</p>' : ''}
-    </div>
-    <div class="sec"><span class="cap">Interactions</span>
-      ${row('Allow comments', i.comment_disabled ? 'Turned off in your TikTok settings.' : '',
-        `<input type="checkbox" data-k="comment" ${S.set.comment && !i.comment_disabled ? 'checked' : ''} ${i.comment_disabled ? 'disabled' : ''}>`)}
+    ${tts.length ? `<div class="sec"><span class="cap">TikTok settings</span>
+      ${tts.length > 1 ? `<div class="bulk"><label class="f" for="bulkpriv">Set who can view for every account</label>
+        <select id="bulkpriv"><option value="">Choose…</option>
+          ${Object.keys(PRIVACY_LABEL).filter(o => !(o === 'SELF_ONLY' && S.set.branded)).map(o => `<option value="${o}">${PRIVACY_LABEL[o]}</option>`).join('')}
+        </select><span class="note">Accounts that do not offer that option keep their own choice.</span></div>` : ''}
+      ${tts.map(ttCard).join('')}
       ${row('Duet', 'Video posts only, not available for photo posts.', '<input type="checkbox" disabled>')}
       ${row('Stitch', 'Video posts only, not available for photo posts.', '<input type="checkbox" disabled>')}
       ${row('Add recommended music', 'Lets TikTok pick a track for the slideshow.', `<input type="checkbox" data-k="music" ${S.set.music ? 'checked' : ''}>`)}
@@ -121,10 +131,10 @@ function composeView() {
         &nbsp;&nbsp;<label><input type="checkbox" data-k="branded" ${S.set.branded ? 'checked' : ''}> Branded content</label>
         <p class="note ${label ? 'warn' : ''}">${label ? `Your photo post will be labeled "${label}".` : 'You need to indicate if your content promotes yourself, a third party, or both.'}</p>
       </div>` : ''}
-    </div>
+    </div>` : ''}
     <div class="sec"><span class="cap">Preview</span>
       <div class="thumbs">${S.images.map(m => `<img src="${esc(m.url)}" alt="" style="width:56px;height:100px;object-fit:cover;border-radius:6px">`).join('') || '<span class="note">Add photos to see them here.</span>'}</div>
-      ${S.title ? `<p><b>${esc(S.title)}</b></p>` : ''}${S.caption ? `<p class="note" style="white-space:pre-wrap">${esc(S.caption)}</p>` : ''}
+      ${S.title && tts.length ? `<p><b>${esc(S.title)}</b></p>` : ''}${S.caption ? `<p class="note" style="white-space:pre-wrap">${esc(S.caption)}</p>` : ''}
     </div>
     <div class="sec"><span class="cap">When</span>
       <label><input type="radio" name="when" value="now" ${S.when === 'now' ? 'checked' : ''}> Post now</label>
@@ -132,12 +142,12 @@ function composeView() {
       ${S.when === 'later' ? `<p><input type="datetime-local" id="at" value="${esc(S.at)}" min="${localInput(Date.now() + 6 * 60e3)}"></p>
         <span class="note">Your local time. At least 5 minutes from now.</span>` : ''}
     </div>
-    <div class="consent">By posting, you agree to TikTok's
+    ${tts.length ? `<div class="consent">By posting, you agree to TikTok's
       ${S.set.branded ? '<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">Branded Content Policy</a> and ' : ''}
       <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">Music Usage Confirmation</a>.</div>` : ''}
     <div class="foot">
       <button class="btn" id="go" ${need || S.busy ? 'disabled' : ''} title="${esc(need || '')}">
-        ${S.busy ? 'Working…' : S.when === 'later' ? 'Schedule' : 'Post to TikTok'}</button>
+        ${S.busy ? 'Working…' : `${S.when === 'later' ? 'Schedule' : 'Post'}${S.targets.length ? ` to ${goLabel()}` : ''}`}</button>
       ${need ? `<span class="note">${esc(need)}</span>` : ''}
       ${S.status ? `<div class="status ${S.status.kind}" style="flex-basis:100%">${esc(S.status.text)}</div>` : ''}
       <span class="note" style="flex-basis:100%">After posting, it may take a few minutes for the post to process and appear on the profile.</span>
@@ -145,16 +155,79 @@ function composeView() {
   </div>`;
 }
 
+const avatar = (url, name) => url
+  ? `<img class="av" src="${esc(url)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'av ini',textContent:'${esc((name || '?')[0].toUpperCase())}'}))">`
+  : `<span class="av ini">${esc((name || '?')[0].toUpperCase())}</span>`;
+const handle = a => `${platformOf(a) === 'facebook' ? '' : '@'}${esc(a.username || a.display_name)}`;
+
+function pickerView() {
+  return ORDER.map(pl => {
+    const list = S.me.accounts.filter(a => platformOf(a) === pl);
+    if (!list.length) return '';
+    const usable = list.filter(a => !a.needs_reconnect);
+    const on = usable.filter(a => S.targets.includes(a.id)).length;
+    return `<div class="pgroup">
+      <div class="phead"><b>${PLATFORM[pl]}</b><span class="note">${on} of ${list.length} selected</span>
+        ${usable.length > 1 ? `<button class="link" data-all="${pl}">${on === usable.length ? 'Clear' : 'Select all'}</button>` : ''}</div>
+      <div class="accts">${list.map(a => `<label class="acc ${S.targets.includes(a.id) ? 'on' : ''} ${a.needs_reconnect ? 'off' : ''}">
+          <input type="checkbox" data-t="${a.id}" ${S.targets.includes(a.id) ? 'checked' : ''} ${a.needs_reconnect ? 'disabled' : ''}>
+          ${avatar(a.avatar_url, a.username || a.display_name)}
+          <span class="nm"><b>${handle(a)}</b><span class="note">${a.needs_reconnect ? '<a href="#settings">Reconnect in Settings</a>' : esc(a.display_name)}</span></span>
+        </label>`).join('')}</div></div>`;
+  }).join('') + `<p class="note" style="margin:6px 0 0"><a href="#settings">Connect more accounts</a></p>`;
+}
+
+// The audited part, once per TikTok account: whose account it is, read live
+// from TikTok, and a privacy choice with no default.
+function ttCard(id) {
+  const a = acct(id), t = S.tt[id] || {}, i = t.info;
+  if (t.err) return `<div class="ttcard"><b>${handle(a)}</b><p class="note bad">${esc(t.err)}</p></div>`;
+  if (!i) return `<div class="ttcard"><b>${handle(a)}</b><p class="note">Loading account settings…</p></div>`;
+  const opts = (i.privacy_level_options || []).filter(o => !(o === 'SELF_ONLY' && S.set.branded));
+  return `<div class="ttcard">
+    <div class="who">${avatar(i.creator_avatar_url, i.creator_nickname)}
+      <div><b>${esc(i.creator_nickname)}</b><div class="note">@${esc(i.creator_username)}</div></div></div>
+    <label class="f" for="pv-${id}" style="margin-top:10px">Who can view this post *</label>
+    <select id="pv-${id}" data-pv="${id}"><option value="" ${t.privacy ? '' : 'selected'}>Select who can view…</option>
+      ${opts.map(o => `<option value="${o}" ${t.privacy === o ? 'selected' : ''}>${PRIVACY_LABEL[o] || o}</option>`).join('')}
+    </select>
+    ${S.set.branded && (i.privacy_level_options || []).includes('SELF_ONLY') ? '<p class="note">Branded content cannot be private, so "Only me" is unavailable.</p>' : ''}
+    ${row('Allow comments', i.comment_disabled ? 'Turned off in this account\'s TikTok settings.' : '',
+      `<input type="checkbox" data-cm="${id}" ${t.comment && !i.comment_disabled ? 'checked' : ''} ${i.comment_disabled ? 'disabled' : ''}>`)}
+  </div>`;
+}
+
 const row = (t, d, control) => `<div class="row"><span class="txt"><span class="t">${t}</span>${d ? `<span class="d">${d}</span>` : ''}</span>${control}</div>`;
 
+const acct = id => S.me.accounts.find(a => a.id === id);
+const ttTargets = () => S.targets.filter(id => platformOf(acct(id)) === 'tiktok');
+const toInstagram = () => S.targets.some(id => acct(id)?.platform === 'instagram');
+const capLimit = () => toInstagram() ? IG_CAPTION : 4000;
+function goLabel() {
+  if (S.targets.length > 3) return `${S.targets.length} accounts`;
+  return S.targets.map(id => `${PLATFORM[platformOf(acct(id))]} ${handle(acct(id)).replace(/&amp;/g, '&')}`).join(', ');
+}
+
 function missing() {
+  if (!S.targets.length) return 'Choose where to post';
   if (!S.images.length) return 'Add at least one photo';
   if (S.images.some(m => m.uploading)) return 'Waiting for uploads to finish';
-  if (len(S.title) > 90) return 'The title is too long';
   if (len(S.caption) > 4000) return 'The caption is too long';
-  if (!S.account || !S.info) return 'Choose an account';
-  if (!S.set.privacy) return 'Choose who can view this post';
-  if (S.set.disclose && !S.set.brand && !S.set.branded) return 'You need to indicate if your content promotes yourself, a third party, or both';
+  if (toInstagram()) {
+    if (S.images.length > IG_MAX) return `Instagram posts can have at most ${IG_MAX} photos`;
+    if (len(S.caption) > IG_CAPTION) return `Instagram captions can be at most ${IG_CAPTION} characters`;
+  }
+  const tts = ttTargets();
+  if (tts.length) {
+    if (len(S.title) > 90) return 'The title is too long';
+    for (const id of tts) {
+      const t = S.tt[id] || {};
+      if (t.err) return `${handle(acct(id))}: ${t.err}`;
+      if (!t.info) return 'Loading TikTok account settings…';
+      if (!t.privacy) return `Choose who can view the post on @${t.info.creator_username}`;
+    }
+    if (S.set.disclose && !S.set.brand && !S.set.branded) return 'You need to indicate if your content promotes yourself, a third party, or both';
+  }
   if (S.when === 'later') {
     const t = S.at ? new Date(S.at).getTime() : NaN;
     if (!Number.isFinite(t)) return 'Pick a date and time';
@@ -197,61 +270,157 @@ async function addFiles(files) {
   }
 }
 
-async function pickAccount(id) {
-  S.account = id; S.info = null; S.infoErr = null; S.set.privacy = ''; render();
-  if (!id) return;
-  try { S.info = await api(`/accounts/${id}/creator-info`); }
-  catch (e) { S.infoErr = e.code === 'needs_reconnect' ? 'Reconnect this account in Settings.' : e.message; }
+function toggleTarget(id, on, draw = true) {
+  S.targets = S.targets.filter(x => x !== id);
+  if (on) S.targets.push(id);
+  if (on && platformOf(acct(id)) === 'tiktok' && !S.tt[id]?.info) loadInfo(id);
+  saveTargets();
+  if (draw) render();
+}
+
+function selectAll(pl) {
+  const usable = S.me.accounts.filter(a => platformOf(a) === pl && !a.needs_reconnect);
+  const all = usable.every(a => S.targets.includes(a.id));
+  for (const a of usable) toggleTarget(a.id, !all, false);
+  render();
+}
+
+// Creator info is read fresh each time an account is picked, never reused
+// from an earlier session: the options are TikTok's, as of now.
+async function loadInfo(id) {
+  S.tt[id] = { ...(S.tt[id] || {}), info: null, err: null, privacy: '' };
+  try { S.tt[id].info = await api(`/accounts/${id}/creator-info`); }
+  catch (e) { S.tt[id].err = e.code === 'needs_reconnect' ? 'Reconnect this account in Settings.' : e.message; }
   render();
 }
 
 function setOpt(k, v) {
   S.set[k] = v;
-  if (k === 'branded' && v && S.set.privacy === 'SELF_ONLY') S.set.privacy = '';
   if (k === 'disclose' && !v) { S.set.brand = false; S.set.branded = false; }
+  if (S.set.branded) for (const t of Object.values(S.tt)) if (t.privacy === 'SELF_ONLY') t.privacy = '';
   render();
+}
+
+function bulkPrivacy(level) {
+  for (const id of ttTargets()) {
+    const t = S.tt[id];
+    if (t?.info && (t.info.privacy_level_options || []).includes(level)) t.privacy = level;
+  }
+  render();
+}
+
+// Instagram refuses images outside 4:5..1.91:1, and a 9:16 slide is outside.
+// Padding (over a blurred copy of the photo) keeps every line of slide text,
+// where a crop would cut the top and bottom off.
+async function forInstagram(m) {
+  const bmp = await createImageBitmap(await (await fetch(m.url)).blob());
+  const r = bmp.width / bmp.height;
+  if (r >= IG_MIN_RATIO && r <= IG_MAX_RATIO && m.key.endsWith('.jpg')) return null;   // usable as is
+  const ratio = Math.min(IG_MAX_RATIO, Math.max(IG_MIN_RATIO, r));
+  const W = 1080, H = Math.round(W / ratio);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const cover = Math.max(W / bmp.width, H / bmp.height);
+  g.filter = 'blur(40px) brightness(0.7)';
+  g.drawImage(bmp, (W - bmp.width * cover) / 2, (H - bmp.height * cover) / 2, bmp.width * cover, bmp.height * cover);
+  g.filter = 'none';
+  const fit = Math.min(W / bmp.width, H / bmp.height);
+  g.drawImage(bmp, (W - bmp.width * fit) / 2, (H - bmp.height * fit) / 2, bmp.width * fit, bmp.height * fit);
+  const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.92));
+  return (await api('/media', { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob })).key;
+}
+
+// Each post owns its images, so the first post takes the uploads and every
+// other one gets server-side copies.
+async function keysFor(platforms) {
+  const plain = S.images.map(m => m.key);
+  let plainUsed = false, igKeys = null, igUsed = false;
+  const copy = async keys => (await api('/media/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keys }) })).media.map(m => m.key);
+  const out = [];
+  for (const p of platforms) {
+    if (p === 'instagram') {
+      if (!igKeys) {
+        const made = [];
+        for (const m of S.images) made.push(await forInstagram(m));
+        // Images that needed no change are copies of the upload, not the upload itself.
+        const reuse = made.map((k, n) => k ? null : plain[n]).filter(Boolean);
+        const copies = reuse.length ? await copy(reuse) : [];
+        igKeys = made.map(k => k || copies.shift());
+      }
+      out.push(igUsed ? await copy(igKeys) : igKeys); igUsed = true;
+    } else {
+      out.push(plainUsed ? await copy(plain) : plain); plainUsed = true;
+    }
+  }
+  return out;
 }
 
 async function submit() {
   if (missing() || S.busy) return;
   S.busy = true; S.status = { kind: '', text: 'Sending…' }; render();
+  const jobs = S.targets.map(id => ({ id, platform: platformOf(acct(id)) }))
+    .sort((a, b) => ORDER.indexOf(a.platform) - ORDER.indexOf(b.platform));
+  const at = S.when === 'later' ? Math.floor(new Date(S.at).getTime() / 1000) : null;
+  const made = [], errors = [];
   try {
-    const p = await api('/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      account_id: S.account, image_keys: S.images.map(m => m.key), cover_index: S.cover,
-      title: S.title, caption: S.caption,
-      settings: { privacy_level: S.set.privacy, disable_comment: !S.set.comment || !!S.info?.comment_disabled,
-        auto_add_music: S.set.music, brand_organic: S.set.disclose && S.set.brand, branded_content: S.set.disclose && S.set.branded },
-      scheduled_at: S.when === 'later' ? Math.floor(new Date(S.at).getTime() / 1000) : null,
-      replaces: S.replaces || undefined,
-    }) });
-    resetComposer();
-    if (p.scheduled_at > Date.now() / 1000 + 60) {
-      S.flash = { kind: 'ok', text: `Scheduled for ${new Date(p.scheduled_at * 1000).toLocaleString()}.` };
-      location.hash = '#calendar';
-    } else {
-      S.status = { kind: '', text: 'Posting… TikTok is processing it. This page updates when it is done.' };
-      render(); watch(p.id);
+    if (toInstagram()) { S.status = { kind: '', text: 'Preparing photos for Instagram…' }; render(); }
+    const keys = await keysFor(jobs.map(j => j.platform));
+    for (const [n, j] of jobs.entries()) {
+      if (jobs.length > 1) { S.status = { kind: '', text: `Sending ${n + 1} of ${jobs.length}…` }; render(); }
+      const name = `${PLATFORM[j.platform]} ${handle(acct(j.id))}`;
+      const t = S.tt[j.id] || {};
+      try {
+        made.push(await api('/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+          account_id: j.id, image_keys: keys[n], cover_index: S.cover, title: S.title, caption: S.caption,
+          settings: j.platform !== 'tiktok' ? {} : { privacy_level: t.privacy, disable_comment: !t.comment || !!t.info?.comment_disabled,
+            auto_add_music: S.set.music, brand_organic: S.set.disclose && S.set.brand, branded_content: S.set.disclose && S.set.branded },
+          scheduled_at: at,
+          // An edit replaces the one post it came from.
+          replaces: S.replaces && S.replacesAccount === j.id ? S.replaces : undefined,
+        }) }));
+      } catch (e) { errors.push(`${name}: ${e.message}`); }
     }
-  } catch (e) { S.status = { kind: 'err', text: e.message }; }
-  S.busy = false; render();
+  } catch (e) { errors.push(e.message); }
+  S.busy = false;
+  if (!made.length) { S.status = { kind: 'err', text: errors.join(' · ') }; return render(); }
+  resetComposer();
+  const tail = errors.length ? ` Not sent: ${errors.join(' · ')}` : '';
+  if (made[0].scheduled_at > Date.now() / 1000 + 60) {
+    S.flash = { kind: errors.length ? 'err' : 'ok', text: `Scheduled for ${new Date(made[0].scheduled_at * 1000).toLocaleString()}.${tail}` };
+    location.hash = '#calendar';
+  } else {
+    S.status = { kind: errors.length ? 'err' : '', text: `Posting… This page updates when it is done.${tail}` };
+    render(); watch(made.map(p => p.id), tail);
+  }
 }
 
-async function watch(id) {
-  for (let n = 0; n < 100; n++) {
+async function watch(ids, tail = '') {
+  const done = new Map();
+  for (let n = 0; n < 100 && done.size < ids.length; n++) {
     await new Promise(r => setTimeout(r, 3000));
     const t = Math.floor(Date.now() / 1000);
-    let p;
-    try { p = (await api(`/posts?from=${t - 3600}&to=${t + 60}`)).posts.find(x => x.id === id); }
+    let posts;
+    try { posts = (await api(`/posts?from=${t - 3600}&to=${t + 60}`)).posts; }
     catch { continue; }   // one failed check is not a result; keep watching
-    if (p?.status === 'published') { S.status = { kind: 'ok', text: 'Published. It may take a few minutes to appear on the profile.' }; return render(); }
-    if (p?.status === 'failed') { S.status = { kind: 'err', text: p.fail_reason || 'TikTok rejected the post.' }; return render(); }
+    for (const p of posts) if (ids.includes(p.id) && (p.status === 'published' || p.status === 'failed')) done.set(p.id, p);
   }
-  S.status = { kind: '', text: 'Still processing. Check the Calendar for the result.' }; render();
+  const all = [...done.values()];
+  const failed = all.filter(p => p.status === 'failed');
+  const label = p => `${PLATFORM[p.platform] || 'TikTok'} ${p.platform === 'facebook' ? '' : '@'}${p.username}`;
+  if (done.size < ids.length) S.status = { kind: '', text: `Still processing. Check the Calendar for the result.${tail}` };
+  else if (failed.length) S.status = { kind: 'err', text: failed.map(p => `${label(p)}: ${p.fail_reason || 'rejected'}`).join(' · ') +
+    (all.length > failed.length ? ` · Published to ${all.filter(p => p.status === 'published').map(label).join(', ')}.` : '') };
+  else S.status = { kind: 'ok', text: `Published to ${all.map(label).join(', ')}. It may take a few minutes to appear on the profile.${tail}` };
+  render();
 }
 
+// Targets stay selected for the next post; privacy is chosen again each time.
 function resetComposer() {
-  Object.assign(S, { images: [], cover: 0, title: '', caption: '', when: 'now', at: '', status: null, replaces: null });
-  S.set = { privacy: '', comment: false, music: false, disclose: false, brand: false, branded: false };
+  Object.assign(S, { images: [], cover: 0, title: '', caption: '', when: 'now', at: '', status: null, replaces: null,
+    replacesAccount: null });
+  for (const t of Object.values(S.tt)) { t.privacy = ''; t.comment = false; }
+  S.set = { music: false, disclose: false, brand: false, branded: false };
 }
 
 // ---- calendar ----------------------------------------------------------
@@ -272,12 +441,19 @@ async function loadWeek() {
 function calendarView() {
   const start = weekStart();
   const accts = S.me.accounts;
-  const posts = S.posts.filter(p => S.filter === 'all' || p.account_id === S.filter);
+  const plats = ORDER.filter(pl => accts.some(a => platformOf(a) === pl));
+  const posts = S.posts.filter(p => (S.fPlat === 'all' || (p.platform || 'tiktok') === S.fPlat)
+    && (S.fAcct === 'all' || p.account_id === S.fAcct));
   const days = [...Array(7)].map((_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
   const today = new Date().toDateString();
+  const shown = accts.filter(a => S.fPlat === 'all' || platformOf(a) === S.fPlat);
   return `<div class="chips">
-      <button class="chip ${S.filter === 'all' ? 'on' : ''}" data-f="all">All accounts</button>
-      ${accts.map(a => `<button class="chip ${S.filter === a.id ? 'on' : ''}" data-f="${a.id}">@${esc(a.username)}</button>`).join('')}
+      <button class="chip ${S.fPlat === 'all' ? 'on' : ''}" data-fp="all">All platforms</button>
+      ${plats.map(pl => `<button class="chip ${S.fPlat === pl ? 'on' : ''}" data-fp="${pl}">${PLATFORM[pl]}</button>`).join('')}
+      ${shown.length > 1 ? `<select id="facct" style="width:auto;padding:5px 10px">
+        <option value="all">All accounts</option>
+        ${shown.map(a => `<option value="${a.id}" ${S.fAcct === a.id ? 'selected' : ''}>${PLATFORM[platformOf(a)]} · ${handle(a)}</option>`).join('')}
+      </select>` : ''}
     </div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <button class="btn sec" data-wk="-1" ${S.week <= 0 ? 'disabled' : ''}>‹</button>
@@ -291,47 +467,76 @@ function calendarView() {
         <h4>${d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })}</h4>
         ${ps.map(p => `<div class="pc">
           ${p.images[p.cover_index] ? `<img src="${esc(p.images[p.cover_index])}" alt="">` : ''}
-          <div>${new Date(p.scheduled_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · @${esc(p.username)}</div>
+          <div><span class="dot ${p.platform || 'tiktok'}"></span>${new Date(p.scheduled_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${PLATFORM[p.platform] || 'TikTok'}</div>
+          <div class="note">${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</div>
           <span class="pill ${p.status}">${p.status}</span>
           ${p.fail_reason ? `<div class="note ${p.status === 'failed' ? 'bad' : ''}">${esc(p.fail_reason)}</div>` : ''}
           <div class="acts">
             ${p.status === 'queued' ? `<button data-edit="${p.id}">Edit</button><button data-cancel="${p.id}">Cancel</button>` : ''}
             ${p.status === 'failed' ? `<button data-retry="${p.id}">Retry</button><button data-edit="${p.id}">Edit</button>` : ''}
+            ${p.status === 'published' || p.status === 'cancelled' ? `<button data-again="${p.id}">Post again</button>` : ''}
             ${p.post_url ? `<a href="${esc(p.post_url)}" target="_blank" rel="noopener">View</a>` : ''}
           </div></div>`).join('') || '<span class="note">Nothing yet</span>'}
       </div>`;
     }).join('')}</div>`;
 }
 
-async function edit(id) {
+// Edit (a queued or failed post) or Post again (a finished one): the post's
+// content and account come back into the composer, and more accounts can be
+// added to it. Privacy is chosen again on purpose: the options come from
+// TikTok now, not from when the post was first made.
+async function edit(id, again = false) {
   const p = S.posts.find(x => x.id === id);
   if (!p) return;
   resetComposer();
-  // A queued post stays scheduled until the edited version is saved.
-  S.replaces = p.status === 'queued' ? p.id : null;
-  Object.assign(S, { images: p.image_keys.map((k, n) => ({ key: k, url: p.images[n] })), cover: p.cover_index,
-    title: p.title, caption: p.caption, when: 'later', at: localInput(Math.max(p.scheduled_at * 1000, Date.now() + 10 * 60e3)) });
-  const s = p.settings;
-  S.set = { privacy: '', comment: !s.disable_comment, music: s.auto_add_music,
-            disclose: s.brand_organic || s.branded_content, brand: s.brand_organic, branded: s.branded_content };
+  S.replaces = !again && p.status === 'queued' ? p.id : null;
+  S.replacesAccount = p.account_id;
+  const images = again ? [] : p.image_keys.map((k, n) => ({ key: k, url: p.images[n] }));
+  Object.assign(S, { images, cover: again ? 0 : p.cover_index, title: p.title, caption: p.caption,
+    when: again ? 'now' : 'later', at: localInput(Math.max(p.scheduled_at * 1000, Date.now() + 10 * 60e3)) });
+  const s = p.settings || {};
+  S.set = { music: !!s.auto_add_music, disclose: !!(s.brand_organic || s.branded_content),
+            brand: !!s.brand_organic, branded: !!s.branded_content };
+  S.targets = [];
+  toggleTarget(p.account_id, true, false);
+  if (S.tt[p.account_id]) S.tt[p.account_id].comment = !s.disable_comment;
   location.hash = '#compose';
-  await pickAccount(p.account_id);
-  // Privacy is chosen again on purpose: the options come from TikTok now, not from when it was first made.
+  render();
+  if (again) {
+    // Images live for 7 days after a post is done; copy them while they do.
+    try {
+      const { media } = await api('/media/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keys: p.image_keys }) });
+      S.images = media.map(m => ({ key: m.key, url: m.url })); S.cover = p.cover_index;
+    } catch { S.status = { kind: '', text: 'The photos of that post were already deleted. Caption copied; add the photos again.' }; }
+    render();
+  }
 }
 
 // ---- settings ----------------------------------------------------------
 
 function settingsView() {
   const a = S.me.accounts;
+  const group = (pl, title, add, hint) => {
+    const list = a.filter(x => platformOf(x) === pl);
+    return `<div class="sec"><span class="cap">${title} (${list.length})</span>
+      ${list.map(x => row(`<span class="who">${avatar(x.avatar_url, x.username || x.display_name)}<span>${handle(x)}</span></span>`,
+          x.needs_reconnect ? '<span class="note bad">Access was revoked or expired. Reconnect to keep posting.</span>' : esc(x.display_name),
+          `${x.needs_reconnect ? `<a class="btn sec" href="${add}" style="text-decoration:none">Reconnect</a>` : ''}
+           <button class="btn danger" data-disc="${x.id}">Disconnect</button>`)).join('') || '<p class="note">None connected.</p>'}
+      ${add ? `<p><a class="btn ${list.length ? 'sec' : ''}" href="${add}" style="text-decoration:none;display:inline-block">${list.length ? 'Add another' : 'Connect'}</a></p>` : ''}
+      <span class="note">${hint}</span></div>`;
+  };
+  const metaAdd = S.me.meta_enabled ? '/api/auth/meta/start?add=1' : '';
   return `<div class="card">
-    <div class="sec"><span class="cap">Connected TikTok accounts (${a.length} / ${S.me.limits.accounts})</span>
-      ${a.map(x => row(`@${esc(x.username)}`, x.needs_reconnect ? '<span class="note bad">Access was revoked or expired. Reconnect to keep posting.</span>' : esc(x.display_name),
-        `${x.needs_reconnect ? '<a class="btn sec" href="/api/auth/start?add=1" style="text-decoration:none">Reconnect</a>' : ''}
-         <button class="btn danger" data-disc="${x.id}">Disconnect</button>`)).join('') || '<p class="note">No accounts yet.</p>'}
-      <p><a class="btn" href="/api/auth/start?add=1" style="text-decoration:none;display:inline-block">Add account</a></p>
-      <span class="note">Disconnecting cancels that account's scheduled posts. You can also revoke access in TikTok under
-        Settings and privacy › Security &amp; permissions › Apps and services.</span>
-    </div>
+    <div class="sec"><span class="cap">Accounts</span>
+      <p class="note" style="margin:0">${a.length} of ${S.me.limits.accounts} connected. Disconnecting an account cancels its scheduled posts.</p></div>
+    ${group('tiktok', 'TikTok', '/api/auth/start?add=1',
+      'TikTok connects the account signed in on tiktok.com. To add a different one, switch accounts on TikTok\'s screen, or sign out of tiktok.com in this browser first. Revoke access in TikTok under Settings and privacy › Security &amp; permissions › Apps and services.')}
+    ${group('instagram', 'Instagram', metaAdd,
+      'Instagram accounts connect through Facebook: the account must be a professional (Business or Creator) account linked to a Facebook Page. On Facebook\'s screen, choose every Page whose Instagram you want here.')}
+    ${group('facebook', 'Facebook Pages', metaAdd,
+      'Choose all the Pages you manage on Facebook\'s screen; Pages connected before stay connected. Pages from another Facebook login: sign in to that Facebook account first. Revoke access in Facebook under Settings › Business integrations.')}
     <div class="sec"><span class="cap">API key</span>
       <p class="note">For posting from your own tools. The key can do everything you can do here. Creating a new key disables the old one.</p>
       ${S.apiKey ? `<p><code style="user-select:all">${esc(S.apiKey)}</code></p><p class="note warn">Copy it now. It will not be shown again.</p>` : ''}
@@ -362,21 +567,28 @@ function bind() {
   on('#title', 'change', render);
   on('#caption', 'input', e => { S.caption = e.target.value; });
   on('#caption', 'change', render);
-  on('#acct', 'change', e => pickAccount(e.target.value));
-  on('#privacy', 'change', e => { S.set.privacy = e.target.value; render(); });
+  on('[data-t]', 'change', e => toggleTarget(e.target.dataset.t, e.target.checked));
+  on('[data-all]', 'click', e => selectAll(e.target.dataset.all));
+  on('[data-pv]', 'change', e => { S.tt[e.target.dataset.pv].privacy = e.target.value; render(); });
+  on('[data-cm]', 'change', e => { S.tt[e.target.dataset.cm].comment = e.target.checked; render(); });
+  on('#bulkpriv', 'change', e => e.target.value && bulkPrivacy(e.target.value));
   on('[data-k]', 'change', e => setOpt(e.target.dataset.k, e.target.checked));
   on('input[name=when]', 'change', e => { S.when = e.target.value; render(); });
   on('#at', 'change', e => { S.at = e.target.value; render(); });
   on('#go', 'click', submit);
   on('#stopedit', 'click', () => { resetComposer(); location.hash = '#calendar'; });
-  on('[data-f]', 'click', e => { S.filter = e.target.dataset.f; render(); });
+  on('[data-fp]', 'click', e => { S.fPlat = e.target.dataset.fp; S.fAcct = 'all'; render(); });
+  on('#facct', 'change', e => { S.fAcct = e.target.value; render(); });
+  on('[data-again]', 'click', e => edit(e.target.dataset.again, true));
   on('[data-wk]', 'click', e => { S.week += Number(e.target.dataset.wk); loadWeek(); });
   on('[data-cancel]', 'click', async e => { try { await api(`/posts/${e.target.dataset.cancel}`, { method: 'DELETE' }); } catch (x) { S.flash = { kind: 'err', text: x.message }; } loadWeek(); });
   on('[data-retry]', 'click', async e => { try { await api(`/posts/${e.target.dataset.retry}/retry`, { method: 'POST' }); } catch (x) { S.flash = { kind: 'err', text: x.message }; } loadWeek(); });
   on('[data-edit]', 'click', e => edit(e.target.dataset.edit));
   on('[data-disc]', 'click', async e => {
     if (!confirm('Disconnect this account? Its scheduled posts will be cancelled.')) return;
-    await api(`/accounts/${e.target.dataset.disc}`, { method: 'DELETE' }); S.me = await api('/me'); render();
+    const id = e.target.dataset.disc;
+    await api(`/accounts/${id}`, { method: 'DELETE' }); S.me = await api('/me');
+    S.targets = S.targets.filter(x => x !== id); saveTargets(); render();
   });
   on('#apikey', 'click', async () => { S.apiKey = (await api('/api-key', { method: 'POST' })).api_key; S.me.api_key_set = true; render(); });
   on('#delws', 'click', async () => {

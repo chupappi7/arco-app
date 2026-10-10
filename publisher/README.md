@@ -39,6 +39,33 @@ Optional:
 The redirect URI is `<deployment origin>/api/auth/callback` and must be
 registered in the portal character for character.
 
+## Instagram and Facebook
+
+One Facebook Login (`api/auth/meta/start.js` → `callback.js` → the Worker's
+`/internal/meta-oauth`) connects each Facebook Page the person picks and the
+Instagram professional account linked to it. The Page token is stored
+encrypted and does not expire; a revoked one marks the account "Reconnect".
+
+Setup, once:
+
+1. developers.facebook.com → the Meta app → add **Facebook Login for Business**
+   and **Instagram** (API setup with Facebook login).
+2. Valid OAuth redirect URI: `https://arco-publisher.vercel.app/api/auth/meta/callback`
+3. Privacy policy URL `/privacy.html`, data deletion URL `/privacy.html#data-deletion`.
+4. Vercel env: `META_APP_ID`. Worker secrets: `META_APP_ID`, `META_APP_SECRET`.
+5. Live D1: `npx wrangler d1 execute arco-publisher --remote --file=migrations/002-meta.sql`
+6. Until App Review grants Advanced Access to `pages_manage_posts`,
+   `pages_read_engagement`, `pages_show_list`, `business_management`,
+   `instagram_basic` and `instagram_content_publish` (with Business
+   Verification), only people with a role on the Meta app can connect.
+
+A workspace holds up to 25 accounts across platforms (several per platform is
+the point: one person running many brands), with up to 200 posts queued.
+
+Limits the composer and the Worker both enforce for Instagram: 10 images,
+JPEG, 2,200-character caption, 30 hashtags, aspect ratio 4:5 to 1.91:1 (tall
+slides are padded in the browser, never cropped).
+
 ## Why there is no database
 
 The only thing worth storing is the user's access token, and it lives in a

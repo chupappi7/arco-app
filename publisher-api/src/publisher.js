@@ -1,8 +1,10 @@
 import { now } from './http.js';
-import { accessTokenFor, forgetAccessToken } from './accounts.js';
+import { accessTokenFor, forgetAccessToken, isMeta } from './accounts.js';
+import { metaFor } from './meta.js';
 import { buildPhotoBody } from './tiktok.js';
 import { mediaUrl } from './media.js';
-import { RETRY_DELAYS, PER_ACCOUNT_PER_TICK, KEEP_AFTER_DONE, PUBLISH_TIMEOUT } from './limits.js';
+import { RETRY_DELAYS, PER_ACCOUNT_PER_TICK, KEEP_AFTER_DONE, PUBLISH_TIMEOUT,
+  TICK_FETCH_BUDGET, POLL_RESERVE } from './limits.js';
 
 const STUCK_AFTER = 600;
 // publish_id = '' marks a content/init call in flight: TikTok may have
@@ -31,21 +33,146 @@ const fail = (env, id, t, reason) => finish(env, id, t, { status: 'failed', fail
 // account's other posts fail the same way without another refresh.
 function tokenCache(env, tk) {
   const cache = new Map();
-  return async accountId => {
+  const load = accountId => {
     if (!cache.has(accountId)) {
       cache.set(accountId, (async () => {
         const account = await env.DB.prepare('SELECT * FROM accounts WHERE id = ?').bind(accountId).first();
         if (!account) { const e = new Error('Account disconnected'); e.code = 'gone'; throw e; }
-        return accessTokenFor(env, tk, account);
+        return { account, access: await accessTokenFor(env, tk, account) };
       })());
     }
     return cache.get(accountId);
   };
+  const token = async accountId => (await load(accountId)).access;
+  token.load = load;
+  return token;
+}
+
+// ---- Instagram and Facebook -------------------------------------------
+//
+// publish_id carries where a Meta post is: 'ig:<container>' is built and
+// waiting for Instagram to process it, 'ig-pub:<container>' is being
+// published right now (claimed, so it is published once), and '' is a
+// Facebook post in flight. Containers that never get published are harmless,
+// so everything before the publish call is safe to retry.
+
+const IG_WAIT = 'ig:', IG_PUBLISHING = 'ig-pub:';
+const igMark = (env, id, from, to, t) => env.DB.prepare(
+  'UPDATE posts SET publish_id = ?, updated_at = ? WHERE id = ? AND publish_id = ?').bind(to, t, id, from).run();
+
+async function metaLost(env, post, t) {
+  await env.DB.prepare('UPDATE accounts SET needs_reconnect = 1 WHERE id = ?').bind(post.account_id).run();
+  const msg = 'Reconnect this account';
+  await fail(env, post.id, t, msg);
+  const { results } = await env.DB.prepare(`SELECT id FROM posts WHERE account_id = ? AND status = 'queued'`)
+    .bind(post.account_id).all();
+  for (const r of results) await fail(env, r.id, t, msg);
+  return 'failed';
+}
+
+async function requeueOrFail(env, post, t, err) {
+  if (err.transient && post.attempts < RETRY_DELAYS.length) {
+    await env.DB.prepare(`UPDATE posts SET status = 'queued', publish_id = NULL, next_attempt_at = ?,
+        fail_reason = ?, updated_at = ? WHERE id = ?`)
+      .bind(t + RETRY_DELAYS[post.attempts], `Retrying: ${err.message}`, t, post.id).run();
+    return 'requeued';
+  }
+  await finish(env, post.id, t, { status: 'failed', publish_id: null, fail_reason: err.message || 'Publishing failed' });
+  return 'failed';
+}
+
+async function startMeta(env, post, account, access, t) {
+  const mt = metaFor(env);
+  const urls = JSON.parse(post.image_keys).map(k => mediaUrl(env, k));
+  const target = account.open_id.slice(3);   // strip 'ig:' / 'fb:'
+  let sent = false;
+  try {
+    if (account.platform === 'instagram') {
+      let container;
+      if (urls.length === 1) container = (await mt.igImage(access, target, urls[0], { caption: post.caption })).id;
+      else {
+        const children = [];
+        for (const u of urls) children.push((await mt.igImage(access, target, u, { carouselItem: true })).id);
+        container = (await mt.igCarousel(access, target, children, post.caption)).id;
+      }
+      await env.DB.prepare('UPDATE posts SET publish_id = ?, fail_reason = NULL, updated_at = ? WHERE id = ?')
+        .bind(IG_WAIT + container, t, post.id).run();
+      return 'started';
+    }
+    // Facebook: upload unpublished photos (safe to repeat), then one post.
+    const message = post.caption;
+    let ids = [];
+    if (urls.length > 1) for (const u of urls) ids.push((await mt.fbPhoto(access, target, u, { published: false })).id);
+    await env.DB.prepare('UPDATE posts SET publish_id = ?, updated_at = ? WHERE id = ?').bind(IN_FLIGHT, t, post.id).run();
+    sent = true;
+    const out = urls.length === 1
+      ? await mt.fbPhoto(access, target, urls[0], { published: true, caption: message })
+      : await mt.fbFeed(access, target, message, ids);
+    const postId = out.post_id || out.id;
+    await finish(env, post.id, t, { status: 'published', publish_id: String(postId), public_post_id: String(postId),
+      post_url: `https://www.facebook.com/${postId}`, fail_reason: null });
+    return 'published';
+  } catch (err) {
+    if (err.code === 'needs_reconnect') return metaLost(env, post, t);
+    // A dropped connection after the post call may still have posted.
+    if (sent && err.code === 'network') { await fail(env, post.id, t, UNKNOWN); return 'failed'; }
+    return requeueOrFail(env, post, t, err);
+  }
+}
+
+async function pollInstagram(env, post, access, t) {
+  const mt = metaFor(env);
+  const account = await env.DB.prepare('SELECT open_id FROM accounts WHERE id = ?').bind(post.account_id).first();
+  if (post.publish_id.startsWith(IG_PUBLISHING)) {
+    // Another run is publishing it; if that run died, nobody knows whether it went out.
+    if (t - post.updated_at > STUCK_AFTER) { await fail(env, post.id, t, UNKNOWN); return 'failed'; }
+    return 'pending';
+  }
+  const container = post.publish_id.slice(IG_WAIT.length);
+  try {
+    const s = await mt.igContainerStatus(access, container);
+    if (s.status_code === 'ERROR' || s.status_code === 'EXPIRED') {
+      await finish(env, post.id, t, { status: 'failed', publish_id: null,
+        fail_reason: `Instagram could not process the images: ${s.status || s.status_code}` });
+      return 'failed';
+    }
+    if (s.status_code !== 'FINISHED') {
+      if (t - post.updated_at > PUBLISH_TIMEOUT) {
+        await finish(env, post.id, t, { status: 'failed', publish_id: null, fail_reason: 'Instagram did not finish processing the images within an hour.' });
+        return 'failed';
+      }
+      return 'pending';
+    }
+  } catch (err) {
+    if (err.code === 'needs_reconnect') return metaLost(env, post, t);
+    return 'pending';
+  }
+  const claim = await igMark(env, post.id, post.publish_id, IG_PUBLISHING + container, t);
+  if (!claim.meta.changes) return 'pending';
+  let out;
+  try {
+    out = await mt.igPublish(access, account.open_id.slice(3), container);
+  } catch (err) {
+    if (err.code === 'needs_reconnect') return metaLost(env, post, t);
+    if (err.code === 'network') { await fail(env, post.id, t, UNKNOWN); return 'failed'; }
+    // Instagram answered with an error, so nothing went live.
+    if (err.transient) { await igMark(env, post.id, IG_PUBLISHING + container, post.publish_id, t); return 'pending'; }
+    await finish(env, post.id, t, { status: 'failed', publish_id: null, fail_reason: err.message });
+    return 'failed';
+  }
+  const link = await mt.igPermalink(access, out.id).catch(() => ({}));
+  await finish(env, post.id, t, { status: 'published', publish_id: String(out.id), public_post_id: String(out.id),
+    post_url: link.permalink || null, fail_reason: null });
+  return 'published';
 }
 
 async function start(env, tk, post, token, t) {
   const settings = JSON.parse(post.settings);
   await env.DB.prepare('UPDATE posts SET attempts = attempts + 1, updated_at = ? WHERE id = ?').bind(t, post.id).run();
+  // A TikTok load failure is not handled here: token() below rejects with
+  // the same cached error, and the TikTok path knows what each one means.
+  const loaded = await token.load(post.account_id).catch(() => null);
+  if (loaded && isMeta(loaded.account)) return startMeta(env, post, loaded.account, loaded.access, t);
   try {
     const access = await token(post.account_id);
     const info = await tk.creatorInfo(access);
@@ -98,6 +225,12 @@ async function start(env, tk, post, token, t) {
 }
 
 async function poll(env, tk, post, token, t) {
+  if (post.publish_id.startsWith(IG_WAIT) || post.publish_id.startsWith(IG_PUBLISHING)) {
+    let access;
+    try { access = await token(post.account_id); }
+    catch (err) { await fail(env, post.id, t, err.message || 'Account disconnected'); return 'failed'; }
+    return pollInstagram(env, post, access, t);
+  }
   try {
     const s = await tk.status(await token(post.account_id), post.publish_id);
     if (s.status === 'PUBLISH_COMPLETE') {
@@ -128,6 +261,15 @@ async function poll(env, tk, post, token, t) {
   return 'pending';
 }
 
+// Outbound calls a start makes: TikTok refresh + creator info + init; for
+// Instagram and Facebook one per image plus the carousel or the post.
+async function startCost(env, post, token) {
+  const loaded = await token.load(post.account_id).catch(() => null);
+  if (!loaded || !isMeta(loaded.account)) return 3;
+  const n = JSON.parse(post.image_keys).length;
+  return n === 1 ? 1 : n + 1;
+}
+
 export async function tick(env, tk, t = now()) {
   const counts = { started: 0, published: 0, failed: 0, requeued: 0 };
   const token = tokenCache(env, tk);
@@ -142,20 +284,28 @@ export async function tick(env, tk, t = now()) {
 
   const claimed = await claimDue(env, t);
   const perAccount = new Map();
+  let budget = TICK_FETCH_BUDGET - POLL_RESERVE;
   for (const p of claimed) {
     const n = perAccount.get(p.account_id) || 0;
-    if (n >= PER_ACCOUNT_PER_TICK) {
+    const cost = await startCost(env, p, token);
+    if (n >= PER_ACCOUNT_PER_TICK || cost > budget) {
       await env.DB.prepare(`UPDATE posts SET status = 'queued', updated_at = ? WHERE id = ?`).bind(t, p.id).run();
       continue;
     }
     perAccount.set(p.account_id, n + 1);
+    budget -= cost;
     const r = await start(env, tk, p, token, t);
     if (r === 'started') counts.started++; else counts[r]++;
   }
 
   const { results: publishing } = await env.DB.prepare(`SELECT * FROM posts
       WHERE status = 'publishing' AND publish_id IS NOT NULL AND publish_id != '' ORDER BY updated_at LIMIT 25`).all();
+  budget += POLL_RESERVE;
   for (const p of publishing) {
+    // An Instagram poll may also publish and fetch the link; TikTok's is one call.
+    const cost = p.publish_id.startsWith(IG_WAIT) ? 3 : 1;
+    if (cost > budget) break;
+    budget -= cost;
     const r = await poll(env, tk, p, token, t);
     if (r === 'published') counts.published++;
     else if (r === 'failed') counts.failed++;
