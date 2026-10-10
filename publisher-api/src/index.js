@@ -1,8 +1,8 @@
 import { json, HttpError, match, readJson, now } from './http.js';
 import { tkFor, TikTokError } from './tiktok.js';
-import { oauthIntake, metaIntake, resolveCaller, rotateApiKey, logout } from './auth.js';
+import { oauthIntake, metaIntake, igIntake, resolveCaller, rotateApiKey, logout } from './auth.js';
 import { metaFor, MetaError } from './meta.js';
-import { listAccounts, creatorInfoFor, disconnect } from './accounts.js';
+import { listAccounts, creatorInfoFor, disconnect, refreshInstagramTokens } from './accounts.js';
 import * as L from './limits.js';
 import { uploadMedia, serveMedia, copyMedia } from './media.js';
 import { createPost, listPosts, cancelPost, retryPost } from './posts.js';
@@ -18,7 +18,8 @@ async function me(req, env, { ws }) {
     limits: { accounts: L.MAX_ACCOUNTS, queued: L.MAX_QUEUED, images: L.MAX_IMAGES,
               image_bytes: L.MAX_IMAGE_BYTES, workspace_bytes: L.MAX_WORKSPACE_BYTES,
               min_lead_seconds: L.MIN_LEAD_SECONDS, ig_images: L.IG_MAX_IMAGES, ig_caption: L.IG_MAX_CAPTION },
-    meta_enabled: !!(env.META_APP_ID && env.META_APP_SECRET),
+    facebook_enabled: !!(env.META_APP_ID && env.META_APP_SECRET),
+    instagram_enabled: !!(env.IG_APP_ID && env.IG_APP_SECRET),
   });
 }
 
@@ -26,6 +27,7 @@ async function me(req, env, { ws }) {
 export const ROUTES = [
   ['POST', '/internal/oauth', async (req, env, { tk }) => json(await oauthIntake(env, tk, await readJson(req))), 'internal'],
   ['POST', '/internal/meta-oauth', async (req, env) => json(await metaIntake(env, metaFor(env), await readJson(req))), 'internal'],
+  ['POST', '/internal/ig-oauth', async (req, env) => json(await igIntake(env, metaFor(env), await readJson(req))), 'internal'],
   ['GET', '/v1/me', me, 'user'],
   ['DELETE', '/v1/me', async (req, env, { ws }) => { await deleteWorkspace(env, ws); return json({ ok: true }); }, 'user'],
   ['POST', '/v1/logout', async (req, env) => { await logout(env, req); return json({ ok: true }); }, 'user'],
@@ -100,6 +102,7 @@ export default {
     ctx.waitUntil((async () => {
       const counts = await tick(env, tkFor(env));
       if (counts.started || counts.published || counts.failed) console.log('tick', JSON.stringify(counts));
+      await refreshInstagramTokens(env, metaFor(env)).catch(e => console.error('ig refresh', e));
       await runCleanup(env);
     })());
   },

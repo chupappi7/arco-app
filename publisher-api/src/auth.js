@@ -85,9 +85,44 @@ export async function oauthIntake(env, tk, { code, code_verifier, redirect_uri, 
   return { session_id: sessionId, workspace_id: ws, account_id: accountId };
 }
 
-// Facebook Login: one consent connects every Page the person picked and the
-// Instagram professional account linked to each. Signing in this way with no
-// session lands in the workspace these accounts already belong to, or a new one.
+// Find or create the workspace a Meta sign-in lands in, and refuse any
+// account that already belongs to another workspace.
+//
+// Without a session, the workspace is found only by WHO signed in (the same
+// Facebook person, or the Instagram account itself), never by the Pages
+// someone can manage: several people manage one Page, and managing it must
+// not open the workspace of whoever connected it first.
+async function metaWorkspace(env, { sessionId, owner, openIds }) {
+  const marks = openIds.map(() => '?').join(',');
+  const { results: existing } = await env.DB.prepare(
+    `SELECT id, workspace_id, open_id FROM accounts WHERE open_id IN (${marks})`).bind(...openIds).all();
+  let ws = sessionId ? await sessionWorkspace(env, sessionId) : null;
+  const adding = !!ws;
+  if (!ws && owner) ws = (await env.DB.prepare(owner.sql).bind(owner.value).first())?.workspace_id || null;
+  const t = now();
+  if (!ws) {
+    if (existing.length) {
+      throw new HttpError(409, 'This account is already connected to another ARCO Publisher workspace. ' +
+        'Sign in there and disconnect it first.');
+    }
+    ws = 'ws_' + randomToken('', 8);
+    await env.DB.prepare('INSERT INTO workspaces (id, created_at) VALUES (?, ?)').bind(ws, t).run();
+  }
+  if (existing.some(r => r.workspace_id !== ws)) {
+    throw new HttpError(409, 'One of these accounts is already connected to another ARCO Publisher workspace. ' +
+      'Sign in there and disconnect it first.');
+  }
+  const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM accounts WHERE workspace_id = ?').bind(ws).first();
+  const fresh = openIds.filter(o => !existing.some(r => r.open_id === o)).length;
+  if (n + fresh > MAX_ACCOUNTS) {
+    throw new HttpError(409, `A workspace can connect up to ${MAX_ACCOUNTS} accounts. Disconnect some first.`);
+  }
+  return { ws, adding, byOpenId: new Map(existing.map(r => [r.open_id, r])) };
+}
+
+// Facebook Login: one consent connects every Page the person picked. Page
+// tokens do not expire, so the token is both the "refresh" and the access
+// token, with no expiry to wait for.
 export async function metaIntake(env, mt, { code, redirect_uri, session_id }) {
   if (!code) throw new HttpError(400, 'code is required');
   if (redirect_uri !== env.META_REDIRECT_URI) throw new HttpError(400, 'unexpected redirect_uri');
@@ -95,77 +130,64 @@ export async function metaIntake(env, mt, { code, redirect_uri, session_id }) {
   const short = await mt.exchangeCode({ code, redirectUri: redirect_uri });
   const long = await mt.longLived(short.access_token);
   const user = await mt.me(long.access_token);
-  const pages = (await mt.pages(long.access_token)).data || [];
+  const pages = ((await mt.pages(long.access_token)).data || []).filter(p => p.access_token);
+  if (!pages.length) throw new HttpError(400, 'No Facebook Page came back. Pick at least one Page on the Facebook screen.');
 
-  const found = [];
-  for (const p of pages) {
-    if (!p.access_token) continue;
-    found.push({ platform: 'facebook', open_id: `fb:${p.id}`, username: p.name || '',
-      display_name: p.name || '', avatar_url: p.picture?.data?.url || '', token: p.access_token });
-    const ig = p.instagram_business_account;
-    if (ig?.id) {
-      found.push({ platform: 'instagram', open_id: `ig:${ig.id}`, username: ig.username || '',
-        display_name: ig.name || ig.username || '', avatar_url: ig.profile_picture_url || '', token: p.access_token });
-    }
-  }
-  if (!found.length) {
-    throw new HttpError(400, 'No Facebook Page came back. Pick at least one Page on the Facebook screen, ' +
-      'and link your Instagram professional account to that Page to post to Instagram.');
-  }
+  const found = pages.map(p => ({ open_id: `fb:${p.id}`, name: p.name || '', avatar: p.picture?.data?.url || '', token: p.access_token }));
+  const { ws, adding, byOpenId } = await metaWorkspace(env, { sessionId: session_id, openIds: found.map(f => f.open_id),
+    owner: { sql: 'SELECT workspace_id FROM accounts WHERE meta_user_id = ? LIMIT 1', value: String(user.id) } });
 
-  const marks = found.map(() => '?').join(',');
-  const { results: existing } = await env.DB.prepare(
-    `SELECT id, workspace_id, open_id FROM accounts WHERE open_id IN (${marks})`).bind(...found.map(f => f.open_id)).all();
-  const byOpenId = new Map(existing.map(r => [r.open_id, r]));
-
-  let ws = session_id ? await sessionWorkspace(env, session_id) : null;
-  const adding = !!ws;
-  if (!ws) {
-    const mine = existing[0] || await env.DB.prepare('SELECT workspace_id FROM accounts WHERE meta_user_id = ? LIMIT 1')
-      .bind(String(user.id)).first();
-    ws = mine?.workspace_id;
-  }
   const t = now();
-  if (!ws) {
-    ws = 'ws_' + randomToken('', 8);
-    await env.DB.prepare('INSERT INTO workspaces (id, created_at) VALUES (?, ?)').bind(ws, t).run();
-  }
-
-  const elsewhere = existing.find(r => r.workspace_id !== ws);
-  if (elsewhere) {
-    throw new HttpError(409, 'One of these Pages or Instagram accounts is already connected to another workspace. ' +
-      'Sign in there and disconnect it first.');
-  }
-  const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM accounts WHERE workspace_id = ?').bind(ws).first();
-  const fresh = found.filter(f => !byOpenId.has(f.open_id)).length;
-  if (n + fresh > MAX_ACCOUNTS) {
-    throw new HttpError(409, `A workspace can connect up to ${MAX_ACCOUNTS} accounts. ` +
-      'Pick fewer Pages on the Facebook screen, or disconnect some first.');
-  }
-
-  const statements = [];
-  const ids = [];
+  const statements = [], ids = [];
   for (const f of found) {
     const enc = await encrypt(f.token, env.TOKEN_KEY);
     const old = byOpenId.get(f.open_id);
-    // Page tokens do not expire, so the token is both the "refresh" and the
-    // access token, with no expiry to wait for.
-    if (old) {
-      ids.push(old.id);
-      statements.push(env.DB.prepare(`UPDATE accounts SET refresh_token_enc = ?, access_token_enc = ?,
-          access_expires_at = NULL, needs_reconnect = 0, username = ?, display_name = ?, avatar_url = ?,
-          meta_user_id = ?, token_updated_at = ? WHERE id = ?`)
-        .bind(enc, enc, f.username, f.display_name, f.avatar_url, String(user.id), t, old.id));
-    } else {
-      const id = 'acc_' + randomToken('', 8);
-      ids.push(id);
-      statements.push(env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, platform, meta_user_id,
-          username, display_name, avatar_url, refresh_token_enc, access_token_enc, connected_at, token_updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .bind(id, ws, f.open_id, f.platform, String(user.id), f.username, f.display_name, f.avatar_url, enc, enc, t, t));
-    }
+    const id = old?.id || 'acc_' + randomToken('', 8);
+    ids.push(id);
+    statements.push(old
+      ? env.DB.prepare(`UPDATE accounts SET refresh_token_enc = ?, access_token_enc = ?, access_expires_at = NULL,
+          needs_reconnect = 0, username = ?, display_name = ?, avatar_url = ?, meta_user_id = ?, token_updated_at = ?
+          WHERE id = ?`).bind(enc, enc, f.name, f.name, f.avatar, String(user.id), t, id)
+      : env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, platform, meta_user_id, username, display_name,
+          avatar_url, refresh_token_enc, access_token_enc, connected_at, token_updated_at)
+          VALUES (?, ?, ?, 'facebook', ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(id, ws, f.open_id, String(user.id), f.name, f.name, f.avatar, enc, enc, t, t));
   }
   await env.DB.batch(statements);
-  const sessionId = adding ? session_id : await createSession(env, ws);
-  return { session_id: sessionId, workspace_id: ws, account_ids: ids };
+  return { session_id: adding ? session_id : await createSession(env, ws), workspace_id: ws, account_ids: ids };
+}
+
+// Instagram Login: the person signs in as the Instagram account itself, so
+// (like TikTok) signing in again with it returns to its workspace. The token
+// lives 60 days; refreshInstagramTokens renews it well before that.
+export async function igIntake(env, mt, { code, redirect_uri, session_id }) {
+  if (!code) throw new HttpError(400, 'code is required');
+  if (redirect_uri !== env.IG_REDIRECT_URI) throw new HttpError(400, 'unexpected redirect_uri');
+
+  // Instagram appends '#_' to the code; it is not part of it.
+  const short = await mt.igExchangeCode({ code: String(code).replace(/#_$/, ''), redirectUri: redirect_uri });
+  const long = await mt.igLongLived(short.access_token);
+  const me = await mt.igMe(long.access_token);
+  const igId = String(me.user_id || short.user_id || me.id);
+  const openId = `ig:${igId}`;
+  const { ws, adding, byOpenId } = await metaWorkspace(env, { sessionId: session_id, openIds: [openId],
+    owner: { sql: 'SELECT workspace_id FROM accounts WHERE open_id = ?', value: openId } });
+
+  const t = now();
+  const enc = await encrypt(long.access_token, env.TOKEN_KEY);
+  const expires = t + Number(long.expires_in || 60 * 86400);
+  const profile = [me.username || '', me.name || me.username || '', me.profile_picture_url || ''];
+  const old = byOpenId.get(openId);
+  const id = old?.id || 'acc_' + randomToken('', 8);
+  if (old) {
+    await env.DB.prepare(`UPDATE accounts SET refresh_token_enc = ?, access_token_enc = ?, access_expires_at = ?,
+        needs_reconnect = 0, username = ?, display_name = ?, avatar_url = ?, token_updated_at = ? WHERE id = ?`)
+      .bind(enc, enc, expires, ...profile, t, id).run();
+  } else {
+    await env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, platform, username, display_name, avatar_url,
+        refresh_token_enc, access_token_enc, access_expires_at, connected_at, token_updated_at)
+        VALUES (?, ?, ?, 'instagram', ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, ws, openId, ...profile, enc, enc, expires, t, t).run();
+  }
+  return { session_id: adding ? session_id : await createSession(env, ws), workspace_id: ws, account_ids: [id] };
 }

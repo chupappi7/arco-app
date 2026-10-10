@@ -176,10 +176,12 @@ body{background:radial-gradient(1200px 600px at 20% -10%,rgba(2,132,199,.06),tra
     <ul>
       <li><b>For each connected TikTok account:</b> TikTok's account identifier (open_id), your username, nickname and avatar
         link, and a refresh token that lets us publish the posts you schedule. The refresh token is encrypted.</li>
-      <li><b>For each connected Facebook Page and Instagram account</b> (connected with Facebook Login): the Page or
-        Instagram account id, its name or username and picture link, the id of the Facebook user who connected it, and
-        the Page access token that lets us publish the posts you schedule. The token is encrypted. We do not store your
-        Facebook password or your personal Facebook profile.</li>
+      <li><b>For each connected Instagram account</b> (connected with Instagram Login): the Instagram account id,
+        username, name and picture link, and an access token that lets us publish the posts you schedule. The token is
+        encrypted and renewed automatically before it expires.</li>
+      <li><b>For each connected Facebook Page</b> (connected with Facebook Login): the Page id, name and picture link,
+        the id of the Facebook user who connected it, and the Page access token that lets us publish the posts you
+        schedule. The token is encrypted. We do not store your Facebook password or your personal Facebook profile.</li>
       <li><b>For each post:</b> the photos you uploaded, the title, caption, settings you chose, the scheduled time, and
         the platform's result (publish id, status, the public post id and link, or the failure reason).</li>
       <li><b>Sign-in:</b> a session cookie in your browser and, if you create one, an API key. We keep only a one-way hash of each.</li>
@@ -200,13 +202,13 @@ body{background:radial-gradient(1200px 600px at 20% -10%,rgba(2,132,199,.06),tra
     <h3>Your choices</h3>
     <p><b>Disconnect</b> an account in Settings to delete its token and cancel its scheduled posts. <b>Delete workspace</b>
       removes all of your accounts, posts and photos immediately. You can also revoke access in TikTok under Settings and
-      privacy › Security &amp; permissions › Apps and services, and in Facebook under Settings › Business integrations
-      (this also covers Instagram).</p>
+      privacy › Security &amp; permissions › Apps and services, in Facebook under Settings › Business integrations,
+      and in Instagram under Settings › Website permissions › Apps and websites.</p>
     <h3 id="data-deletion">Deleting your data</h3>
     <p>Sign in and choose <b>Delete workspace</b> in Settings: your accounts, tokens, posts and photos are deleted
       immediately. If you can no longer sign in, email <a href="mailto:thinht7110@gmail.com?subject=ARCO%20Publisher%20data%20deletion">thinht7110@gmail.com</a>
       with the TikTok username, Instagram username or Facebook Page name, and we delete everything connected to it
-      within 7 days. Removing ARCO Publisher in Facebook's Business integrations stops all access straight away.</p>
+      within 7 days. Removing ARCO Publisher in Facebook's Business integrations or Instagram's Apps and websites stops that access straight away.</p>
     <h3>Where it runs</h3>
     <p>The website runs on Vercel and the posting service on Cloudflare. Both keep standard request logs (IP address, time,
       path) for a short period for security and operations.</p>

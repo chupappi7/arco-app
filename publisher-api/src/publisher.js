@@ -12,12 +12,19 @@ const STUCK_AFTER = 600;
 const IN_FLIGHT = '';
 const UNKNOWN = 'The publish request may have reached TikTok, but no answer came back. Check the profile before posting it again.';
 
+// Fair across workspaces: at most PER_WORKSPACE_PER_TICK posts from any one
+// workspace per tick, so one account manager queueing 200 posts for nine
+// o'clock does not hold everyone else's nine o'clock post behind them.
+const PER_WORKSPACE_PER_TICK = 5;
 export async function claimDue(env, t, limit = 25) {
   const { results } = await env.DB.prepare(`UPDATE posts SET status = 'publishing', updated_at = ?
-      WHERE status = 'queued' AND id IN (SELECT id FROM posts WHERE status = 'queued' AND next_attempt_at <= ?
-        ORDER BY next_attempt_at LIMIT ?)
-      RETURNING *`).bind(t, t, limit).all();
-  return results;
+      WHERE status = 'queued' AND id IN (
+        SELECT id FROM (SELECT id, next_attempt_at,
+            ROW_NUMBER() OVER (PARTITION BY workspace_id ORDER BY next_attempt_at, id) AS rn
+          FROM posts WHERE status = 'queued' AND next_attempt_at <= ?)
+        WHERE rn <= ? ORDER BY next_attempt_at LIMIT ?)
+      RETURNING *`).bind(t, t, PER_WORKSPACE_PER_TICK, limit).all();
+  return results.sort((a, b) => a.next_attempt_at - b.next_attempt_at);
 }
 
 async function finish(env, id, t, fields) {
@@ -288,12 +295,15 @@ export async function tick(env, tk, t = now()) {
   for (const p of claimed) {
     const n = perAccount.get(p.account_id) || 0;
     const cost = await startCost(env, p, token);
-    if (n >= PER_ACCOUNT_PER_TICK || cost > budget) {
+    // A post bigger than the whole budget (a 35-photo Facebook post) still
+    // goes out, alone, on a tick where nothing else has started.
+    const fits = cost <= budget || budget === TICK_FETCH_BUDGET - POLL_RESERVE;
+    if (n >= PER_ACCOUNT_PER_TICK || !fits) {
       await env.DB.prepare(`UPDATE posts SET status = 'queued', updated_at = ? WHERE id = ?`).bind(t, p.id).run();
       continue;
     }
     perAccount.set(p.account_id, n + 1);
-    budget -= cost;
+    budget = Math.max(0, budget - cost);
     const r = await start(env, tk, p, token, t);
     if (r === 'started') counts.started++; else counts[r]++;
   }

@@ -14,6 +14,8 @@ export default defineWorkersConfig({
             TIKTOK_CLIENT_SECRET: 'test-client-secret',
             META_APP_ID: 'test-meta-app',
             META_APP_SECRET: 'test-meta-secret',
+            IG_APP_ID: 'test-ig-app',
+            IG_APP_SECRET: 'test-ig-secret',
           },
         },
       },

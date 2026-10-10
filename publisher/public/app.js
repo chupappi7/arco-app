@@ -78,9 +78,10 @@ function signInView() {
       We show your nickname and avatar so you always know which account will post, and we only post what you
       confirm on the next screens. You can connect more accounts afterwards.</p>
     <a class="btn" href="/api/auth/start" style="text-decoration:none;display:inline-block">Continue with TikTok</a>
+    <a class="btn sec" href="/api/auth/instagram/start" style="text-decoration:none;display:inline-block;margin-left:8px">Continue with Instagram</a>
     <a class="btn sec" href="/api/auth/meta/start" style="text-decoration:none;display:inline-block;margin-left:8px">Continue with Facebook</a>
-    <p class="note" style="margin-top:14px">Facebook sign-in connects your Facebook Pages and the Instagram
-      professional accounts linked to them. We only post what you confirm.</p>
+    <p class="note" style="margin-top:14px">Instagram needs a professional (Business or Creator) account. Facebook
+      sign-in connects the Pages you manage. Whichever you start with, you can add the others in Settings.</p>
   </div></div>`;
 }
 
@@ -312,11 +313,14 @@ function bulkPrivacy(level) {
 // Instagram refuses images outside 4:5..1.91:1, and a 9:16 slide is outside.
 // Padding (over a blurred copy of the photo) keeps every line of slide text,
 // where a crop would cut the top and bottom off.
-async function forInstagram(m) {
-  const bmp = await createImageBitmap(await (await fetch(m.url)).blob());
+// Instagram also crops every carousel image to the FIRST image's ratio, so
+// all of them are padded to that one ratio, not merely into the allowed range.
+const bitmap = async m => createImageBitmap(await (await fetch(m.url)).blob());
+const clampRatio = r => Math.min(IG_MAX_RATIO, Math.max(IG_MIN_RATIO, r));
+async function forInstagram(m, ratio) {
+  const bmp = await bitmap(m);
   const r = bmp.width / bmp.height;
-  if (r >= IG_MIN_RATIO && r <= IG_MAX_RATIO && m.key.endsWith('.jpg')) return null;   // usable as is
-  const ratio = Math.min(IG_MAX_RATIO, Math.max(IG_MIN_RATIO, r));
+  if (Math.abs(r - ratio) < 0.01 && m.key.endsWith('.jpg')) return null;   // usable as is
   const W = 1080, H = Math.round(W / ratio);
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d');
@@ -341,8 +345,10 @@ async function keysFor(platforms) {
   for (const p of platforms) {
     if (p === 'instagram') {
       if (!igKeys) {
+        const first = await bitmap(S.images[0]);
+        const ratio = clampRatio(first.width / first.height);
         const made = [];
-        for (const m of S.images) made.push(await forInstagram(m));
+        for (const m of S.images) made.push(await forInstagram(m, ratio));
         // Images that needed no change are copies of the upload, not the upload itself.
         const reuse = made.map((k, n) => k ? null : plain[n]).filter(Boolean);
         const copies = reuse.length ? await copy(reuse) : [];
@@ -527,15 +533,16 @@ function settingsView() {
       ${add ? `<p><a class="btn ${list.length ? 'sec' : ''}" href="${add}" style="text-decoration:none;display:inline-block">${list.length ? 'Add another' : 'Connect'}</a></p>` : ''}
       <span class="note">${hint}</span></div>`;
   };
-  const metaAdd = S.me.meta_enabled ? '/api/auth/meta/start?add=1' : '';
+  const igAdd = S.me.instagram_enabled ? '/api/auth/instagram/start?add=1' : '';
+  const fbAdd = S.me.facebook_enabled ? '/api/auth/meta/start?add=1' : '';
   return `<div class="card">
     <div class="sec"><span class="cap">Accounts</span>
       <p class="note" style="margin:0">${a.length} of ${S.me.limits.accounts} connected. Disconnecting an account cancels its scheduled posts.</p></div>
     ${group('tiktok', 'TikTok', '/api/auth/start?add=1',
       'TikTok connects the account signed in on tiktok.com. To add a different one, switch accounts on TikTok\'s screen, or sign out of tiktok.com in this browser first. Revoke access in TikTok under Settings and privacy › Security &amp; permissions › Apps and services.')}
-    ${group('instagram', 'Instagram', metaAdd,
-      'Instagram accounts connect through Facebook: the account must be a professional (Business or Creator) account linked to a Facebook Page. On Facebook\'s screen, choose every Page whose Instagram you want here.')}
-    ${group('facebook', 'Facebook Pages', metaAdd,
+    ${group('instagram', 'Instagram', igAdd,
+      'Any professional (Business or Creator) Instagram account; no Facebook Page needed. "Add another" asks Instagram for the login of the next account, so you do not have to log out first. Revoke access in Instagram under Settings › Website permissions › Apps and websites.')}
+    ${group('facebook', 'Facebook Pages', fbAdd,
       'Choose all the Pages you manage on Facebook\'s screen; Pages connected before stay connected. Pages from another Facebook login: sign in to that Facebook account first. Revoke access in Facebook under Settings › Business integrations.')}
     <div class="sec"><span class="cap">API key</span>
       <p class="note">For posting from your own tools. The key can do everything you can do here. Creating a new key disables the old one.</p>

@@ -41,30 +41,45 @@ registered in the portal character for character.
 
 ## Instagram and Facebook
 
-One Facebook Login (`api/auth/meta/start.js` → `callback.js` → the Worker's
-`/internal/meta-oauth`) connects each Facebook Page the person picks and the
-Instagram professional account linked to it. The Page token is stored
-encrypted and does not expire; a revoked one marks the account "Reconnect".
+Two logins, because Meta has two:
 
-Setup, once:
+- **Instagram Login** (`api/auth/instagram/*` → Worker `/internal/ig-oauth`)
+  connects a professional Instagram account directly, no Facebook Page
+  needed. Scopes `instagram_business_basic,instagram_business_content_publish`;
+  publishing goes to `graph.instagram.com`. The token lasts 60 days; the cron
+  renews any within 20 days of expiry (it must be at least a day old). "Add
+  another" sends `force_reauth=true` so a second account can sign in without
+  logging out the first.
+- **Facebook Login** (`api/auth/meta/*` → Worker `/internal/meta-oauth`)
+  connects the Pages the person picks. Page tokens do not expire.
 
-1. developers.facebook.com → the Meta app → add **Facebook Login for Business**
-   and **Instagram** (API setup with Facebook login).
-2. Valid OAuth redirect URI: `https://arco-publisher.vercel.app/api/auth/meta/callback`
+Signing in without a session finds a workspace only by who signed in (the
+Instagram account itself, or the same Facebook person), never by a Page they
+can manage; a Page already in someone else's workspace is refused.
+
+Setup, once, in the Meta app at developers.facebook.com:
+
+1. Instagram › API setup with Instagram login: add the redirect URI
+   `https://arco-publisher.vercel.app/api/auth/instagram/callback`. Its
+   Instagram app ID and secret are `IG_APP_ID` / `IG_APP_SECRET`.
+2. Facebook Login for Business: add the redirect URI
+   `https://arco-publisher.vercel.app/api/auth/meta/callback`. The app's own
+   ID and secret are `META_APP_ID` / `META_APP_SECRET`.
 3. Privacy policy URL `/privacy.html`, data deletion URL `/privacy.html#data-deletion`.
-4. Vercel env: `META_APP_ID`. Worker secrets: `META_APP_ID`, `META_APP_SECRET`.
+4. Vercel env: `IG_APP_ID`, `META_APP_ID`. Worker secrets: all four.
 5. Live D1: `npx wrangler d1 execute arco-publisher --remote --file=migrations/002-meta.sql`
-6. Until App Review grants Advanced Access to `pages_manage_posts`,
-   `pages_read_engagement`, `pages_show_list`, `business_management`,
-   `instagram_basic` and `instagram_content_publish` (with Business
-   Verification), only people with a role on the Meta app can connect.
+6. Until App Review grants Advanced Access (Instagram:
+   `instagram_business_basic`, `instagram_business_content_publish`; Pages:
+   `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`,
+   `business_management`), only people with a role on the app can connect.
 
 A workspace holds up to 25 accounts across platforms (several per platform is
 the point: one person running many brands), with up to 200 posts queued.
 
 Limits the composer and the Worker both enforce for Instagram: 10 images,
-JPEG, 2,200-character caption, 30 hashtags, aspect ratio 4:5 to 1.91:1 (tall
-slides are padded in the browser, never cropped).
+JPEG, 2,200-character caption, 30 hashtags, aspect ratio 4:5 to 1.91:1, and
+every carousel image at the first one's ratio (Instagram crops to it), so the
+browser pads them all to that ratio; nothing is cropped. 100 posts per 24h.
 
 ## Why there is no database
 

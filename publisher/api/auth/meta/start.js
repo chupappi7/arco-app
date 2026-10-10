@@ -1,13 +1,14 @@
-// Facebook Login: one consent screen connects the person's Facebook Pages and
-// the Instagram professional account linked to each. Same shape as the TikTok
-// start: a signed state cookie, and "add" keeps the current workspace.
+// Facebook Login, for Facebook Pages. (Instagram has its own login, see
+// ../instagram.) Same shape as the TikTok start: a signed state cookie, and
+// "add" keeps the current workspace.
 
 import crypto from 'node:crypto';
 import { b64url, clearCookie, env, originOf, setCookie } from '../../_lib.js';
 
 export const META_DIALOG = 'https://www.facebook.com/v23.0/dialog/oauth';
+// business_management makes Pages owned through a Business portfolio show up.
 export const META_SCOPE = ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts',
-  'business_management', 'instagram_basic', 'instagram_content_publish'].join(',');
+  'business_management'].join(',');
 export const metaRedirectUri = req => `${originOf(req)}/api/auth/meta/callback`;
 
 export default function handler(req, res) {

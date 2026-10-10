@@ -1,7 +1,9 @@
 import { env as baseEnv } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDb, fakeTk } from './helpers.js';
-import { metaIntake, createSession } from '../src/auth.js';
+import { metaIntake, igIntake, createSession } from '../src/auth.js';
+import { refreshInstagramTokens } from '../src/accounts.js';
+import { claimDue } from '../src/publisher.js';
 import { createPost } from '../src/posts.js';
 import { tick, publishNow } from '../src/publisher.js';
 import { copyMedia } from '../src/media.js';
@@ -9,6 +11,7 @@ import { decrypt } from '../src/crypto.js';
 import { MetaError } from '../src/meta.js';
 
 const RU = 'https://arco-publisher.vercel.app/api/auth/meta/callback';
+const IGRU = 'https://arco-publisher.vercel.app/api/auth/instagram/callback';
 const T = 1_800_000_000;
 
 function fakeMeta(overrides = {}) {
@@ -21,8 +24,11 @@ function fakeMeta(overrides = {}) {
     longLived: async () => ({ access_token: 'long' }),
     me: async () => ({ id: 'fbuser-1', name: 'Pat' }),
     pages: async () => ({ data: [{ id: 'page-1', name: 'ARCO', access_token: 'page-token',
-      picture: { data: { url: 'https://fb/p.jpg' } },
-      instagram_business_account: { id: 'ig-1', username: 'arco.app', profile_picture_url: 'https://ig/a.jpg' } }] }),
+      picture: { data: { url: 'https://fb/p.jpg' } } }] }),
+    igExchangeCode: async () => ({ access_token: 'ig-short', user_id: 'ig-1' }),
+    igLongLived: async () => ({ access_token: 'ig-long', expires_in: 5184000 }),
+    igMe: async () => ({ id: 'app-scoped-9', user_id: 'ig-1', username: 'arco.app', name: 'ARCO', profile_picture_url: 'https://ig/a.jpg' }),
+    igRefresh: async () => ({ access_token: 'ig-renewed', expires_in: 5184000 }),
     igImage: async (...a) => { calls.push(['igImage', ...a]); return { id: `child-${++n}` }; },
     igCarousel: async (...a) => { calls.push(['igCarousel', ...a]); return { id: 'carousel-1' }; },
     igContainerStatus: async () => ({ status_code: 'FINISHED' }),
@@ -37,6 +43,7 @@ function fakeMeta(overrides = {}) {
 
 const withMeta = mt => ({ ...baseEnv, __meta: mt });
 const intake = (mt, extra = {}) => metaIntake(withMeta(mt), mt, { code: 'c', redirect_uri: RU, ...extra });
+const igIn = (mt, extra = {}) => igIntake(withMeta(mt), mt, { code: 'c#_', redirect_uri: IGRU, ...extra });
 
 async function account(platform) {
   return baseEnv.DB.prepare('SELECT * FROM accounts WHERE platform = ?').bind(platform).first();
@@ -57,21 +64,26 @@ async function upload(env, ws, n, type = 'image/jpeg') {
 describe('facebook login', () => {
   beforeEach(() => resetDb(baseEnv));
 
-  it('connects the Page and its Instagram account into a new workspace', async () => {
+  it('connects the picked Pages into a new workspace', async () => {
     const r = await intake(fakeMeta());
     expect(r.workspace_id).toMatch(/^ws_/);
-    expect(r.account_ids).toHaveLength(2);
-    const fb = await account('facebook'), ig = await account('instagram');
+    expect(r.account_ids).toHaveLength(1);
+    const fb = await account('facebook');
     expect(fb.open_id).toBe('fb:page-1');
-    expect(ig.open_id).toBe('ig:ig-1');
-    expect(ig.username).toBe('arco.app');
-    expect(await decrypt(ig.access_token_enc, baseEnv.TOKEN_KEY)).toBe('page-token');
-    expect(ig.access_token_enc).not.toContain('page-token');
+    expect(await decrypt(fb.access_token_enc, baseEnv.TOKEN_KEY)).toBe('page-token');
+    expect(fb.access_token_enc).not.toContain('page-token');
+  });
+
+  it('a second manager of the same Page cannot sign into the first one\'s workspace', async () => {
+    await intake(fakeMeta());
+    await expect(intake(fakeMeta({ me: async () => ({ id: 'fbuser-2', name: 'Someone else' }) })))
+      .rejects.toThrow(/already connected to another/);
   });
 
   it('signing in again lands in the same workspace and updates the token', async () => {
     const a = await intake(fakeMeta());
-    const b = await intake(fakeMeta({ pages: async () => ({ data: [{ id: 'page-1', name: 'ARCO', access_token: 'new-token' }] }) }));
+    const b = await intake(fakeMeta({ pages: async () => ({ data: [{ id: 'page-1', name: 'ARCO', access_token: 'new-token' }] }),
+      me: async () => ({ id: 'fbuser-1' }) }));
     expect(b.workspace_id).toBe(a.workspace_id);
     expect(await decrypt((await account('facebook')).access_token_enc, baseEnv.TOKEN_KEY)).toBe('new-token');
   });
@@ -93,11 +105,49 @@ describe('facebook login', () => {
   });
 });
 
+describe('instagram login', () => {
+  beforeEach(() => resetDb(baseEnv));
+
+  it('connects the Instagram account itself, with a 60-day token, keyed by its professional id', async () => {
+    let code;
+    const r = await igIn(fakeMeta({ igExchangeCode: async a => { code = a.code; return { access_token: 's', user_id: 'ig-1' }; } }));
+    expect(code).toBe('c');                       // the '#_' suffix is stripped
+    const ig = await account('instagram');
+    expect(ig.open_id).toBe('ig:ig-1');
+    expect(ig.username).toBe('arco.app');
+    expect(await decrypt(ig.access_token_enc, baseEnv.TOKEN_KEY)).toBe('ig-long');
+    expect(ig.access_expires_at).toBeGreaterThan(Date.now() / 1000 + 59 * 86400);
+    const again = await igIn(fakeMeta());
+    expect(again.workspace_id).toBe(r.workspace_id);
+  });
+
+  it('adds a second Instagram account to the signed-in workspace', async () => {
+    const a = await igIn(fakeMeta());
+    const b = await igIn(fakeMeta({ igMe: async () => ({ user_id: 'ig-2', username: 'arco.focus' }) }), { session_id: a.session_id });
+    expect(b.workspace_id).toBe(a.workspace_id);
+    const { n } = await baseEnv.DB.prepare(`SELECT COUNT(*) AS n FROM accounts WHERE platform = 'instagram'`).first();
+    expect(n).toBe(2);
+  });
+
+  it('renews tokens nearing expiry and marks revoked ones for reconnect', async () => {
+    await igIn(fakeMeta());
+    const t = Math.floor(Date.now() / 1000) + 45 * 86400;   // 15 days left
+    expect(await refreshInstagramTokens(baseEnv, fakeMeta(), t)).toBe(1);
+    const ig = await account('instagram');
+    expect(await decrypt(ig.access_token_enc, baseEnv.TOKEN_KEY)).toBe('ig-renewed');
+    await baseEnv.DB.prepare('UPDATE accounts SET access_expires_at = ?, token_updated_at = 0').bind(t + 86400).run();
+    await refreshInstagramTokens(baseEnv, fakeMeta({ igRefresh: async () => { throw new MetaError('x', { code: 'needs_reconnect' }); } }), t);
+    expect((await account('instagram')).needs_reconnect).toBe(1);
+  });
+});
+
 describe('instagram and facebook posts', () => {
   let ws;
   beforeEach(async () => {
     await resetDb(baseEnv);
     ws = (await intake(fakeMeta())).workspace_id;
+    const sid = await createSession(baseEnv, ws);
+    await igIn(fakeMeta(), { session_id: sid });
   });
 
   const make = async (platform, extra = {}) => {
@@ -199,7 +249,7 @@ describe('tick budget', () => {
   beforeEach(() => resetDb(baseEnv));
 
   it('starts only what fits in one tick and leaves the rest queued', async () => {
-    const ws = (await intake(fakeMeta())).workspace_id;
+    const ws = (await igIn(fakeMeta())).workspace_id;
     const acc = await account('instagram');
     // 10 posts x 10 images = 11 calls each; the start budget fits 3.
     for (let i = 0; i < 10; i++) {
@@ -210,5 +260,32 @@ describe('tick budget', () => {
     const { n } = await baseEnv.DB.prepare(`SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'`).first();
     expect(n).toBe(7);
     expect(mt.calls.filter(c => c[0] === 'igCarousel')).toHaveLength(3);
+  });
+});
+
+describe('fairness', () => {
+  beforeEach(() => resetDb(baseEnv));
+
+  it('one workspace with a big queue cannot hold back another', async () => {
+    for (const ws of ['ws_big', 'ws_small']) {
+      await baseEnv.DB.prepare('INSERT INTO workspaces (id, created_at) VALUES (?, ?)').bind(ws, T).run();
+      const n = ws === 'ws_big' ? 40 : 1;
+      for (let i = 0; i < n; i++) {
+        await baseEnv.DB.prepare(`INSERT INTO posts (id, workspace_id, account_id, status, image_keys, settings,
+            scheduled_at, next_attempt_at, created_at, updated_at) VALUES (?, ?, 'acc', 'queued', '[]', '{}', ?, ?, ?, ?)`)
+          .bind(`${ws}_${i}`, ws, T - 100 + (ws === 'ws_big' ? 0 : 50), T - 100 + (ws === 'ws_big' ? 0 : 50), T, T).run();
+      }
+    }
+    const got = await claimDue(baseEnv, T);
+    expect(got.some(p => p.workspace_id === 'ws_small')).toBe(true);
+    expect(got.filter(p => p.workspace_id === 'ws_big').length).toBeLessThanOrEqual(5);
+  });
+
+  it('a post bigger than the whole tick budget still goes out on its own', async () => {
+    const ws = (await intake(fakeMeta())).workspace_id;
+    const acc = await account('facebook');
+    const p = await createPost(baseEnv, fakeTk(), ws, { account_id: acc.id, image_keys: await upload(baseEnv, ws, 35), caption: 'big' });
+    await tick(withMeta(fakeMeta()), fakeTk(), T + 10);
+    expect((await baseEnv.DB.prepare('SELECT status FROM posts WHERE id = ?').bind(p.id).first()).status).toBe('published');
   });
 });

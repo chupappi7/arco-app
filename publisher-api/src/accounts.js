@@ -22,8 +22,15 @@ const EARLY = 300;
 export const isMeta = account => account.platform === 'instagram' || account.platform === 'facebook';
 
 export async function accessTokenFor(env, tk, account, retried = false) {
-  // A Page token does not expire; it only stops working when revoked.
-  if (isMeta(account)) return decrypt(account.access_token_enc, env.TOKEN_KEY);
+  // A Page token does not expire; an Instagram token is renewed by the cron
+  // (refreshInstagramTokens) long before its 60 days run out.
+  if (isMeta(account)) {
+    if (account.platform === 'instagram' && account.access_expires_at && account.access_expires_at <= now()) {
+      await env.DB.prepare('UPDATE accounts SET needs_reconnect = 1 WHERE id = ?').bind(account.id).run();
+      const e = new Error('Reconnect this account'); e.code = 'needs_reconnect'; throw e;
+    }
+    return decrypt(account.access_token_enc, env.TOKEN_KEY);
+  }
   const t = now();
   if (account.access_token_enc && account.access_expires_at > t + EARLY) {
     return decrypt(account.access_token_enc, env.TOKEN_KEY);
@@ -75,4 +82,29 @@ export async function disconnect(env, ws, id) {
         (SELECT id FROM posts WHERE account_id = ?) AND delete_after IS NULL`).bind(t + KEEP_AFTER_DONE, id),
     env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(id),
   ]);
+}
+
+// Instagram tokens last 60 days and can only be refreshed once a day old and
+// before they expire. Renew any within 20 days of expiry, a few per tick, so
+// an account nobody posts to for two months still works.
+const IG_RENEW_WITHIN = 20 * 86400;
+export async function refreshInstagramTokens(env, mt, t = now(), limit = 3) {
+  const { results } = await env.DB.prepare(`SELECT * FROM accounts WHERE platform = 'instagram' AND needs_reconnect = 0
+      AND access_expires_at IS NOT NULL AND access_expires_at < ? AND token_updated_at < ?
+      ORDER BY access_expires_at LIMIT ?`).bind(t + IG_RENEW_WITHIN, t - 86400, limit).all();
+  let renewed = 0;
+  for (const a of results) {
+    try {
+      const r = await mt.igRefresh(await decrypt(a.access_token_enc, env.TOKEN_KEY));
+      const enc = await encrypt(r.access_token, env.TOKEN_KEY);
+      await env.DB.prepare(`UPDATE accounts SET access_token_enc = ?, refresh_token_enc = ?, access_expires_at = ?,
+          token_updated_at = ? WHERE id = ?`).bind(enc, enc, t + Number(r.expires_in || 60 * 86400), t, a.id).run();
+      renewed++;
+    } catch (err) {
+      if (err.code === 'needs_reconnect') {
+        await env.DB.prepare('UPDATE accounts SET needs_reconnect = 1 WHERE id = ?').bind(a.id).run();
+      }
+    }
+  }
+  return renewed;
 }
