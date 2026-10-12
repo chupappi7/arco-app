@@ -1547,5 +1547,85 @@
    "Cloudflare",
    "Vercel"
   ]
+ },
+ {
+  "topic": "work-by-noon-11",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "Notion",
+   "Raycast",
+   "Zapier"
+  ]
+ },
+ {
+  "topic": "pay-for-twelve-6",
+  "tools": [
+   "ARCO",
+   "Perplexity",
+   "Canva",
+   "Stripe",
+   "Framer"
+  ]
+ },
+ {
+  "topic": "wish-i-knew-at-17-9",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "GitHub",
+   "CapCut",
+   "Obsidian"
+  ]
+ },
+ {
+  "topic": "ten-x-12",
+  "tools": [
+   "ARCO",
+   "Codex",
+   "Make",
+   "Airtable",
+   "Vercel"
+  ]
+ },
+ {
+  "topic": "4x-productivity-13",
+  "tools": [
+   "ARCO",
+   "Cursor",
+   "Granola",
+   "Figma",
+   "Buffer"
+  ]
+ },
+ {
+  "topic": "work-by-noon-12",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Superwhisper",
+   "Linear",
+   "Sentry"
+  ]
+ },
+ {
+  "topic": "pay-for-twelve-7",
+  "tools": [
+   "ARCO",
+   "Manus",
+   "Higgsfield",
+   "Supabase",
+   "ElevenLabs"
+  ]
+ },
+ {
+  "topic": "wish-i-knew-at-17-10",
+  "tools": [
+   "ARCO",
+   "Antigravity",
+   "Notion",
+   "Cloudflare",
+   "Canva"
+  ]
  }
 ]

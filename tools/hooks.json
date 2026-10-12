@@ -1452,6 +1452,118 @@
     "06.jpg"
    ],
    "_note": "built 2026-10-07 by gen-keep-five-10.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/Gemini/Canva/Cloudflare/Vercel. ARCO angle v11 via next_arco_angle('planning'). every teaching point checked against all captions in this file. BGs h46/h32/h36/h24/h29/h22 (slide 2 swapped from n04, a bright day villa, to h32 to match the dark set). rebuild: python3 tools/gen-keep-five-10.py"
+  },
+  {
+   "topic": "work-by-noon-11",
+   "title": "the tools i use to do a full day of work by noon",
+   "caption": "the tools i use to do a full day of work by noon, here is why. app blocker & focus: arco keeps tasks with no time in anytime until the day has room, and focus mode blocks the apps i chose for exactly that block, my holy grail. claude in chrome reads the tab you are on and clicks through the page for you, so a full inbox gets archived and labelled while you make coffee. notion ai meeting notes transcribe a call straight into the page you have open, so the summary and action items are in the project doc the minute the call ends. a raycast snippet expands a few letters into a full reply you saved once, so the answer you type ten times a morning takes three keystrokes each time. a zapier delay step holds the next action until the day and time you set, so every new lead gets the follow-up two days later with nothing on your calendar. #productivity #apps #aitools #dayinmylife #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-12 by gen-work-by-noon-11.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/Claude/Notion/Raycast/Zapier. ARCO angle v12 via next_arco_angle('planning'). every teaching point checked against all captions in this file. bright villa frames n01/n03 kept off every slide after read-back showed washed-out copy. rebuild: python3 tools/gen-work-by-noon-11.py"
+  },
+  {
+   "topic": "pay-for-twelve-6",
+   "title": "i pay for 12 apps these 5 do all the work",
+   "caption": "i pay for 12 apps these 5 do all the work, here is why. app blocker & focus: arco puts the block i am in on the lock screen with the time left, so picking up the phone shows the plan before a feed, my holy grail. perplexity pro lets you pick which model answers, claude, gpt or gemini, so one subscription covers what used to be three chat apps. canva sheets turns a table into charts that drop straight into a design, so the monthly numbers and the deck come from one file, with no spreadsheet app. a stripe payment link can let the buyer choose how much to pay, so a pay what you want launch needs no storefront app on top of it. framer wireframer lays out a full responsive page from one sentence, so you start by editing a landing page instead of paying someone to draft it. #productivity #apps #aitools #buildinpublic #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-12 by gen-pay-for-twelve-6.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/Perplexity/Canva/Stripe/Framer. ARCO angle v13 via next_arco_angle('business'). every teaching point checked against all captions in this file. bright villa frames n01/n03 kept off every slide after read-back showed washed-out copy. rebuild: python3 tools/gen-pay-for-twelve-6.py"
+  },
+  {
+   "topic": "wish-i-knew-at-17-9",
+   "title": "5 apps i wish someone showed me at 17",
+   "caption": "5 apps i wish someone showed me at 17, here is why. app blocker & focus: arco closes the distracting apps when the study block starts, and the session ends when the timer does, not when i give in, my holy grail. chatgpt voice mode runs a mock interview out loud and asks follow up questions, so your first real interview is the second time you have answered them. a repo named after your username becomes the front page of your github profile, so your projects read as a portfolio anyone can open, before you have a cv. capcut auto reframe keeps the subject centred when a wide clip goes to 9:16, so one school project video fits tiktok and youtube from a single edit. obsidian saves every note as a plain text file in a folder you own, so notes you start at 17 still open in any app at 30, with no account to lose. #studytok #apps #productivity #studentlife #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-12 by gen-wish-i-knew-at-17-9.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/ChatGPT/GitHub/CapCut/Obsidian. ARCO angle l1 via next_arco_angle('study'). every teaching point checked against all captions in this file. bright villa frames n01/n03 kept off every slide after read-back showed washed-out copy. rebuild: python3 tools/gen-wish-i-knew-at-17-9.py"
+  },
+  {
+   "topic": "ten-x-12",
+   "title": "how i 10x'd my productivity",
+   "caption": "how i 10x'd my productivity, here is why. app blocker & focus: arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs, my holy grail. a codex cloud task can run as up to four attempts at the same time, so you read four takes on one feature and keep the best, from one prompt. a make iterator splits one list into items and runs each through the scenario, so forty attachments in one email get saved, renamed and filed with no clicks. airtable omni builds a whole base from a sentence, tables and fields included, so the tracker for your side project exists before you would have named a column. a cron entry in vercel.json runs one of your functions on a schedule, so the daily email or cleanup job runs with no server of your own. #productivity #apps #aitools #deepwork #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-12 by gen-ten-x-12.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/Codex/Make/Airtable/Vercel. ARCO angle f1 via next_arco_angle('focus'). every teaching point checked against all captions in this file. bright villa frames n01/n03 kept off every slide after read-back showed washed-out copy. rebuild: python3 tools/gen-ten-x-12.py"
+  },
+  {
+   "topic": "4x-productivity-13",
+   "title": "the tools i used to 4x my productivity",
+   "caption": "the tools i used to 4x my productivity, here is why. app blocker & focus: arco holds the plan and the block that protects it, tasks get a time on the timeline and focus mode shuts the apps for it, my holy grail. cursor plan mode writes the plan as a file you edit before any code changes, so a wrong step is fixed in one line instead of undone across twenty files. the granola iphone app takes notes on a meeting with no laptop open, so a coffee chat ends as written notes and next steps on your phone. figma visual search finds every frame that looks like an image you drop in, so a button you drew months ago is found from a screenshot, not by digging. buffer start page is a link in bio page you edit from the same dashboard, so your bio link gets built without paying for a separate link in bio app. #productivity #apps #aitools #dayinmylife #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-12 by gen-4x-productivity-13.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/Cursor/Granola/Figma/Buffer. ARCO angle v14 via next_arco_angle('planning'). every teaching point checked against all captions in this file. bright villa frames n01/n03 kept off every slide after read-back showed washed-out copy. rebuild: python3 tools/gen-4x-productivity-13.py"
+  },
+  {
+   "topic": "work-by-noon-12",
+   "title": "the tools i use to do a full day of work by noon",
+   "caption": "the tools i use to do a full day of work by noon, here is why. app blocker & focus: arco repeats habits into the day in their own slot on the timeline, so the plan is half built before i open it, my holy grail. gemini scheduled actions run a prompt at the time you set and send the result, so a summary of your unread email is waiting at 7am, before you open gmail. drop an audio file into superwhisper and it transcribes it on your mac, so the voice memo from your walk is text before you sit down at the desk. a linear recurring issue creates itself on the schedule you set, so the monday checks are on the list before you open the app. sentry cron monitors alert you when a scheduled job did not run on time, so a broken nightly backup is an alert at 8am, not a surprise a week later. #productivity #apps #aitools #dayinmylife #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-12 by gen-work-by-noon-12.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/Gemini/Superwhisper/Linear/Sentry. ARCO angle v15 via next_arco_angle('planning'). every teaching point checked against all captions in this file. bright villa frames n01/n03 kept off every slide after read-back showed washed-out copy. rebuild: python3 tools/gen-work-by-noon-12.py"
+  },
+  {
+   "topic": "pay-for-twelve-7",
+   "title": "i pay for 12 apps these 5 do all the work",
+   "caption": "i pay for 12 apps these 5 do all the work, here is why. app blocker & focus: arco holds all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away, my holy grail. manus builds a full web app with its own database and login from one prompt, so the internal tool you were paying for monthly becomes one you own. higgsfield runs veo and kling from the same prompt box, so you test one shot on two video models without paying for two subscriptions. supabase auth covers 50,000 monthly active users on the free plan, so login, magic links and sign in with apple need no separate auth bill. elevenlabs writes a music track from a prompt, licensed for commercial use on paid plans, so the background music for an ad needs no stock music subscription. #productivity #apps #aitools #buildinpublic #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-12 by gen-pay-for-twelve-7.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/Manus/Higgsfield/Supabase/ElevenLabs. ARCO angle v1 via next_arco_angle('business'). every teaching point checked against all captions in this file. bright villa frames n01/n03 kept off every slide after read-back showed washed-out copy. rebuild: python3 tools/gen-pay-for-twelve-7.py"
+  },
+  {
+   "topic": "wish-i-knew-at-17-10",
+   "title": "5 apps i wish someone showed me at 17",
+   "caption": "5 apps i wish someone showed me at 17, here is why. app blocker & focus: arco locks every app on the list when a session starts, four hours later the phone has not been picked up once, my holy grail. the antigravity agent can draw a mockup of a screen before it writes the code, so you agree on how the app looks before a single file changes. sign up for notion with a school email and the plus plan is free, so unlimited uploads and 30 days of page history cost nothing while you are a student. cloudflare pages hosts a static site for free with no bandwidth limit, so the first project you share stays up even on the day it gets traffic. canva live lets the room send questions from their phones while you present, so the q&a after your class presentation is a list on screen, not silence. #studytok #apps #productivity #studentlife #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-10-12 by gen-wish-i-knew-at-17-10.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/Antigravity/Notion/Cloudflare/Canva. ARCO angle f2 via next_arco_angle('study'). every teaching point checked against all captions in this file. bright villa frames n01/n03 kept off every slide after read-back showed washed-out copy. rebuild: python3 tools/gen-wish-i-knew-at-17-10.py"
   }
  ]
 }
