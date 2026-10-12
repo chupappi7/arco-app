@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     return back(res, 'could not reach the ARCO Publisher service, try again');
   }
   setSessionCookie(res, body.session_id);
-  res.redirect(302, `/app.html?connected=1${adding ? '#settings' : ''}`);
+  res.redirect(302, `/app.html?connected=1${adding ? '#accounts' : ''}`);
 }
 
 function back(res, why) {

@@ -23,3 +23,5 @@ export const IG_MAX_HASHTAGS = 30;
 // minute would blow straight through that; whatever does not fit waits a minute.
 export const TICK_FETCH_BUDGET = 45;
 export const POLL_RESERVE = 10;
+
+export const MAX_BRANDS = 25;

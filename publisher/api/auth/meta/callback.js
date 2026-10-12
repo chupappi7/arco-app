@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   }
   setSessionCookie(res, body.session_id);
   const n = (body.account_ids || []).length;
-  res.redirect(302, `/app.html?connected=${n}${adding ? '#settings' : ''}`);
+  res.redirect(302, `/app.html?connected=${n}${adding ? '#accounts' : ''}`);
 }
 
 function back(res, why) {

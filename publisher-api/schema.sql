@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   platform TEXT NOT NULL DEFAULT 'tiktok', -- tiktok | instagram | facebook
   meta_user_id TEXT,                       -- the Facebook user who connected it
   can_sign_in INTEGER NOT NULL DEFAULT 0,  -- 1 if signing in with it opens its workspace
+  brand_id TEXT,                           -- the brand it is grouped under, or NULL
   username TEXT NOT NULL DEFAULT '',
   display_name TEXT NOT NULL DEFAULT '',
   avatar_url TEXT NOT NULL DEFAULT '',
@@ -24,6 +25,16 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 CREATE INDEX IF NOT EXISTS accounts_ws ON accounts(workspace_id);
 CREATE INDEX IF NOT EXISTS accounts_meta_user ON accounts(meta_user_id);
+
+-- Brands group a workspace's accounts the way Business Suite groups a Page
+-- with its Instagram: "Client Bakery" = its TikTok, Instagram and Page.
+CREATE TABLE IF NOT EXISTS brands (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS brands_ws ON brands(workspace_id);
 
 CREATE TABLE IF NOT EXISTS sessions (
   id_hash TEXT PRIMARY KEY,

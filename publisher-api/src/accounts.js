@@ -3,7 +3,7 @@ import { HttpError, now } from './http.js';
 import { KEEP_AFTER_DONE } from './limits.js';
 
 export async function listAccounts(env, ws) {
-  const { results } = await env.DB.prepare(`SELECT id, platform, username, display_name, avatar_url, needs_reconnect
+  const { results } = await env.DB.prepare(`SELECT id, platform, username, display_name, avatar_url, needs_reconnect, brand_id
       FROM accounts WHERE workspace_id = ? ORDER BY connected_at`).bind(ws).all();
   return results.map(r => ({ ...r, needs_reconnect: !!r.needs_reconnect }));
 }

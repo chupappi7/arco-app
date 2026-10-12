@@ -23,7 +23,8 @@ const S = {
   targets: [], tt: {},
   set: { music: false, disclose: false, brand: false, branded: false },
   when: 'now', at: '', busy: false, status: null,
-  week: 0, fPlat: 'all', fAcct: 'all', posts: [], apiKey: null,
+  week: 0, fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
+  pickOpen: false, pq: '',
 };
 const ORDER = ['tiktok', 'instagram', 'facebook'];
 const platformOf = a => a?.platform || 'tiktok';
@@ -65,7 +66,7 @@ function saveTargets() { try { localStorage.setItem(SAVED, JSON.stringify(S.targ
 
 function route() {
   S.view = (location.hash || '#compose').slice(1);
-  if (!['compose', 'calendar', 'settings'].includes(S.view)) S.view = 'compose';
+  if (!['compose', 'calendar', 'accounts', 'settings'].includes(S.view)) S.view = 'compose';
   if (S.view === 'calendar') loadWeek();
   render();
 }
@@ -77,7 +78,8 @@ function render() {
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.v === S.view));
   const flash = S.flash ? `<div class="status ${S.flash.kind}">${esc(S.flash.text)}</div>` : '';
   if (!S.me) { $('app').innerHTML = flash + signInView(); return; }
-  $('app').innerHTML = flash + (S.view === 'calendar' ? calendarView() : S.view === 'settings' ? settingsView() : composeView());
+  const views = { calendar: calendarView, accounts: accountsView, settings: settingsView, compose: composeView };
+  $('app').innerHTML = flash + views[S.view]();
   bind();
 }
 
@@ -91,19 +93,19 @@ function signInView() {
       ${connectBtn('instagram', '/api/auth/instagram/start', 'Continue with Instagram')}
       ${connectBtn('facebook', '/api/auth/meta/start', 'Continue with Facebook')}</div>
     <p class="note" style="margin-top:14px">Instagram needs a professional (Business or Creator) account. Facebook
-      sign-in connects the Pages you manage. Whichever you start with, you can add the others in Settings.</p>
+      sign-in connects the Pages you manage. Whichever you start with, you can add the others under Accounts.</p>
   </div></div>`;
 }
 
 function composeView() {
-  if (!S.me.accounts.length) return `<div class="card"><div class="sec">Connect an account in <a href="#settings">Settings</a> first.</div></div>`;
+  if (!S.me.accounts.length) return `<div class="card"><div class="sec">Connect an account in <a href="#accounts">Accounts</a> first.</div></div>`;
   const tts = ttTargets();
   const label = S.set.branded ? 'Paid partnership' : S.set.brand ? 'Promotional content' : '';
   const need = missing();
   return `${S.replaces ? `<div class="status">Editing a scheduled post. The original stays scheduled until you save this one.
       <button class="btn sec" id="stopedit" style="margin-left:8px">Stop editing</button></div>` : ''}
   <div class="card">
-    <div class="sec"><span class="cap">Post to</span>${pickerView()}</div>
+    <div class="sec"><span class="cap">Post to</span>${postToView()}</div>
     <div class="sec"><span class="cap">Photos</span>
       <div class="thumbs">${S.images.map((m, n) => `<div class="th ${n === S.cover ? 'cover' : ''}">
           ${n === S.cover ? '<span class="badge">Cover</span>' : ''}
@@ -171,21 +173,61 @@ const avatar = (url, name) => url
   : `<span class="av ini">${esc((name || '?')[0].toUpperCase())}</span>`;
 const handle = a => `${platformOf(a) === 'facebook' ? '' : '@'}${esc(a.username || a.display_name)}`;
 
-function pickerView() {
-  return ORDER.map(pl => {
-    const list = S.me.accounts.filter(a => platformOf(a) === pl);
-    if (!list.length) return '';
-    const usable = list.filter(a => !a.needs_reconnect);
-    const on = usable.filter(a => S.targets.includes(a.id)).length;
-    return `<div class="pgroup">
-      <div class="phead">${icon(pl, 18)}<b>${PLATFORM[pl]}</b><span class="note">${on} of ${list.length} selected</span>
-        ${usable.length > 1 ? `<button class="link" data-all="${pl}">${on === usable.length ? 'Clear' : 'Select all'}</button>` : ''}</div>
-      <div class="accts">${list.map(a => `<label class="acc ${S.targets.includes(a.id) ? 'on' : ''} ${a.needs_reconnect ? 'off' : ''}">
+// ---- the "Post to" picker: chips for what is chosen, and a searchable
+// panel grouped by brand, like Business Suite's account switcher.
+
+const brandName = id => S.me.brands.find(b => b.id === id)?.name;
+function brandGroups(list = S.me.accounts) {
+  const groups = S.me.brands.map(b => ({ id: b.id, name: b.name, accounts: list.filter(a => a.brand_id === b.id) }));
+  const loose = list.filter(a => !a.brand_id || !brandName(a.brand_id));
+  if (loose.length) groups.push({ id: 'none', name: S.me.brands.length ? 'Not in a brand' : 'All accounts', accounts: loose });
+  const byPlatform = (a, b) => ORDER.indexOf(platformOf(a)) - ORDER.indexOf(platformOf(b));
+  return groups.map(g => ({ ...g, accounts: g.accounts.sort(byPlatform) }));
+}
+const marks = accounts => [...new Set(accounts.map(platformOf))].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b))
+  .map(pl => icon(pl, 13)).join('');
+
+function postToView() {
+  const chosen = S.targets.map(acct).filter(Boolean);
+  return `<div class="chosen">
+      ${chosen.map(a => `<span class="chipacc">${withBadge(avatar(a.avatar_url, a.username || a.display_name), platformOf(a))}
+        <span>${handle(a)}</span><button class="x" data-unpick="${a.id}" aria-label="Remove ${esc(a.username)}">×</button></span>`).join('')
+        || '<span class="note">No accounts chosen yet.</span>'}
+      <button class="btn sec" id="openpick" aria-expanded="${S.pickOpen}">${S.pickOpen ? 'Done' : chosen.length ? 'Change accounts' : 'Choose accounts'}</button>
+    </div>
+    ${S.pickOpen ? pickPanel() : ''}`;
+}
+
+function pickPanel() {
+  const q = S.pq.trim().toLowerCase();
+  const hit = a => !q || [a.username, a.display_name, PLATFORM[platformOf(a)], brandName(a.brand_id)]
+    .some(v => String(v || '').toLowerCase().includes(q));
+  const groups = brandGroups(S.me.accounts.filter(hit)).filter(g => g.accounts.length);
+  return `<div class="pickpanel">
+    <input type="text" id="pq" placeholder="Search accounts or brands" value="${esc(S.pq)}" autocomplete="off">
+    ${groups.map(g => {
+      const usable = g.accounts.filter(a => !a.needs_reconnect);
+      const on = usable.filter(a => S.targets.includes(a.id)).length;
+      const state = !on ? 'none' : on === usable.length ? 'all' : 'some';
+      return `<div class="bgroup">
+        <label class="bhead"><input type="checkbox" data-bg="${g.id}" data-state="${state}" ${state === 'all' ? 'checked' : ''} ${usable.length ? '' : 'disabled'}>
+          <b>${esc(g.name)}</b><span class="marks">${marks(g.accounts)}</span><span class="note">${on ? `${on} of ` : ''}${g.accounts.length}</span></label>
+        ${g.accounts.map(a => `<label class="prow ${a.needs_reconnect ? 'off' : ''}">
           <input type="checkbox" data-t="${a.id}" ${S.targets.includes(a.id) ? 'checked' : ''} ${a.needs_reconnect ? 'disabled' : ''}>
-          ${withBadge(avatar(a.avatar_url, a.username || a.display_name), pl)}
-          <span class="nm"><b>${handle(a)}</b><span class="note">${a.needs_reconnect ? '<a href="#settings">Reconnect in Settings</a>' : esc(a.display_name)}</span></span>
-        </label>`).join('')}</div></div>`;
-  }).join('') + `<p class="note" style="margin:6px 0 0"><a href="#settings">Connect more accounts</a></p>`;
+          ${withBadge(avatar(a.avatar_url, a.username || a.display_name), platformOf(a))}
+          <span class="nm"><b>${handle(a)}</b><span class="note">${PLATFORM[platformOf(a)]}${a.needs_reconnect
+            ? ' · <a href="#accounts">reconnect</a>' : a.display_name && a.display_name !== a.username ? ` · ${esc(a.display_name)}` : ''}</span></span>
+        </label>`).join('')}
+      </div>`;
+    }).join('') || '<p class="note">No account matches.</p>'}
+    <p class="note" style="margin:8px 0 0"><a href="#accounts">Manage accounts and brands</a></p>
+  </div>`;
+}
+
+function pickGroup(id, on) {
+  const g = brandGroups().find(x => x.id === id);
+  for (const a of (g?.accounts || []).filter(a => !a.needs_reconnect)) toggleTarget(a.id, on, false);
+  render();
 }
 
 // The audited part, once per TikTok account: whose account it is, read live
@@ -289,19 +331,12 @@ function toggleTarget(id, on, draw = true) {
   if (draw) render();
 }
 
-function selectAll(pl) {
-  const usable = S.me.accounts.filter(a => platformOf(a) === pl && !a.needs_reconnect);
-  const all = usable.every(a => S.targets.includes(a.id));
-  for (const a of usable) toggleTarget(a.id, !all, false);
-  render();
-}
-
 // Creator info is read fresh each time an account is picked, never reused
 // from an earlier session: the options are TikTok's, as of now.
 async function loadInfo(id) {
   S.tt[id] = { ...(S.tt[id] || {}), info: null, err: null, privacy: '' };
   try { S.tt[id].info = await api(`/accounts/${id}/creator-info`); }
-  catch (e) { S.tt[id].err = e.code === 'needs_reconnect' ? 'Reconnect this account in Settings.' : e.message; }
+  catch (e) { S.tt[id].err = e.code === 'needs_reconnect' ? 'Reconnect this account in Accounts.' : e.message; }
   render();
 }
 
@@ -459,11 +494,17 @@ function calendarView() {
   const accts = S.me.accounts;
   const plats = ORDER.filter(pl => accts.some(a => platformOf(a) === pl));
   const posts = S.posts.filter(p => (S.fPlat === 'all' || (p.platform || 'tiktok') === S.fPlat)
-    && (S.fAcct === 'all' || p.account_id === S.fAcct));
+    && (S.fAcct === 'all' || p.account_id === S.fAcct)
+    && (S.fBrand === 'all' || acct(p.account_id)?.brand_id === S.fBrand));
   const days = [...Array(7)].map((_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
   const today = new Date().toDateString();
-  const shown = accts.filter(a => S.fPlat === 'all' || platformOf(a) === S.fPlat);
+  const shown = accts.filter(a => (S.fPlat === 'all' || platformOf(a) === S.fPlat)
+    && (S.fBrand === 'all' || a.brand_id === S.fBrand));
   return `<div class="chips">
+      ${S.me.brands.length ? `<select id="fbrand" style="width:auto;padding:5px 10px">
+        <option value="all">All brands</option>
+        ${S.me.brands.map(b => `<option value="${b.id}" ${S.fBrand === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
+      </select>` : ''}
       <button class="chip ${S.fPlat === 'all' ? 'on' : ''}" data-fp="all">All platforms</button>
       ${plats.map(pl => `<button class="chip ${S.fPlat === pl ? 'on' : ''}" data-fp="${pl}">${icon(pl, 13)}${PLATFORM[pl]}</button>`).join('')}
       ${shown.length > 1 ? `<select id="facct" style="width:auto;padding:5px 10px">
@@ -531,30 +572,60 @@ async function edit(id, again = false) {
 
 // ---- settings ----------------------------------------------------------
 
-function settingsView() {
+// ---- accounts manager: brands as cards, each holding its accounts.
+
+const PLATFORM_HINT = {
+  tiktok: 'TikTok connects the account signed in on tiktok.com. For another one, switch accounts on TikTok\'s screen or sign out of tiktok.com first.',
+  instagram: 'Any professional (Business or Creator) account, no Facebook Page needed. Instagram asks for the login each time, so you can add accounts one after another.',
+  facebook: 'Pick every Page you manage on Facebook\'s screen. Pages connected before stay connected.',
+};
+const connectHref = pl => pl === 'tiktok' ? '/api/auth/start?add=1'
+  : pl === 'instagram' ? (S.me.instagram_enabled ? '/api/auth/instagram/start?add=1' : '')
+  : (S.me.facebook_enabled ? '/api/auth/meta/start?add=1' : '');
+
+function accountRow(x) {
+  const pl = platformOf(x);
+  return `<div class="row acctrow"><span class="txt who">${withBadge(avatar(x.avatar_url, x.username || x.display_name), pl)}
+      <span><span class="t">${handle(x)}</span><span class="d">${x.needs_reconnect
+        ? '<span class="note bad">Access was revoked or expired. Reconnect to keep posting.</span>'
+        : `${PLATFORM[pl]}${x.display_name && x.display_name !== x.username ? ` · ${esc(x.display_name)}` : ''}`}</span></span></span>
+    <select data-move="${x.id}" aria-label="Brand for ${esc(x.username)}" class="move">
+      <option value="">Not in a brand</option>
+      ${S.me.brands.map(b => `<option value="${b.id}" ${x.brand_id === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
+    </select>
+    ${x.needs_reconnect && connectHref(pl) ? `<a class="btn sec" href="${connectHref(pl)}" style="text-decoration:none">Reconnect</a>` : ''}
+    <button class="btn danger" data-disc="${x.id}">Disconnect</button></div>`;
+}
+
+function accountsView() {
   const a = S.me.accounts;
-  const group = (pl, title, add, hint) => {
-    const list = a.filter(x => platformOf(x) === pl);
-    return `<div class="sec"><div class="phead">${icon(pl, 20)}<b>${title}</b><span class="note">${list.length} connected</span></div>
-      ${list.map(x => `<div class="row acctrow"><span class="txt who">${withBadge(avatar(x.avatar_url, x.username || x.display_name), pl)}
-          <span><span class="t">${handle(x)}</span><span class="d">${x.needs_reconnect
-            ? '<span class="note bad">Access was revoked or expired. Reconnect to keep posting.</span>' : esc(x.display_name)}</span></span></span>
-          ${x.needs_reconnect ? `<a class="btn sec" href="${add}" style="text-decoration:none">Reconnect</a>` : ''}
-          <button class="btn danger" data-disc="${x.id}">Disconnect</button></div>`).join('') || '<p class="note">None connected.</p>'}
-      ${add ? `<p>${connectBtn(pl, add, list.length ? `Add another ${PLATFORM[pl]} account` : `Connect ${PLATFORM[pl]}`)}</p>` : ''}
-      <span class="note">${hint}</span></div>`;
-  };
-  const igAdd = S.me.instagram_enabled ? '/api/auth/instagram/start?add=1' : '';
-  const fbAdd = S.me.facebook_enabled ? '/api/auth/meta/start?add=1' : '';
+  const groups = brandGroups();
+  return `<div class="card"><div class="sec">
+      <div class="phead"><b>Connect accounts</b><span class="note">${a.length} of ${S.me.limits.accounts} connected</span></div>
+      <div class="brands">${ORDER.filter(connectHref).map(pl => connectBtn(pl, connectHref(pl), `Add ${PLATFORM[pl]}`)).join('')}</div>
+      <details class="hints"><summary>Tips for adding more than one account</summary>
+        ${ORDER.map(pl => `<p class="note">${icon(pl, 12)} ${PLATFORM_HINT[pl]}</p>`).join('')}</details>
+    </div>
+    <div class="sec"><div class="phead"><b>Brands</b><span class="note">Group each client's or product's accounts, then post to the whole brand in one click.</span></div>
+      <form id="newbrand" class="newbrand"><input type="text" id="brandname" maxlength="60" placeholder="New brand name, e.g. Client Bakery">
+        <button class="btn">Create brand</button></form>
+    </div></div>
+    ${groups.map(g => `<div class="card brandcard">
+      <div class="sec"><div class="phead">
+        <b>${esc(g.name)}</b><span class="marks">${marks(g.accounts)}</span><span class="note">${g.accounts.length} account${g.accounts.length === 1 ? '' : 's'}</span>
+        ${g.id !== 'none' ? `<span class="bacts"><button class="link" data-rename="${g.id}">Rename</button>
+          <button class="link danger" data-delbrand="${g.id}">Delete</button></span>` : ''}</div>
+        ${g.accounts.map(accountRow).join('') || '<p class="note">No accounts yet. Use "Brand" on any account below to move it here.</p>'}
+      </div></div>`).join('') || '<div class="card"><div class="sec"><p class="note">No accounts connected yet.</p></div></div>'}
+    <p class="note">Disconnecting an account deletes its token and cancels its scheduled posts. Deleting a brand only ungroups its accounts.
+      Revoke access any time in TikTok (Settings and privacy › Security &amp; permissions › Apps and services),
+      Instagram (Settings › Website permissions › Apps and websites) or Facebook (Settings › Business integrations).</p>`;
+}
+
+function settingsView() {
   return `<div class="card">
     <div class="sec"><span class="cap">Accounts</span>
-      <p class="note" style="margin:0">${a.length} of ${S.me.limits.accounts} connected. Disconnecting an account cancels its scheduled posts.</p></div>
-    ${group('tiktok', 'TikTok', '/api/auth/start?add=1',
-      'TikTok connects the account signed in on tiktok.com. To add a different one, switch accounts on TikTok\'s screen, or sign out of tiktok.com in this browser first. Revoke access in TikTok under Settings and privacy › Security &amp; permissions › Apps and services.')}
-    ${group('instagram', 'Instagram', igAdd,
-      'Any professional (Business or Creator) Instagram account; no Facebook Page needed. "Add another" asks Instagram for the login of the next account, so you do not have to log out first. Revoke access in Instagram under Settings › Website permissions › Apps and websites.')}
-    ${group('facebook', 'Facebook Pages', fbAdd,
-      'Choose all the Pages you manage on Facebook\'s screen; Pages connected before stay connected. Pages from another Facebook login: sign in to that Facebook account first. Revoke access in Facebook under Settings › Business integrations.')}
+      <p class="note" style="margin:0">Connect, group and disconnect accounts in <a href="#accounts">Accounts</a>.</p></div>
     <div class="sec"><span class="cap">API key</span>
       <p class="note">For posting from your own tools. The key can do everything you can do here. Creating a new key disables the old one.</p>
       ${S.apiKey ? `<p><code style="user-select:all">${esc(S.apiKey)}</code></p><p class="note warn">Copy it now. It will not be shown again.</p>` : ''}
@@ -565,6 +636,14 @@ function settingsView() {
       <button class="btn danger" id="delws">Delete workspace</button>
       <a class="btn sec" href="/api/auth/logout" style="text-decoration:none;margin-left:8px">Sign out</a>
     </div></div>`;
+}
+
+async function refreshMe() { S.me = await api('/me'); render(); }
+const send = (path, method, body) => api(path, { method, headers: { 'Content-Type': 'application/json' },
+  body: body === undefined ? undefined : JSON.stringify(body) });
+async function brandAction(fn) {
+  try { await fn(); } catch (e) { S.flash = { kind: 'err', text: e.message }; }
+  await refreshMe();
 }
 
 // ---- events ------------------------------------------------------------
@@ -586,7 +665,20 @@ function bind() {
   on('#caption', 'input', e => { S.caption = e.target.value; });
   on('#caption', 'change', render);
   on('[data-t]', 'change', e => toggleTarget(e.target.dataset.t, e.target.checked));
-  on('[data-all]', 'click', e => selectAll(e.target.dataset.all));
+  on('#openpick', 'click', () => { S.pickOpen = !S.pickOpen; render(); if (S.pickOpen) $('pq')?.focus(); });
+  on('[data-unpick]', 'click', e => toggleTarget(e.currentTarget.dataset.unpick, false));
+  on('[data-bg]', 'change', e => pickGroup(e.target.dataset.bg, e.target.checked));
+  document.querySelectorAll('[data-state=some]').forEach(el => { el.indeterminate = true; });
+  on('#pq', 'input', e => { S.pq = e.target.value; const at = e.target.selectionStart; render();
+    const el = $('pq'); if (el) { el.focus(); el.setSelectionRange(at, at); } });
+  on('#fbrand', 'change', e => { S.fBrand = e.target.value; S.fAcct = 'all'; render(); });
+  on('#newbrand', 'submit', e => { e.preventDefault(); const name = $('brandname').value;
+    brandAction(() => send('/brands', 'POST', { name })); });
+  on('[data-move]', 'change', e => brandAction(() => send(`/accounts/${e.target.dataset.move}`, 'PATCH', { brand_id: e.target.value || null })));
+  on('[data-rename]', 'click', e => { const id = e.target.dataset.rename;
+    const name = prompt('Rename brand', brandName(id) || ''); if (name) brandAction(() => send(`/brands/${id}`, 'PATCH', { name })); });
+  on('[data-delbrand]', 'click', e => { const id = e.target.dataset.delbrand;
+    if (confirm(`Delete the brand "${brandName(id)}"? Its accounts stay connected, just ungrouped.`)) brandAction(() => send(`/brands/${id}`, 'DELETE')); });
   on('[data-pv]', 'change', e => { S.tt[e.target.dataset.pv].privacy = e.target.value; render(); });
   on('[data-cm]', 'change', e => { S.tt[e.target.dataset.cm].comment = e.target.checked; render(); });
   on('#bulkpriv', 'change', e => e.target.value && bulkPrivacy(e.target.value));

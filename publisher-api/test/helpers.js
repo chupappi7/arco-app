@@ -41,7 +41,7 @@ export async function callWorker(path, { method = 'GET', headers = {}, body, tk 
 
 export async function resetDb(env) {
   await applySchema(env);
-  for (const t of ['posts', 'media', 'sessions', 'accounts', 'workspaces']) {
+  for (const t of ['posts', 'media', 'sessions', 'accounts', 'brands', 'workspaces']) {
     await env.DB.prepare(`DELETE FROM ${t}`).run();
   }
 }

@@ -8,12 +8,14 @@ import { uploadMedia, serveMedia, copyMedia } from './media.js';
 import { createPost, listPosts, cancelPost, retryPost } from './posts.js';
 import { tick, publishNow } from './publisher.js';
 import { runCleanup, deleteWorkspace } from './cleanup.js';
+import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './brands.js';
 
 async function me(req, env, { ws }) {
   const row = await env.DB.prepare('SELECT api_key_hash FROM workspaces WHERE id = ?').bind(ws).first();
   return json({
     workspace_id: ws,
     accounts: await listAccounts(env, ws),
+    brands: await listBrands(env, ws),
     api_key_set: !!row?.api_key_hash,
     limits: { accounts: L.MAX_ACCOUNTS, queued: L.MAX_QUEUED, images: L.MAX_IMAGES,
               image_bytes: L.MAX_IMAGE_BYTES, workspace_bytes: L.MAX_WORKSPACE_BYTES,
@@ -34,6 +36,16 @@ export const ROUTES = [
   ['POST', '/v1/api-key', async (req, env, { ws }) => json({ api_key: await rotateApiKey(env, ws) }), 'user'],
   ['GET', '/v1/accounts', async (req, env, { ws }) => json({ accounts: await listAccounts(env, ws) }), 'user'],
   ['DELETE', '/v1/accounts/:id', async (req, env, { ws, params }) => { await disconnect(env, ws, params.id); return json({ ok: true }); }, 'user'],
+  ['PATCH', '/v1/accounts/:id', async (req, env, { ws, params }) => {
+    const b = await readJson(req);
+    return json(await assign(env, ws, [params.id], b.brand_id ?? null));
+  }, 'user'],
+  ['GET', '/v1/brands', async (req, env, { ws }) => json({ brands: await listBrands(env, ws) }), 'user'],
+  ['POST', '/v1/brands', async (req, env, { ws }) => json(await createBrand(env, ws, await readJson(req))), 'user'],
+  ['PATCH', '/v1/brands/:id', async (req, env, { ws, params }) => json(await renameBrand(env, ws, params.id, await readJson(req))), 'user'],
+  ['DELETE', '/v1/brands/:id', async (req, env, { ws, params }) => json(await deleteBrand(env, ws, params.id)), 'user'],
+  ['POST', '/v1/brands/:id/accounts', async (req, env, { ws, params }) =>
+    json(await assign(env, ws, (await readJson(req)).account_ids, params.id)), 'user'],
   ['GET', '/v1/accounts/:id/creator-info', async (req, env, { ws, params, tk }) => json(await creatorInfoFor(env, tk, ws, params.id)), 'user'],
   ['POST', '/v1/media', async (req, env, { ws }) => json(await uploadMedia(env, ws, req)), 'user'],
   ['POST', '/v1/media/copy', async (req, env, { ws }) => json(await copyMedia(env, ws, (await readJson(req)).keys)), 'user'],
