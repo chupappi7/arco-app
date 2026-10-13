@@ -42,6 +42,22 @@ describe('email sign-in', () => {
     await expect(verifyEmail(env, { email: 'a@b.co', code })).rejects.toMatchObject({ status: 400 });
   });
 
+  it('guesses sent in parallel cannot exceed five attempts', async () => {
+    await startEmail(env, { email: 'p@b.co' });
+    const code = mail.codeFor('p@b.co');
+    const wrong = code === '000000' ? '111111' : '000000';
+    await Promise.allSettled(Array.from({ length: 12 }, () => verifyEmail(env, { email: 'p@b.co', code: wrong })));
+    const row = await baseEnv.DB.prepare('SELECT attempts FROM login_codes WHERE email = ?').bind('p@b.co').first();
+    expect(row.attempts).toBe(5);
+    await expect(verifyEmail(env, { email: 'p@b.co', code })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('parallel code requests cannot exceed the hourly cap', async () => {
+    await Promise.allSettled(Array.from({ length: 12 }, () => startEmail(env, { email: 'flood@b.co' })));
+    const { n } = await baseEnv.DB.prepare('SELECT COUNT(*) AS n FROM login_codes WHERE email = ?').bind('flood@b.co').first();
+    expect(n).toBe(5);
+  });
+
   it('a used code cannot be replayed', async () => {
     await startEmail(env, { email: 'a@b.co' });
     const code = mail.codeFor('a@b.co');
@@ -116,6 +132,34 @@ describe('members, roles and invites', () => {
     expect((await req(a1.sid, `/v1/members/${a2.userId}`, 'DELETE', undefined, env)).status).toBe(403);
     expect((await req(a1.sid, `/v1/members/${owner.userId}`, 'PATCH', { role: 'member' }, env)).status).toBe(403);
     expect((await req(owner.sid, `/v1/members/${a2.userId}`, 'DELETE', undefined, env)).status).toBe(200);
+  });
+
+  it('only the owner makes, changes, cancels or removes admins; admins manage members', async () => {
+    const owner = await signUp(baseEnv);
+    const a1 = await join(owner, 'adm1@x.co', { role: 'admin' });
+    const a2 = await join(owner, 'adm2@x.co', { role: 'admin' });
+    const m = await join(owner, 'mem@x.co', { role: 'member' });
+    expect((await req(a1.sid, `/v1/members/${a2.userId}`, 'PATCH', { role: 'member' }, env)).status).toBe(403);
+    expect((await req(a1.sid, `/v1/members/${m.userId}`, 'PATCH', { role: 'admin' }, env)).status).toBe(403);
+    expect((await req(a1.sid, '/v1/invites', 'POST', { email: 'new-admin@x.co', role: 'admin' }, env)).status).toBe(403);
+    expect((await req(a1.sid, '/v1/invites', 'POST', { email: 'new-member@x.co', role: 'member' }, env)).status).toBe(200);
+    await req(owner.sid, '/v1/invites', 'POST', { email: 'owner-made-admin@x.co', role: 'admin' }, env);
+    const { invites } = await (await req(owner.sid, '/v1/members', 'GET', undefined, env)).json();
+    const adminInvite = invites.find(i => i.role === 'admin');
+    expect((await req(a1.sid, `/v1/invites/${adminInvite.id}`, 'DELETE', undefined, env)).status).toBe(403);
+    expect((await req(owner.sid, `/v1/members/${a2.userId}`, 'PATCH', { role: 'member' }, env)).status).toBe(200);
+  });
+
+  it('an API key cannot see or manage people', async () => {
+    const owner = await signUp(baseEnv);
+    const m = await join(owner, 'k@x.co', { role: 'member' });
+    const { rotateApiKey } = await import('../src/auth.js');
+    const key = { Authorization: `Key ${await rotateApiKey(baseEnv, owner.ws)}` };
+    const k = (path, method = 'GET', body) => callWorker(path, { method, headers: key, body, env });
+    expect((await k('/v1/members')).status).toBe(403);
+    expect((await k('/v1/invites', 'POST', { email: 'z@x.co' })).status).toBe(403);
+    expect((await k(`/v1/members/${m.userId}`, 'PATCH', { role: 'member', brand_ids: null })).status).toBe(403);
+    expect((await k(`/v1/members/${m.userId}`, 'DELETE')).status).toBe(403);
   });
 
   it('someone removed from a workspace loses it on their very next request', async () => {

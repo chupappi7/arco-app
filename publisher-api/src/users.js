@@ -41,12 +41,13 @@ function sameText(a, b) {
 export async function startEmail(env, body) {
   const email = normEmail(body?.email);
   const t = now();
-  const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM login_codes WHERE email = ? AND created_at > ?')
-    .bind(email, t - 3600).first();
-  if (n >= CODES_PER_HOUR) throw new HttpError(429, 'Too many codes requested. Wait a while and try again.');
   const code = sixDigits();
-  await env.DB.prepare(`INSERT INTO login_codes (id, email, code_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`)
-    .bind(randomToken('lc_', 8), email, await codeHash(env, email, code), t + CODE_TTL, t).run();
+  // Count and insert in one statement, so parallel requests cannot all slip
+  // under the hourly cap.
+  const r = await env.DB.prepare(`INSERT INTO login_codes (id, email, code_hash, expires_at, created_at)
+      SELECT ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM login_codes WHERE email = ? AND created_at > ?) < ?`)
+    .bind(randomToken('lc_', 8), email, await codeHash(env, email, code), t + CODE_TTL, t, email, t - 3600, CODES_PER_HOUR).run();
+  if (!r.meta.changes) throw new HttpError(429, 'Too many codes requested. Wait a while and try again.');
   await mailerFor(env).send({ to: email, ...codeMail(code) });
   return { ok: true };
 }
@@ -55,11 +56,13 @@ export async function startEmail(env, body) {
 // it allows CODE_MAX_ATTEMPTS guesses in total.
 async function checkCode(env, email, code) {
   const t = now();
-  const row = await env.DB.prepare(`SELECT * FROM login_codes WHERE email = ? AND expires_at > ?
-      ORDER BY created_at DESC LIMIT 1`).bind(email, t).first();
   const bad = new HttpError(400, 'That code is wrong or has expired. Request a new one.');
-  if (!row || row.attempts >= CODE_MAX_ATTEMPTS) throw bad;
-  await env.DB.prepare('UPDATE login_codes SET attempts = attempts + 1 WHERE id = ?').bind(row.id).run();
+  // Take an attempt and check the cap in one statement: guesses sent in
+  // parallel each consume one, and none get past the fifth.
+  const row = await env.DB.prepare(`UPDATE login_codes SET attempts = attempts + 1
+      WHERE id = (SELECT id FROM login_codes WHERE email = ? AND expires_at > ? ORDER BY created_at DESC, id DESC LIMIT 1)
+        AND attempts < ? RETURNING *`).bind(email, t, CODE_MAX_ATTEMPTS).first();
+  if (!row) throw bad;
   if (!/^\d{6}$/.test(String(code ?? '')) || !sameText(row.code_hash, await codeHash(env, email, String(code)))) throw bad;
   await env.DB.prepare('DELETE FROM login_codes WHERE email = ?').bind(email).run();
 }
@@ -219,12 +222,20 @@ async function cleanScope(env, ws, role, brandIds) {
   return JSON.stringify(ids);
 }
 
+// People are managed by people: an API key never can. Admins manage members;
+// only the owner creates, changes, cancels or removes admins.
+function peopleManager(who) {
+  if (!who.userId) throw new HttpError(403, 'Sign in as a person to manage people');
+  need(who, 'admin');
+}
 const assignable = (who, role) => {
   if (!['admin', 'member'].includes(role)) throw new HttpError(400, 'Role must be admin or member');
-  need(who, 'admin');
+  peopleManager(who);
+  if (role === 'admin') need(who, 'owner');
 };
 
 export async function listMembers(env, who) {
+  peopleManager(who);
   const { results: members } = await env.DB.prepare(`SELECT u.id AS user_id, u.email, m.role, m.brand_ids, m.created_at
       FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.workspace_id = ? ORDER BY m.created_at`).bind(who.ws).all();
   const { results: invites } = await env.DB.prepare(`SELECT id, email, role, brand_ids, expires_at FROM invites
@@ -234,7 +245,7 @@ export async function listMembers(env, who) {
 }
 
 export async function invite(env, who, body) {
-  if (!who.userId) throw new HttpError(400, 'Add your email first');
+  peopleManager(who);
   const role = body?.role || 'member';
   assignable(who, role);
   const email = normEmail(body?.email);
@@ -257,7 +268,10 @@ export async function invite(env, who, body) {
 }
 
 export async function cancelInvite(env, who, id) {
-  need(who, 'admin');
+  peopleManager(who);
+  const inv = await env.DB.prepare('SELECT role FROM invites WHERE id = ? AND workspace_id = ?').bind(id, who.ws).first();
+  if (!inv) throw new HttpError(404, 'Invite not found');
+  if (inv.role === 'admin') need(who, 'owner');
   await env.DB.prepare('DELETE FROM invites WHERE id = ? AND workspace_id = ?').bind(id, who.ws).run();
   return { ok: true };
 }
@@ -285,9 +299,10 @@ async function memberRow(env, ws, userId) {
 }
 
 export async function updateMember(env, who, userId, body) {
-  need(who, 'admin');
+  peopleManager(who);
   const m = await memberRow(env, who.ws, userId);
   if (m.role === 'owner') throw new HttpError(403, 'The owner\'s role cannot be changed');
+  if (m.role === 'admin') need(who, 'owner');
   const role = body?.role || m.role;
   assignable(who, role);
   const scope = await cleanScope(env, who.ws, role, body?.brand_ids === undefined ? null : body.brand_ids);
@@ -297,6 +312,7 @@ export async function updateMember(env, who, userId, body) {
 }
 
 export async function removeMember(env, who, userId) {
+  if (!who.userId) throw new HttpError(403, 'Sign in as a person to manage people');
   const self = userId === who.userId;
   if (!self) need(who, 'admin');
   const m = await memberRow(env, who.ws, userId);
