@@ -27,6 +27,7 @@ const S = {
   // A caption per platform, when it should differ from the main one. Absent
   // means "same as the main caption".
   over: {},
+  drafts: [], fromDraft: null, draftGroup: null,
   set: { music: false, disclose: false, brand: false, branded: false },
   when: 'now', at: '', busy: false, status: null,
   week: 0, fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
@@ -62,7 +63,9 @@ async function boot() {
   if (q.get('invite')) { try { sessionStorage.setItem(INVITE, q.get('invite')); } catch {} }
   if (q.get('auth_error') || q.get('connected') || q.get('invite')) history.replaceState({}, '', location.pathname + location.hash);
   await loadMe();
-  window.addEventListener('hashchange', route);
+  // A message belongs to the page it was shown on, unless it was set for the
+  // page being opened (S.keepFlash).
+  window.addEventListener('hashchange', () => { if (!S.keepFlash) S.flash = null; S.keepFlash = false; route(); });
   route();
 }
 
@@ -92,8 +95,9 @@ function saveTargets() { try { localStorage.setItem(SAVED, JSON.stringify(S.targ
 
 function route() {
   S.view = (location.hash || '#compose').slice(1);
-  if (!['compose', 'calendar', 'accounts', 'settings'].includes(S.view)) S.view = 'compose';
+  if (!['compose', 'calendar', 'drafts', 'accounts', 'settings'].includes(S.view)) S.view = 'compose';
   if (S.view === 'calendar') loadWeek();
+  if (S.view === 'drafts') loadDrafts();
   render();
 }
 
@@ -110,7 +114,7 @@ function render() {
   const flash = S.flash ? `<div class="status ${S.flash.kind}">${esc(S.flash.text)}</div>` : '';
   if (!signedIn) { $('app').innerHTML = flash + signInView(); bind(); return; }
   if (S.view === 'accounts' && !can('admin')) S.view = 'compose';
-  const views = { calendar: calendarView, accounts: accountsView, settings: settingsView, compose: composeView };
+  const views = { calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
   $('app').innerHTML = flash + views[S.view]();
   bind();
 }
@@ -185,7 +189,8 @@ function composeView() {
   const tts = ttTargets();
   const label = S.set.branded ? 'Paid partnership' : S.set.brand ? 'Promotional content' : '';
   const need = missing();
-  return `${S.replaces ? `<div class="status">Editing a scheduled post. The original stays scheduled until you save this one.
+  return `${S.fromDraft ? `<div class="status">Editing a draft. Scheduling or posting it replaces the draft.
+      <button class="btn sec" id="stopedit" style="margin-left:8px">Close draft</button></div>` : ''}${S.replaces ? `<div class="status">Editing a scheduled post. The original stays scheduled until you save this one.
       <button class="btn sec" id="stopedit" style="margin-left:8px">Stop editing</button></div>` : ''}
   <div class="card">
     <div class="sec"><span class="cap">Post to</span>${postToView()}</div>
@@ -245,6 +250,7 @@ function composeView() {
     <div class="foot">
       <button class="btn" id="go" ${need || S.busy ? 'disabled' : ''} title="${esc(need || '')}">
         ${S.busy ? 'Working…' : `${S.when === 'later' ? 'Schedule' : 'Post'}${S.targets.length ? ` to ${goLabel()}` : ''}`}</button>
+      <button class="btn sec" id="savedraft" ${draftBlocker() || S.busy ? 'disabled' : ''} title="${esc(draftBlocker())}">Save draft</button>
       ${need ? `<span class="note">${esc(need)}</span>` : ''}
       ${S.status ? `<div class="status ${S.status.kind}" style="flex-basis:100%">${esc(S.status.text)}</div>` : ''}
       <span class="note" style="flex-basis:100%">After posting, it may take a few minutes for the post to process and appear on the profile.</span>
@@ -488,14 +494,16 @@ async function forInstagram(m, ratio) {
 
 // Each post owns its images, so the first post takes the uploads and every
 // other one gets server-side copies.
-async function keysFor(platforms) {
+async function keysFor(platforms, { raw = false } = {}) {
   const plain = S.images.map(m => m.key);
-  let plainUsed = false, igKeys = null, igUsed = false;
+  // Images opened from a draft belong to that draft until it is deleted, so
+  // every new post gets its own copy.
+  let plainUsed = !!S.fromDraft, igKeys = null, igUsed = false;
   const copy = async keys => (await api('/media/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ keys }) })).media.map(m => m.key);
   const out = [];
   for (const p of platforms) {
-    if (p === 'instagram') {
+    if (p === 'instagram' && !raw) {
       if (!igKeys) {
         const first = await bitmap(S.images[0]);
         const ratio = clampRatio(first.width / first.height);
@@ -542,10 +550,12 @@ async function submit() {
   } catch (e) { errors.push(e.message); }
   S.busy = false;
   if (!made.length) { S.status = { kind: 'err', text: errors.join(' · ') }; return render(); }
+  if (S.fromDraft && !errors.length) await dropDrafts(S.fromDraft);
   resetComposer();
   const tail = errors.length ? ` Not sent: ${errors.join(' · ')}` : '';
   if (made[0].scheduled_at > Date.now() / 1000 + 60) {
     S.flash = { kind: errors.length ? 'err' : 'ok', text: `Scheduled for ${new Date(made[0].scheduled_at * 1000).toLocaleString()}.${tail}` };
+    S.keepFlash = true;
     location.hash = '#calendar';
   } else {
     S.status = { kind: errors.length ? 'err' : '', text: `Posting… This page updates when it is done.${tail}` };
@@ -576,9 +586,108 @@ async function watch(ids, tail = '') {
 // Targets stay selected for the next post; privacy is chosen again each time.
 function resetComposer() {
   Object.assign(S, { images: [], cover: 0, title: '', caption: '', when: 'now', at: '', status: null, replaces: null,
-    replacesAccount: null, over: {} });
+    replacesAccount: null, over: {}, fromDraft: null, draftGroup: null });
   for (const t of Object.values(S.tt)) { t.privacy = ''; t.comment = false; }
   S.set = { music: false, disclose: false, brand: false, branded: false };
+}
+
+// ---- drafts --------------------------------------------------------------
+
+function draftBlocker() {
+  if (!S.targets.length) return 'Choose where it will go';
+  if (!S.images.length) return 'Add at least one photo';
+  if (S.images.some(m => m.uploading)) return 'Waiting for uploads to finish';
+  return '';
+}
+
+const newGroup = () => 'grp_' + [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, '0')).join('');
+
+// A draft is one row per account, sharing a group, each with its own caption.
+async function saveDraft() {
+  if (draftBlocker() || S.busy) return;
+  S.busy = true; S.status = { kind: '', text: 'Saving draft…' }; render();
+  const jobs = S.targets.map(id => ({ id, platform: platformOf(acct(id)) }));
+  const group = newGroup(), errors = [];
+  try {
+    const keys = await keysFor(jobs.map(j => j.platform), { raw: true });
+    for (const [n, j] of jobs.entries()) {
+      const t = S.tt[j.id] || {};
+      try {
+        await send('/posts', 'POST', { account_id: j.id, image_keys: keys[n], cover_index: S.cover, title: S.title,
+          caption: captionFor(j.platform), draft: true, group_id: group,
+          settings: j.platform !== 'tiktok' ? {} : { privacy_level: t.privacy || '', disable_comment: !t.comment,
+            auto_add_music: S.set.music, brand_organic: S.set.disclose && S.set.brand, branded_content: S.set.disclose && S.set.branded } });
+      } catch (e) { errors.push(`${handle(acct(j.id))}: ${e.message}`); }
+    }
+  } catch (e) { errors.push(e.message); }
+  S.busy = false;
+  if (errors.length) { S.status = { kind: 'err', text: errors.join(' · ') }; return render(); }
+  if (S.fromDraft) await dropDrafts(S.fromDraft);
+  resetComposer();
+  S.flash = { kind: 'ok', text: 'Draft saved.' }; S.keepFlash = true;
+  location.hash = '#drafts';
+}
+
+async function dropDrafts(ids) {
+  for (const id of ids) { try { await send(`/posts/${id}`, 'DELETE'); } catch {} }
+}
+
+async function loadDrafts() {
+  try { S.drafts = (await api('/drafts')).drafts; } catch (e) { S.flash = { kind: 'err', text: e.message }; }
+  render();
+}
+
+// Drafts saved together come back as one card.
+function draftGroups() {
+  const groups = new Map();
+  for (const d of S.drafts) {
+    const k = d.group_id || d.id;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(d);
+  }
+  return [...groups.values()];
+}
+
+function draftsView() {
+  const groups = draftGroups();
+  return `<div class="drafts">${groups.map(g => {
+    const d = g[0], cover = d.images[d.cover_index] || d.images[0];
+    return `<div class="card draft"><div class="sec">
+      ${cover ? `<img src="${esc(cover)}" alt="">` : ''}
+      <div class="dtxt"><div class="marks">${g.map(x => icon(x.platform, 13)).join('')}
+        <span class="note">${g.map(x => `${x.platform === 'facebook' ? '' : '@'}${esc(x.username)}`).join(', ')}</span></div>
+        <p>${esc((d.caption || d.title || 'No caption yet').slice(0, 160))}</p>
+        <span class="note">${d.images.length} photo${d.images.length === 1 ? '' : 's'} · saved ${new Date(d.updated_at * 1000).toLocaleString()}</span></div>
+      <div class="dacts"><button class="btn" data-opendraft="${esc(d.group_id || d.id)}">Open</button>
+        <button class="btn danger" data-deldraft="${esc(d.group_id || d.id)}">Delete</button></div>
+    </div></div>`;
+  }).join('') || `<div class="card"><div class="sec"><p class="note" style="margin:0">No drafts. Use "Save draft" in
+    <a href="#compose">New post</a> to keep a post for later.</p></div></div>`}</div>`;
+}
+
+function openDraft(key) {
+  const g = draftGroups().find(x => (x[0].group_id || x[0].id) === key);
+  if (!g) return;
+  resetComposer();
+  // Photos from a non-Instagram copy when there is one: Instagram's may be padded.
+  const src = g.find(x => x.platform !== 'instagram') || g[0];
+  // The main caption is the one most copies share; on a tie, TikTok's, then
+  // Facebook's, since Instagram is the one people usually shorten.
+  const counts = {}, rank = { tiktok: 0, facebook: 1, instagram: 2 };
+  for (const x of g) counts[x.caption] = (counts[x.caption] || 0) + 1;
+  const main = [...g].sort((a, b) => (counts[b.caption] - counts[a.caption]) || (rank[a.platform] - rank[b.platform]))[0].caption;
+  const tt = g.find(x => x.platform === 'tiktok');
+  Object.assign(S, { images: src.image_keys.map((k, n) => ({ key: k, url: src.images[n] })), cover: src.cover_index,
+    caption: main, title: (tt || src).title || '', fromDraft: g.map(x => x.id), draftGroup: key, targets: [] });
+  for (const x of g) if (x.caption !== main) S.over[x.platform] = x.caption;
+  const s = tt?.settings || {};
+  S.set = { music: !!s.auto_add_music, disclose: !!(s.brand_organic || s.branded_content), brand: !!s.brand_organic, branded: !!s.branded_content };
+  for (const x of g) {
+    toggleTarget(x.account_id, true, false);
+    if (x.platform === 'tiktok' && S.tt[x.account_id]) S.tt[x.account_id].comment = !x.settings?.disable_comment;
+  }
+  location.hash = '#compose';
+  render();
 }
 
 // ---- calendar ----------------------------------------------------------
@@ -889,6 +998,12 @@ function bind() {
   on('input[name=when]', 'change', e => { S.when = e.target.value; render(); });
   on('#at', 'change', e => { S.at = e.target.value; render(); });
   on('#go', 'click', submit);
+  on('#savedraft', 'click', saveDraft);
+  on('[data-opendraft]', 'click', e => openDraft(e.target.dataset.opendraft));
+  on('[data-deldraft]', 'click', async e => {
+    const key = e.target.dataset.deldraft, g = draftGroups().find(x => (x[0].group_id || x[0].id) === key);
+    if (!g || !confirm('Delete this draft?')) return;
+    await dropDrafts(g.map(x => x.id)); loadDrafts(); });
   on('#stopedit', 'click', () => { resetComposer(); location.hash = '#calendar'; });
   on('[data-fp]', 'click', e => { S.fPlat = e.target.dataset.fp; S.fAcct = 'all'; render(); });
   on('#facct', 'change', e => { S.fAcct = e.target.value; render(); });

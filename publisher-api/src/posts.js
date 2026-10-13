@@ -3,13 +3,15 @@ import { randomToken } from './crypto.js';
 import { getAccount, accessTokenFor, isMeta } from './accounts.js';
 import { wsOf, inScope } from './scope.js';
 import { mediaUrl } from './media.js';
-import { MAX_IMAGES, MAX_QUEUED, MIN_LEAD_SECONDS, KEEP_AFTER_DONE, PRIVACY,
+import { MAX_IMAGES, MAX_QUEUED, MAX_DRAFTS, MIN_LEAD_SECONDS, KEEP_AFTER_DONE, PRIVACY,
   IG_MAX_IMAGES, IG_MAX_CAPTION, IG_MAX_HASHTAGS, FB_MAX_CAPTION } from './limits.js';
 
 const len = s => [...String(s ?? '')].length;
 const bad = msg => { throw new HttpError(400, msg); };
 
-export function validatePost(input, t = now(), platform = 'tiktok') {
+// A draft keeps whatever is filled in: no privacy choice or time is needed
+// until it is scheduled, and it is validated in full then.
+export function validatePost(input, t = now(), platform = 'tiktok', { draft = false } = {}) {
   const i = input || {};
   if (typeof i.account_id !== 'string' || !i.account_id) bad('Pick an account');
   const keys = Array.isArray(i.image_keys) ? i.image_keys : [];
@@ -27,13 +29,18 @@ export function validatePost(input, t = now(), platform = 'tiktok') {
     if (len(caption) > IG_MAX_CAPTION) bad(`An Instagram caption can be at most ${IG_MAX_CAPTION} characters`);
     if ((caption.match(/#[^\s#]+/g) || []).length > IG_MAX_HASHTAGS) bad(`Instagram allows at most ${IG_MAX_HASHTAGS} hashtags`);
   }
-  const at = scheduledAt(i, t);
+  const at = draft ? t : scheduledAt(i, t);
   // Privacy, music and the disclosure toggles are TikTok's; Instagram and
   // Facebook posts are public on a public profile.
   if (platform !== 'tiktok') {
     return { account_id: i.account_id, title, caption, image_keys: keys, cover_index: cover, settings: {}, scheduled_at: at };
   }
   const s = i.settings || {};
+  if (draft && !s.privacy_level) {
+    return { account_id: i.account_id, title, caption, image_keys: keys, cover_index: cover, scheduled_at: at,
+      settings: { privacy_level: '', disable_comment: !!s.disable_comment, auto_add_music: !!s.auto_add_music,
+        brand_organic: !!s.brand_organic, branded_content: !!s.branded_content } };
+  }
   if (!PRIVACY.includes(s.privacy_level)) bad('Choose who can view this post');
   const settings = {
     privacy_level: s.privacy_level,
@@ -67,6 +74,7 @@ export function postJson(env, row) {
     title: row.title, caption: row.caption, images: keys.map(k => mediaUrl(env, k)), image_keys: keys,
     cover_index: row.cover_index, settings: JSON.parse(row.settings), scheduled_at: row.scheduled_at,
     attempts: row.attempts, public_post_id: row.public_post_id, fail_reason: row.fail_reason,
+    group_id: row.group_id ?? null, updated_at: row.updated_at,
     post_url: row.status === 'published' ? (row.post_url || tiktokUrl(row)) : null,
   };
 }
@@ -83,7 +91,11 @@ export async function createPost(env, tk, w, input) {
   const ws = wsOf(w);
   if (typeof input?.account_id !== 'string' || !input.account_id) bad('Pick an account');
   const account = await getAccount(env, w, input.account_id);
-  const p = validatePost(input, now(), account.platform);
+  const draft = input.draft === true;
+  const p = validatePost(input, now(), account.platform, { draft });
+  // Posts made together share a group, so a draft reopens with all its accounts.
+  const group = input.group_id == null ? null : String(input.group_id);
+  if (group !== null && !/^grp_[0-9a-f]{16}$/.test(group)) bad('group_id is invalid');
   if (account.needs_reconnect) throw new HttpError(409, 'Reconnect this account before posting', 'needs_reconnect');
 
   // Edit = a new post that replaces a queued one, which stays scheduled
@@ -94,8 +106,11 @@ export async function createPost(env, tk, w, input) {
     if (old.status !== 'queued') throw new HttpError(409, 'That post has already started or finished, so it cannot be edited');
   }
 
-  const { n } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM posts WHERE workspace_id = ? AND status = 'queued'`).bind(ws).first();
-  if (n - (replaces ? 1 : 0) >= MAX_QUEUED) throw new HttpError(409, `You can have at most ${MAX_QUEUED} posts waiting at a time`);
+  const kind = draft ? 'draft' : 'queued', cap = draft ? MAX_DRAFTS : MAX_QUEUED;
+  const { n } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM posts WHERE workspace_id = ? AND status = ?`).bind(ws, kind).first();
+  if (n - (replaces && !draft ? 1 : 0) >= cap) {
+    throw new HttpError(409, draft ? `You can keep at most ${MAX_DRAFTS} drafts` : `You can have at most ${MAX_QUEUED} posts waiting at a time`);
+  }
 
   const marks = p.image_keys.map(() => '?').join(',');
   // Images may come fresh from upload, or from a cancelled/failed post being
@@ -106,13 +121,13 @@ export async function createPost(env, tk, w, input) {
   if (results.length !== new Set(p.image_keys).size || results.length !== p.image_keys.length) {
     bad('One or more images are missing, already used by another post, or listed twice. Upload them again.');
   }
-  if (account.platform === 'instagram' && results.some(r => r.content_type !== 'image/jpeg')) {
+  if (account.platform === 'instagram' && !draft && results.some(r => r.content_type !== 'image/jpeg')) {
     bad('Instagram only accepts JPG images');
   }
 
   // The panel already limits privacy to what TikTok offers; check again here
   // because the API can be called without the panel.
-  if (!isMeta(account)) {
+  if (!isMeta(account) && !draft) {
     const info = await tk.creatorInfo(await accessTokenFor(env, tk, account));
     if (!(info.privacy_level_options || []).includes(p.settings.privacy_level)) {
       bad('That privacy level is not available for this account right now');
@@ -129,10 +144,10 @@ export async function createPost(env, tk, w, input) {
   }
   await env.DB.batch([
     env.DB.prepare(`INSERT INTO posts (id, workspace_id, account_id, status, title, caption, image_keys, cover_index,
-        settings, scheduled_at, next_attempt_at, created_at, updated_at)
-        VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(id, ws, p.account_id, p.title, p.caption, JSON.stringify(p.image_keys), p.cover_index,
-            JSON.stringify(p.settings), p.scheduled_at, p.scheduled_at, t, t),
+        settings, scheduled_at, next_attempt_at, created_at, updated_at, group_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, ws, p.account_id, kind, p.title, p.caption, JSON.stringify(p.image_keys), p.cover_index,
+            JSON.stringify(p.settings), p.scheduled_at, p.scheduled_at, t, t, group),
     env.DB.prepare(`UPDATE media SET post_id = ?, delete_after = NULL WHERE workspace_id = ? AND key IN (${marks})`)
       .bind(id, ws, ...p.image_keys),
   ]);
@@ -142,13 +157,21 @@ export async function createPost(env, tk, w, input) {
 export async function listPosts(env, w, from, to) {
   const sc = inScope(w, 'a.brand_id');
   const { results } = await env.DB.prepare(`SELECT p.*, a.username, a.platform FROM posts p LEFT JOIN accounts a ON a.id = p.account_id
-      WHERE p.workspace_id = ? AND p.scheduled_at >= ? AND p.scheduled_at < ?${sc.sql} ORDER BY p.scheduled_at`)
+      WHERE p.workspace_id = ? AND p.status != 'draft' AND p.scheduled_at >= ? AND p.scheduled_at < ?${sc.sql} ORDER BY p.scheduled_at`)
     .bind(wsOf(w), from, to, ...sc.binds).all();
   return results.map(r => postJson(env, r));
 }
 
 export async function cancelPost(env, w, id) {
   const row = await loadPost(env, w, id);
+  if (row.status === 'draft') {
+    const t = now();
+    await env.DB.batch([
+      env.DB.prepare(`DELETE FROM posts WHERE id = ? AND status = 'draft'`).bind(id),
+      env.DB.prepare('UPDATE media SET delete_after = ?, post_id = NULL WHERE post_id = ?').bind(t, id),
+    ]);
+    return { id, deleted: true };
+  }
   if (row.status !== 'queued') throw new HttpError(409, 'Only posts that have not started can be cancelled');
   const t = now();
   await env.DB.batch([
@@ -173,5 +196,34 @@ export async function retryPost(env, w, id) {
         publish_id = NULL, updated_at = ? WHERE id = ?`).bind(t, t, id),
     env.DB.prepare('UPDATE media SET delete_after = NULL WHERE post_id = ?').bind(id),
   ]);
+  return postJson(env, await loadPost(env, w, id));
+}
+
+export async function listDrafts(env, w) {
+  const sc = inScope(w, 'a.brand_id');
+  const { results } = await env.DB.prepare(`SELECT p.*, a.username, a.platform FROM posts p JOIN accounts a ON a.id = p.account_id
+      WHERE p.workspace_id = ? AND p.status = 'draft'${sc.sql} ORDER BY p.updated_at DESC LIMIT 200`)
+    .bind(wsOf(w), ...sc.binds).all();
+  return results.map(r => postJson(env, r));
+}
+
+// Quick edit of a post that has not started: caption, title or time. The
+// update is conditional on the status, so a post the cron has just claimed is
+// never changed under it.
+export async function updatePost(env, w, id, body) {
+  const row = await loadPost(env, w, id);
+  if (!['queued', 'draft'].includes(row.status)) throw new HttpError(409, 'That post has already started or finished');
+  const merged = { account_id: row.account_id, image_keys: JSON.parse(row.image_keys), cover_index: row.cover_index,
+    settings: JSON.parse(row.settings), title: body?.title ?? row.title, caption: body?.caption ?? row.caption,
+    scheduled_at: body?.scheduled_at === undefined ? (row.status === 'draft' ? null : row.scheduled_at) : body.scheduled_at };
+  const t = now();
+  // Keeping a scheduled time that is already close is fine; a new one must be ahead.
+  const keepsTime = body?.scheduled_at === undefined;
+  const p = validatePost(keepsTime ? { ...merged, scheduled_at: null } : merged, t, row.platform, { draft: row.status === 'draft' });
+  const at = keepsTime ? row.scheduled_at : p.scheduled_at;
+  const r = await env.DB.prepare(`UPDATE posts SET title = ?, caption = ?, scheduled_at = ?, next_attempt_at = ?, updated_at = ?
+      WHERE id = ? AND workspace_id = ? AND status = ?`)
+    .bind(p.title, p.caption, at, at, t, id, wsOf(w), row.status).run();
+  if (!r.meta.changes) throw new HttpError(409, 'That post has just started publishing, so it cannot be edited');
   return postJson(env, await loadPost(env, w, id));
 }

@@ -34,7 +34,7 @@ Nothing is live yet. Platform reviews take the longest, so they start first.
 - [ ] Meta app: Instagram Login redirect URI and Facebook Login redirect URI;
       Worker secrets `IG_APP_ID`, `IG_APP_SECRET`, `META_APP_ID`, `META_APP_SECRET`;
       Vercel env `IG_APP_ID`, `META_APP_ID`
-- [ ] D1 migrations, in order: `002-meta.sql`, `003-brands.sql`, `004-users.sql`
+- [ ] D1 migrations, in order: `002-meta.sql` … `005-drafts.sql` (see publisher/README.md)
 - [ ] Deploy the Worker, then Vercel
 - [ ] Merge `publisher-public` into `main` and push
 
@@ -61,13 +61,13 @@ Nothing is live yet. Platform reviews take the longest, so they start first.
 The everyday loop has to be smooth before anything is added.
 
 **Editable titles and captions:**
-- [ ] One caption for everywhere, plus an optional override per platform
+- [x] One caption for everywhere, plus an optional override per platform
       (Blotato's main editing pattern), with each platform's limits live as
       you type: TikTok title 90 / caption 4,000, Instagram 2,200 with 30
       hashtags, Facebook ~63,000
 - [ ] Edit any scheduled post in place (caption, time, images, accounts)
       without cancelling it; today Edit replaces the post
-- [ ] Drafts: save a post without scheduling it, come back later
+- [x] Drafts: save a post (several accounts, their captions) without scheduling it, reopen it later
 - [ ] Duplicate a post ("Post again" exists; extend it to drafts)
 
 **Scheduling basics:**

@@ -118,9 +118,11 @@ CREATE TABLE IF NOT EXISTS posts (
   publish_id TEXT,
   public_post_id TEXT,
   post_url TEXT,
+  group_id TEXT,                           -- posts made together (one composer submit)
   fail_reason TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS posts_due ON posts(status, next_attempt_at);
 CREATE INDEX IF NOT EXISTS posts_ws ON posts(workspace_id, scheduled_at);
+CREATE INDEX IF NOT EXISTS posts_drafts ON posts(workspace_id, status, updated_at);

@@ -26,3 +26,4 @@ export const POLL_RESERVE = 10;
 
 export const MAX_BRANDS = 25;
 export const FB_MAX_CAPTION = 63206;
+export const MAX_DRAFTS = 200;

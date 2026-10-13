@@ -88,7 +88,7 @@ Setup, once, in the Meta app at developers.facebook.com:
    ID and secret are `META_APP_ID` / `META_APP_SECRET`.
 3. Privacy policy URL `/privacy.html`, data deletion URL `/privacy.html#data-deletion`.
 4. Vercel env: `IG_APP_ID`, `META_APP_ID`. Worker secrets: all four.
-5. Live D1, in order: `migrations/002-meta.sql`, `003-brands.sql`, `004-users.sql`
+5. Live D1, in order: `migrations/002-meta.sql`, `003-brands.sql`, `004-users.sql`, `005-drafts.sql`
    (`npx wrangler d1 execute arco-publisher --remote --file=<file>`)
 6. Until App Review grants Advanced Access (Instagram:
    `instagram_business_basic`, `instagram_business_content_publish`; Pages:

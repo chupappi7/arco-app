@@ -7,7 +7,7 @@ import { metaFor, MetaError } from './meta.js';
 import { listAccounts, creatorInfoFor, disconnect, refreshInstagramTokens } from './accounts.js';
 import * as L from './limits.js';
 import { uploadMedia, serveMedia, copyMedia } from './media.js';
-import { createPost, listPosts, cancelPost, retryPost } from './posts.js';
+import { createPost, listPosts, cancelPost, retryPost, listDrafts, updatePost } from './posts.js';
 import { tick, publishNow } from './publisher.js';
 import { runCleanup, deleteWorkspace } from './cleanup.js';
 import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './brands.js';
@@ -82,7 +82,7 @@ export const ROUTES = [
   ['HEAD', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`, 'HEAD'), 'public'],
   ['POST', '/v1/posts', async (req, env, { who, tk, ctx }) => {
     const post = await createPost(env, tk, who, await body(req));
-    if (post.scheduled_at <= now()) ctx.waitUntil(publishNow(env, tk, post.id).catch(e => console.error('publishNow', e)));
+    if (post.status === 'queued' && post.scheduled_at <= now()) ctx.waitUntil(publishNow(env, tk, post.id).catch(e => console.error('publishNow', e)));
     return json(post);
   }, 'member'],
   ['GET', '/v1/posts', async (req, env, { who, url }) => {
@@ -92,6 +92,8 @@ export const ROUTES = [
     }
     return json({ posts: await listPosts(env, who, from, to) });
   }, 'member'],
+  ['GET', '/v1/drafts', async (req, env, { who }) => json({ drafts: await listDrafts(env, who) }), 'member'],
+  ['PATCH', '/v1/posts/:id', async (req, env, { who, params }) => json(await updatePost(env, who, params.id, await body(req))), 'member'],
   ['DELETE', '/v1/posts/:id', async (req, env, { who, params }) => json(await cancelPost(env, who, params.id)), 'member'],
   ['POST', '/v1/posts/:id/retry', async (req, env, { who, params }) => json(await retryPost(env, who, params.id)), 'member'],
 ];
