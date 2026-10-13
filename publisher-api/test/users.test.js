@@ -147,6 +147,10 @@ describe('members, roles and invites', () => {
     const { invites } = await (await req(owner.sid, '/v1/members', 'GET', undefined, env)).json();
     const adminInvite = invites.find(i => i.role === 'admin');
     expect((await req(a1.sid, `/v1/invites/${adminInvite.id}`, 'DELETE', undefined, env)).status).toBe(403);
+    // nor by re-inviting the same address as a member
+    expect((await req(a1.sid, '/v1/invites', 'POST', { email: 'owner-made-admin@x.co', role: 'member' }, env)).status).toBe(403);
+    const after = (await (await req(owner.sid, '/v1/members', 'GET', undefined, env)).json()).invites;
+    expect(after.find(i => i.email === 'owner-made-admin@x.co').role).toBe('admin');
     expect((await req(owner.sid, `/v1/members/${a2.userId}`, 'PATCH', { role: 'member' }, env)).status).toBe(200);
   });
 

@@ -256,6 +256,11 @@ export async function invite(env, who, body) {
   if (n >= 50) throw new HttpError(409, 'Too many open invites. Cancel some first.');
   const scope = await cleanScope(env, who.ws, role, body?.brand_ids);
   const token = randomToken('inv_'), id = 'ivt_' + randomToken('', 8), t = now();
+  // Re-inviting replaces the open invite for that address, which cancels it:
+  // the same rule as cancelling applies, so an admin cannot overwrite an
+  // invite the owner sent as admin.
+  const open = await env.DB.prepare('SELECT role FROM invites WHERE workspace_id = ? AND email = ?').bind(who.ws, email).first();
+  if (open?.role === 'admin') need(who, 'owner');
   await env.DB.prepare(`DELETE FROM invites WHERE workspace_id = ? AND email = ?`).bind(who.ws, email).run();
   await env.DB.prepare(`INSERT INTO invites (id, workspace_id, email, role, brand_ids, token_hash, invited_by, expires_at, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
