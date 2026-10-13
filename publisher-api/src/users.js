@@ -10,6 +10,7 @@ import { randomToken, sha256Hex } from './crypto.js';
 import { HttpError, now, cookie } from './http.js';
 import { mailerFor, codeMail, inviteMail } from './email.js';
 import { SESSION_TTL } from './limits.js';
+import { cleanSlots } from './slots.js';
 
 const ROLES = ['owner', 'admin', 'member'];
 const CODE_TTL = 600, CODE_MAX_ATTEMPTS = 5, CODES_PER_HOUR = 5, INVITE_TTL = 7 * 86400;
@@ -209,6 +210,9 @@ export async function updateWorkspace(env, who, body) {
       if (tz.length > 64) throw new HttpError(400, 'Unknown time zone');
     }
     await env.DB.prepare('UPDATE workspaces SET timezone = ? WHERE id = ?').bind(tz, who.ws).run();
+  }
+  if (body?.slots !== undefined) {
+    await env.DB.prepare('UPDATE workspaces SET slots = ? WHERE id = ?').bind(cleanSlots(body.slots), who.ws).run();
   }
   return { ok: true };
 }

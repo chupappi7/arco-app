@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL DEFAULT 'My workspace',
   timezone TEXT,                           -- IANA zone; NULL means the viewer's own
+  slots TEXT,                              -- default posting times, JSON {days, times}
   created_at INTEGER NOT NULL,
   api_key_hash TEXT
 );
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS brands (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
   name TEXT NOT NULL,
+  slots TEXT,                              -- posting times, JSON {days, times}; NULL = workspace default
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS brands_ws ON brands(workspace_id);

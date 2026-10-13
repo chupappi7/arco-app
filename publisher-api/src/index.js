@@ -14,13 +14,13 @@ import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './bra
 
 async function me(req, env, { who }) {
   const ws = who.ws;
-  const row = await env.DB.prepare('SELECT name, timezone, api_key_hash FROM workspaces WHERE id = ?').bind(ws).first();
+  const row = await env.DB.prepare('SELECT name, timezone, slots, api_key_hash FROM workspaces WHERE id = ?').bind(ws).first();
   const user = who.userId ? await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(who.userId).first() : null;
   return json({
     user: user ? { id: who.userId, email: user.email } : null,
     // A workspace from before email sign-in: the page asks for an email.
     needs_email: who.via === 'legacy',
-    workspace: { id: ws, name: row?.name || 'My workspace', timezone: row?.timezone || null, role: who.role, brand_scope: who.scope },
+    workspace: { id: ws, name: row?.name || 'My workspace', timezone: row?.timezone || null, slots: row?.slots ? JSON.parse(row.slots) : null, role: who.role, brand_scope: who.scope },
     workspaces: await myWorkspaces(env, who.userId),
     workspace_id: ws,
     accounts: await listAccounts(env, who),

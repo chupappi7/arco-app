@@ -73,7 +73,7 @@ The everyday loop has to be smooth before anything is added.
 **Scheduling basics:**
 - [x] Time zone per workspace, shown on every time
 - [x] Calendar: drag a post to another day; month view next to week
-- [ ] Queue / posting slots: set "Mon–Fri 9:00, 18:00" per brand, and "Add to
+- [x] Queue / posting slots: set "Mon–Fri 9:00, 18:00" per brand, and "Add to
       queue" picks the next free slot
 
 **Know what happened:**

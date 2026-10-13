@@ -28,6 +28,7 @@ const S = {
   // means "same as the main caption".
   over: {},
   drafts: [], fromDraft: null, draftGroup: null,
+  slotEdit: null, queuePosts: null,
   set: { music: false, disclose: false, brand: false, branded: false },
   when: 'now', at: '', busy: false, status: null,
   week: 0, month: 0, calMode: 'week', fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
@@ -240,7 +241,9 @@ function composeView() {
     </div>
     <div class="sec"><span class="cap">When</span>
       <label><input type="radio" name="when" value="now" ${S.when === 'now' ? 'checked' : ''}> Post now</label>
-      &nbsp;&nbsp;<label><input type="radio" name="when" value="later" ${S.when === 'later' ? 'checked' : ''}> Schedule</label>
+      &nbsp;&nbsp;<label><input type="radio" name="when" value="queue" ${S.when === 'queue' ? 'checked' : ''}> Add to queue</label>
+      &nbsp;&nbsp;<label><input type="radio" name="when" value="later" ${S.when === 'later' ? 'checked' : ''}> Pick a time</label>
+      ${S.when === 'queue' ? queuePreview() : ''}
       ${S.when === 'later' ? `<p><input type="datetime-local" id="at" value="${esc(S.at)}" min="${localInput(Date.now() + 6 * 60e3)}"></p>
         <span class="note">In ${esc(tz().replace(/_/g, ' '))} time${S.me.workspace.timezone ? ' (the workspace\'s zone)' : ''}. At least 5 minutes from now.</span>` : ''}
     </div>
@@ -393,6 +396,12 @@ function missing() {
       if (!t.privacy) return `Choose who can view the post on @${t.info.creator_username}`;
     }
     if (S.set.disclose && !S.set.brand && !S.set.branded) return 'You need to indicate if your content promotes yourself, a third party, or both';
+  }
+  if (S.when === 'queue') {
+    if (!S.queuePosts) return 'Finding the next free slots…';
+    const plan = queuePlan();
+    const none = S.targets.find(id => !plan[id]);
+    if (none) return `${handle(acct(none))} has no posting times. Set them in ${can('admin') ? 'Accounts' : 'the brand (ask an admin)'}.`;
   }
   if (S.when === 'later') {
     const t = S.at ? inputToMs(S.at) : NaN;
@@ -556,6 +565,7 @@ async function submit() {
   S.busy = true; S.status = { kind: '', text: 'Sending…' }; render();
   const jobs = S.targets.map(id => ({ id, platform: platformOf(acct(id)) }))
     .sort((a, b) => ORDER.indexOf(a.platform) - ORDER.indexOf(b.platform));
+  const plan = S.when === 'queue' ? queuePlan() : null;
   const at = S.when === 'later' ? Math.floor(inputToMs(S.at) / 1000) : null;
   const made = [], errors = [];
   try {
@@ -570,7 +580,7 @@ async function submit() {
           account_id: j.id, image_keys: keys[n], cover_index: S.cover, title: S.title, caption: captionFor(j.platform),
           settings: j.platform !== 'tiktok' ? {} : { privacy_level: t.privacy, disable_comment: !t.comment || !!t.info?.comment_disabled,
             auto_add_music: S.set.music, brand_organic: S.set.disclose && S.set.brand, branded_content: S.set.disclose && S.set.branded },
-          scheduled_at: at,
+          scheduled_at: plan ? plan[j.id] : at,
           // An edit replaces the one post it came from.
           replaces: S.replaces && S.replacesAccount === j.id ? S.replaces : undefined,
         }) }));
@@ -583,7 +593,8 @@ async function submit() {
   resetComposer();
   const tail = errors.length ? ` Not sent: ${errors.join(' · ')}` : '';
   if (made[0].scheduled_at > Date.now() / 1000 + 60) {
-    S.flash = { kind: errors.length ? 'err' : 'ok', text: `Scheduled for ${fmtFull(made[0].scheduled_at)}.${tail}` };
+    const first = Math.min(...made.map(p => p.scheduled_at));
+    S.flash = { kind: errors.length ? 'err' : 'ok', text: `${made.length > 1 ? `${made.length} posts scheduled, the first for` : 'Scheduled for'} ${fmtFull(first)}.${tail}` };
     S.keepFlash = true;
     location.hash = '#calendar';
   } else {
@@ -618,6 +629,91 @@ function resetComposer() {
     replacesAccount: null, over: {}, fromDraft: null, draftGroup: null });
   for (const t of Object.values(S.tt)) { t.privacy = ''; t.comment = false; }
   S.set = { music: false, disclose: false, brand: false, branded: false };
+}
+
+// ---- posting slots and the queue -------------------------------------------
+
+const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const slotsOf = a => (a && S.me.brands.find(b => b.id === a.brand_id)?.slots) || S.me.workspace.slots || null;
+function slotsText(sl) {
+  if (!sl) return 'not set';
+  const days = sl.days.length === 7 ? 'Every day' : sl.days.join() === '1,2,3,4,5' ? 'Mon–Fri' : sl.days.map(d => DAY[d]).join(', ');
+  return `${days} · ${sl.times.join(', ')}`;
+}
+
+// The posts already lined up, so the queue skips taken slots.
+async function loadQueue() {
+  S.queuePosts = null; render();
+  const from = Math.floor(Date.now() / 1000);
+  try { S.queuePosts = (await api(`/posts?from=${from}&to=${from + 60 * 86400}`)).posts.filter(p => ['queued', 'publishing'].includes(p.status)); }
+  catch (e) { S.queuePosts = []; S.flash = { kind: 'err', text: e.message }; }
+  render();
+}
+
+// Each account's next free slot in its brand's posting times (or the
+// workspace default), in the workspace's zone, at least 6 minutes ahead,
+// and not within 30 minutes of another post on that account.
+function queuePlan() {
+  const plan = {}, taken = {};
+  for (const p of S.queuePosts || []) (taken[p.account_id] ||= []).push(p.scheduled_at);
+  const soonest = Date.now() / 1000 + 6 * 60, t0 = today();
+  for (const id of S.targets) {
+    const sl = slotsOf(acct(id));
+    plan[id] = null;
+    if (!sl) continue;
+    for (let i = 0; i < 60 && !plan[id]; i++) {
+      const day = addDays(t0, i), wd = new Date(Date.UTC(day.y, day.m - 1, day.d)).getUTCDay();
+      if (!sl.days.includes(wd)) continue;
+      for (const time of sl.times) {
+        const [h, mi] = time.split(':').map(Number), at = Math.floor(zonedToMs(day.y, day.m, day.d, h, mi) / 1000);
+        if (at < soonest || (taken[id] || []).some(x => Math.abs(x - at) < 1800)) continue;
+        plan[id] = at; (taken[id] ||= []).push(at); break;
+      }
+    }
+  }
+  return plan;
+}
+
+function queuePreview() {
+  if (!S.queuePosts) return '<p class="note">Finding the next free slots…</p>';
+  const plan = queuePlan();
+  return `<div class="qplan">${S.targets.map(id => { const a = acct(id);
+    return `<div>${icon(platformOf(a), 12)} ${handle(a)}: <b>${plan[id] ? fmtFull(plan[id]) : 'no posting times set'}</b></div>`; }).join('')
+    || '<span class="note">Choose accounts first.</span>'}
+    <span class="note">Each account takes its next free posting time (${esc(tz().replace(/_/g, ' '))}).</span></div>`;
+}
+
+function slotsEditor(key, current, label) {
+  const x = S.slotEdit;
+  if (!x || x.key !== key) {
+    return `<div class="slotline"><span class="note">${label}: <b>${esc(slotsText(current))}</b></span>
+      ${can('admin') ? `<button class="link" data-slotedit="${key}">Edit posting times</button>` : ''}</div>`;
+  }
+  return `<div class="sloted">
+    <div class="days">${[1, 2, 3, 4, 5, 6, 0].map(d => `<button type="button" class="chip ${x.days.includes(d) ? 'on' : ''}" data-slotday="${d}">${DAY[d]}</button>`).join('')}</div>
+    <div class="times">${x.times.map((t, n) => `<span class="tm"><input type="time" value="${t}" data-slottime="${n}" aria-label="Posting time ${n + 1}">
+      <button type="button" class="link" data-slotrm="${n}" aria-label="Remove">×</button></span>`).join('')}
+      <button type="button" class="btn sec" id="slotadd">Add time</button></div>
+    <div class="acts2"><button type="button" class="btn" id="slotsave">Save</button>
+      <button type="button" class="btn sec" id="slotcancel">Cancel</button>
+      ${key !== 'ws' && current ? '<button type="button" class="link" id="slotclear">Use the workspace default</button>' : ''}</div>
+    <span class="note">Times are in ${esc(tz().replace(/_/g, ' '))}.</span></div>`;
+}
+
+function openSlots(key) {
+  const cur = key === 'ws' ? S.me.workspace.slots : S.me.brands.find(b => b.id === key)?.slots;
+  const base = cur || S.me.workspace.slots || { days: [1, 2, 3, 4, 5], times: ['09:00', '18:00'] };
+  S.slotEdit = { key, days: [...base.days], times: [...base.times] };
+  render();
+}
+
+async function saveSlots(slots) {
+  const key = S.slotEdit.key;
+  try {
+    await send(key === 'ws' ? '/workspace' : `/brands/${key}`, 'PATCH', { slots });
+    S.slotEdit = null; S.flash = { kind: 'ok', text: 'Posting times saved.' };
+  } catch (e) { S.flash = { kind: 'err', text: e.message }; }
+  await refreshMe();
 }
 
 // ---- drafts --------------------------------------------------------------
@@ -903,6 +999,8 @@ function accountsView() {
         <b>${esc(g.name)}</b><span class="marks">${marks(g.accounts)}</span><span class="note">${g.accounts.length} account${g.accounts.length === 1 ? '' : 's'}</span>
         ${g.id !== 'none' ? `<span class="bacts"><button class="link" data-rename="${g.id}">Rename</button>
           <button class="link danger" data-delbrand="${g.id}">Delete</button></span>` : ''}</div>
+        ${g.id !== 'none' ? slotsEditor(g.id, S.me.brands.find(b => b.id === g.id)?.slots,
+          S.me.brands.find(b => b.id === g.id)?.slots ? 'Posting times' : `Posting times (workspace default: ${slotsText(S.me.workspace.slots)})`) : ''}
         ${g.accounts.map(accountRow).join('') || '<p class="note">No accounts yet. Use "Brand" on any account below to move it here.</p>'}
       </div></div>`).join('') || '<div class="card"><div class="sec"><p class="note">No accounts connected yet.</p></div></div>'}
     <p class="note">Disconnecting an account deletes its token and cancels its scheduled posts. Deleting a brand only ungroups its accounts.
@@ -926,7 +1024,9 @@ function settingsView() {
         <label class="f" for="wstz" style="margin-top:12px">Time zone for scheduling and the calendar</label>
         <select id="wstz"><option value="">Each person's own (${esc(Intl.DateTimeFormat().resolvedOptions().timeZone)})</option>
           ${(Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : []).map(z => `<option value="${z}" ${w.timezone === z ? 'selected' : ''}>${z.replace(/_/g, ' ')}</option>`).join('')}
-        </select>` : `<p style="margin:0"><b>${esc(w.name)}</b> · ${esc(tz().replace(/_/g, ' '))}</p>`}
+        </select>
+        <label class="f" style="margin-top:12px">Default posting times for "Add to queue"</label>
+        ${slotsEditor('ws', w.slots, 'Every account not in a brand with its own times')}` : `<p style="margin:0"><b>${esc(w.name)}</b> · ${esc(tz().replace(/_/g, ' '))}</p>`}
       <p class="note">Everything here (accounts, brands, posts and images) belongs to this workspace only. No other workspace can see it.</p>
     </div>
     ${admin ? `<div class="sec"><span class="cap">People</span>
@@ -1072,7 +1172,16 @@ function bind() {
   on('[data-cm]', 'change', e => { S.tt[e.target.dataset.cm].comment = e.target.checked; render(); });
   on('#bulkpriv', 'change', e => e.target.value && bulkPrivacy(e.target.value));
   on('[data-k]', 'change', e => setOpt(e.target.dataset.k, e.target.checked));
-  on('input[name=when]', 'change', e => { S.when = e.target.value; render(); });
+  on('input[name=when]', 'change', e => { S.when = e.target.value; if (S.when === 'queue') loadQueue(); render(); });
+  on('[data-slotedit]', 'click', e => openSlots(e.target.dataset.slotedit));
+  on('[data-slotday]', 'click', e => { const d = +e.target.dataset.slotday, x = S.slotEdit;
+    x.days = x.days.includes(d) ? x.days.filter(v => v !== d) : [...x.days, d]; render(); });
+  on('[data-slottime]', 'change', e => { S.slotEdit.times[+e.target.dataset.slottime] = e.target.value; });
+  on('[data-slotrm]', 'click', e => { S.slotEdit.times.splice(+e.target.dataset.slotrm, 1); render(); });
+  on('#slotadd', 'click', () => { S.slotEdit.times.push('12:00'); render(); });
+  on('#slotcancel', 'click', () => { S.slotEdit = null; render(); });
+  on('#slotclear', 'click', () => saveSlots(null));
+  on('#slotsave', 'click', () => saveSlots({ days: S.slotEdit.days, times: S.slotEdit.times.filter(Boolean) }));
   on('#at', 'change', e => { S.at = e.target.value; render(); });
   on('#go', 'click', submit);
   on('#savedraft', 'click', saveDraft);

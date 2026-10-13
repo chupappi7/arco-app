@@ -21,7 +21,7 @@ describe('brands', () => {
     const b = await (await call('/v1/brands', h, 'POST', { name: '  Client   Bakery ', account_ids: [account] })).json();
     expect(b.name).toBe('Client Bakery');
     let me = await (await call('/v1/me', h)).json();
-    expect(me.brands).toEqual([{ id: b.id, name: 'Client Bakery' }]);
+    expect(me.brands).toEqual([{ id: b.id, name: 'Client Bakery', slots: null }]);
     expect(me.accounts[0].brand_id).toBe(b.id);
 
     await call(`/v1/brands/${b.id}`, h, 'PATCH', { name: 'Bakery' });
@@ -54,6 +54,21 @@ describe('brands', () => {
     const mine = await (await call('/v1/brands', one.h, 'POST', { name: 'Mine' })).json();
     expect((await call(`/v1/brands/${mine.id}/accounts`, one.h, 'POST', { account_ids: [two.account] })).status).toBe(404);
     expect((await call(`/v1/accounts/${two.account}`, one.h, 'PATCH', { brand_id: mine.id })).status).toBe(404);
+  });
+
+  it('stores posting times per brand and as the workspace default, and validates them', async () => {
+    const { h } = await signIn();
+    const b = await (await call('/v1/brands', h, 'POST', { name: 'Bakery' })).json();
+    expect((await call(`/v1/brands/${b.id}`, h, 'PATCH', { slots: { days: [5, 1, 1], times: ['18:00', '09:00'] } })).status).toBe(200);
+    expect((await call('/v1/workspace', h, 'PATCH', { slots: { days: [0, 6], times: ['10:30'] } })).status).toBe(200);
+    const me = await (await call('/v1/me', h)).json();
+    expect(me.brands[0]).toMatchObject({ name: 'Bakery', slots: { days: [1, 5], times: ['09:00', '18:00'] } });
+    expect(me.workspace.slots).toEqual({ days: [0, 6], times: ['10:30'] });
+    for (const slots of [{ days: [], times: ['09:00'] }, { days: [7], times: ['09:00'] }, { days: [1], times: ['9am'] }, { days: [1], times: ['24:00'] }]) {
+      expect((await call(`/v1/brands/${b.id}`, h, 'PATCH', { slots })).status).toBe(400);
+    }
+    expect((await call(`/v1/brands/${b.id}`, h, 'PATCH', { slots: null })).status).toBe(200);
+    expect((await (await call('/v1/me', h)).json()).brands[0].slots).toBeNull();
   });
 
   it('requires a name of sensible length', async () => {

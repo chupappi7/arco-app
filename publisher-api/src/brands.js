@@ -2,6 +2,7 @@ import { HttpError, now } from './http.js';
 import { randomToken } from './crypto.js';
 import { MAX_BRANDS } from './limits.js';
 import { wsOf, inScope } from './scope.js';
+import { cleanSlots, parseSlots } from './slots.js';
 
 const cleanName = n => {
   const name = String(n ?? '').trim().replace(/\s+/g, ' ');
@@ -12,9 +13,9 @@ const cleanName = n => {
 
 export async function listBrands(env, w) {
   const sc = inScope(w, 'id');
-  const { results } = await env.DB.prepare(`SELECT id, name FROM brands WHERE workspace_id = ?${sc.sql} ORDER BY name COLLATE NOCASE`)
+  const { results } = await env.DB.prepare(`SELECT id, name, slots FROM brands WHERE workspace_id = ?${sc.sql} ORDER BY name COLLATE NOCASE`)
     .bind(wsOf(w), ...sc.binds).all();
-  return results;
+  return results.map(b => ({ ...b, slots: parseSlots(b.slots) }));
 }
 
 async function getBrand(env, ws, id) {
@@ -35,10 +36,14 @@ export async function createBrand(env, ws, body) {
   return { id, name };
 }
 
+// Rename, and/or set posting times (null clears them back to the default).
 export async function renameBrand(env, ws, id, body) {
-  await getBrand(env, ws, id);
-  const name = cleanName(body?.name);
+  const b = await getBrand(env, ws, id);
+  const name = body?.name === undefined ? b.name : cleanName(body.name);
   await env.DB.prepare('UPDATE brands SET name = ? WHERE id = ? AND workspace_id = ?').bind(name, id, ws).run();
+  if (body?.slots !== undefined) {
+    await env.DB.prepare('UPDATE brands SET slots = ? WHERE id = ? AND workspace_id = ?').bind(cleanSlots(body.slots), id, ws).run();
+  }
   return { id, name };
 }
 
