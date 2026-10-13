@@ -30,7 +30,7 @@ const S = {
   drafts: [], fromDraft: null, draftGroup: null,
   set: { music: false, disclose: false, brand: false, branded: false },
   when: 'now', at: '', busy: false, status: null,
-  week: 0, fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
+  week: 0, month: 0, calMode: 'week', fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
   pickOpen: false, pq: '',
   login: { step: 'email', email: '', code: '', busy: false, err: '' }, members: null, invited: null,
 };
@@ -242,7 +242,7 @@ function composeView() {
       <label><input type="radio" name="when" value="now" ${S.when === 'now' ? 'checked' : ''}> Post now</label>
       &nbsp;&nbsp;<label><input type="radio" name="when" value="later" ${S.when === 'later' ? 'checked' : ''}> Schedule</label>
       ${S.when === 'later' ? `<p><input type="datetime-local" id="at" value="${esc(S.at)}" min="${localInput(Date.now() + 6 * 60e3)}"></p>
-        <span class="note">Your local time. At least 5 minutes from now.</span>` : ''}
+        <span class="note">In ${esc(tz().replace(/_/g, ' '))} time${S.me.workspace.timezone ? ' (the workspace\'s zone)' : ''}. At least 5 minutes from now.</span>` : ''}
     </div>
     ${tts.length ? `<div class="consent">By posting, you agree to TikTok's
       ${S.set.branded ? '<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">Branded Content Policy</a> and ' : ''}
@@ -395,17 +395,46 @@ function missing() {
     if (S.set.disclose && !S.set.brand && !S.set.branded) return 'You need to indicate if your content promotes yourself, a third party, or both';
   }
   if (S.when === 'later') {
-    const t = S.at ? new Date(S.at).getTime() : NaN;
+    const t = S.at ? inputToMs(S.at) : NaN;
     if (!Number.isFinite(t)) return 'Pick a date and time';
     if (t < Date.now() + 5 * 60e3) return 'Pick a time at least 5 minutes from now';
   }
   return '';
 }
 
-function localInput(ms) {
-  const d = new Date(ms), p = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+// ---- time, always in the workspace's zone ---------------------------------
+// A post scheduled for "9:00" is 9:00 where the workspace says, whoever looks.
+
+const tz = () => S.me?.workspace?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+const fmt = (sec, opts) => new Intl.DateTimeFormat(undefined, { timeZone: tz(), ...opts }).format(new Date(sec * 1000));
+const fmtFull = sec => fmt(sec, { dateStyle: 'medium', timeStyle: 'short' });
+
+function zoned(ms) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz(), hourCycle: 'h23', year: 'numeric',
+    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+  return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, mi: +p.minute };
 }
+// Wall-clock time in the workspace's zone -> epoch ms (two passes settle DST edges).
+function zonedToMs(y, m, d, h = 0, mi = 0) {
+  const want = Date.UTC(y, m - 1, d, h, mi);
+  let guess = want;
+  for (let i = 0; i < 2; i++) { const p = zoned(guess); guess += want - Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi); }
+  return guess;
+}
+const pad = n => String(n).padStart(2, '0');
+function localInput(ms) { const p = zoned(ms); return `${p.y}-${pad(p.m)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}`; }
+function inputToMs(str) {
+  const [date, time] = String(str).split('T');
+  if (!date || !time) return NaN;
+  const [y, m, d] = date.split('-').map(Number), [h, mi] = time.split(':').map(Number);
+  return zonedToMs(y, m, d, h, mi);
+}
+// A calendar day as plain numbers, and the date one is in.
+const dayOf = sec => { const p = zoned(sec * 1000); return `${p.y}-${p.m}-${p.d}`; };
+const addDays = (day, n) => { const t = new Date(Date.UTC(day.y, day.m - 1, day.d + n)); return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() }; };
+const dayKey = day => `${day.y}-${day.m}-${day.d}`;
+const dayLabel = (day, opts) => new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', ...opts }).format(new Date(Date.UTC(day.y, day.m - 1, day.d)));
+const today = () => { const p = zoned(Date.now()); return { y: p.y, m: p.m, d: p.d }; };
 
 // ---- compose actions ---------------------------------------------------
 
@@ -527,7 +556,7 @@ async function submit() {
   S.busy = true; S.status = { kind: '', text: 'Sending…' }; render();
   const jobs = S.targets.map(id => ({ id, platform: platformOf(acct(id)) }))
     .sort((a, b) => ORDER.indexOf(a.platform) - ORDER.indexOf(b.platform));
-  const at = S.when === 'later' ? Math.floor(new Date(S.at).getTime() / 1000) : null;
+  const at = S.when === 'later' ? Math.floor(inputToMs(S.at) / 1000) : null;
   const made = [], errors = [];
   try {
     if (toInstagram()) { S.status = { kind: '', text: 'Preparing photos for Instagram…' }; render(); }
@@ -554,7 +583,7 @@ async function submit() {
   resetComposer();
   const tail = errors.length ? ` Not sent: ${errors.join(' · ')}` : '';
   if (made[0].scheduled_at > Date.now() / 1000 + 60) {
-    S.flash = { kind: errors.length ? 'err' : 'ok', text: `Scheduled for ${new Date(made[0].scheduled_at * 1000).toLocaleString()}.${tail}` };
+    S.flash = { kind: errors.length ? 'err' : 'ok', text: `Scheduled for ${fmtFull(made[0].scheduled_at)}.${tail}` };
     S.keepFlash = true;
     location.hash = '#calendar';
   } else {
@@ -657,7 +686,7 @@ function draftsView() {
       <div class="dtxt"><div class="marks">${g.map(x => icon(x.platform, 13)).join('')}
         <span class="note">${g.map(x => `${x.platform === 'facebook' ? '' : '@'}${esc(x.username)}`).join(', ')}</span></div>
         <p>${esc((d.caption || d.title || 'No caption yet').slice(0, 160))}</p>
-        <span class="note">${d.images.length} photo${d.images.length === 1 ? '' : 's'} · saved ${new Date(d.updated_at * 1000).toLocaleString()}</span></div>
+        <span class="note">${d.images.length} photo${d.images.length === 1 ? '' : 's'} · saved ${fmtFull(d.updated_at)}</span></div>
       <div class="dacts"><button class="btn" data-opendraft="${esc(d.group_id || d.id)}">Open</button>
         <button class="btn danger" data-deldraft="${esc(d.group_id || d.id)}">Delete</button></div>
     </div></div>`;
@@ -692,30 +721,66 @@ function openDraft(key) {
 
 // ---- calendar ----------------------------------------------------------
 
-function weekStart() {
-  const d = new Date(); d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + S.week * 7);
-  return d;
+// ---- calendar: week or month, in the workspace's zone; drag to reschedule --
+
+function calRange() {
+  const t = today();
+  if (S.calMode === 'month') {
+    let y = t.y, m = t.m + S.month;
+    while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; }
+    const first = { y, m, d: 1 };
+    const wd = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+    const start = addDays(first, -((wd + 6) % 7));
+    return { start, n: 42, month: m, title: dayLabel(first, { month: 'long', year: 'numeric' }) };
+  }
+  const wd = new Date(Date.UTC(t.y, t.m - 1, t.d)).getUTCDay();
+  const start = addDays(t, -((wd + 6) % 7) + S.week * 7);
+  const end = addDays(start, 6);
+  return { start, n: 7, title: `${dayLabel(start, { day: 'numeric', month: 'short' })} – ${dayLabel(end, { day: 'numeric', month: 'short' })}` };
 }
 
 async function loadWeek() {
-  const from = Math.floor(weekStart().getTime() / 1000);
-  try { S.posts = (await api(`/posts?from=${from}&to=${from + 7 * 86400}`)).posts; }
+  const r = calRange();
+  const from = Math.floor(zonedToMs(r.start.y, r.start.m, r.start.d) / 1000);
+  const endDay = addDays(r.start, r.n);
+  const to = Math.floor(zonedToMs(endDay.y, endDay.m, endDay.d) / 1000);
+  try { S.posts = (await api(`/posts?from=${from}&to=${to}`)).posts; }
   catch (e) { S.flash = { kind: 'err', text: e.message }; }
   render();
 }
 
+function postCard(p, compact) {
+  const time = fmt(p.scheduled_at, { hour: '2-digit', minute: '2-digit' });
+  const drag = p.status === 'queued' ? `draggable="true" data-drag="${p.id}"` : '';
+  if (compact) {
+    return `<div class="pill-post ${p.status}" ${drag} title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.status}`)}">
+      ${icon(p.platform || 'tiktok', 11)}<span>${time}</span></div>`;
+  }
+  return `<div class="pc" ${drag}>
+    ${p.images[p.cover_index] ? `<img src="${esc(p.images[p.cover_index])}" alt="">` : ''}
+    <div class="when" title="${PLATFORM[p.platform] || 'TikTok'}">${icon(p.platform || 'tiktok', 13)}${time}</div>
+    <div class="note">${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</div>
+    <span class="pill ${p.status}">${p.status}</span>
+    ${p.fail_reason ? `<div class="note ${p.status === 'failed' ? 'bad' : ''}">${esc(p.fail_reason)}</div>` : ''}
+    <div class="acts">
+      ${p.status === 'queued' ? `<button data-edit="${p.id}">Edit</button><button data-cancel="${p.id}">Cancel</button>` : ''}
+      ${p.status === 'failed' ? `<button data-retry="${p.id}">Retry</button><button data-edit="${p.id}">Edit</button>` : ''}
+      ${p.status === 'published' || p.status === 'cancelled' ? `<button data-again="${p.id}">Post again</button>` : ''}
+      ${p.post_url ? `<a href="${esc(p.post_url)}" target="_blank" rel="noopener">View</a>` : ''}
+    </div></div>`;
+}
+
 function calendarView() {
-  const start = weekStart();
+  const r = calRange(), month = S.calMode === 'month';
   const accts = S.me.accounts;
   const plats = ORDER.filter(pl => accts.some(a => platformOf(a) === pl));
   const posts = S.posts.filter(p => (S.fPlat === 'all' || (p.platform || 'tiktok') === S.fPlat)
     && (S.fAcct === 'all' || p.account_id === S.fAcct)
     && (S.fBrand === 'all' || acct(p.account_id)?.brand_id === S.fBrand));
-  const days = [...Array(7)].map((_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
-  const today = new Date().toDateString();
   const shown = accts.filter(a => (S.fPlat === 'all' || platformOf(a) === S.fPlat)
     && (S.fBrand === 'all' || a.brand_id === S.fBrand));
+  const days = [...Array(r.n)].map((_, i) => addDays(r.start, i));
+  const now = dayKey(today()), offset = month ? S.month : S.week;
   return `<div class="chips">
       ${S.me.brands.length ? `<select id="fbrand" style="width:auto;padding:5px 10px">
         <option value="all">All brands</option>
@@ -728,30 +793,37 @@ function calendarView() {
         ${shown.map(a => `<option value="${a.id}" ${S.fAcct === a.id ? 'selected' : ''}>${PLATFORM[platformOf(a)]} · ${handle(a)}</option>`).join('')}
       </select>` : ''}
     </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-      <button class="btn sec" data-wk="-1" ${S.week <= 0 ? 'disabled' : ''}>‹</button>
-      <b>${days[0].toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${days[6].toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</b>
-      <button class="btn sec" data-wk="1">›</button>
+    <div class="calbar">
+      <button class="btn sec" data-wk="-1" ${offset <= 0 ? 'disabled' : ''} aria-label="Previous">‹</button>
+      <b>${r.title}</b>
+      <button class="btn sec" data-wk="1" aria-label="Next">›</button>
+      <span class="seg"><button class="${month ? '' : 'on'}" data-mode="week">Week</button><button class="${month ? 'on' : ''}" data-mode="month">Month</button></span>
+      <span class="note">${esc(tz().replace(/_/g, ' '))} · drag a scheduled post to move it</span>
       <a class="btn" href="#compose" style="margin-left:auto;text-decoration:none">New post</a>
     </div>
-    <div class="week">${days.map(d => {
-      const ps = posts.filter(p => new Date(p.scheduled_at * 1000).toDateString() === d.toDateString());
-      return `<div class="day ${d.toDateString() === today ? 'today' : ''}">
-        <h4>${d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })}</h4>
-        ${ps.map(p => `<div class="pc">
-          ${p.images[p.cover_index] ? `<img src="${esc(p.images[p.cover_index])}" alt="">` : ''}
-          <div class="when" title="${PLATFORM[p.platform] || 'TikTok'}">${icon(p.platform || 'tiktok', 13)}${new Date(p.scheduled_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-          <div class="note">${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</div>
-          <span class="pill ${p.status}">${p.status}</span>
-          ${p.fail_reason ? `<div class="note ${p.status === 'failed' ? 'bad' : ''}">${esc(p.fail_reason)}</div>` : ''}
-          <div class="acts">
-            ${p.status === 'queued' ? `<button data-edit="${p.id}">Edit</button><button data-cancel="${p.id}">Cancel</button>` : ''}
-            ${p.status === 'failed' ? `<button data-retry="${p.id}">Retry</button><button data-edit="${p.id}">Edit</button>` : ''}
-            ${p.status === 'published' || p.status === 'cancelled' ? `<button data-again="${p.id}">Post again</button>` : ''}
-            ${p.post_url ? `<a href="${esc(p.post_url)}" target="_blank" rel="noopener">View</a>` : ''}
-          </div></div>`).join('') || '<span class="note">Nothing yet</span>'}
+    ${month ? `<div class="monthhead">${days.slice(0, 7).map(d => `<span>${dayLabel(d, { weekday: 'short' })}</span>`).join('')}</div>` : ''}
+    <div class="${month ? 'month' : 'week'}">${days.map(d => {
+      const ps = posts.filter(p => dayOf(p.scheduled_at) === dayKey(d));
+      const out = month && d.m !== r.month;
+      return `<div class="day ${dayKey(d) === now ? 'today' : ''} ${out ? 'out' : ''}" data-day="${d.y}-${d.m}-${d.d}">
+        <h4>${month ? d.d : dayLabel(d, { weekday: 'short', day: 'numeric' })}</h4>
+        ${ps.map(p => postCard(p, month)).join('') || (month ? '' : '<span class="note">Nothing yet</span>')}
       </div>`;
     }).join('')}</div>`;
+}
+
+// Dropping a post on another day keeps its time of day, in the workspace's zone.
+async function movePost(id, dayStr) {
+  const p = S.posts.find(x => x.id === id);
+  if (!p) return;
+  const [y, m, d] = dayStr.split('-').map(Number), t = zoned(p.scheduled_at * 1000);
+  const at = Math.floor(zonedToMs(y, m, d, t.h, t.mi) / 1000);
+  if (at === p.scheduled_at) return;
+  try {
+    await send(`/posts/${id}`, 'PATCH', { scheduled_at: at });
+    S.flash = { kind: 'ok', text: `Moved to ${fmtFull(at)}.` };
+  } catch (e) { S.flash = { kind: 'err', text: e.message }; }
+  loadWeek();
 }
 
 // Edit (a queued or failed post) or Post again (a finished one): the post's
@@ -850,7 +922,11 @@ function settingsView() {
   return `<div class="card">
     <div class="sec"><span class="cap">Workspace</span>
       ${admin ? `<form id="wsname" class="newbrand"><input type="text" id="wsnamein" maxlength="60" value="${esc(w.name)}" aria-label="Workspace name">
-        <button class="btn sec">Rename</button></form>` : `<p style="margin:0"><b>${esc(w.name)}</b></p>`}
+        <button class="btn sec">Rename</button></form>
+        <label class="f" for="wstz" style="margin-top:12px">Time zone for scheduling and the calendar</label>
+        <select id="wstz"><option value="">Each person's own (${esc(Intl.DateTimeFormat().resolvedOptions().timeZone)})</option>
+          ${(Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : []).map(z => `<option value="${z}" ${w.timezone === z ? 'selected' : ''}>${z.replace(/_/g, ' ')}</option>`).join('')}
+        </select>` : `<p style="margin:0"><b>${esc(w.name)}</b> · ${esc(tz().replace(/_/g, ' '))}</p>`}
       <p class="note">Everything here (accounts, brands, posts and images) belongs to this workspace only. No other workspace can see it.</p>
     </div>
     ${admin ? `<div class="sec"><span class="cap">People</span>
@@ -867,7 +943,7 @@ function settingsView() {
           <button class="btn" data-savescope="${x.user_id}">Save access</button></div>` : ''}
       </div>`).join('')}
       ${m.invites.map(x => `<div class="row acctrow"><span class="txt"><span class="t">${esc(x.email)}</span>
-          <span class="d">Invited as ${x.role}${x.brand_ids ? ` · ${x.brand_ids.length} brand${x.brand_ids.length === 1 ? '' : 's'}` : ''} · expires ${new Date(x.expires_at * 1000).toLocaleDateString()}</span></span>
+          <span class="d">Invited as ${x.role}${x.brand_ids ? ` · ${x.brand_ids.length} brand${x.brand_ids.length === 1 ? '' : 's'}` : ''} · expires ${fmt(x.expires_at, { dateStyle: 'medium' })}</span></span>
         <button class="btn sec" data-uninvite="${x.id}">Cancel invite</button></div>`).join('')}
       <form id="inviteform" class="invite">
         <input type="email" id="invemail" required placeholder="teammate@company.com" aria-label="Email to invite">
@@ -945,6 +1021,7 @@ function bind() {
   on('#newws', 'submit', async e => { e.preventDefault();
     try { await send('/workspaces', 'POST', { name: $('newwsname').value || 'New workspace' }); await loadMe(); S.members = null; location.hash = '#accounts'; route(); }
     catch (x) { S.flash = { kind: 'err', text: x.message }; render(); } });
+  on('#wstz', 'change', e => brandAction(() => send('/workspace', 'PATCH', { timezone: e.target.value || null })));
   on('#wsname', 'submit', e => { e.preventDefault(); brandAction(() => send('/workspace', 'PATCH', { name: $('wsnamein').value })); });
   on('#inviteform', 'submit', e => { e.preventDefault(); const email = $('invemail').value, role = $('invrole').value;
     peopleAction(() => send('/invites', 'POST', { email, role, brand_ids: role === 'member' ? scopeFrom('inv') : null }), `Invite sent to ${email}.`); });
@@ -1008,7 +1085,13 @@ function bind() {
   on('[data-fp]', 'click', e => { S.fPlat = e.target.dataset.fp; S.fAcct = 'all'; render(); });
   on('#facct', 'change', e => { S.fAcct = e.target.value; render(); });
   on('[data-again]', 'click', e => edit(e.target.dataset.again, true));
-  on('[data-wk]', 'click', e => { S.week += Number(e.target.dataset.wk); loadWeek(); });
+  on('[data-wk]', 'click', e => { if (S.calMode === 'month') S.month += Number(e.target.dataset.wk); else S.week += Number(e.target.dataset.wk); loadWeek(); });
+  on('[data-mode]', 'click', e => { S.calMode = e.target.dataset.mode; loadWeek(); });
+  on('[data-drag]', 'dragstart', e => { e.dataTransfer.setData('text/plain', e.currentTarget.dataset.drag); e.dataTransfer.effectAllowed = 'move'; });
+  on('[data-day]', 'dragover', e => { e.preventDefault(); e.currentTarget.classList.add('drop'); });
+  on('[data-day]', 'dragleave', e => e.currentTarget.classList.remove('drop'));
+  on('[data-day]', 'drop', e => { e.preventDefault(); e.currentTarget.classList.remove('drop');
+    const id = e.dataTransfer.getData('text/plain'); if (id) movePost(id, e.currentTarget.dataset.day); });
   on('[data-cancel]', 'click', async e => { try { await api(`/posts/${e.target.dataset.cancel}`, { method: 'DELETE' }); } catch (x) { S.flash = { kind: 'err', text: x.message }; } loadWeek(); });
   on('[data-retry]', 'click', async e => { try { await api(`/posts/${e.target.dataset.retry}/retry`, { method: 'POST' }); } catch (x) { S.flash = { kind: 'err', text: x.message }; } loadWeek(); });
   on('[data-edit]', 'click', e => edit(e.target.dataset.edit));

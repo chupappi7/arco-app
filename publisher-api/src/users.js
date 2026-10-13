@@ -196,8 +196,20 @@ export async function addWorkspace(env, who, body) {
   return { id: ws };
 }
 
-export async function renameWorkspace(env, who, body) {
-  await env.DB.prepare('UPDATE workspaces SET name = ? WHERE id = ?').bind(cleanWsName(body?.name), who.ws).run();
+// Name and time zone. The zone decides how every time in the workspace is
+// shown and entered, so a team in several countries sees the same schedule.
+export async function updateWorkspace(env, who, body) {
+  if (body?.name !== undefined) {
+    await env.DB.prepare('UPDATE workspaces SET name = ? WHERE id = ?').bind(cleanWsName(body.name), who.ws).run();
+  }
+  if (body?.timezone !== undefined) {
+    const tz = body.timezone === null || body.timezone === '' ? null : String(body.timezone);
+    if (tz !== null) {
+      try { new Intl.DateTimeFormat('en', { timeZone: tz }); } catch { throw new HttpError(400, 'Unknown time zone'); }
+      if (tz.length > 64) throw new HttpError(400, 'Unknown time zone');
+    }
+    await env.DB.prepare('UPDATE workspaces SET timezone = ? WHERE id = ?').bind(tz, who.ws).run();
+  }
   return { ok: true };
 }
 

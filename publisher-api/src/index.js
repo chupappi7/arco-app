@@ -1,7 +1,7 @@
 import { json, HttpError, match, readJson, now } from './http.js';
 import { tkFor, TikTokError } from './tiktok.js';
 import { oauthIntake, metaIntake, igIntake, rotateApiKey, logout } from './auth.js';
-import { startEmail, verifyEmail, callerFor, need, myWorkspaces, switchWorkspace, addWorkspace, renameWorkspace,
+import { startEmail, verifyEmail, callerFor, need, myWorkspaces, switchWorkspace, addWorkspace, updateWorkspace,
   logoutEverywhere, listMembers, invite, cancelInvite, acceptInvite, updateMember, removeMember } from './users.js';
 import { metaFor, MetaError } from './meta.js';
 import { listAccounts, creatorInfoFor, disconnect, refreshInstagramTokens } from './accounts.js';
@@ -14,13 +14,13 @@ import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './bra
 
 async function me(req, env, { who }) {
   const ws = who.ws;
-  const row = await env.DB.prepare('SELECT name, api_key_hash FROM workspaces WHERE id = ?').bind(ws).first();
+  const row = await env.DB.prepare('SELECT name, timezone, api_key_hash FROM workspaces WHERE id = ?').bind(ws).first();
   const user = who.userId ? await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(who.userId).first() : null;
   return json({
     user: user ? { id: who.userId, email: user.email } : null,
     // A workspace from before email sign-in: the page asks for an email.
     needs_email: who.via === 'legacy',
-    workspace: { id: ws, name: row?.name || 'My workspace', role: who.role, brand_scope: who.scope },
+    workspace: { id: ws, name: row?.name || 'My workspace', timezone: row?.timezone || null, role: who.role, brand_scope: who.scope },
     workspaces: await myWorkspaces(env, who.userId),
     workspace_id: ws,
     accounts: await listAccounts(env, who),
@@ -55,7 +55,7 @@ export const ROUTES = [
 
   ['POST', '/v1/workspaces', async (req, env, { who }) => json(await addWorkspace(env, who, await body(req))), 'member'],
   ['POST', '/v1/session/workspace', async (req, env, { who }) => json(await switchWorkspace(env, who, await body(req))), 'member'],
-  ['PATCH', '/v1/workspace', async (req, env, { who }) => json(await renameWorkspace(env, who, await body(req))), 'admin'],
+  ['PATCH', '/v1/workspace', async (req, env, { who }) => json(await updateWorkspace(env, who, await body(req))), 'admin'],
   ['GET', '/v1/members', async (req, env, { who }) => json(await listMembers(env, who)), 'admin'],
   ['POST', '/v1/invites', async (req, env, { who }) => json(await invite(env, who, await body(req))), 'admin'],
   ['DELETE', '/v1/invites/:id', async (req, env, { who, params }) => json(await cancelInvite(env, who, params.id)), 'admin'],

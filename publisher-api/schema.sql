@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS workspaces (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL DEFAULT 'My workspace',
+  timezone TEXT,                           -- IANA zone; NULL means the viewer's own
   created_at INTEGER NOT NULL,
   api_key_hash TEXT
 );

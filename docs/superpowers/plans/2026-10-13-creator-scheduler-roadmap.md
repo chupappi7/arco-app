@@ -71,8 +71,8 @@ The everyday loop has to be smooth before anything is added.
 - [ ] Duplicate a post ("Post again" exists; extend it to drafts)
 
 **Scheduling basics:**
-- [ ] Time zone per workspace, shown on every time (today: browser local)
-- [ ] Calendar: drag a post to another day or time; month view next to week
+- [x] Time zone per workspace, shown on every time
+- [x] Calendar: drag a post to another day; month view next to week
 - [ ] Queue / posting slots: set "Mon–Fri 9:00, 18:00" per brand, and "Add to
       queue" picks the next free slot
 

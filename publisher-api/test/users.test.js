@@ -174,6 +174,15 @@ describe('members, roles and invites', () => {
     expect((await (await req(m.sid, '/v1/me', 'GET', undefined, env)).json()).workspace.id).not.toBe(owner.ws);
   });
 
+  it('admins set the workspace time zone; unknown zones are refused', async () => {
+    const owner = await signUp(baseEnv);
+    expect((await req(owner.sid, '/v1/workspace', 'PATCH', { timezone: 'America/New_York' }, env)).status).toBe(200);
+    expect((await (await req(owner.sid, '/v1/me', 'GET', undefined, env)).json()).workspace.timezone).toBe('America/New_York');
+    expect((await req(owner.sid, '/v1/workspace', 'PATCH', { timezone: 'Mars/Olympus' }, env)).status).toBe(400);
+    const m = await join(owner, 'tz@x.co', { role: 'member' });
+    expect((await req(m.sid, '/v1/workspace', 'PATCH', { timezone: 'UTC' }, env)).status).toBe(403);
+  });
+
   it('nobody can switch into a workspace they are not a member of', async () => {
     const a = await signUp(baseEnv), b = await signUp(baseEnv);
     expect((await req(a.sid, '/v1/session/workspace', 'POST', { workspace_id: b.ws }, env)).status).toBe(404);
