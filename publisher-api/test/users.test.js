@@ -166,6 +166,21 @@ describe('members, roles and invites', () => {
     expect((await k(`/v1/members/${m.userId}`, 'DELETE')).status).toBe(403);
   });
 
+  it('the owner can hand the workspace to a member, and nobody else can', async () => {
+    const owner = await signUp(baseEnv);
+    const adm = await join(owner, 'next@x.co', { role: 'admin' });
+    const mem = await join(owner, 'm2@x.co', { role: 'member' });
+    expect((await req(adm.sid, '/v1/workspace/transfer', 'POST', { user_id: adm.userId }, env)).status).toBe(403);
+    expect((await req(owner.sid, '/v1/workspace/transfer', 'POST', { user_id: 'usr_nobody' }, env)).status).toBe(404);
+    expect((await req(owner.sid, '/v1/workspace/transfer', 'POST', { user_id: adm.userId }, env)).status).toBe(200);
+    const roles = Object.fromEntries((await (await req(adm.sid, '/v1/members', 'GET', undefined, env)).json()).members.map(x => [x.email, x.role]));
+    expect(roles['next@x.co']).toBe('owner');
+    expect(Object.values(roles).filter(r => r === 'owner')).toHaveLength(1);
+    expect(roles[mem.email]).toBe('member');
+    // the old owner is an admin now and cannot take it back
+    expect((await req(owner.sid, '/v1/workspace/transfer', 'POST', { user_id: owner.userId }, env)).status).toBe(403);
+  });
+
   it('someone removed from a workspace loses it on their very next request', async () => {
     const owner = await signUp(baseEnv);
     const m = await join(owner, 'gone@x.co', { role: 'member' });

@@ -2,7 +2,7 @@ import { json, HttpError, match, readJson, now } from './http.js';
 import { tkFor, TikTokError } from './tiktok.js';
 import { oauthIntake, metaIntake, igIntake, rotateApiKey, logout } from './auth.js';
 import { startEmail, verifyEmail, callerFor, need, myWorkspaces, switchWorkspace, addWorkspace, updateWorkspace,
-  logoutEverywhere, listMembers, invite, cancelInvite, acceptInvite, updateMember, removeMember } from './users.js';
+  logoutEverywhere, transferOwnership, listMembers, invite, cancelInvite, acceptInvite, updateMember, removeMember } from './users.js';
 import { metaFor, MetaError } from './meta.js';
 import { listAccounts, creatorInfoFor, disconnect, refreshInstagramTokens } from './accounts.js';
 import * as L from './limits.js';
@@ -57,6 +57,7 @@ export const ROUTES = [
   ['POST', '/v1/workspaces', async (req, env, { who }) => json(await addWorkspace(env, who, await body(req))), 'member'],
   ['POST', '/v1/session/workspace', async (req, env, { who }) => json(await switchWorkspace(env, who, await body(req))), 'member'],
   ['PATCH', '/v1/workspace', async (req, env, { who }) => json(await updateWorkspace(env, who, await body(req))), 'admin'],
+  ['POST', '/v1/workspace/transfer', async (req, env, { who }) => json(await transferOwnership(env, who, await body(req))), 'owner'],
   ['GET', '/v1/members', async (req, env, { who }) => json(await listMembers(env, who)), 'admin'],
   ['POST', '/v1/invites', async (req, env, { who }) => json(await invite(env, who, await body(req))), 'admin'],
   ['DELETE', '/v1/invites/:id', async (req, env, { who, params }) => json(await cancelInvite(env, who, params.id)), 'admin'],

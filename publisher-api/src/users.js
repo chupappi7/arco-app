@@ -345,3 +345,20 @@ export async function removeMember(env, who, userId) {
   ]);
   return { ok: true };
 }
+
+// Hand the workspace to another member: they become the owner, the old owner
+// stays on as an admin. Only the owner can do it, and only to someone already
+// in the workspace, so a workspace always has exactly one owner.
+export async function transferOwnership(env, who, body) {
+  if (!who.userId) throw new HttpError(403, 'Sign in as a person to manage people');
+  need(who, 'owner');
+  const to = String(body?.user_id ?? '');
+  if (to === who.userId) throw new HttpError(400, 'You already own this workspace');
+  const m = await memberRow(env, who.ws, to);
+  if (!m) throw new HttpError(404, 'Member not found');
+  await env.DB.batch([
+    env.DB.prepare(`UPDATE memberships SET role = 'owner', brand_ids = NULL WHERE workspace_id = ? AND user_id = ?`).bind(who.ws, to),
+    env.DB.prepare(`UPDATE memberships SET role = 'admin' WHERE workspace_id = ? AND user_id = ?`).bind(who.ws, who.userId),
+  ]);
+  return { ok: true };
+}

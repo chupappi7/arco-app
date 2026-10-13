@@ -83,7 +83,7 @@ The everyday loop has to be smooth before anything is added.
 
 **Sign-in polish:**
 - [ ] "Continue with Google" (needs a Google OAuth client)
-- [ ] Lockout guard: an owner can always get back in; transfer ownership
+- [x] Transfer ownership (the owner can never leave or be removed, so a workspace always has one)
 
 ---
 

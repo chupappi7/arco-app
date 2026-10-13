@@ -1066,6 +1066,7 @@ function settingsView() {
             <option value="member" ${x.role === 'member' ? 'selected' : ''}>Member</option>
             <option value="admin" ${x.role === 'admin' ? 'selected' : ''}>Admin</option></select>
           ${x.role === 'member' && S.me.brands.length ? `<button class="btn sec" data-editscope="${x.user_id}">Brands</button>` : ''}
+          ${owner ? `<button class="btn sec" data-transfer="${x.user_id}" data-email="${esc(x.email)}">Make owner</button>` : ''}
           <button class="btn danger" data-remove="${x.user_id}">Remove</button>` : ''}
         ${S.editScope === x.user_id ? `<div style="flex-basis:100%">${brandPick('sc-' + x.user_id, x.brand_ids)}
           <button class="btn" data-savescope="${x.user_id}">Save access</button></div>` : ''}
@@ -1164,6 +1165,12 @@ function bind() {
     if (!confirm(leave ? 'Leave this workspace? You lose access to its accounts and posts.' : 'Remove this person from the workspace?')) return;
     if (leave) { try { await send(`/members/${id}`, 'DELETE'); await loadMe(); S.members = null; route(); } catch (x) { S.flash = { kind: 'err', text: x.message }; render(); } }
     else peopleAction(() => send(`/members/${id}`, 'DELETE'), 'Removed.'); });
+  on('[data-transfer]', 'click', async e => {
+    const { transfer, email } = e.target.dataset;
+    if (prompt(`Make ${email} the owner? You become an admin and cannot undo this yourself. Type their email to confirm.`) !== email) return;
+    try { await send('/workspace/transfer', 'POST', { user_id: transfer }); await loadMe(); S.members = null;
+      S.flash = { kind: 'ok', text: `${email} now owns this workspace. You are an admin.` }; route(); }
+    catch (x) { S.flash = { kind: 'err', text: x.message }; render(); } });
   on('#logoutall', 'click', async () => { if (!confirm('Sign out on every device?')) return;
     await send('/logout-all', 'POST'); location.href = '/api/auth/logout'; });
   on('[data-cover]', 'click', e => { S.cover = Number(e.target.dataset.cover); render(); });
