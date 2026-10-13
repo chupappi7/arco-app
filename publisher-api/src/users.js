@@ -13,6 +13,7 @@ import { SESSION_TTL } from './limits.js';
 import { cleanSlots } from './slots.js';
 
 const ROLES = ['owner', 'admin', 'member'];
+const MAX_OWNED = 10;
 const CODE_TTL = 600, CODE_MAX_ATTEMPTS = 5, CODES_PER_HOUR = 5, INVITE_TTL = 7 * 86400;
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 
@@ -191,7 +192,7 @@ export async function switchWorkspace(env, who, body) {
 export async function addWorkspace(env, who, body) {
   if (!who.userId) throw new HttpError(400, 'Add your email first');
   const { n } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM memberships WHERE user_id = ? AND role = 'owner'`).bind(who.userId).first();
-  if (n >= 10) throw new HttpError(409, 'You can own up to 10 workspaces');
+  if (n >= MAX_OWNED) throw new HttpError(409, `You can own up to ${MAX_OWNED} workspaces`);
   const ws = await createWorkspace(env, who.userId, body?.name || 'New workspace');
   if (who.sessionHash) await env.DB.prepare('UPDATE sessions SET workspace_id = ? WHERE id_hash = ?').bind(ws, who.sessionHash).run();
   return { id: ws };
@@ -354,8 +355,11 @@ export async function transferOwnership(env, who, body) {
   need(who, 'owner');
   const to = String(body?.user_id ?? '');
   if (to === who.userId) throw new HttpError(400, 'You already own this workspace');
-  const m = await memberRow(env, who.ws, to);
-  if (!m) throw new HttpError(404, 'Member not found');
+  await memberRow(env, who.ws, to);
+  // The same cap as creating a workspace: nobody ends up owning more than
+  // MAX_OWNED by being handed them.
+  const { n } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM memberships WHERE user_id = ? AND role = 'owner'`).bind(to).first();
+  if (n >= MAX_OWNED) throw new HttpError(409, `That person already owns ${MAX_OWNED} workspaces, the most anyone can`);
   await env.DB.batch([
     env.DB.prepare(`UPDATE memberships SET role = 'owner', brand_ids = NULL WHERE workspace_id = ? AND user_id = ?`).bind(who.ws, to),
     env.DB.prepare(`UPDATE memberships SET role = 'admin' WHERE workspace_id = ? AND user_id = ?`).bind(who.ws, who.userId),

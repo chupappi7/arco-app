@@ -181,6 +181,14 @@ describe('members, roles and invites', () => {
     expect((await req(owner.sid, '/v1/workspace/transfer', 'POST', { user_id: owner.userId }, env)).status).toBe(403);
   });
 
+  it('ownership cannot be handed to someone who already owns the maximum', async () => {
+    const owner = await signUp(baseEnv);
+    const full = await join(owner, 'full@x.co', { role: 'member' });
+    for (let i = 0; i < 9; i++) await req(full.sid, '/v1/workspaces', 'POST', { name: `w${i}` }, env);   // 1 own + 9 = 10
+    await req(full.sid, '/v1/session/workspace', 'POST', { workspace_id: owner.ws }, env);
+    expect((await req(owner.sid, '/v1/workspace/transfer', 'POST', { user_id: full.userId }, env)).status).toBe(409);
+  });
+
   it('someone removed from a workspace loses it on their very next request', async () => {
     const owner = await signUp(baseEnv);
     const m = await join(owner, 'gone@x.co', { role: 'member' });
