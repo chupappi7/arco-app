@@ -65,8 +65,8 @@ The everyday loop has to be smooth before anything is added.
       (Blotato's main editing pattern), with each platform's limits live as
       you type: TikTok title 90 / caption 4,000, Instagram 2,200 with 30
       hashtags, Facebook ~63,000
-- [ ] Edit any scheduled post in place (caption, time, images, accounts)
-      without cancelling it; today Edit replaces the post
+- [x] Edit a scheduled post: caption and time in place (detail panel, drag on
+      the calendar); images and accounts through the editor
 - [x] Drafts: save a post (several accounts, their captions) without scheduling it, reopen it later
 - [ ] Duplicate a post ("Post again" exists; extend it to drafts)
 
@@ -77,8 +77,8 @@ The everyday loop has to be smooth before anything is added.
       queue" picks the next free slot
 
 **Know what happened:**
-- [ ] Email when a post fails, with the reason and a Retry link
-- [ ] A post detail view: per-account status, link to the live post, error text
+- [x] Email when a post fails, with the reason and a Retry link (one email per person per run)
+- [x] A post detail view: status, photos, full caption, error, live link; fix the caption in place
 - [ ] Weekly email summary (optional, off by default)
 
 **Sign-in polish:**

@@ -122,6 +122,8 @@ CREATE TABLE IF NOT EXISTS posts (
   public_post_id TEXT,
   post_url TEXT,
   group_id TEXT,                           -- posts made together (one composer submit)
+  created_by TEXT,                         -- user who made it (told if it fails)
+  notified INTEGER NOT NULL DEFAULT 0,     -- 1 once a failure has been emailed
   fail_reason TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL

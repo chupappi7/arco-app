@@ -38,3 +38,18 @@ export const inviteMail = ({ workspace, inviter, link }) => ({
     <p><a href="${esc(link)}" style="display:inline-block;background:#0284C7;color:#fff;padding:10px 16px;border-radius:9px;text-decoration:none;font-weight:600">Accept invite</a></p>
     <p style="color:#71717A">The invite expires in 7 days and only works for this email address.</p>`),
 });
+
+const PLATFORM = { tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook' };
+export function failureMail(posts, link) {
+  const when = p => new Intl.DateTimeFormat('en', { timeZone: p.timezone, dateStyle: 'medium', timeStyle: 'short' })
+    .format(new Date(p.scheduled_at * 1000));
+  const line = p => `${PLATFORM[p.platform] || p.platform} ${p.platform === 'facebook' ? '' : '@'}${p.username} (${when(p)}): ${p.fail_reason || 'failed'}`;
+  const n = posts.length;
+  return {
+    subject: n === 1 ? `A post to ${PLATFORM[posts[0].platform] || 'your account'} failed` : `${n} posts failed to publish`,
+    text: `${n === 1 ? 'This post' : 'These posts'} in ${posts[0].workspace} did not publish:\n\n${posts.map(line).join('\n')}\n\nRetry or edit: ${link}`,
+    html: shell(`<p>${n === 1 ? 'This post' : 'These posts'} in <b>${esc(posts[0].workspace)}</b> did not publish:</p>
+      <ul>${posts.map(p => `<li>${esc(line(p))}</li>`).join('')}</ul>
+      <p><a href="${esc(link)}" style="display:inline-block;background:#0284C7;color:#fff;padding:10px 16px;border-radius:9px;text-decoration:none;font-weight:600">Retry or edit</a></p>`),
+  };
+}

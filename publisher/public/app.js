@@ -28,7 +28,7 @@ const S = {
   // means "same as the main caption".
   over: {},
   drafts: [], fromDraft: null, draftGroup: null,
-  slotEdit: null, queuePosts: null,
+  slotEdit: null, queuePosts: null, detail: null,
   set: { music: false, disclose: false, brand: false, branded: false },
   when: 'now', at: '', busy: false, status: null,
   week: 0, month: 0, calMode: 'week', fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
@@ -66,7 +66,7 @@ async function boot() {
   await loadMe();
   // A message belongs to the page it was shown on, unless it was set for the
   // page being opened (S.keepFlash).
-  window.addEventListener('hashchange', () => { if (!S.keepFlash) S.flash = null; S.keepFlash = false; route(); });
+  window.addEventListener('hashchange', () => { if (!S.keepFlash) S.flash = null; S.keepFlash = false; S.detail = null; route(); });
   route();
 }
 
@@ -116,7 +116,7 @@ function render() {
   if (!signedIn) { $('app').innerHTML = flash + signInView(); bind(); return; }
   if (S.view === 'accounts' && !can('admin')) S.view = 'compose';
   const views = { calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
-  $('app').innerHTML = flash + views[S.view]();
+  $('app').innerHTML = flash + views[S.view]() + (S.view === 'calendar' && S.detail ? detailView() : '');
   bind();
 }
 
@@ -849,10 +849,10 @@ function postCard(p, compact) {
   const time = fmt(p.scheduled_at, { hour: '2-digit', minute: '2-digit' });
   const drag = p.status === 'queued' ? `draggable="true" data-drag="${p.id}"` : '';
   if (compact) {
-    return `<div class="pill-post ${p.status}" ${drag} title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.status}`)}">
+    return `<div class="pill-post ${p.status}" ${drag} data-open="${p.id}" title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.status}`)}">
       ${icon(p.platform || 'tiktok', 11)}<span>${time}</span></div>`;
   }
-  return `<div class="pc" ${drag}>
+  return `<div class="pc" ${drag} data-open="${p.id}">
     ${p.images[p.cover_index] ? `<img src="${esc(p.images[p.cover_index])}" alt="">` : ''}
     <div class="when" title="${PLATFORM[p.platform] || 'TikTok'}">${icon(p.platform || 'tiktok', 13)}${time}</div>
     <div class="note">${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</div>
@@ -906,6 +906,34 @@ function calendarView() {
         ${ps.map(p => postCard(p, month)).join('') || (month ? '' : '<span class="note">Nothing yet</span>')}
       </div>`;
     }).join('')}</div>`;
+}
+
+// The whole post, from the calendar: photos, every word of the caption, what
+// happened, and what can still be done. A post that has not started can have
+// its caption fixed right here.
+function detailView() {
+  const p = S.posts.find(x => x.id === S.detail);
+  if (!p) return '';
+  const a = acct(p.account_id), editable = p.status === 'queued';
+  return `<div class="overlay" id="overlay"><div class="panel" role="dialog" aria-modal="true" aria-label="Post details">
+    <div class="phead">${withBadge(avatar(a?.avatar_url, p.username), p.platform || 'tiktok')}
+      <b>${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</b><span class="pill ${p.status}">${p.status}</span>
+      <button class="link" id="closedetail" style="margin-left:auto" aria-label="Close">Close ×</button></div>
+    <p class="note">${fmtFull(p.scheduled_at)} · ${esc(tz().replace(/_/g, ' '))}</p>
+    <div class="thumbs">${p.images.map((u, n) => `<img src="${esc(u)}" alt="Slide ${n + 1}" class="${n === p.cover_index ? 'cv' : ''}">`).join('')
+      || `<span class="note">${['published', 'failed', 'cancelled'].includes(p.status)
+        ? 'The photos of this post were deleted (7 days after it finished).' : 'No photos.'}</span>`}</div>
+    ${p.title ? `<p><b>${esc(p.title)}</b></p>` : ''}
+    ${editable ? `<label class="f" for="dcap">Caption</label><textarea id="dcap">${esc(p.caption)}</textarea>
+      <button class="btn sec" id="savecap">Save caption</button>`
+      : `<p class="cap-full">${esc(p.caption) || '<span class="note">No caption</span>'}</p>`}
+    ${p.fail_reason ? `<div class="status ${p.status === 'failed' ? 'err' : ''}">${esc(p.fail_reason)}</div>` : ''}
+    <div class="foot" style="padding:12px 0 0">
+      ${editable ? `<button class="btn sec" data-edit="${p.id}">Open in editor</button><button class="btn danger" data-cancel="${p.id}">Cancel post</button>` : ''}
+      ${p.status === 'failed' ? `<button class="btn" data-retry="${p.id}">Retry</button><button class="btn sec" data-edit="${p.id}">Edit</button>` : ''}
+      ${p.status === 'published' || p.status === 'cancelled' ? `<button class="btn sec" data-again="${p.id}">Post again</button>` : ''}
+      ${p.post_url ? `<a class="btn sec" href="${esc(p.post_url)}" target="_blank" rel="noopener" style="text-decoration:none">View live post</a>` : ''}
+    </div></div></div>`;
 }
 
 // Dropping a post on another day keeps its time of day, in the workspace's zone.
@@ -1108,6 +1136,8 @@ async function brandAction(fn) {
 
 // ---- events ------------------------------------------------------------
 
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.detail) { S.detail = null; render(); } });
+
 function bind() {
   const on = (sel, ev, fn) => document.querySelectorAll(sel).forEach(el => el.addEventListener(ev, fn));
   on('#files', 'change', e => addFiles(e.target.files));
@@ -1193,8 +1223,15 @@ function bind() {
   on('#stopedit', 'click', () => { resetComposer(); location.hash = '#calendar'; });
   on('[data-fp]', 'click', e => { S.fPlat = e.target.dataset.fp; S.fAcct = 'all'; render(); });
   on('#facct', 'change', e => { S.fAcct = e.target.value; render(); });
-  on('[data-again]', 'click', e => edit(e.target.dataset.again, true));
+  on('[data-again]', 'click', e => { S.detail = null; edit(e.target.dataset.again, true); });
   on('[data-wk]', 'click', e => { if (S.calMode === 'month') S.month += Number(e.target.dataset.wk); else S.week += Number(e.target.dataset.wk); loadWeek(); });
+  on('[data-open]', 'click', e => { if (e.target.closest('button,a')) return; S.detail = e.currentTarget.dataset.open; render(); });
+  on('#closedetail', 'click', () => { S.detail = null; render(); });
+  on('#overlay', 'click', e => { if (e.target.id === 'overlay') { S.detail = null; render(); } });
+  on('#savecap', 'click', async () => {
+    try { await send(`/posts/${S.detail}`, 'PATCH', { caption: $('dcap').value }); S.flash = { kind: 'ok', text: 'Caption saved.' }; }
+    catch (x) { S.flash = { kind: 'err', text: x.message }; }
+    loadWeek(); });
   on('[data-mode]', 'click', e => { S.calMode = e.target.dataset.mode; loadWeek(); });
   on('[data-drag]', 'dragstart', e => { e.dataTransfer.setData('text/plain', e.currentTarget.dataset.drag); e.dataTransfer.effectAllowed = 'move'; });
   on('[data-day]', 'dragover', e => { e.preventDefault(); e.currentTarget.classList.add('drop'); });
@@ -1203,7 +1240,7 @@ function bind() {
     const id = e.dataTransfer.getData('text/plain'); if (id) movePost(id, e.currentTarget.dataset.day); });
   on('[data-cancel]', 'click', async e => { try { await api(`/posts/${e.target.dataset.cancel}`, { method: 'DELETE' }); } catch (x) { S.flash = { kind: 'err', text: x.message }; } loadWeek(); });
   on('[data-retry]', 'click', async e => { try { await api(`/posts/${e.target.dataset.retry}/retry`, { method: 'POST' }); } catch (x) { S.flash = { kind: 'err', text: x.message }; } loadWeek(); });
-  on('[data-edit]', 'click', e => edit(e.target.dataset.edit));
+  on('[data-edit]', 'click', e => { S.detail = null; edit(e.target.dataset.edit); });
   on('[data-disc]', 'click', async e => {
     if (!confirm('Disconnect this account? Its scheduled posts will be cancelled.')) return;
     const id = e.target.dataset.disc;

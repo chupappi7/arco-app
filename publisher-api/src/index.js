@@ -9,6 +9,7 @@ import * as L from './limits.js';
 import { uploadMedia, serveMedia, copyMedia } from './media.js';
 import { createPost, listPosts, cancelPost, retryPost, listDrafts, updatePost } from './posts.js';
 import { tick, publishNow } from './publisher.js';
+import { notifyFailures } from './notify.js';
 import { runCleanup, deleteWorkspace } from './cleanup.js';
 import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './brands.js';
 
@@ -82,7 +83,9 @@ export const ROUTES = [
   ['HEAD', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`, 'HEAD'), 'public'],
   ['POST', '/v1/posts', async (req, env, { who, tk, ctx }) => {
     const post = await createPost(env, tk, who, await body(req));
-    if (post.status === 'queued' && post.scheduled_at <= now()) ctx.waitUntil(publishNow(env, tk, post.id).catch(e => console.error('publishNow', e)));
+    if (post.status === 'queued' && post.scheduled_at <= now()) {
+      ctx.waitUntil(publishNow(env, tk, post.id).then(() => notifyFailures(env)).catch(e => console.error('publishNow', e)));
+    }
     return json(post);
   }, 'member'],
   ['GET', '/v1/posts', async (req, env, { who, url }) => {
@@ -145,6 +148,7 @@ export default {
     ctx.waitUntil((async () => {
       const counts = await tick(env, tkFor(env));
       if (counts.started || counts.published || counts.failed) console.log('tick', JSON.stringify(counts));
+      await notifyFailures(env).catch(e => console.error('notify', e));
       await refreshInstagramTokens(env, metaFor(env)).catch(e => console.error('ig refresh', e));
       await runCleanup(env);
     })());

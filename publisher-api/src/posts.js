@@ -144,10 +144,11 @@ export async function createPost(env, tk, w, input) {
   }
   await env.DB.batch([
     env.DB.prepare(`INSERT INTO posts (id, workspace_id, account_id, status, title, caption, image_keys, cover_index,
-        settings, scheduled_at, next_attempt_at, created_at, updated_at, group_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        settings, scheduled_at, next_attempt_at, created_at, updated_at, group_id, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(id, ws, p.account_id, kind, p.title, p.caption, JSON.stringify(p.image_keys), p.cover_index,
-            JSON.stringify(p.settings), p.scheduled_at, p.scheduled_at, t, t, group),
+            JSON.stringify(p.settings), p.scheduled_at, p.scheduled_at, t, t, group,
+            typeof w === 'string' ? null : w.userId || null),
     env.DB.prepare(`UPDATE media SET post_id = ?, delete_after = NULL WHERE workspace_id = ? AND key IN (${marks})`)
       .bind(id, ws, ...p.image_keys),
   ]);
@@ -193,7 +194,7 @@ export async function retryPost(env, w, id) {
   const t = now();
   await env.DB.batch([
     env.DB.prepare(`UPDATE posts SET status = 'queued', attempts = 0, next_attempt_at = ?, fail_reason = NULL,
-        publish_id = NULL, updated_at = ? WHERE id = ?`).bind(t, t, id),
+        publish_id = NULL, notified = 0, updated_at = ? WHERE id = ?`).bind(t, t, id),
     env.DB.prepare('UPDATE media SET delete_after = NULL WHERE post_id = ?').bind(id),
   ]);
   return postJson(env, await loadPost(env, w, id));
