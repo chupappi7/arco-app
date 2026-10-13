@@ -57,6 +57,9 @@ accounts, posts, brands and image copies is filtered by workspace and, for
 a limited member, by brand (`src/scope.js`). `test/users.test.js` tries to
 reach another workspace's and another brand's data through every endpoint.
 
+AI writing (`src/ai.js`) runs on the Claude API in the Worker: Worker secret
+`ANTHROPIC_API_KEY`. 50 writes per workspace per day (`AI_DAILY_LIMIT`).
+
 Mail goes through Resend: Worker secrets `RESEND_API_KEY` and `MAIL_FROM`
 (a sender on a domain verified in Resend).
 

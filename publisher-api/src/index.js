@@ -10,6 +10,7 @@ import { uploadMedia, serveMedia, copyMedia } from './media.js';
 import { createPost, listPosts, cancelPost, retryPost, listDrafts, updatePost } from './posts.js';
 import { tick, publishNow } from './publisher.js';
 import { notifyFailures } from './notify.js';
+import { writeCaptions, aiUsage } from './ai.js';
 import { runCleanup, deleteWorkspace } from './cleanup.js';
 import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './brands.js';
 
@@ -32,6 +33,7 @@ async function me(req, env, { who }) {
               min_lead_seconds: L.MIN_LEAD_SECONDS, ig_images: L.IG_MAX_IMAGES, ig_caption: L.IG_MAX_CAPTION },
     facebook_enabled: !!(env.META_APP_ID && env.META_APP_SECRET),
     instagram_enabled: !!(env.IG_APP_ID && env.IG_APP_SECRET),
+    ai_enabled: !!(env.ANTHROPIC_API_KEY || env.__ai),
   });
 }
 
@@ -96,6 +98,8 @@ export const ROUTES = [
     }
     return json({ posts: await listPosts(env, who, from, to) });
   }, 'member'],
+  ['POST', '/v1/ai/captions', async (req, env, { who }) => json(await writeCaptions(env, who, await body(req))), 'member'],
+  ['GET', '/v1/ai/usage', async (req, env, { who }) => json(await aiUsage(env, who)), 'member'],
   ['GET', '/v1/drafts', async (req, env, { who }) => json({ drafts: await listDrafts(env, who) }), 'member'],
   ['PATCH', '/v1/posts/:id', async (req, env, { who, params }) => json(await updatePost(env, who, params.id, await body(req))), 'member'],
   ['DELETE', '/v1/posts/:id', async (req, env, { who, params }) => json(await cancelPost(env, who, params.id)), 'member'],

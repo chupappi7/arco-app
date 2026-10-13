@@ -29,6 +29,8 @@ const S = {
   over: {},
   drafts: [], fromDraft: null, draftGroup: null,
   slotEdit: null, queuePosts: null, detail: null,
+  ai: { open: false, brief: '', tone: 'friendly', length: 'medium', emoji: true, hashtags: true, cta: '', language: '', busy: false, err: '', remaining: null },
+  voiceEdit: null,
   set: { music: false, disclose: false, brand: false, branded: false },
   when: 'now', at: '', busy: false, status: null,
   week: 0, month: 0, calMode: 'week', fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
@@ -211,9 +213,12 @@ function composeView() {
       ${tts.length ? `<label class="f" for="title">Title <span class="note">(TikTok only)</span></label>
       <input type="text" id="title" maxlength="200" value="${esc(S.title)}">
       <div class="count ${len(S.title) > 90 ? 'note bad' : ''}">${len(S.title)} / 90</div>` : ''}
+      ${S.me.ai_enabled ? aiPanel() : ''}
       <label class="f" for="caption">Caption${chosenPlatforms().length > 1 ? ' <span class="note">(used everywhere unless customized below)</span>' : ''}</label>
       <textarea id="caption">${esc(S.caption)}</textarea>
       <div class="limits" id="caplimits">${limitsLine()}</div>
+      ${S.me.ai_enabled && S.caption.trim() ? `<div class="rewrites"><span class="note">Rewrite:</span>${Object.entries(REWRITE_LABEL)
+        .map(([k, l]) => `<button type="button" class="chip" data-rewrite="${k}" ${S.ai.busy ? 'disabled' : ''}>${l}</button>`).join('')}</div>` : ''}
       ${overridesView()}
     </div>
     ${tts.length ? `<div class="sec"><span class="cap">TikTok settings</span>
@@ -631,6 +636,77 @@ function resetComposer() {
   S.set = { music: false, disclose: false, brand: false, branded: false };
 }
 
+// ---- AI writing ------------------------------------------------------------
+// Writes from the photos and a one-line brief; the result lands in the editor
+// for the person to read and change. Nothing is posted by it.
+
+const TONES = ['friendly', 'professional', 'playful', 'bold', 'inspirational', 'educational'];
+const REWRITE_LABEL = { shorter: 'Shorter', punchier: 'Punchier', professional: 'More professional', casual: 'More casual', grammar: 'Fix grammar', hashtags: 'Add hashtags' };
+const cap1 = s => s[0].toUpperCase() + s.slice(1);
+
+// The brand to write for: the one most of the chosen accounts belong to.
+function aiBrand() {
+  const counts = {};
+  for (const id of S.targets) { const b = acct(id)?.brand_id; if (b) counts[b] = (counts[b] || 0) + 1; }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+}
+
+function aiPanel() {
+  const A = S.ai;
+  if (!A.open) return `<button type="button" class="btn sec aibtn" id="aiopen">✨ Write with AI</button>`;
+  const brand = aiBrand(), bname = brand && S.me.brands.find(b => b.id === brand);
+  return `<div class="aipanel">
+    <div class="phead"><b>✨ Write with AI</b>${A.remaining != null ? `<span class="note">${A.remaining} left today</span>` : ''}
+      <button type="button" class="link" id="aiclose" style="margin-left:auto">Close</button></div>
+    <label class="f" for="aibrief">What is this post about? <span class="note">(optional with photos)</span></label>
+    <textarea id="aibrief" maxlength="1000" placeholder="e.g. New sourdough is out, only on weekends">${esc(A.brief)}</textarea>
+    <div class="aiopts">
+      <label>Tone <select id="aitone">${TONES.map(t => `<option value="${t}" ${A.tone === t ? 'selected' : ''}>${cap1(t)}</option>`).join('')}</select></label>
+      <label>Length <select id="ailen">${['short', 'medium', 'long'].map(t => `<option value="${t}" ${A.length === t ? 'selected' : ''}>${cap1(t)}</option>`).join('')}</select></label>
+      <label>Language <input type="text" id="ailang" maxlength="40" placeholder="Auto" value="${esc(A.language)}"></label>
+      <label class="chk"><input type="checkbox" id="aiemoji" ${A.emoji ? 'checked' : ''}> Emoji</label>
+      <label class="chk"><input type="checkbox" id="aitags" ${A.hashtags ? 'checked' : ''}> Hashtags</label>
+    </div>
+    <label class="f" for="aicta">Call to action <span class="note">(optional)</span></label>
+    <input type="text" id="aicta" maxlength="200" placeholder="e.g. Order in the link in bio" value="${esc(A.cta)}">
+    <p class="note">${S.images.length ? `Reads ${Math.min(S.images.length, 6)} photo${S.images.length === 1 ? '' : 's'}. ` : ''}Writes for ${chosenPlatforms().map(p => PLATFORM[p]).join(', ') || 'the platforms you choose'}${
+      bname ? ` in ${esc(bname.name)}'s voice${bname.voice ? '' : ' (no brand voice set yet)'}` : ''}. Replaces the caption and title below.</p>
+    ${A.err ? `<div class="status err">${esc(A.err)}</div>` : ''}
+    <button type="button" class="btn" id="aigo" ${A.busy || !S.targets.length ? 'disabled' : ''}>${A.busy ? 'Writing…' : 'Write it'}</button>
+  </div>`;
+}
+
+async function aiWrite() {
+  const A = S.ai;
+  A.busy = true; A.err = ''; render();
+  try {
+    const r = await send('/ai/captions', 'POST', { platforms: chosenPlatforms(), image_keys: S.images.filter(m => m.key).map(m => m.key),
+      brief: A.brief, tone: A.tone, length: A.length, emoji: A.emoji, hashtags: A.hashtags, cta: A.cta, language: A.language, brand_id: aiBrand() });
+    const pls = chosenPlatforms();
+    // TikTok's (or Facebook's) text is the main caption; the others become
+    // per-platform captions where they differ, Instagram usually the short one.
+    const main = ['tiktok', 'facebook', 'instagram'].find(p => pls.includes(p));
+    S.caption = r.captions[main] || '';
+    S.over = {};
+    for (const pl of pls) if (pl !== main && r.captions[pl] && r.captions[pl] !== S.caption) S.over[pl] = r.captions[pl];
+    if (r.title) S.title = r.title;
+    A.remaining = r.remaining; A.open = false;
+    S.status = { kind: 'ok', text: 'Written. Read it over and edit anything before posting.' };
+  } catch (e) { A.err = e.message; }
+  A.busy = false; render();
+}
+
+async function aiRewrite(kind) {
+  const A = S.ai;
+  A.busy = true; render();
+  try {
+    const r = await send('/ai/captions', 'POST', { mode: 'rewrite', text: S.caption, instruction: kind, brand_id: aiBrand(),
+      platform: chosenPlatforms().length === 1 ? chosenPlatforms()[0] : undefined });
+    S.caption = r.text; A.remaining = r.remaining;
+  } catch (e) { S.status = { kind: 'err', text: e.message }; }
+  A.busy = false; render();
+}
+
 // ---- posting slots and the queue -------------------------------------------
 
 const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -698,6 +774,17 @@ function slotsEditor(key, current, label) {
       <button type="button" class="btn sec" id="slotcancel">Cancel</button>
       ${key !== 'ws' && current ? '<button type="button" class="link" id="slotclear">Use the workspace default</button>' : ''}</div>
     <span class="note">Times are in ${esc(tz().replace(/_/g, ' '))}.</span></div>`;
+}
+
+function voiceLine(id) {
+  const b = S.me.brands.find(x => x.id === id);
+  if (S.voiceEdit?.id === id) {
+    return `<div class="sloted"><label class="f" for="voicetext">Brand voice for AI writing</label>
+      <textarea id="voicetext" maxlength="2000" placeholder="How the brand sounds, words it uses or avoids, and one or two example posts">${esc(S.voiceEdit.text)}</textarea>
+      <div class="acts2"><button type="button" class="btn" id="voicesave">Save</button><button type="button" class="btn sec" id="voicecancel">Cancel</button></div></div>`;
+  }
+  return `<div class="slotline"><span class="note">Brand voice: <b>${b?.voice ? esc(b.voice.slice(0, 80)) + (b.voice.length > 80 ? '…' : '') : 'not set'}</b></span>
+    ${S.me.ai_enabled && can('admin') ? `<button class="link" data-voice="${id}">${b?.voice ? 'Edit' : 'Add'} brand voice</button>` : ''}</div>`;
 }
 
 function openSlots(key) {
@@ -1027,6 +1114,7 @@ function accountsView() {
         <b>${esc(g.name)}</b><span class="marks">${marks(g.accounts)}</span><span class="note">${g.accounts.length} account${g.accounts.length === 1 ? '' : 's'}</span>
         ${g.id !== 'none' ? `<span class="bacts"><button class="link" data-rename="${g.id}">Rename</button>
           <button class="link danger" data-delbrand="${g.id}">Delete</button></span>` : ''}</div>
+        ${g.id !== 'none' ? voiceLine(g.id) : ''}
         ${g.id !== 'none' ? slotsEditor(g.id, S.me.brands.find(b => b.id === g.id)?.slots,
           S.me.brands.find(b => b.id === g.id)?.slots ? 'Posting times' : `Posting times (workspace default: ${slotsText(S.me.workspace.slots)})`) : ''}
         ${g.accounts.map(accountRow).join('') || '<p class="note">No accounts yet. Use "Brand" on any account below to move it here.</p>'}
@@ -1185,6 +1273,25 @@ function bind() {
   on('#title', 'input', e => { S.title = e.target.value; });
   on('#title', 'change', render);
   on('#caption', 'input', e => { S.caption = e.target.value; refreshLimits(); });
+  on('#aiopen', 'click', async () => { S.ai.open = true; render(); $('aibrief')?.focus();
+    if (S.ai.remaining == null) { try { S.ai.remaining = (await api('/ai/usage')).remaining; render(); } catch {} } });
+  on('#aiclose', 'click', () => { S.ai.open = false; render(); });
+  on('#aibrief', 'input', e => { S.ai.brief = e.target.value; });
+  on('#aicta', 'input', e => { S.ai.cta = e.target.value; });
+  on('#ailang', 'input', e => { S.ai.language = e.target.value; });
+  on('#aitone', 'change', e => { S.ai.tone = e.target.value; });
+  on('#ailen', 'change', e => { S.ai.length = e.target.value; });
+  on('#aiemoji', 'change', e => { S.ai.emoji = e.target.checked; });
+  on('#aitags', 'change', e => { S.ai.hashtags = e.target.checked; });
+  on('#aigo', 'click', aiWrite);
+  on('[data-rewrite]', 'click', e => aiRewrite(e.target.dataset.rewrite));
+  on('[data-voice]', 'click', e => { const id = e.target.dataset.voice; S.voiceEdit = { id, text: S.me.brands.find(b => b.id === id)?.voice || '' }; render(); });
+  on('#voicetext', 'input', e => { S.voiceEdit.text = e.target.value; });
+  on('#voicecancel', 'click', () => { S.voiceEdit = null; render(); });
+  on('#voicesave', 'click', async () => {
+    try { await send(`/brands/${S.voiceEdit.id}`, 'PATCH', { voice: S.voiceEdit.text }); S.voiceEdit = null; S.flash = { kind: 'ok', text: 'Brand voice saved.' }; }
+    catch (x) { S.flash = { kind: 'err', text: x.message }; }
+    await refreshMe(); });
   on('[data-ov]', 'input', e => { S.over[e.target.dataset.ov] = e.target.value; refreshLimits(); });
   on('[data-ov]', 'change', render);
   on('[data-custom]', 'click', e => { const pl = e.currentTarget.dataset.custom; S.over[pl] = S.caption; render(); $(`ov-${pl}`)?.focus(); });

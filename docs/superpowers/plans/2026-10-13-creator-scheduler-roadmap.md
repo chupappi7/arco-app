@@ -89,18 +89,18 @@ The everyday loop has to be smooth before anything is added.
 
 ## Phase 2: AI titles and captions (weeks 3–4)
 
-- [ ] "Write with AI" in the composer: from the photos (vision) plus an
+- [x] "Write with AI" in the composer: from the photos (vision) plus an
       optional one-line brief, generate a title and captions per platform
-- [ ] Options: tone (casual, professional, playful…), length, emoji, hashtags,
+- [x] Options: tone (casual, professional, playful…), length, emoji, hashtags,
       call to action, language
-- [ ] Rewrite / shorten / make it punchier for an existing caption
-- [ ] Brand voice: a short description and example posts saved per brand,
+- [x] Rewrite / shorten / make it punchier for an existing caption
+- [x] Brand voice: a short description and example posts saved per brand,
       used in every generation for that brand
-- [ ] Runs in the Worker on the Claude API (Haiku for speed and cost, Sonnet
-      for "better" rewrites); the API key stays server side
-- [ ] Free-plan quota per workspace (for example 50 generations a day), shown
+- [x] Runs in the Worker on the Claude API (Claude Opus 5.5 at low effort,
+      server-side refusal fallback); the API key stays server side
+- [x] Free-plan quota per workspace (for example 50 generations a day), shown
       in the UI, to cap cost and abuse
-- [ ] Nothing generated is posted without the person seeing it first
+- [x] Nothing generated is posted without the person seeing it first
 
 ---
 

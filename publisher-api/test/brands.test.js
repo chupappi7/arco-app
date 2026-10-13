@@ -21,7 +21,7 @@ describe('brands', () => {
     const b = await (await call('/v1/brands', h, 'POST', { name: '  Client   Bakery ', account_ids: [account] })).json();
     expect(b.name).toBe('Client Bakery');
     let me = await (await call('/v1/me', h)).json();
-    expect(me.brands).toEqual([{ id: b.id, name: 'Client Bakery', slots: null }]);
+    expect(me.brands).toEqual([{ id: b.id, name: 'Client Bakery', slots: null, voice: null }]);
     expect(me.accounts[0].brand_id).toBe(b.id);
 
     await call(`/v1/brands/${b.id}`, h, 'PATCH', { name: 'Bakery' });

@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS brands (
   workspace_id TEXT NOT NULL,
   name TEXT NOT NULL,
   slots TEXT,                              -- posting times, JSON {days, times}; NULL = workspace default
+  voice TEXT,                              -- brand voice for AI writing: how it sounds, example posts
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS brands_ws ON brands(workspace_id);
@@ -131,3 +132,11 @@ CREATE TABLE IF NOT EXISTS posts (
 CREATE INDEX IF NOT EXISTS posts_due ON posts(status, next_attempt_at);
 CREATE INDEX IF NOT EXISTS posts_ws ON posts(workspace_id, scheduled_at);
 CREATE INDEX IF NOT EXISTS posts_drafts ON posts(workspace_id, status, updated_at);
+
+-- AI generations per workspace per UTC day, for the free quota.
+CREATE TABLE IF NOT EXISTS ai_usage (
+  workspace_id TEXT NOT NULL,
+  day TEXT NOT NULL,
+  count INTEGER NOT NULL,
+  PRIMARY KEY (workspace_id, day)
+);

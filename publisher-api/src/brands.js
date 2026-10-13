@@ -13,7 +13,7 @@ const cleanName = n => {
 
 export async function listBrands(env, w) {
   const sc = inScope(w, 'id');
-  const { results } = await env.DB.prepare(`SELECT id, name, slots FROM brands WHERE workspace_id = ?${sc.sql} ORDER BY name COLLATE NOCASE`)
+  const { results } = await env.DB.prepare(`SELECT id, name, slots, voice FROM brands WHERE workspace_id = ?${sc.sql} ORDER BY name COLLATE NOCASE`)
     .bind(wsOf(w), ...sc.binds).all();
   return results.map(b => ({ ...b, slots: parseSlots(b.slots) }));
 }
@@ -43,6 +43,11 @@ export async function renameBrand(env, ws, id, body) {
   await env.DB.prepare('UPDATE brands SET name = ? WHERE id = ? AND workspace_id = ?').bind(name, id, ws).run();
   if (body?.slots !== undefined) {
     await env.DB.prepare('UPDATE brands SET slots = ? WHERE id = ? AND workspace_id = ?').bind(cleanSlots(body.slots), id, ws).run();
+  }
+  if (body?.voice !== undefined) {
+    const voice = body.voice === null ? null : String(body.voice).trim();
+    if (voice && [...voice].length > 2000) throw new HttpError(400, 'The brand voice can be at most 2000 characters');
+    await env.DB.prepare('UPDATE brands SET voice = ? WHERE id = ? AND workspace_id = ?').bind(voice || null, id, ws).run();
   }
   return { id, name };
 }
