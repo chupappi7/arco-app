@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': env('INTERNAL_SECRET') },
       body: JSON.stringify({ code, redirect_uri: igRedirectUri(req),
-        session_id: adding ? rawCookie(req, SESSION_COOKIE) || undefined : undefined }),
+        session_id: rawCookie(req, SESSION_COOKIE) || undefined }),
     });
     body = await r.json();
     if (!r.ok) return back(res, body.error || `sign-in failed (${r.status})`);

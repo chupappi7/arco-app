@@ -25,10 +25,14 @@ const S = {
   when: 'now', at: '', busy: false, status: null,
   week: 0, fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
   pickOpen: false, pq: '',
+  login: { step: 'email', email: '', code: '', busy: false, err: '' }, members: null, invited: null,
 };
 const ORDER = ['tiktok', 'instagram', 'facebook'];
 const platformOf = a => a?.platform || 'tiktok';
 const SAVED = 'arco-publisher.targets';
+const INVITE = 'arco-publisher.invite';
+const RANK = { member: 1, admin: 2, owner: 3 };
+const can = role => !!S.me && RANK[S.me.workspace?.role || 'member'] >= RANK[role];
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -48,11 +52,27 @@ async function boot() {
   const q = new URL(location.href).searchParams;
   if (q.get('auth_error')) S.flash = { kind: 'err', text: q.get('auth_error') };
   else if (q.get('connected')) S.flash = { kind: 'ok', text: `Connected ${q.get('connected')} account${q.get('connected') === '1' ? '' : 's'}.` };
-  if (q.get('auth_error') || q.get('connected')) history.replaceState({}, '', location.pathname + location.hash);
-  try { S.me = await api('/me'); } catch (e) { if (e.status !== 401) S.flash = { kind: 'err', text: e.message }; }
-  if (S.me) restoreTargets();
+  // An invite link: kept through sign-in, accepted once signed in.
+  if (q.get('invite')) { try { sessionStorage.setItem(INVITE, q.get('invite')); } catch {} }
+  if (q.get('auth_error') || q.get('connected') || q.get('invite')) history.replaceState({}, '', location.pathname + location.hash);
+  await loadMe();
   window.addEventListener('hashchange', route);
   route();
+}
+
+async function loadMe() {
+  try { S.me = await api('/me'); } catch (e) { S.me = null; if (e.status !== 401) S.flash = { kind: 'err', text: e.message }; }
+  if (!S.me || S.me.needs_email) return;
+  let token = null;
+  try { token = sessionStorage.getItem(INVITE); } catch {}
+  if (token) {
+    try { sessionStorage.removeItem(INVITE); } catch {}
+    try { await send('/invites/accept', 'POST', { token }); S.me = await api('/me');
+      S.flash = { kind: 'ok', text: `You joined ${S.me.workspace.name}.` }; }
+    catch (e) { S.flash = { kind: 'err', text: e.message }; }
+  }
+  S.targets = []; S.tt = {};
+  restoreTargets();
 }
 
 // The accounts last posted to come back preselected: someone running ten
@@ -74,31 +94,88 @@ function route() {
 // ---- render ------------------------------------------------------------
 
 function render() {
-  $('tabs').hidden = !S.me;
-  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.v === S.view));
+  const signedIn = !!S.me && !S.me.needs_email;
+  $('tabs').hidden = !signedIn;
+  $('wsbar').innerHTML = signedIn ? wsBar() : '';
+  document.querySelectorAll('#tabs a').forEach(a => {
+    a.classList.toggle('on', a.dataset.v === S.view);
+    a.hidden = a.dataset.v === 'accounts' && !can('admin');
+  });
   const flash = S.flash ? `<div class="status ${S.flash.kind}">${esc(S.flash.text)}</div>` : '';
-  if (!S.me) { $('app').innerHTML = flash + signInView(); return; }
+  if (!signedIn) { $('app').innerHTML = flash + signInView(); bind(); return; }
+  if (S.view === 'accounts' && !can('admin')) S.view = 'compose';
   const views = { calendar: calendarView, accounts: accountsView, settings: settingsView, compose: composeView };
   $('app').innerHTML = flash + views[S.view]();
   bind();
 }
 
+// ---- sign in: email, then the 6-digit code it receives ---------------------
+
 function signInView() {
-  return `<div class="card"><div class="sec">
-    <span class="cap">Sign in</span>
-    <p style="margin:0 0 16px;color:var(--muted)">Schedule photo posts to TikTok, Instagram and Facebook Pages,
-      one account or many. We show each account's name and picture so you always know where a post is going, and we
-      only post what you confirm.</p>
-    <div class="brands">${connectBtn('tiktok', '/api/auth/start', 'Continue with TikTok')}
-      ${connectBtn('instagram', '/api/auth/instagram/start', 'Continue with Instagram')}
-      ${connectBtn('facebook', '/api/auth/meta/start', 'Continue with Facebook')}</div>
-    <p class="note" style="margin-top:14px">Instagram needs a professional (Business or Creator) account. Facebook
-      sign-in connects the Pages you manage. Whichever you start with, you can add the others under Accounts.</p>
+  const L = S.login, claiming = S.me?.needs_email;
+  let invited = false;
+  try { invited = !!sessionStorage.getItem(INVITE); } catch {}
+  return `<div class="card signin"><div class="sec">
+    <span class="cap">${claiming ? 'Add your email' : 'Sign in or create an account'}</span>
+    <p style="margin:0 0 16px;color:var(--muted)">${claiming
+      ? 'ARCO Publisher now signs in with email. Add yours to keep this workspace, its accounts and its posts. From then on you sign in with it, and you can invite teammates.'
+      : invited ? 'Sign in with the email the invite was sent to, and you will join the workspace.'
+      : 'Schedule photo posts to TikTok, Instagram and Facebook Pages, one account or many. No password: we email you a code.'}</p>
+    ${L.step === 'email' ? `<form id="loginemail" class="loginform">
+        <label class="f" for="le">Email</label>
+        <input type="email" id="le" autocomplete="email" required value="${esc(L.email)}" placeholder="you@company.com">
+        <button class="btn" ${L.busy ? 'disabled' : ''}>${L.busy ? 'Sending…' : 'Email me a code'}</button>
+      </form>`
+    : `<form id="logincode" class="loginform">
+        <label class="f" for="lc">Enter the 6-digit code we sent to <b>${esc(L.email)}</b></label>
+        <input type="text" id="lc" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required value="${esc(L.code)}">
+        <button class="btn" ${L.busy ? 'disabled' : ''}>${L.busy ? 'Checking…' : claiming ? 'Add email' : 'Sign in'}</button>
+        <p class="note"><button type="button" class="link" id="loginback">Use a different email</button> ·
+          <button type="button" class="link" id="loginresend">Send a new code</button></p>
+      </form>`}
+    ${L.err ? `<div class="status err">${esc(L.err)}</div>` : ''}
+    ${claiming ? '' : `<p class="note" style="margin-top:18px">Signed up with TikTok before email sign-in existed?
+      <a href="/api/auth/start">Continue with TikTok</a> once, then add your email.</p>`}
+    <p class="note">By continuing you agree to the <a href="/terms.html">terms</a> and <a href="/privacy.html">privacy policy</a>.</p>
   </div></div>`;
 }
 
+async function sendCode() {
+  const L = S.login;
+  L.busy = true; L.err = ''; render();
+  try { await send('/auth/email/start', 'POST', { email: L.email }); L.step = 'code'; L.code = ''; }
+  catch (e) { L.err = e.message; }
+  L.busy = false; render();
+  $('lc')?.focus();
+}
+
+async function verifyCode() {
+  const L = S.login;
+  L.busy = true; L.err = ''; render();
+  try {
+    const r = await fetch('/api/auth/email/verify', { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: L.email, code: L.code }) });
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(b.error || 'Sign-in failed');
+    S.login = { step: 'email', email: '', code: '', busy: false, err: '' };
+    await loadMe(); route(); return;
+  } catch (e) { L.err = e.message; }
+  L.busy = false; render();
+}
+
+// The workspace you are in, and a switch when you belong to several.
+function wsBar() {
+  const w = S.me.workspace, list = S.me.workspaces || [];
+  const label = w.role === 'owner' ? 'Owner' : w.role === 'admin' ? 'Admin' : w.brand_scope ? 'Member · some brands' : 'Member';
+  return `${list.length > 1 ? `<select id="wsswitch" aria-label="Workspace">
+      ${list.map(x => `<option value="${x.id}" ${x.id === w.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`
+    : `<b>${esc(w.name)}</b>`}<span class="note">${label}${S.me.user ? ` · ${esc(S.me.user.email)}` : ''}</span>`;
+}
+
 function composeView() {
-  if (!S.me.accounts.length) return `<div class="card"><div class="sec">Connect an account in <a href="#accounts">Accounts</a> first.</div></div>`;
+  if (!S.me.accounts.length) return `<div class="card"><div class="sec">${can('admin')
+    ? 'Connect an account in <a href="#accounts">Accounts</a> first.'
+    : 'No accounts are shared with you yet. Ask a workspace admin to give you access to a brand.'}</div></div>`;
   const tts = ttTargets();
   const label = S.set.branded ? 'Paid partnership' : S.set.brand ? 'Promotional content' : '';
   const need = missing();
@@ -220,7 +297,7 @@ function pickPanel() {
         </label>`).join('')}
       </div>`;
     }).join('') || '<p class="note">No account matches.</p>'}
-    <p class="note" style="margin:8px 0 0"><a href="#accounts">Manage accounts and brands</a></p>
+    ${can('admin') ? '<p class="note" style="margin:8px 0 0"><a href="#accounts">Manage accounts and brands</a></p>' : ''}
   </div>`;
 }
 
@@ -623,22 +700,90 @@ function accountsView() {
 }
 
 function settingsView() {
+  const w = S.me.workspace, owner = can('owner'), admin = can('admin');
+  if (admin && S.members === null) loadMembers();
+  const brandPick = (name, chosen) => S.me.brands.length ? `<div class="scope">
+      <label><input type="radio" name="${name}" value="all" ${!chosen ? 'checked' : ''}> All brands</label>
+      <label><input type="radio" name="${name}" value="some" ${chosen ? 'checked' : ''}> Only:</label>
+      ${S.me.brands.map(b => `<label class="bchk"><input type="checkbox" data-scope="${name}" value="${b.id}" ${chosen?.includes(b.id) ? 'checked' : ''}> ${esc(b.name)}</label>`).join('')}
+    </div>` : '';
+  const m = S.members;
   return `<div class="card">
-    <div class="sec"><span class="cap">Accounts</span>
-      <p class="note" style="margin:0">Connect, group and disconnect accounts in <a href="#accounts">Accounts</a>.</p></div>
-    <div class="sec"><span class="cap">API key</span>
-      <p class="note">For posting from your own tools. The key can do everything you can do here. Creating a new key disables the old one.</p>
+    <div class="sec"><span class="cap">Workspace</span>
+      ${admin ? `<form id="wsname" class="newbrand"><input type="text" id="wsnamein" maxlength="60" value="${esc(w.name)}" aria-label="Workspace name">
+        <button class="btn sec">Rename</button></form>` : `<p style="margin:0"><b>${esc(w.name)}</b></p>`}
+      <p class="note">Everything here (accounts, brands, posts and images) belongs to this workspace only. No other workspace can see it.</p>
+    </div>
+    ${admin ? `<div class="sec"><span class="cap">People</span>
+      ${!m ? '<p class="note">Loading…</p>' : `
+      ${m.members.map(x => `<div class="row acctrow"><span class="txt"><span class="t">${esc(x.email)}${x.user_id === S.me.user?.id ? ' (you)' : ''}</span>
+          <span class="d">${x.role === 'owner' ? 'Owner' : x.role === 'admin' ? 'Admin · accounts, brands, posts and invites' : x.brand_ids
+            ? `Member · ${x.brand_ids.map(id => esc(S.me.brands.find(b => b.id === id)?.name || 'removed brand')).join(', ')}` : 'Member · all brands'}</span></span>
+        ${x.role !== 'owner' && x.user_id !== S.me.user?.id ? `<select data-role="${x.user_id}" class="move" aria-label="Role for ${esc(x.email)}">
+            <option value="member" ${x.role === 'member' ? 'selected' : ''}>Member</option>
+            <option value="admin" ${x.role === 'admin' ? 'selected' : ''}>Admin</option></select>
+          ${x.role === 'member' && S.me.brands.length ? `<button class="btn sec" data-editscope="${x.user_id}">Brands</button>` : ''}
+          <button class="btn danger" data-remove="${x.user_id}">Remove</button>` : ''}
+        ${S.editScope === x.user_id ? `<div style="flex-basis:100%">${brandPick('sc-' + x.user_id, x.brand_ids)}
+          <button class="btn" data-savescope="${x.user_id}">Save access</button></div>` : ''}
+      </div>`).join('')}
+      ${m.invites.map(x => `<div class="row acctrow"><span class="txt"><span class="t">${esc(x.email)}</span>
+          <span class="d">Invited as ${x.role}${x.brand_ids ? ` · ${x.brand_ids.length} brand${x.brand_ids.length === 1 ? '' : 's'}` : ''} · expires ${new Date(x.expires_at * 1000).toLocaleDateString()}</span></span>
+        <button class="btn sec" data-uninvite="${x.id}">Cancel invite</button></div>`).join('')}
+      <form id="inviteform" class="invite">
+        <input type="email" id="invemail" required placeholder="teammate@company.com" aria-label="Email to invite">
+        <select id="invrole" aria-label="Role"><option value="member">Member</option><option value="admin">Admin</option></select>
+        <button class="btn">Send invite</button>
+        ${brandPick('inv', null)}
+      </form>
+      <p class="note"><b>Admins</b> connect accounts, manage brands and invite people. <b>Members</b> post and schedule,
+        and can be limited to some brands: they never see the others, their accounts or their posts.</p>`}
+    </div>` : ''}
+    <div class="sec"><span class="cap">Your workspaces</span>
+      ${(S.me.workspaces || []).map(x => `<div class="row"><span class="txt"><span class="t">${esc(x.name)}${x.id === w.id ? ' (current)' : ''}</span>
+          <span class="d">${x.role}</span></span>
+        ${x.id !== w.id ? `<button class="btn sec" data-switch="${x.id}">Open</button>` : ''}</div>`).join('')}
+      <form id="newws" class="newbrand"><input type="text" id="newwsname" maxlength="60" placeholder="New workspace, e.g. a separate client">
+        <button class="btn sec">Create workspace</button></form>
+      ${w.role !== 'owner' ? `<p><button class="btn danger" data-remove="${S.me.user?.id}" data-leave="1">Leave this workspace</button></p>` : ''}
+    </div>
+    ${owner ? `<div class="sec"><span class="cap">API key</span>
+      <p class="note">For posting from your own tools. The key can do everything an admin can do here. Creating a new key disables the old one.</p>
       ${S.apiKey ? `<p><code style="user-select:all">${esc(S.apiKey)}</code></p><p class="note warn">Copy it now. It will not be shown again.</p>` : ''}
       <button class="btn sec" id="apikey">${S.me.api_key_set ? 'Create a new key' : 'Create key'}</button>
+    </div>` : ''}
+    <div class="sec"><span class="cap">Security</span>
+      <p class="note">Signed in as ${esc(S.me.user?.email || '')}. Signing out everywhere ends every session on every device.</p>
+      <a class="btn sec" href="/api/auth/logout" style="text-decoration:none">Sign out</a>
+      <button class="btn sec" id="logoutall" style="margin-left:8px">Sign out everywhere</button>
     </div>
-    <div class="sec"><span class="cap">Your data</span>
-      <p class="note">Delete workspace removes your connected accounts, scheduled posts and uploaded images immediately.</p>
+    ${owner ? `<div class="sec"><span class="cap">Delete workspace</span>
+      <p class="note">Removes this workspace's accounts, brands, posts, images and members immediately. It cannot be undone.</p>
       <button class="btn danger" id="delws">Delete workspace</button>
-      <a class="btn sec" href="/api/auth/logout" style="text-decoration:none;margin-left:8px">Sign out</a>
-    </div></div>`;
+    </div>` : ''}
+  </div>`;
+}
+
+async function loadMembers() {
+  S.members = undefined;
+  try { S.members = await api('/members'); } catch (e) { S.members = { members: [], invites: [] }; S.flash = { kind: 'err', text: e.message }; }
+  render();
+}
+const scopeFrom = name => {
+  const mode = document.querySelector(`input[name="${name}"]:checked`)?.value;
+  if (mode !== 'some') return null;
+  return [...document.querySelectorAll(`[data-scope="${name}"]:checked`)].map(x => x.value);
+};
+async function peopleAction(fn, ok) {
+  try { await fn(); if (ok) S.flash = { kind: 'ok', text: ok }; } catch (e) { S.flash = { kind: 'err', text: e.message }; }
+  S.editScope = null; await loadMembers();
 }
 
 async function refreshMe() { S.me = await api('/me'); render(); }
+async function switchTo(id) {
+  try { await send('/session/workspace', 'POST', { workspace_id: id }); await loadMe(); S.members = null; S.posts = []; route(); }
+  catch (e) { S.flash = { kind: 'err', text: e.message }; render(); }
+}
 const send = (path, method, body) => api(path, { method, headers: { 'Content-Type': 'application/json' },
   body: body === undefined ? undefined : JSON.stringify(body) });
 async function brandAction(fn) {
@@ -651,6 +796,30 @@ async function brandAction(fn) {
 function bind() {
   const on = (sel, ev, fn) => document.querySelectorAll(sel).forEach(el => el.addEventListener(ev, fn));
   on('#files', 'change', e => addFiles(e.target.files));
+  on('#loginemail', 'submit', e => { e.preventDefault(); S.login.email = $('le').value.trim(); sendCode(); });
+  on('#logincode', 'submit', e => { e.preventDefault(); S.login.code = $('lc').value.trim(); verifyCode(); });
+  on('#lc', 'input', e => { S.login.code = e.target.value.replace(/\D/g, ''); if (S.login.code.length === 6) verifyCode(); });
+  on('#loginback', 'click', () => { S.login = { step: 'email', email: S.login.email, code: '', busy: false, err: '' }; render(); });
+  on('#loginresend', 'click', sendCode);
+  on('#wsswitch', 'change', e => switchTo(e.target.value));
+  on('[data-switch]', 'click', e => switchTo(e.target.dataset.switch));
+  on('#newws', 'submit', async e => { e.preventDefault();
+    try { await send('/workspaces', 'POST', { name: $('newwsname').value || 'New workspace' }); await loadMe(); S.members = null; location.hash = '#accounts'; route(); }
+    catch (x) { S.flash = { kind: 'err', text: x.message }; render(); } });
+  on('#wsname', 'submit', e => { e.preventDefault(); brandAction(() => send('/workspace', 'PATCH', { name: $('wsnamein').value })); });
+  on('#inviteform', 'submit', e => { e.preventDefault(); const email = $('invemail').value, role = $('invrole').value;
+    peopleAction(() => send('/invites', 'POST', { email, role, brand_ids: role === 'member' ? scopeFrom('inv') : null }), `Invite sent to ${email}.`); });
+  on('[data-uninvite]', 'click', e => peopleAction(() => send(`/invites/${e.target.dataset.uninvite}`, 'DELETE')));
+  on('[data-role]', 'change', e => peopleAction(() => send(`/members/${e.target.dataset.role}`, 'PATCH', { role: e.target.value })));
+  on('[data-editscope]', 'click', e => { S.editScope = S.editScope === e.target.dataset.editscope ? null : e.target.dataset.editscope; render(); });
+  on('[data-savescope]', 'click', e => { const id = e.target.dataset.savescope;
+    peopleAction(() => send(`/members/${id}`, 'PATCH', { role: 'member', brand_ids: scopeFrom('sc-' + id) }), 'Access updated.'); });
+  on('[data-remove]', 'click', async e => { const id = e.target.dataset.remove, leave = e.target.dataset.leave;
+    if (!confirm(leave ? 'Leave this workspace? You lose access to its accounts and posts.' : 'Remove this person from the workspace?')) return;
+    if (leave) { try { await send(`/members/${id}`, 'DELETE'); await loadMe(); S.members = null; route(); } catch (x) { S.flash = { kind: 'err', text: x.message }; render(); } }
+    else peopleAction(() => send(`/members/${id}`, 'DELETE'), 'Removed.'); });
+  on('#logoutall', 'click', async () => { if (!confirm('Sign out on every device?')) return;
+    await send('/logout-all', 'POST'); location.href = '/api/auth/logout'; });
   on('[data-cover]', 'click', e => { S.cover = Number(e.target.dataset.cover); render(); });
   on('[data-rm]', 'click', e => { const n = Number(e.target.dataset.rm); S.images.splice(n, 1); S.cover = Math.min(S.cover, Math.max(0, S.images.length - 1)); render(); });
   on('[data-mv]', 'click', e => {
@@ -702,7 +871,7 @@ function bind() {
   });
   on('#apikey', 'click', async () => { S.apiKey = (await api('/api-key', { method: 'POST' })).api_key; S.me.api_key_set = true; render(); });
   on('#delws', 'click', async () => {
-    if (!confirm('Delete your workspace, accounts, posts and images? This cannot be undone.')) return;
+    if (prompt(`Type the workspace name to delete it: ${S.me.workspace.name}`) !== S.me.workspace.name) return;
     await api('/me', { method: 'DELETE' }); location.href = '/api/auth/logout';
   });
 }

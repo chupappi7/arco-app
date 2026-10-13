@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetDb, callWorker, fakeTk } from './helpers.js';
+import { resetDb, callWorker, fakeTk, signUp } from './helpers.js';
 
 const RU = 'https://arco-publisher.vercel.app/api/auth/callback';
 
@@ -8,7 +8,7 @@ async function signIn(openId = 'open-1') {
   const tk = fakeTk({ exchangeCode: async () => ({ access_token: 'at', refresh_token: 'rt', open_id: openId }) });
   const s = await (await callWorker('/internal/oauth', { method: 'POST', tk,
     headers: { 'X-Internal-Secret': env.INTERNAL_SECRET },
-    body: { code: 'c', code_verifier: 'v', redirect_uri: RU } })).json();
+    body: { code: 'c', code_verifier: 'v', redirect_uri: RU, session_id: (await signUp(env)).sid } })).json();
   return { h: { Cookie: `tt_sid=${s.session_id}` }, account: s.account_id };
 }
 const call = (path, h, method = 'GET', body) => callWorker(path, { method, headers: h, body });

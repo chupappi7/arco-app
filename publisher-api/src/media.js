@@ -1,6 +1,7 @@
 import { HttpError, now } from './http.js';
 import { randomToken } from './crypto.js';
 import { MAX_IMAGE_BYTES, MAX_WORKSPACE_BYTES, KEEP_UNATTACHED } from './limits.js';
+import { wsOf, scopeOf, inScope } from './scope.js';
 
 const TYPES = {
   'image/jpeg': { ext: 'jpg', magic: [0xff, 0xd8, 0xff] },
@@ -45,6 +46,9 @@ export async function serveMedia(env, key, method = 'GET') {
       'Content-Length': String(obj.size),
       'Cache-Control': 'public, max-age=3600',
       'X-Content-Type-Options': 'nosniff',
+      // Public only because TikTok and Meta fetch posts by URL; keys are 128
+      // random bits, and nothing should index them.
+      'X-Robots-Tag': 'noindex, nofollow',
     },
   });
 }
@@ -52,7 +56,8 @@ export async function serveMedia(env, key, method = 'GET') {
 // One upload, several posts: each post owns its images (that is what lets a
 // finished post free its storage on its own clock), so posting the same
 // photos to TikTok, Instagram and Facebook copies them once per extra post.
-export async function copyMedia(env, ws, keys) {
+export async function copyMedia(env, w, keys) {
+  const ws = wsOf(w);
   if (!Array.isArray(keys) || !keys.length || keys.length > 35 || !keys.every(k => typeof k === 'string')) {
     throw new HttpError(400, 'keys must be a list of up to 35 image keys');
   }
@@ -61,6 +66,16 @@ export async function copyMedia(env, ws, keys) {
       WHERE workspace_id = ? AND key IN (${marks})`).bind(ws, ...keys).all();
   const rows = new Map(results.map(r => [r.key, r]));
   if (rows.size !== new Set(keys).size) throw new HttpError(400, 'One or more images are missing. Upload them again.');
+  // A member limited to brands may only copy images of posts they can see.
+  if (scopeOf(w)) {
+    const sc = inScope(w, 'a.brand_id');
+    const { n } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM media m JOIN posts p ON p.id = m.post_id
+        JOIN accounts a ON a.id = p.account_id WHERE m.workspace_id = ? AND m.key IN (${marks})${sc.sql}`)
+      .bind(ws, ...keys, ...sc.binds).first();
+    const { n: attached } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM media WHERE workspace_id = ? AND key IN (${marks})
+        AND post_id IS NOT NULL`).bind(ws, ...keys).first();
+    if (n !== attached) throw new HttpError(404, 'One or more images are missing. Upload them again.');
+  }
   const total = keys.reduce((n, k) => n + rows.get(k).bytes, 0);
   if ((await workspaceBytes(env, ws)) + total > MAX_WORKSPACE_BYTES) {
     throw new HttpError(409, 'Storage is full (200 MB). Images are freed 7 days after their post is done.');

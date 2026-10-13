@@ -27,21 +27,31 @@ export function fakeTk(overrides = {}) {
 }
 
 // Call the Worker's fetch handler with a fake TikTok client injected.
-export async function callWorker(path, { method = 'GET', headers = {}, body, tk = fakeTk() } = {}) {
+export async function callWorker(path, { method = 'GET', headers = {}, body, tk = fakeTk(), env: extra } = {}) {
   const init = { method, headers: { ...headers } };
   if (body !== undefined) {
     if (body instanceof Uint8Array || body instanceof ArrayBuffer) init.body = body;
     else { init.body = JSON.stringify(body); init.headers['Content-Type'] = 'application/json'; }
   }
   const ctx = createExecutionContext();
-  const res = await worker.fetch(new Request(`https://api.test${path}`, init), { ...baseEnv, __tk: tk }, ctx);
+  const res = await worker.fetch(new Request(`https://api.test${path}`, init), { ...baseEnv, __tk: tk, ...(extra || {}) }, ctx);
   await waitOnExecutionContext(ctx);
   return res;
 }
 
 export async function resetDb(env) {
   await applySchema(env);
-  for (const t of ['posts', 'media', 'sessions', 'accounts', 'brands', 'workspaces']) {
+  for (const t of ['posts', 'media', 'sessions', 'accounts', 'brands', 'memberships', 'invites', 'login_codes', 'users', 'workspaces']) {
     await env.DB.prepare(`DELETE FROM ${t}`).run();
   }
+}
+
+// A signed-up person with their own workspace, as email sign-in leaves them.
+let signups = 0;
+export async function signUp(env, email = `owner${++signups}-${Date.now()}@test.dev`) {
+  const { createWorkspace, newSession } = await import('../src/users.js');
+  const userId = 'usr_' + Math.random().toString(16).slice(2, 10);
+  await env.DB.prepare('INSERT INTO users (id, email, created_at) VALUES (?, ?, ?)').bind(userId, email, 1).run();
+  const ws = await createWorkspace(env, userId);
+  return { sid: await newSession(env, userId, ws), ws, userId, email };
 }

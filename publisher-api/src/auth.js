@@ -1,6 +1,17 @@
 import { randomToken, sha256Hex, encrypt } from './crypto.js';
 import { HttpError, now, cookie } from './http.js';
 import { MAX_ACCOUNTS, SESSION_TTL } from './limits.js';
+import { sessionCaller, need } from './users.js';
+
+const SIGN_IN_FIRST = 'Sign in to ARCO Publisher with your email first, then connect accounts from the Accounts tab.';
+
+// Connecting an account is something a signed-in owner or admin does.
+async function connector(env, sessionId) {
+  const who = sessionId ? await sessionCaller(env, sessionId) : null;
+  if (!who) throw new HttpError(401, SIGN_IN_FIRST);
+  need(who, 'admin');
+  return who;
+}
 
 export async function createSession(env, workspaceId) {
   const id = randomToken('ses_');
@@ -14,17 +25,6 @@ export async function sessionWorkspace(env, sessionId) {
   const row = await env.DB.prepare('SELECT workspace_id FROM sessions WHERE id_hash = ? AND expires_at > ?')
     .bind(await sha256Hex(sessionId), now()).first();
   return row ? row.workspace_id : null;
-}
-
-export async function resolveCaller(env, req) {
-  const auth = req.headers.get('Authorization') || '';
-  if (auth.startsWith('Key ')) {
-    const row = await env.DB.prepare('SELECT id FROM workspaces WHERE api_key_hash = ?')
-      .bind(await sha256Hex(auth.slice(4).trim())).first();
-    return row ? { workspaceId: row.id, via: 'key' } : null;
-  }
-  const ws = await sessionWorkspace(env, cookie(req, 'tt_sid'));
-  return ws ? { workspaceId: ws, via: 'session' } : null;
 }
 
 export async function rotateApiKey(env, workspaceId) {
@@ -52,7 +52,12 @@ export async function oauthIntake(env, tk, { code, code_verifier, redirect_uri, 
   const existing = await env.DB.prepare('SELECT id, workspace_id, can_sign_in FROM accounts WHERE open_id = ?')
     .bind(tokens.open_id).first();
 
-  let ws = session_id ? await sessionWorkspace(env, session_id) : null;
+  // Signed in: connect to the current workspace. Not signed in: only the
+  // TikTok account a workspace was created with before email sign-in existed
+  // may still open it, until its owner adds an email.
+  const who = session_id ? await sessionCaller(env, session_id) : null;
+  if (who) need(who, 'admin');
+  let ws = who?.ws || null;
   const adding = !!ws;
   if (adding) {
     if (existing && existing.workspace_id !== ws) {
@@ -63,15 +68,14 @@ export async function oauthIntake(env, tk, { code, code_verifier, redirect_uri, 
       const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM accounts WHERE workspace_id = ?').bind(ws).first();
       if (n >= MAX_ACCOUNTS) throw new HttpError(409, `A workspace can connect up to ${MAX_ACCOUNTS} accounts.`);
     }
-  } else if (existing) {
-    // Only an account that signs into its workspace may open it. One that was
-    // added to someone else's workspace (an agency connecting a client) must
-    // not hand that client every other account in it.
-    if (!existing.can_sign_in) throw new HttpError(409, NOT_YOURS);
-    ws = existing.workspace_id;
   } else {
-    ws = 'ws_' + randomToken('', 8);
-    await env.DB.prepare('INSERT INTO workspaces (id, created_at) VALUES (?, ?)').bind(ws, t).run();
+    if (!existing) throw new HttpError(401, SIGN_IN_FIRST);
+    // An account added to someone else's workspace (an agency connecting a
+    // client) must never hand that client the workspace.
+    if (!existing.can_sign_in) throw new HttpError(409, NOT_YOURS);
+    const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM memberships WHERE workspace_id = ?').bind(existing.workspace_id).first();
+    if (n > 0) throw new HttpError(401, 'This workspace now signs in with email. Use "Continue with email".');
+    ws = existing.workspace_id;
   }
 
   const enc = await encrypt(tokens.refresh_token, env.TOKEN_KEY);
@@ -86,43 +90,30 @@ export async function oauthIntake(env, tk, { code, code_verifier, redirect_uri, 
     accountId = 'acc_' + randomToken('', 8);
     await env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, username, display_name, avatar_url,
         refresh_token_enc, connected_at, token_updated_at, can_sign_in) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(accountId, ws, tokens.open_id, ...profile, enc, t, t, adding ? 0 : 1).run();
+      .bind(accountId, ws, tokens.open_id, ...profile, enc, t, t, 0).run();
   }
   const sessionId = adding ? session_id : await createSession(env, ws);
   return { session_id: sessionId, workspace_id: ws, account_id: accountId };
 }
 
-// Find or create the workspace a Meta sign-in lands in, and refuse any
-// account that already belongs to another workspace.
-//
-// Without a session, the workspace is found only by WHO signed in (the same
-// Facebook person, or the Instagram account itself), never by the Pages
-// someone can manage: several people manage one Page, and managing it must
-// not open the workspace of whoever connected it first.
-async function metaWorkspace(env, { sessionId, owner, openIds }) {
+// Connected accounts belong to the signed-in admin's workspace. One already
+// in another workspace is refused, so nobody can pull a Page or an Instagram
+// account (and its posting rights) out of someone else's workspace.
+async function metaWorkspace(env, { sessionId, openIds }) {
+  const who = await connector(env, sessionId);
   const marks = openIds.map(() => '?').join(',');
   const { results: existing } = await env.DB.prepare(
-    `SELECT id, workspace_id, open_id, can_sign_in FROM accounts WHERE open_id IN (${marks})`).bind(...openIds).all();
-  let ws = sessionId ? await sessionWorkspace(env, sessionId) : null;
-  const adding = !!ws;
-  if (!ws && owner) ws = (await env.DB.prepare(owner.sql).bind(owner.value).first())?.workspace_id || null;
-  const t = now();
-  if (!ws) {
-    if (existing.length) throw new HttpError(409, existing.some(r => !r.can_sign_in) ? NOT_YOURS
-      : 'This account is already connected to another ARCO Publisher workspace. Sign in there and disconnect it first.');
-    ws = 'ws_' + randomToken('', 8);
-    await env.DB.prepare('INSERT INTO workspaces (id, created_at) VALUES (?, ?)').bind(ws, t).run();
-  }
-  if (existing.some(r => r.workspace_id !== ws)) {
+    `SELECT id, workspace_id, open_id FROM accounts WHERE open_id IN (${marks})`).bind(...openIds).all();
+  if (existing.some(r => r.workspace_id !== who.ws)) {
     throw new HttpError(409, 'One of these accounts is already connected to another ARCO Publisher workspace. ' +
-      'Sign in there and disconnect it first.');
+      'Its admin has to disconnect it first.');
   }
-  const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM accounts WHERE workspace_id = ?').bind(ws).first();
+  const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM accounts WHERE workspace_id = ?').bind(who.ws).first();
   const fresh = openIds.filter(o => !existing.some(r => r.open_id === o)).length;
   if (n + fresh > MAX_ACCOUNTS) {
     throw new HttpError(409, `A workspace can connect up to ${MAX_ACCOUNTS} accounts. Disconnect some first.`);
   }
-  return { ws, adding, byOpenId: new Map(existing.map(r => [r.open_id, r])), canSignIn: adding ? 0 : 1 };
+  return { ws: who.ws, byOpenId: new Map(existing.map(r => [r.open_id, r])) };
 }
 
 // Facebook Login: one consent connects every Page the person picked. Page
@@ -131,6 +122,7 @@ async function metaWorkspace(env, { sessionId, owner, openIds }) {
 export async function metaIntake(env, mt, { code, redirect_uri, session_id }) {
   if (!code) throw new HttpError(400, 'code is required');
   if (redirect_uri !== env.META_REDIRECT_URI) throw new HttpError(400, 'unexpected redirect_uri');
+  await connector(env, session_id);
 
   const short = await mt.exchangeCode({ code, redirectUri: redirect_uri });
   const long = await mt.longLived(short.access_token);
@@ -139,8 +131,7 @@ export async function metaIntake(env, mt, { code, redirect_uri, session_id }) {
   if (!pages.length) throw new HttpError(400, 'No Facebook Page came back. Pick at least one Page on the Facebook screen.');
 
   const found = pages.map(p => ({ open_id: `fb:${p.id}`, name: p.name || '', avatar: p.picture?.data?.url || '', token: p.access_token }));
-  const { ws, adding, byOpenId, canSignIn } = await metaWorkspace(env, { sessionId: session_id, openIds: found.map(f => f.open_id),
-    owner: { sql: 'SELECT workspace_id FROM accounts WHERE meta_user_id = ? AND can_sign_in = 1 LIMIT 1', value: String(user.id) } });
+  const { ws, byOpenId } = await metaWorkspace(env, { sessionId: session_id, openIds: found.map(f => f.open_id) });
 
   const t = now();
   const statements = [], ids = [];
@@ -156,10 +147,10 @@ export async function metaIntake(env, mt, { code, redirect_uri, session_id }) {
       : env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, platform, meta_user_id, username, display_name,
           avatar_url, refresh_token_enc, access_token_enc, connected_at, token_updated_at, can_sign_in)
           VALUES (?, ?, ?, 'facebook', ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .bind(id, ws, f.open_id, String(user.id), f.name, f.name, f.avatar, enc, enc, t, t, canSignIn));
+        .bind(id, ws, f.open_id, String(user.id), f.name, f.name, f.avatar, enc, enc, t, t, 0));
   }
   await env.DB.batch(statements);
-  return { session_id: adding ? session_id : await createSession(env, ws), workspace_id: ws, account_ids: ids };
+  return { session_id, workspace_id: ws, account_ids: ids };
 }
 
 // Instagram Login: the person signs in as the Instagram account itself, so
@@ -168,6 +159,7 @@ export async function metaIntake(env, mt, { code, redirect_uri, session_id }) {
 export async function igIntake(env, mt, { code, redirect_uri, session_id }) {
   if (!code) throw new HttpError(400, 'code is required');
   if (redirect_uri !== env.IG_REDIRECT_URI) throw new HttpError(400, 'unexpected redirect_uri');
+  await connector(env, session_id);
 
   // Instagram appends '#_' to the code; it is not part of it.
   const short = await mt.igExchangeCode({ code: String(code).replace(/#_$/, ''), redirectUri: redirect_uri });
@@ -175,8 +167,7 @@ export async function igIntake(env, mt, { code, redirect_uri, session_id }) {
   const me = await mt.igMe(long.access_token);
   const igId = String(me.user_id || short.user_id || me.id);
   const openId = `ig:${igId}`;
-  const { ws, adding, byOpenId, canSignIn } = await metaWorkspace(env, { sessionId: session_id, openIds: [openId],
-    owner: { sql: 'SELECT workspace_id FROM accounts WHERE open_id = ? AND can_sign_in = 1', value: openId } });
+  const { ws, byOpenId } = await metaWorkspace(env, { sessionId: session_id, openIds: [openId] });
 
   const t = now();
   const enc = await encrypt(long.access_token, env.TOKEN_KEY);
@@ -192,7 +183,7 @@ export async function igIntake(env, mt, { code, redirect_uri, session_id }) {
     await env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, platform, username, display_name, avatar_url,
         refresh_token_enc, access_token_enc, access_expires_at, connected_at, token_updated_at, can_sign_in)
         VALUES (?, ?, ?, 'instagram', ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(id, ws, openId, ...profile, enc, enc, expires, t, t, canSignIn).run();
+      .bind(id, ws, openId, ...profile, enc, enc, expires, t, t, 0).run();
   }
-  return { session_id: adding ? session_id : await createSession(env, ws), workspace_id: ws, account_ids: [id] };
+  return { session_id, workspace_id: ws, account_ids: [id] };
 }

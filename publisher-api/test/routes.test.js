@@ -1,13 +1,13 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetDb, callWorker } from './helpers.js';
+import { resetDb, callWorker, signUp } from './helpers.js';
 
 const RU = 'https://arco-publisher.vercel.app/api/auth/callback';
 
 async function signIn() {
   const res = await callWorker('/internal/oauth', { method: 'POST',
     headers: { 'X-Internal-Secret': env.INTERNAL_SECRET },
-    body: { code: 'c', code_verifier: 'v', redirect_uri: RU } });
+    body: { code: 'c', code_verifier: 'v', redirect_uri: RU, session_id: (await signUp(env)).sid } });
   return res.json();
 }
 

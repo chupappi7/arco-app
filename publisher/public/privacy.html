@@ -184,7 +184,13 @@ body{background:radial-gradient(1200px 600px at 20% -10%,rgba(2,132,199,.06),tra
         schedule. The token is encrypted. We do not store your Facebook password or your personal Facebook profile.</li>
       <li><b>For each post:</b> the photos you uploaded, the title, caption, settings you chose, the scheduled time, and
         the platform's result (publish id, status, the public post id and link, or the failure reason).</li>
+      <li><b>Your account:</b> your email address, which workspaces you belong to and your role in each. Sign-in codes
+        are kept only as a one-way hash, for at most 10 minutes. We use your email only to send sign-in codes, invites
+        and messages about your account.</li>
       <li><b>Sign-in:</b> a session cookie in your browser and, if you create one, an API key. We keep only a one-way hash of each.</li>
+      <li><b>Separation:</b> each workspace's accounts, brands, posts and photos are visible only to its members, and a
+        member limited to some brands sees only those. Photo links are long random addresses so TikTok, Instagram and
+        Facebook can fetch them; they are not listed or indexed anywhere and are deleted 7 days after the post is done.</li>
     </ul>
     <h3>What we do not do</h3>
     <ul>

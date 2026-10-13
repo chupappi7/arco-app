@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetDb, callWorker, fakeTk } from './helpers.js';
+import { resetDb, callWorker, fakeTk, signUp } from './helpers.js';
 import { validatePost } from '../src/posts.js';
 import { MAX_QUEUED } from '../src/limits.js';
 
@@ -13,7 +13,7 @@ const settings = { privacy_level: 'PUBLIC_TO_EVERYONE', disable_comment: false, 
 async function setup() {
   const s = await (await callWorker('/internal/oauth', { method: 'POST',
     headers: { 'X-Internal-Secret': env.INTERNAL_SECRET },
-    body: { code: 'c', code_verifier: 'v', redirect_uri: RU } })).json();
+    body: { code: 'c', code_verifier: 'v', redirect_uri: RU, session_id: (await signUp(env)).sid } })).json();
   const h = { Cookie: `tt_sid=${s.session_id}` };
   const up = async () => (await (await callWorker('/v1/media', { method: 'POST',
     headers: { ...h, 'Content-Type': 'image/jpeg' }, body: JPEG })).json()).key;

@@ -1,6 +1,8 @@
 import { json, HttpError, match, readJson, now } from './http.js';
 import { tkFor, TikTokError } from './tiktok.js';
-import { oauthIntake, metaIntake, igIntake, resolveCaller, rotateApiKey, logout } from './auth.js';
+import { oauthIntake, metaIntake, igIntake, rotateApiKey, logout } from './auth.js';
+import { startEmail, verifyEmail, callerFor, need, myWorkspaces, switchWorkspace, addWorkspace, renameWorkspace,
+  logoutEverywhere, listMembers, invite, cancelInvite, acceptInvite, updateMember, removeMember } from './users.js';
 import { metaFor, MetaError } from './meta.js';
 import { listAccounts, creatorInfoFor, disconnect, refreshInstagramTokens } from './accounts.js';
 import * as L from './limits.js';
@@ -10,12 +12,19 @@ import { tick, publishNow } from './publisher.js';
 import { runCleanup, deleteWorkspace } from './cleanup.js';
 import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './brands.js';
 
-async function me(req, env, { ws }) {
-  const row = await env.DB.prepare('SELECT api_key_hash FROM workspaces WHERE id = ?').bind(ws).first();
+async function me(req, env, { who }) {
+  const ws = who.ws;
+  const row = await env.DB.prepare('SELECT name, api_key_hash FROM workspaces WHERE id = ?').bind(ws).first();
+  const user = who.userId ? await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(who.userId).first() : null;
   return json({
+    user: user ? { id: who.userId, email: user.email } : null,
+    // A workspace from before email sign-in: the page asks for an email.
+    needs_email: who.via === 'legacy',
+    workspace: { id: ws, name: row?.name || 'My workspace', role: who.role, brand_scope: who.scope },
+    workspaces: await myWorkspaces(env, who.userId),
     workspace_id: ws,
-    accounts: await listAccounts(env, ws),
-    brands: await listBrands(env, ws),
+    accounts: await listAccounts(env, who),
+    brands: await listBrands(env, who),
     api_key_set: !!row?.api_key_hash,
     limits: { accounts: L.MAX_ACCOUNTS, queued: L.MAX_QUEUED, images: L.MAX_IMAGES,
               image_bytes: L.MAX_IMAGE_BYTES, workspace_bytes: L.MAX_WORKSPACE_BYTES,
@@ -25,47 +34,66 @@ async function me(req, env, { ws }) {
   });
 }
 
-// [method, pattern, handler, access]. Later tasks append to this list.
+const body = req => readJson(req);
+
+// [method, pattern, handler, access]. access is 'public', 'internal', or the
+// lowest role allowed: 'member', 'admin', 'owner'. Handlers get `who`
+// ({ ws, userId, role, scope }) and pass it, not a bare workspace id, to
+// anything that reads accounts or posts, so brand limits apply everywhere.
 export const ROUTES = [
-  ['POST', '/internal/oauth', async (req, env, { tk }) => json(await oauthIntake(env, tk, await readJson(req))), 'internal'],
-  ['POST', '/internal/meta-oauth', async (req, env) => json(await metaIntake(env, metaFor(env), await readJson(req))), 'internal'],
-  ['POST', '/internal/ig-oauth', async (req, env) => json(await igIntake(env, metaFor(env), await readJson(req))), 'internal'],
-  ['GET', '/v1/me', me, 'user'],
-  ['DELETE', '/v1/me', async (req, env, { ws }) => { await deleteWorkspace(env, ws); return json({ ok: true }); }, 'user'],
-  ['POST', '/v1/logout', async (req, env) => { await logout(env, req); return json({ ok: true }); }, 'user'],
-  ['POST', '/v1/api-key', async (req, env, { ws }) => json({ api_key: await rotateApiKey(env, ws) }), 'user'],
-  ['GET', '/v1/accounts', async (req, env, { ws }) => json({ accounts: await listAccounts(env, ws) }), 'user'],
-  ['DELETE', '/v1/accounts/:id', async (req, env, { ws, params }) => { await disconnect(env, ws, params.id); return json({ ok: true }); }, 'user'],
-  ['PATCH', '/v1/accounts/:id', async (req, env, { ws, params }) => {
-    const b = await readJson(req);
-    return json(await assign(env, ws, [params.id], b.brand_id ?? null));
-  }, 'user'],
-  ['GET', '/v1/brands', async (req, env, { ws }) => json({ brands: await listBrands(env, ws) }), 'user'],
-  ['POST', '/v1/brands', async (req, env, { ws }) => json(await createBrand(env, ws, await readJson(req))), 'user'],
-  ['PATCH', '/v1/brands/:id', async (req, env, { ws, params }) => json(await renameBrand(env, ws, params.id, await readJson(req))), 'user'],
-  ['DELETE', '/v1/brands/:id', async (req, env, { ws, params }) => json(await deleteBrand(env, ws, params.id)), 'user'],
-  ['POST', '/v1/brands/:id/accounts', async (req, env, { ws, params }) =>
-    json(await assign(env, ws, (await readJson(req)).account_ids, params.id)), 'user'],
-  ['GET', '/v1/accounts/:id/creator-info', async (req, env, { ws, params, tk }) => json(await creatorInfoFor(env, tk, ws, params.id)), 'user'],
-  ['POST', '/v1/media', async (req, env, { ws }) => json(await uploadMedia(env, ws, req)), 'user'],
-  ['POST', '/v1/media/copy', async (req, env, { ws }) => json(await copyMedia(env, ws, (await readJson(req)).keys)), 'user'],
+  ['POST', '/internal/oauth', async (req, env, { tk }) => json(await oauthIntake(env, tk, await body(req))), 'internal'],
+  ['POST', '/internal/meta-oauth', async (req, env) => json(await metaIntake(env, metaFor(env), await body(req))), 'internal'],
+  ['POST', '/internal/ig-oauth', async (req, env) => json(await igIntake(env, metaFor(env), await body(req))), 'internal'],
+  ['POST', '/internal/email-verify', async (req, env) => json(await verifyEmail(env, await body(req))), 'internal'],
+  ['POST', '/v1/auth/email/start', async (req, env) => json(await startEmail(env, await body(req))), 'public'],
+
+  ['GET', '/v1/me', me, 'member'],
+  ['DELETE', '/v1/me', async (req, env, { who }) => { await deleteWorkspace(env, who.ws); return json({ ok: true }); }, 'owner'],
+  ['POST', '/v1/logout', async (req, env) => { await logout(env, req); return json({ ok: true }); }, 'member'],
+  ['POST', '/v1/logout-all', async (req, env, { who }) => json(await logoutEverywhere(env, who)), 'member'],
+  ['POST', '/v1/api-key', async (req, env, { who }) => json({ api_key: await rotateApiKey(env, who.ws) }), 'owner'],
+
+  ['POST', '/v1/workspaces', async (req, env, { who }) => json(await addWorkspace(env, who, await body(req))), 'member'],
+  ['POST', '/v1/session/workspace', async (req, env, { who }) => json(await switchWorkspace(env, who, await body(req))), 'member'],
+  ['PATCH', '/v1/workspace', async (req, env, { who }) => json(await renameWorkspace(env, who, await body(req))), 'admin'],
+  ['GET', '/v1/members', async (req, env, { who }) => json(await listMembers(env, who)), 'admin'],
+  ['POST', '/v1/invites', async (req, env, { who }) => json(await invite(env, who, await body(req))), 'admin'],
+  ['DELETE', '/v1/invites/:id', async (req, env, { who, params }) => json(await cancelInvite(env, who, params.id)), 'admin'],
+  ['POST', '/v1/invites/accept', async (req, env, { who }) => json(await acceptInvite(env, who, await body(req))), 'member'],
+  ['PATCH', '/v1/members/:id', async (req, env, { who, params }) => json(await updateMember(env, who, params.id, await body(req))), 'admin'],
+  ['DELETE', '/v1/members/:id', async (req, env, { who, params }) => json(await removeMember(env, who, params.id)), 'member'],
+
+  ['GET', '/v1/accounts', async (req, env, { who }) => json({ accounts: await listAccounts(env, who) }), 'member'],
+  ['DELETE', '/v1/accounts/:id', async (req, env, { who, params }) => { await disconnect(env, who, params.id); return json({ ok: true }); }, 'admin'],
+  ['PATCH', '/v1/accounts/:id', async (req, env, { who, params }) =>
+    json(await assign(env, who.ws, [params.id], (await body(req)).brand_id ?? null)), 'admin'],
+  ['GET', '/v1/accounts/:id/creator-info', async (req, env, { who, params, tk }) => json(await creatorInfoFor(env, tk, who, params.id)), 'member'],
+  ['GET', '/v1/brands', async (req, env, { who }) => json({ brands: await listBrands(env, who) }), 'member'],
+  ['POST', '/v1/brands', async (req, env, { who }) => json(await createBrand(env, who.ws, await body(req))), 'admin'],
+  ['PATCH', '/v1/brands/:id', async (req, env, { who, params }) => json(await renameBrand(env, who.ws, params.id, await body(req))), 'admin'],
+  ['DELETE', '/v1/brands/:id', async (req, env, { who, params }) => json(await deleteBrand(env, who.ws, params.id)), 'admin'],
+  ['POST', '/v1/brands/:id/accounts', async (req, env, { who, params }) =>
+    json(await assign(env, who.ws, (await body(req)).account_ids, params.id)), 'admin'],
+
+  ['POST', '/v1/media', async (req, env, { who }) => json(await uploadMedia(env, who.ws, req)), 'member'],
+  ['POST', '/v1/media/copy', async (req, env, { who }) => json(await copyMedia(env, who, (await body(req)).keys)), 'member'],
   ['GET', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`), 'public'],
   // TikTok's fetcher, or a CDN in front of it, may check an image with HEAD first.
   ['HEAD', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`, 'HEAD'), 'public'],
-  ['POST', '/v1/posts', async (req, env, { ws, tk, ctx }) => {
-    const post = await createPost(env, tk, ws, await readJson(req));
+  ['POST', '/v1/posts', async (req, env, { who, tk, ctx }) => {
+    const post = await createPost(env, tk, who, await body(req));
     if (post.scheduled_at <= now()) ctx.waitUntil(publishNow(env, tk, post.id).catch(e => console.error('publishNow', e)));
     return json(post);
-  }, 'user'],
-  ['GET', '/v1/posts', async (req, env, { ws, url }) => {
+  }, 'member'],
+  ['GET', '/v1/posts', async (req, env, { who, url }) => {
     const from = Number(url.searchParams.get('from')), to = Number(url.searchParams.get('to'));
     if (!Number.isInteger(from) || !Number.isInteger(to) || to <= from || to - from > 62 * 86400) {
       throw new HttpError(400, 'from and to must be epoch seconds, at most 62 days apart');
     }
-    return json({ posts: await listPosts(env, ws, from, to) });
-  }, 'user'],
-  ['DELETE', '/v1/posts/:id', async (req, env, { ws, params }) => json(await cancelPost(env, ws, params.id)), 'user'],
-  ['POST', '/v1/posts/:id/retry', async (req, env, { ws, params }) => json(await retryPost(env, ws, params.id)), 'user'],
+    return json({ posts: await listPosts(env, who, from, to) });
+  }, 'member'],
+  ['DELETE', '/v1/posts/:id', async (req, env, { who, params }) => json(await cancelPost(env, who, params.id)), 'member'],
+  ['POST', '/v1/posts/:id/retry', async (req, env, { who, params }) => json(await retryPost(env, who, params.id)), 'member'],
 ];
 
 function sameSecret(a, b) {
@@ -93,14 +121,15 @@ export default {
         if (method !== req.method) continue;
         const params = match(pattern, url.pathname);
         if (!params) continue;
-        const context = { params, url, tk: tkFor(env), ws: null, ctx };
+        const context = { params, url, tk: tkFor(env), who: null, ctx };
         if (access === 'internal' && !sameSecret(req.headers.get('X-Internal-Secret') || '', env.INTERNAL_SECRET)) {
           return json({ error: 'forbidden' }, 403);
         }
-        if (access === 'user') {
-          const caller = await resolveCaller(env, req);
-          if (!caller) return json({ error: 'Sign in first' }, 401);
-          context.ws = caller.workspaceId;
+        if (access !== 'public' && access !== 'internal') {
+          const who = await callerFor(env, req);
+          if (!who) return json({ error: 'Sign in first' }, 401);
+          need(who, access);
+          context.who = who;
         }
         return await handler(req, env, context);
       }

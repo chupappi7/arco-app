@@ -11,6 +11,7 @@
 :root{--bg:#F4F4F5;--surface:#fff;--line:#E4E4E7;--line-2:#D4D4D8;--well:#FAFAFA;
   --text:#18181B;--muted:#52525B;--dim:#71717A;--accent:#0284C7;--ok:#15803D;--warn:#B45309;--bad:#B91C1C}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif}
 a{color:var(--accent)}
 button{font:inherit;cursor:pointer}
@@ -124,6 +125,16 @@ button.link.danger{color:var(--bad)}
 select.move{width:auto;max-width:170px;padding:7px 10px}
 details.hints{margin-top:12px}details.hints summary{cursor:pointer;font-size:12.5px;color:var(--accent)}
 details.hints p{margin:6px 0}
+/* sign-in, workspace, people */
+.signin{max-width:520px;margin:6vh auto 18px}
+.loginform{display:flex;flex-direction:column;gap:10px}
+.loginform input{font-size:16px}
+#lc{letter-spacing:6px;font-size:22px;text-align:center}
+.wsbar{display:flex;align-items:center;gap:10px;min-width:0}
+.wsbar select{width:auto;max-width:220px;padding:6px 10px}
+.invite{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.invite input[type=email]{flex:1 1 220px}.invite select{width:auto}
+.scope{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;padding:6px 0}
+.scope .bchk{color:var(--muted)}
 @media (max-width:760px){.week{grid-template-columns:1fr}.accts{grid-template-columns:1fr}
   nav.tabs{margin-left:0;gap:2px}nav.tabs a{padding:7px 9px}
   .phead{flex-wrap:wrap}.phead>.note{flex-basis:100%}}
@@ -134,6 +145,7 @@ details.hints p{margin:6px 0}
   <header>
     <h1><a href="/" style="color:inherit;text-decoration:none;display:flex;gap:10px;align-items:center">
       <img src="/icon.png" alt="">ARCO Publisher</a></h1>
+    <div class="wsbar" id="wsbar"></div>
     <nav class="tabs" id="tabs" hidden>
       <a href="#compose" data-v="compose">New post</a>
       <a href="#calendar" data-v="calendar">Calendar</a>

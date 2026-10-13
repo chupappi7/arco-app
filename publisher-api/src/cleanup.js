@@ -21,12 +21,16 @@ export async function runCleanup(env, t = now()) {
     await deleteObjects(env, keys);
   }
   const s = await env.DB.prepare('DELETE FROM sessions WHERE expires_at <= ?').bind(t).run();
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM login_codes WHERE expires_at <= ?').bind(t - 3600),
+    env.DB.prepare('DELETE FROM invites WHERE expires_at <= ?').bind(t),
+  ]);
   return { images: keys.length, sessions: s.meta.changes };
 }
 
 export async function deleteWorkspace(env, ws) {
   const { results } = await env.DB.prepare('SELECT key FROM media WHERE workspace_id = ?').bind(ws).all();
-  await env.DB.batch(['media', 'posts', 'accounts', 'sessions', 'brands'].map(t =>
+  await env.DB.batch(['media', 'posts', 'accounts', 'sessions', 'brands', 'memberships', 'invites'].map(t =>
     env.DB.prepare(`DELETE FROM ${t} WHERE workspace_id = ?`).bind(ws))
     .concat(env.DB.prepare('DELETE FROM workspaces WHERE id = ?').bind(ws)));
   await deleteObjects(env, results.map(r => r.key));

@@ -1,6 +1,7 @@
 import { HttpError, now } from './http.js';
 import { randomToken } from './crypto.js';
 import { getAccount, accessTokenFor, isMeta } from './accounts.js';
+import { wsOf, inScope } from './scope.js';
 import { mediaUrl } from './media.js';
 import { MAX_IMAGES, MAX_QUEUED, MIN_LEAD_SECONDS, KEEP_AFTER_DONE, PRIVACY,
   IG_MAX_IMAGES, IG_MAX_CAPTION, IG_MAX_HASHTAGS } from './limits.js';
@@ -69,16 +70,18 @@ export function postJson(env, row) {
   };
 }
 
-async function loadPost(env, ws, id) {
+async function loadPost(env, w, id) {
+  const sc = inScope(w, 'a.brand_id');
   const row = await env.DB.prepare(`SELECT p.*, a.username, a.platform FROM posts p LEFT JOIN accounts a ON a.id = p.account_id
-      WHERE p.id = ? AND p.workspace_id = ?`).bind(id, ws).first();
+      WHERE p.id = ? AND p.workspace_id = ?${sc.sql}`).bind(id, wsOf(w), ...sc.binds).first();
   if (!row) throw new HttpError(404, 'Post not found');
   return row;
 }
 
-export async function createPost(env, tk, ws, input) {
+export async function createPost(env, tk, w, input) {
+  const ws = wsOf(w);
   if (typeof input?.account_id !== 'string' || !input.account_id) bad('Pick an account');
-  const account = await getAccount(env, ws, input.account_id);
+  const account = await getAccount(env, w, input.account_id);
   const p = validatePost(input, now(), account.platform);
   if (account.needs_reconnect) throw new HttpError(409, 'Reconnect this account before posting', 'needs_reconnect');
 
@@ -86,7 +89,7 @@ export async function createPost(env, tk, ws, input) {
   // until this one is saved.
   const replaces = typeof input?.replaces === 'string' && input.replaces ? input.replaces : null;
   if (replaces) {
-    const old = await loadPost(env, ws, replaces);
+    const old = await loadPost(env, w, replaces);
     if (old.status !== 'queued') throw new HttpError(409, 'That post has already started or finished, so it cannot be edited');
   }
 
@@ -132,29 +135,30 @@ export async function createPost(env, tk, ws, input) {
     env.DB.prepare(`UPDATE media SET post_id = ?, delete_after = NULL WHERE workspace_id = ? AND key IN (${marks})`)
       .bind(id, ws, ...p.image_keys),
   ]);
-  return postJson(env, await loadPost(env, ws, id));
+  return postJson(env, await loadPost(env, w, id));
 }
 
-export async function listPosts(env, ws, from, to) {
+export async function listPosts(env, w, from, to) {
+  const sc = inScope(w, 'a.brand_id');
   const { results } = await env.DB.prepare(`SELECT p.*, a.username, a.platform FROM posts p LEFT JOIN accounts a ON a.id = p.account_id
-      WHERE p.workspace_id = ? AND p.scheduled_at >= ? AND p.scheduled_at < ? ORDER BY p.scheduled_at`)
-    .bind(ws, from, to).all();
+      WHERE p.workspace_id = ? AND p.scheduled_at >= ? AND p.scheduled_at < ?${sc.sql} ORDER BY p.scheduled_at`)
+    .bind(wsOf(w), from, to, ...sc.binds).all();
   return results.map(r => postJson(env, r));
 }
 
-export async function cancelPost(env, ws, id) {
-  const row = await loadPost(env, ws, id);
+export async function cancelPost(env, w, id) {
+  const row = await loadPost(env, w, id);
   if (row.status !== 'queued') throw new HttpError(409, 'Only posts that have not started can be cancelled');
   const t = now();
   await env.DB.batch([
     env.DB.prepare(`UPDATE posts SET status = 'cancelled', updated_at = ? WHERE id = ? AND status = 'queued'`).bind(t, id),
     env.DB.prepare('UPDATE media SET delete_after = ? WHERE post_id = ?').bind(t + KEEP_AFTER_DONE, id),
   ]);
-  return postJson(env, await loadPost(env, ws, id));
+  return postJson(env, await loadPost(env, w, id));
 }
 
-export async function retryPost(env, ws, id) {
-  const row = await loadPost(env, ws, id);
+export async function retryPost(env, w, id) {
+  const row = await loadPost(env, w, id);
   if (row.status !== 'failed') throw new HttpError(409, 'Only failed posts can be retried');
   if (row.publish_id !== null) {
     throw new HttpError(409, 'This post may already have been published. Check the profile, then use Edit to post it again.');
@@ -168,5 +172,5 @@ export async function retryPost(env, ws, id) {
         publish_id = NULL, updated_at = ? WHERE id = ?`).bind(t, t, id),
     env.DB.prepare('UPDATE media SET delete_after = NULL WHERE post_id = ?').bind(id),
   ]);
-  return postJson(env, await loadPost(env, ws, id));
+  return postJson(env, await loadPost(env, w, id));
 }

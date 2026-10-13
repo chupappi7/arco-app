@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetDb, callWorker } from './helpers.js';
+import { resetDb, callWorker, signUp } from './helpers.js';
 
 const RU = 'https://arco-publisher.vercel.app/api/auth/callback';
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
@@ -9,7 +9,7 @@ const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9]);
 async function session() {
   const s = await (await callWorker('/internal/oauth', { method: 'POST',
     headers: { 'X-Internal-Secret': env.INTERNAL_SECRET },
-    body: { code: 'c', code_verifier: 'v', redirect_uri: RU } })).json();
+    body: { code: 'c', code_verifier: 'v', redirect_uri: RU, session_id: (await signUp(env)).sid } })).json();
   return { Cookie: `tt_sid=${s.session_id}` };
 }
 

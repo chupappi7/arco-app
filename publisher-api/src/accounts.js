@@ -1,15 +1,19 @@
 import { decrypt, encrypt } from './crypto.js';
 import { HttpError, now } from './http.js';
 import { KEEP_AFTER_DONE } from './limits.js';
+import { wsOf, inScope } from './scope.js';
 
-export async function listAccounts(env, ws) {
+export async function listAccounts(env, w) {
+  const sc = inScope(w);
   const { results } = await env.DB.prepare(`SELECT id, platform, username, display_name, avatar_url, needs_reconnect, brand_id
-      FROM accounts WHERE workspace_id = ? ORDER BY connected_at`).bind(ws).all();
+      FROM accounts WHERE workspace_id = ?${sc.sql} ORDER BY connected_at`).bind(wsOf(w), ...sc.binds).all();
   return results.map(r => ({ ...r, needs_reconnect: !!r.needs_reconnect }));
 }
 
-export async function getAccount(env, ws, id) {
-  const row = await env.DB.prepare('SELECT * FROM accounts WHERE id = ? AND workspace_id = ?').bind(id, ws).first();
+export async function getAccount(env, w, id) {
+  const sc = inScope(w);
+  const row = await env.DB.prepare(`SELECT * FROM accounts WHERE id = ? AND workspace_id = ?${sc.sql}`)
+    .bind(id, wsOf(w), ...sc.binds).first();
   if (!row) throw new HttpError(404, 'Account not found');
   return row;
 }
@@ -64,14 +68,15 @@ export async function forgetAccessToken(env, accountId) {
     .bind(accountId).run();
 }
 
-export async function creatorInfoFor(env, tk, ws, id) {
-  const account = await getAccount(env, ws, id);
+export async function creatorInfoFor(env, tk, w, id) {
+  const account = await getAccount(env, w, id);
   if (isMeta(account)) throw new HttpError(400, 'Creator info is a TikTok setting');
   return tk.creatorInfo(await accessTokenFor(env, tk, account));
 }
 
-export async function disconnect(env, ws, id) {
-  await getAccount(env, ws, id);
+export async function disconnect(env, w, id) {
+  const ws = wsOf(w);
+  await getAccount(env, w, id);
   const t = now();
   await env.DB.batch([
     env.DB.prepare(`UPDATE media SET delete_after = ? WHERE post_id IN

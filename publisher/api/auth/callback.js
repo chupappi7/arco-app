@@ -34,7 +34,7 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': env('INTERNAL_SECRET') },
       body: JSON.stringify({
         code, code_verifier: verifier, redirect_uri: redirectUri(req),
-        session_id: adding ? rawCookie(req, SESSION_COOKIE) || undefined : undefined,
+        session_id: rawCookie(req, SESSION_COOKIE) || undefined,
       }),
     });
     body = await r.json();

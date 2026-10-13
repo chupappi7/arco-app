@@ -1,6 +1,6 @@
 import { env as baseEnv } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetDb, fakeTk } from './helpers.js';
+import { resetDb, fakeTk, signUp } from './helpers.js';
 import { metaIntake, igIntake, createSession } from '../src/auth.js';
 import { refreshInstagramTokens } from '../src/accounts.js';
 import { claimDue } from '../src/publisher.js';
@@ -42,8 +42,10 @@ function fakeMeta(overrides = {}) {
 }
 
 const withMeta = mt => ({ ...baseEnv, __meta: mt });
-const intake = (mt, extra = {}) => metaIntake(withMeta(mt), mt, { code: 'c', redirect_uri: RU, ...extra });
-const igIn = (mt, extra = {}) => igIntake(withMeta(mt), mt, { code: 'c#_', redirect_uri: IGRU, ...extra });
+// Signed in as a new workspace's owner unless a session_id (or null) is given.
+const sess = async extra => ('session_id' in extra ? extra.session_id : (await signUp(baseEnv)).sid);
+const intake = async (mt, extra = {}) => metaIntake(withMeta(mt), mt, { code: 'c', redirect_uri: RU, ...extra, session_id: await sess(extra) });
+const igIn = async (mt, extra = {}) => igIntake(withMeta(mt), mt, { code: 'c#_', redirect_uri: IGRU, ...extra, session_id: await sess(extra) });
 
 async function account(platform) {
   return baseEnv.DB.prepare('SELECT * FROM accounts WHERE platform = ?').bind(platform).first();
@@ -74,26 +76,30 @@ describe('facebook login', () => {
     expect(fb.access_token_enc).not.toContain('page-token');
   });
 
-  it('a second manager of the same Page cannot sign into the first one\'s workspace', async () => {
+  it('a second manager of the same Page cannot pull it into their own workspace', async () => {
     await intake(fakeMeta());
     await expect(intake(fakeMeta({ me: async () => ({ id: 'fbuser-2', name: 'Someone else' }) })))
       .rejects.toThrow(/already connected to another/);
   });
 
-  it('signing in again lands in the same workspace and updates the token', async () => {
+  it('cannot connect anything without signing in', async () => {
+    await expect(intake(fakeMeta(), { session_id: null })).rejects.toMatchObject({ status: 401 });
+    await expect(igIn(fakeMeta(), { session_id: null })).rejects.toMatchObject({ status: 401 });
+  });
+
+  it('reconnecting updates the token in place', async () => {
     const a = await intake(fakeMeta());
     const b = await intake(fakeMeta({ pages: async () => ({ data: [{ id: 'page-1', name: 'ARCO', access_token: 'new-token' }] }),
-      me: async () => ({ id: 'fbuser-1' }) }));
+      me: async () => ({ id: 'fbuser-1' }) }), { session_id: a.session_id });
     expect(b.workspace_id).toBe(a.workspace_id);
     expect(await decrypt((await account('facebook')).access_token_enc, baseEnv.TOKEN_KEY)).toBe('new-token');
   });
 
   it('adds to the signed-in workspace', async () => {
-    await baseEnv.DB.prepare('INSERT INTO workspaces (id, created_at) VALUES (?, ?)').bind('ws_tt', T).run();
-    const sid = await createSession(baseEnv, 'ws_tt');
-    const r = await intake(fakeMeta(), { session_id: sid });
-    expect(r.workspace_id).toBe('ws_tt');
-    expect(r.session_id).toBe(sid);
+    const me = await signUp(baseEnv);
+    const r = await intake(fakeMeta(), { session_id: me.sid });
+    expect(r.workspace_id).toBe(me.ws);
+    expect(r.session_id).toBe(me.sid);
   });
 
   it('refuses when no Page was picked', async () => {
@@ -117,8 +123,9 @@ describe('instagram login', () => {
     expect(ig.username).toBe('arco.app');
     expect(await decrypt(ig.access_token_enc, baseEnv.TOKEN_KEY)).toBe('ig-long');
     expect(ig.access_expires_at).toBeGreaterThan(Date.now() / 1000 + 59 * 86400);
-    const again = await igIn(fakeMeta());
+    const again = await igIn(fakeMeta(), { session_id: r.session_id });
     expect(again.workspace_id).toBe(r.workspace_id);
+    expect(again.account_ids).toEqual(r.account_ids);
   });
 
   it('adds a second Instagram account to the signed-in workspace', async () => {
@@ -129,10 +136,11 @@ describe('instagram login', () => {
     expect(n).toBe(2);
   });
 
-  it('an account added to someone else\'s workspace cannot be used to sign into it', async () => {
-    const agency = await intake(fakeMeta());                       // the agency signs in with Facebook
-    await igIn(fakeMeta(), { session_id: agency.session_id });      // and adds the client's Instagram
-    await expect(igIn(fakeMeta())).rejects.toThrow(/someone else/); // the client signs in with it
+  it('a client\'s Instagram in an agency workspace gives the client no way in, nor a copy', async () => {
+    const agency = await intake(fakeMeta());
+    await igIn(fakeMeta(), { session_id: agency.session_id });
+    await expect(igIn(fakeMeta(), { session_id: null })).rejects.toMatchObject({ status: 401 });
+    await expect(igIn(fakeMeta())).rejects.toThrow(/already connected to another/);
   });
 
   it('renews tokens nearing expiry and marks revoked ones for reconnect', async () => {
@@ -151,9 +159,9 @@ describe('instagram and facebook posts', () => {
   let ws;
   beforeEach(async () => {
     await resetDb(baseEnv);
-    ws = (await intake(fakeMeta())).workspace_id;
-    const sid = await createSession(baseEnv, ws);
-    await igIn(fakeMeta(), { session_id: sid });
+    const r = await intake(fakeMeta());
+    ws = r.workspace_id;
+    await igIn(fakeMeta(), { session_id: r.session_id });
   });
 
   const make = async (platform, extra = {}) => {

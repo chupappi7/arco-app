@@ -25,8 +25,8 @@ describe('cleanup', () => {
   });
 
   it('removes expired sessions', async () => {
-    await env.DB.prepare('INSERT INTO sessions VALUES (?, ?, ?)').bind('h1', 'ws_1', T - 1).run();
-    await env.DB.prepare('INSERT INTO sessions VALUES (?, ?, ?)').bind('h2', 'ws_1', T + 1).run();
+    await env.DB.prepare('INSERT INTO sessions (id_hash, workspace_id, expires_at) VALUES (?, ?, ?)').bind('h1', 'ws_1', T - 1).run();
+    await env.DB.prepare('INSERT INTO sessions (id_hash, workspace_id, expires_at) VALUES (?, ?, ?)').bind('h2', 'ws_1', T + 1).run();
     expect((await runCleanup(env, T)).sessions).toBe(1);
   });
 
@@ -34,7 +34,7 @@ describe('cleanup', () => {
     await env.DB.prepare('INSERT INTO workspaces (id, created_at) VALUES (?, ?), (?, ?)').bind('ws_1', T, 'ws_2', T).run();
     await img('ws_1/a.jpg');
     await img('ws_2/b.jpg', { ws: 'ws_2' });
-    await env.DB.prepare('INSERT INTO sessions VALUES (?, ?, ?)').bind('h1', 'ws_1', T + 99).run();
+    await env.DB.prepare('INSERT INTO sessions (id_hash, workspace_id, expires_at) VALUES (?, ?, ?)').bind('h1', 'ws_1', T + 99).run();
     await deleteWorkspace(env, 'ws_1');
     expect(await env.MEDIA.head('ws_1/a.jpg')).toBeNull();
     expect(await env.MEDIA.head('ws_2/b.jpg')).not.toBeNull();

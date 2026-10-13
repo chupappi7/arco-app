@@ -1,6 +1,7 @@
 import { HttpError, now } from './http.js';
 import { randomToken } from './crypto.js';
 import { MAX_BRANDS } from './limits.js';
+import { wsOf, inScope } from './scope.js';
 
 const cleanName = n => {
   const name = String(n ?? '').trim().replace(/\s+/g, ' ');
@@ -9,9 +10,10 @@ const cleanName = n => {
   return name;
 };
 
-export async function listBrands(env, ws) {
-  const { results } = await env.DB.prepare('SELECT id, name FROM brands WHERE workspace_id = ? ORDER BY name COLLATE NOCASE')
-    .bind(ws).all();
+export async function listBrands(env, w) {
+  const sc = inScope(w, 'id');
+  const { results } = await env.DB.prepare(`SELECT id, name FROM brands WHERE workspace_id = ?${sc.sql} ORDER BY name COLLATE NOCASE`)
+    .bind(wsOf(w), ...sc.binds).all();
   return results;
 }
 

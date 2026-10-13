@@ -39,6 +39,27 @@ Optional:
 The redirect URI is `<deployment origin>/api/auth/callback` and must be
 registered in the portal character for character.
 
+## People, workspaces and separation
+
+People sign in with email: a 6-digit code (hashed, 10 minutes, 5 guesses,
+5 codes an hour per address), no passwords. TikTok, Instagram and Facebook
+are only connections a workspace owns; connecting one needs an owner or admin
+session. Workspaces from before email sign-in still open with their TikTok
+until someone adds an email, which makes them that workspace's owner.
+
+- **owner**: everything, including the API key and deleting the workspace
+- **admin**: accounts, brands, posts, invites (not the owner, not other admins)
+- **member**: posts and schedules; can be limited to some brands, and then
+  never sees other brands' accounts, posts or images
+
+Separation is enforced in the Worker's queries, not the page: every read of
+accounts, posts, brands and image copies is filtered by workspace and, for
+a limited member, by brand (`src/scope.js`). `test/users.test.js` tries to
+reach another workspace's and another brand's data through every endpoint.
+
+Mail goes through Resend: Worker secrets `RESEND_API_KEY` and `MAIL_FROM`
+(a sender on a domain verified in Resend).
+
 ## Instagram and Facebook
 
 Two logins, because Meta has two:
@@ -67,7 +88,7 @@ Setup, once, in the Meta app at developers.facebook.com:
    ID and secret are `META_APP_ID` / `META_APP_SECRET`.
 3. Privacy policy URL `/privacy.html`, data deletion URL `/privacy.html#data-deletion`.
 4. Vercel env: `IG_APP_ID`, `META_APP_ID`. Worker secrets: all four.
-5. Live D1, in order: `migrations/002-meta.sql`, then `migrations/003-brands.sql`
+5. Live D1, in order: `migrations/002-meta.sql`, `003-brands.sql`, `004-users.sql`
    (`npx wrangler d1 execute arco-publisher --remote --file=<file>`)
 6. Until App Review grants Advanced Access (Instagram:
    `instagram_business_basic`, `instagram_business_content_publish`; Pages:

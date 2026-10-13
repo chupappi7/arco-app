@@ -1,39 +1,59 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetDb, fakeTk } from './helpers.js';
-import { oauthIntake, resolveCaller, rotateApiKey } from '../src/auth.js';
+import { resetDb, fakeTk, signUp } from './helpers.js';
+import { oauthIntake, rotateApiKey } from '../src/auth.js';
+import { callerFor } from '../src/users.js';
 import { accessTokenFor } from '../src/accounts.js';
 import { decrypt } from '../src/crypto.js';
 
 const RU = 'https://arco-publisher.vercel.app/api/auth/callback';
-const intake = (tk, extra = {}) => oauthIntake(env, tk,
-  { code: 'c', code_verifier: 'v', redirect_uri: RU, ...extra });
+// Signed in as a new workspace's owner unless a session_id (or null) is given.
+const intake = async (tk, extra = {}) => oauthIntake(env, tk, { code: 'c', code_verifier: 'v', redirect_uri: RU,
+  session_id: 'session_id' in extra ? extra.session_id : (await signUp(env)).sid, ...extra });
+const tk2 = () => fakeTk({ exchangeCode: async () => ({ access_token: 'at', refresh_token: 'rt-2', open_id: 'open-2' }) });
 
 describe('oauth intake', () => {
   beforeEach(() => resetDb(env));
 
-  it('first sign-in creates a workspace, an account and a session', async () => {
-    const r = await intake(fakeTk());
-    expect(r.workspace_id).toMatch(/^ws_/);
+  it('connects TikTok into the signed-in owner\'s workspace, token encrypted', async () => {
+    const me = await signUp(env);
+    const r = await intake(fakeTk(), { session_id: me.sid });
+    expect(r.workspace_id).toBe(me.ws);
     const acc = await env.DB.prepare('SELECT * FROM accounts WHERE id=?').bind(r.account_id).first();
     expect(acc.username).toBe('creator');
     expect(acc.refresh_token_enc).not.toContain('rt-1');
     expect(await decrypt(acc.refresh_token_enc, env.TOKEN_KEY)).toBe('rt-1');
-    const caller = await resolveCaller(env, new Request('https://x', { headers: { Cookie: `tt_sid=${r.session_id}` } }));
-    expect(caller).toEqual({ workspaceId: r.workspace_id, via: 'session' });
+    const caller = await callerFor(env, new Request('https://x', { headers: { Cookie: `tt_sid=${r.session_id}` } }));
+    expect(caller).toMatchObject({ ws: me.ws, userId: me.userId, role: 'owner', scope: null });
   });
 
-  it('signing in again with the same TikTok account returns the same workspace', async () => {
-    const a = await intake(fakeTk());
-    const b = await intake(fakeTk());
-    expect(b.workspace_id).toBe(a.workspace_id);
-    expect(b.account_id).toBe(a.account_id);
+  it('without a session, TikTok cannot create a workspace', async () => {
+    await expect(intake(fakeTk(), { session_id: null })).rejects.toMatchObject({ status: 401 });
+  });
+
+  it('a workspace from before email sign-in opens with its TikTok until an email claims it', async () => {
+    const { encrypt } = await import('../src/crypto.js');
+    await env.DB.prepare('INSERT INTO workspaces (id, created_at) VALUES (?, 1)').bind('ws_old').run();
+    await env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, refresh_token_enc, connected_at, token_updated_at, can_sign_in)
+        VALUES ('acc_old', 'ws_old', 'open-1', ?, 1, 1, 1)`).bind(await encrypt('rt', env.TOKEN_KEY)).run();
+    const r = await intake(fakeTk(), { session_id: null });
+    expect(r.workspace_id).toBe('ws_old');
+    const legacy = await callerFor(env, new Request('https://x', { headers: { Cookie: `tt_sid=${r.session_id}` } }));
+    expect(legacy).toMatchObject({ ws: 'ws_old', via: 'legacy' });
+    await env.DB.prepare(`INSERT INTO memberships (workspace_id, user_id, role, created_at) VALUES ('ws_old', 'usr_x', 'owner', 1)`).run();
+    await expect(intake(fakeTk(), { session_id: null })).rejects.toMatchObject({ status: 401 });
+    expect(await callerFor(env, new Request('https://x', { headers: { Cookie: `tt_sid=${r.session_id}` } }))).toBeNull();
+  });
+
+  it('a member (not admin) cannot connect accounts', async () => {
+    const me = await signUp(env);
+    await env.DB.prepare(`UPDATE memberships SET role = 'member' WHERE user_id = ?`).bind(me.userId).run();
+    await expect(intake(fakeTk(), { session_id: me.sid })).rejects.toMatchObject({ status: 403 });
   });
 
   it('Add account attaches a second TikTok account to the current workspace', async () => {
     const a = await intake(fakeTk());
-    const b = await intake(fakeTk({ exchangeCode: async () => ({ access_token: 'at2', refresh_token: 'rt-2', open_id: 'open-2' }) }),
-      { session_id: a.session_id });
+    const b = await intake(tk2(), { session_id: a.session_id });
     expect(b.workspace_id).toBe(a.workspace_id);
     const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM accounts WHERE workspace_id=?').bind(a.workspace_id).first();
     expect(n).toBe(2);
@@ -41,16 +61,13 @@ describe('oauth intake', () => {
 
   it('refuses to add an account that belongs to another workspace', async () => {
     await intake(fakeTk());                                   // open-1 -> workspace A
-    const other = await intake(fakeTk({ exchangeCode: async () => ({ access_token: 'x', refresh_token: 'y', open_id: 'open-9' }) }));
-    await expect(intake(fakeTk(), { session_id: other.session_id })).rejects.toMatchObject({ status: 409 });
+    await expect(intake(fakeTk())).rejects.toMatchObject({ status: 409 });   // workspace B wants it too
   });
 
   it('an added account cannot be used to sign into the workspace it was added to', async () => {
     const a = await intake(fakeTk());
-    await intake(fakeTk({ exchangeCode: async () => ({ access_token: 'at', refresh_token: 'rt-2', open_id: 'open-2' }) }),
-      { session_id: a.session_id });
-    await expect(intake(fakeTk({ exchangeCode: async () => ({ access_token: 'at', refresh_token: 'rt-2', open_id: 'open-2' }) })))
-      .rejects.toThrow(/someone else/);
+    await intake(tk2(), { session_id: a.session_id });
+    await expect(intake(tk2(), { session_id: null })).rejects.toThrow(/someone else/);
   });
 
   it('rejects an unexpected redirect_uri', async () => {
@@ -67,8 +84,8 @@ describe('api keys', () => {
     const k1 = await rotateApiKey(env, workspace_id);
     const k2 = await rotateApiKey(env, workspace_id);
     const req = k => new Request('https://x', { headers: { Authorization: `Key ${k}` } });
-    expect(await resolveCaller(env, req(k2))).toEqual({ workspaceId: workspace_id, via: 'key' });
-    expect(await resolveCaller(env, req(k1))).toBeNull();
+    expect(await callerFor(env, req(k2))).toMatchObject({ ws: workspace_id, via: 'key', role: 'admin' });
+    expect(await callerFor(env, req(k1))).toBeNull();
   });
 });
 
