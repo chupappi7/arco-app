@@ -187,6 +187,12 @@ describe('instagram and facebook posts', () => {
       .rejects.toThrow(/30 hashtags/);
   });
 
+  it('lets a Facebook caption run past TikTok\'s 4,000 characters, to Facebook\'s own limit', async () => {
+    const p = await make('facebook', { caption: 'x'.repeat(5000) });
+    expect(p.caption).toHaveLength(5000);
+    await expect(make('facebook', { caption: 'x'.repeat(63207) })).rejects.toThrow(/63206/);
+  });
+
   it('publishes an Instagram carousel: containers, then publish once processed', async () => {
     const p = await make('instagram');
     const mt = fakeMeta();

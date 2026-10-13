@@ -14,6 +14,9 @@ const withBadge = (av, pl) => `<span class="avw">${av}<span class="badge-pl ${pl
 const connectBtn = (pl, href, text) => `<a class="btn brand ${pl}" href="${href}">${icon(pl, 16)}<span>${text}</span></a>`;
 // Instagram takes JPEG between 4:5 (portrait) and 1.91:1 (landscape), 10 per post.
 const IG_MIN_RATIO = 4 / 5, IG_MAX_RATIO = 1.91, IG_MAX = 10, IG_CAPTION = 2200;
+const CAPTION_MAX = { tiktok: 4000, instagram: IG_CAPTION, facebook: 63206 };
+const IG_HASHTAGS = 30;
+const hashtags = s => (String(s).match(/#[^\s#]+/g) || []).length;
 
 const S = {
   me: null, view: 'compose', flash: null,
@@ -21,6 +24,9 @@ const S = {
   // Every account the post goes to, any platform. TikTok accounts each carry
   // their own creator info, privacy and comment choice in S.tt.
   targets: [], tt: {},
+  // A caption per platform, when it should differ from the main one. Absent
+  // means "same as the main caption".
+  over: {},
   set: { music: false, disclose: false, brand: false, branded: false },
   when: 'now', at: '', busy: false, status: null,
   week: 0, fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
@@ -199,9 +205,10 @@ function composeView() {
       ${tts.length ? `<label class="f" for="title">Title <span class="note">(TikTok only)</span></label>
       <input type="text" id="title" maxlength="200" value="${esc(S.title)}">
       <div class="count ${len(S.title) > 90 ? 'note bad' : ''}">${len(S.title)} / 90</div>` : ''}
-      <label class="f" for="caption">Caption</label>
+      <label class="f" for="caption">Caption${chosenPlatforms().length > 1 ? ' <span class="note">(used everywhere unless customized below)</span>' : ''}</label>
       <textarea id="caption">${esc(S.caption)}</textarea>
-      <div class="count ${len(S.caption) > capLimit() ? 'note bad' : ''}">${len(S.caption)} / ${capLimit()}</div>
+      <div class="limits" id="caplimits">${limitsLine()}</div>
+      ${overridesView()}
     </div>
     ${tts.length ? `<div class="sec"><span class="cap">TikTok settings</span>
       ${tts.length > 1 ? `<div class="bulk"><label class="f" for="bulkpriv">Set who can view for every account</label>
@@ -332,7 +339,29 @@ const row = (t, d, control) => `<div class="row"><span class="txt"><span class="
 const acct = id => S.me.accounts.find(a => a.id === id);
 const ttTargets = () => S.targets.filter(id => platformOf(acct(id)) === 'tiktok');
 const toInstagram = () => S.targets.some(id => acct(id)?.platform === 'instagram');
-const capLimit = () => toInstagram() ? IG_CAPTION : 4000;
+const chosenPlatforms = () => ORDER.filter(pl => S.targets.some(id => platformOf(acct(id)) === pl));
+const captionFor = pl => (S.over[pl] ?? S.caption);
+
+// Each platform's count against its own limit, for whichever caption it will
+// actually get. Updated as you type, without re-rendering the page.
+function limitsLine() {
+  return chosenPlatforms().map(pl => {
+    const c = captionFor(pl), n = len(c), over = n > CAPTION_MAX[pl] || (pl === 'instagram' && hashtags(c) > IG_HASHTAGS);
+    return `<span class="lim ${over ? 'bad' : ''}">${icon(pl, 12)} ${n.toLocaleString()} / ${CAPTION_MAX[pl].toLocaleString()}${
+      pl === 'instagram' ? ` · ${hashtags(c)}/${IG_HASHTAGS} #` : ''}${S.over[pl] != null ? ' · custom' : ''}</span>`;
+  }).join('') || `<span class="lim">${len(S.caption)} characters</span>`;
+}
+
+function overridesView() {
+  const pls = chosenPlatforms();
+  if (pls.length < 2 && !pls.some(pl => S.over[pl] != null)) return '';
+  return `<div class="overrides">${pls.map(pl => S.over[pl] == null
+    ? `<button type="button" class="chip" data-custom="${pl}">${icon(pl, 13)} Customize for ${PLATFORM[pl]}</button>`
+    : `<div class="ov"><label class="f" for="ov-${pl}">${icon(pl, 13)} ${PLATFORM[pl]} caption</label>
+        <textarea id="ov-${pl}" data-ov="${pl}">${esc(S.over[pl])}</textarea>
+        <button type="button" class="link" data-uncustom="${pl}">Use the main caption for ${PLATFORM[pl]}</button></div>`).join('')}</div>`;
+}
+const refreshLimits = () => { const el = $('caplimits'); if (el) el.innerHTML = limitsLine(); };
 function goLabel() {
   if (S.targets.length > 3) return `${S.targets.length} accounts`;
   return S.targets.map(id => `${PLATFORM[platformOf(acct(id))]} ${handle(acct(id)).replace(/&amp;/g, '&')}`).join(', ');
@@ -342,11 +371,12 @@ function missing() {
   if (!S.targets.length) return 'Choose where to post';
   if (!S.images.length) return 'Add at least one photo';
   if (S.images.some(m => m.uploading)) return 'Waiting for uploads to finish';
-  if (len(S.caption) > 4000) return 'The caption is too long';
-  if (toInstagram()) {
-    if (S.images.length > IG_MAX) return `Instagram posts can have at most ${IG_MAX} photos`;
-    if (len(S.caption) > IG_CAPTION) return `Instagram captions can be at most ${IG_CAPTION} characters`;
+  for (const pl of chosenPlatforms()) {
+    const c = captionFor(pl);
+    if (len(c) > CAPTION_MAX[pl]) return `The ${PLATFORM[pl]} caption is too long (${len(c).toLocaleString()} / ${CAPTION_MAX[pl].toLocaleString()})`;
+    if (pl === 'instagram' && hashtags(c) > IG_HASHTAGS) return `Instagram allows at most ${IG_HASHTAGS} hashtags`;
   }
+  if (toInstagram() && S.images.length > IG_MAX) return `Instagram posts can have at most ${IG_MAX} photos`;
   const tts = ttTargets();
   if (tts.length) {
     if (len(S.title) > 90) return 'The title is too long';
@@ -500,7 +530,7 @@ async function submit() {
       const t = S.tt[j.id] || {};
       try {
         made.push(await api('/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-          account_id: j.id, image_keys: keys[n], cover_index: S.cover, title: S.title, caption: S.caption,
+          account_id: j.id, image_keys: keys[n], cover_index: S.cover, title: S.title, caption: captionFor(j.platform),
           settings: j.platform !== 'tiktok' ? {} : { privacy_level: t.privacy, disable_comment: !t.comment || !!t.info?.comment_disabled,
             auto_add_music: S.set.music, brand_organic: S.set.disclose && S.set.brand, branded_content: S.set.disclose && S.set.branded },
           scheduled_at: at,
@@ -546,7 +576,7 @@ async function watch(ids, tail = '') {
 // Targets stay selected for the next post; privacy is chosen again each time.
 function resetComposer() {
   Object.assign(S, { images: [], cover: 0, title: '', caption: '', when: 'now', at: '', status: null, replaces: null,
-    replacesAccount: null });
+    replacesAccount: null, over: {} });
   for (const t of Object.values(S.tt)) { t.privacy = ''; t.comment = false; }
   S.set = { music: false, disclose: false, brand: false, branded: false };
 }
@@ -831,7 +861,11 @@ function bind() {
   });
   on('#title', 'input', e => { S.title = e.target.value; });
   on('#title', 'change', render);
-  on('#caption', 'input', e => { S.caption = e.target.value; });
+  on('#caption', 'input', e => { S.caption = e.target.value; refreshLimits(); });
+  on('[data-ov]', 'input', e => { S.over[e.target.dataset.ov] = e.target.value; refreshLimits(); });
+  on('[data-ov]', 'change', render);
+  on('[data-custom]', 'click', e => { const pl = e.currentTarget.dataset.custom; S.over[pl] = S.caption; render(); $(`ov-${pl}`)?.focus(); });
+  on('[data-uncustom]', 'click', e => { delete S.over[e.target.dataset.uncustom]; render(); });
   on('#caption', 'change', render);
   on('[data-t]', 'change', e => toggleTarget(e.target.dataset.t, e.target.checked));
   on('#openpick', 'click', () => { S.pickOpen = !S.pickOpen; render(); if (S.pickOpen) $('pq')?.focus(); });

@@ -4,7 +4,7 @@ import { getAccount, accessTokenFor, isMeta } from './accounts.js';
 import { wsOf, inScope } from './scope.js';
 import { mediaUrl } from './media.js';
 import { MAX_IMAGES, MAX_QUEUED, MIN_LEAD_SECONDS, KEEP_AFTER_DONE, PRIVACY,
-  IG_MAX_IMAGES, IG_MAX_CAPTION, IG_MAX_HASHTAGS } from './limits.js';
+  IG_MAX_IMAGES, IG_MAX_CAPTION, IG_MAX_HASHTAGS, FB_MAX_CAPTION } from './limits.js';
 
 const len = s => [...String(s ?? '')].length;
 const bad = msg => { throw new HttpError(400, msg); };
@@ -21,7 +21,8 @@ export function validatePost(input, t = now(), platform = 'tiktok') {
   if (!Number.isInteger(cover) || cover < 0 || cover >= keys.length) bad('The cover must be one of the images');
   const title = String(i.title ?? ''), caption = String(i.caption ?? '');
   if (len(title) > 90) bad('The title can be at most 90 characters');
-  if (len(caption) > 4000) bad('The caption can be at most 4000 characters');
+  const capMax = platform === 'facebook' ? FB_MAX_CAPTION : 4000;
+  if (len(caption) > capMax) bad(`The caption can be at most ${capMax} characters`);
   if (platform === 'instagram') {
     if (len(caption) > IG_MAX_CAPTION) bad(`An Instagram caption can be at most ${IG_MAX_CAPTION} characters`);
     if ((caption.match(/#[^\s#]+/g) || []).length > IG_MAX_HASHTAGS) bad(`Instagram allows at most ${IG_MAX_HASHTAGS} hashtags`);

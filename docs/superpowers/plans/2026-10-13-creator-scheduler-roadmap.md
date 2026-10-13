@@ -16,17 +16,18 @@ in order: each one leaves a product that works end to end.
 Nothing is live yet. Platform reviews take the longest, so they start first.
 
 **Start the reviews now (the critical path):**
-- [ ] TikTok: Direct Post audit. Until it passes, every post through the API
-      is forced to "Only me". Re-record the demo with email sign-in →
-      Connect TikTok → post, and update the application text (no longer a free
-      single-brand tool)
+- [x] TikTok: Direct Post audit has passed. No new review is needed: same
+      scopes (`user.info.basic`, `video.publish`, `video.upload`, which also
+      covers video), same audited posting panel, connection still through
+      Login Kit. A new review is needed only for new scopes, or a change to the
+      app's name, icon, description, redirect URI or verified domain
 - [ ] Meta: Business Verification, then App Review for Advanced Access:
       `instagram_business_basic`, `instagram_business_content_publish`,
       `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`,
       `business_management`. Until then only people with a role on the app
       can connect
-- [ ] Decide the product name. "ARCO Publisher" is the name on the TikTok
-      app; renaming means a TikTok app revision, so decide before the audit
+- [ ] Decide the product name: keep "ARCO Publisher", or rename and accept a
+      TikTok app revision
 
 **Set up and deploy:**
 - [ ] Resend: verify a sending domain; Worker secrets `RESEND_API_KEY`, `MAIL_FROM`
