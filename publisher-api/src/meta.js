@@ -102,7 +102,7 @@ export function meta({ appId, appSecret, igAppId, igAppSecret, fetch }) {
         fields: 'like_count,comments_count' + (insights ? ',insights.metric(views,reach,saved,shares)' : '') } }),
     igAccountStats: token => call('/me', { base: GRAPH_IG, label: 'instagram account stats',
       params: { fields: 'followers_count,media_count', access_token: token } }),
-    // pages_read_engagement covers a Page post's reactions, comments and shares.
+    // A Page post's reactions, comments and shares need pages_read_user_content.
     fbPostStats: (token, postId) => call(`/${postId}`, { label: 'facebook stats',
       params: { access_token: token,
         fields: 'reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares' } }),

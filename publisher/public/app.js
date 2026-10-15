@@ -349,7 +349,7 @@ function perfCard() {
   return `<section class="panel perf">${head}
     ${st.tracked || st.followers.total != null ? `<div class="pgrid">${cells.map(([l, v, c]) => `<div><span>${l}</span><b class="${c}">${v}</b></div>`).join('')}</div>`
       : '<div class="empty">Numbers appear a few hours after your first Instagram or Facebook post goes out.</div>'}
-    <p class="pnote">Instagram and Facebook${st.updated_at ? `, updated ${ago(st.updated_at)}` : ''}.${st.tiktok_pending ? ' TikTok numbers come once TikTok approves access.' : ''}</p></section>`;
+    <p class="pnote">${st.facebook_limited ? 'Instagram posts, and followers on Facebook' : 'Instagram and Facebook'}${st.updated_at ? `, updated ${ago(st.updated_at)}` : ''}.${st.tiktok_pending ? ' TikTok numbers come once TikTok approves access.' : ''}</p></section>`;
 }
 
 function analyticsView() {
@@ -370,6 +370,7 @@ function analyticsView() {
       <span class="fc ${a.change > 0 ? 'up' : a.change < 0 ? 'down' : ''}">${a.change == null ? '' : signed(a.change)}</span></div>`;
   const notes = [
     st.tiktok_pending && 'TikTok views and likes come once TikTok approves the stats permissions for ARCO Publisher.',
+    st.facebook_limited && 'Facebook Page likes and comments need one more permission (pages_read_user_content). Followers already show.',
     st.tracked && st.totals.views == null && 'Instagram views, reach and saves need the insights permission; until then you see likes and comments.',
   ].filter(Boolean);
   // Let the pagehead title stand; put the period switch under it.

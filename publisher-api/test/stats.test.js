@@ -132,3 +132,17 @@ describe('getStats', () => {
     await expect(getStats(env, 'ws1', 9, T)).rejects.toThrow('days');
   });
 });
+
+describe('Facebook without pages_read_user_content', () => {
+  beforeEach(() => resetDb(env));
+  it('stops asking for a week and says so in the stats', async () => {
+    await account('fb1', 'facebook'); await post('p1', 'fb1', T - 3600); await post('p2', 'fb1', T - 3600);
+    const mt = fakeMeta({ fbPostStats: async (tok, id) => { mt.calls.push(['fb', id]);
+      throw new MetaError('facebook stats: (#10) This endpoint requires the pages_read_user_content permission', { code: '10' }); } });
+    await refreshStats(env, mt, fakeTk(), T, 6);
+    expect(mt.calls.filter(c => c[0] === 'fb').length).toBe(1);
+    const s = await getStats(env, 'ws1', 7, T);
+    expect(s.facebook_limited).toBe(true);
+    expect(s.tracked).toBe(0);
+  });
+});

@@ -59,8 +59,18 @@ async function readInstagram(env, mt, token, post, account, t) {
   return s;
 }
 
-async function readFacebook(mt, token, post) {
-  const r = await mt.fbPostStats(token, post.public_post_id);
+// Without pages_read_user_content Facebook refuses to read the post at all;
+// the account is then left alone for a week, like Instagram insights.
+async function readFacebook(env, mt, token, post, account, t) {
+  if (account.insights_denied_at && account.insights_denied_at > t - INSIGHTS_RETRY) return null;
+  let r;
+  try { r = await mt.fbPostStats(token, post.public_post_id); }
+  catch (err) {
+    if (!denied(err)) throw err;
+    await env.DB.prepare('UPDATE accounts SET insights_denied_at = ? WHERE id = ?').bind(t, account.id).run();
+    account.insights_denied_at = t;
+    return null;
+  }
   return { likes: count(r.reactions?.summary?.total_count), comments: count(r.comments?.summary?.total_count),
     shares: count(r.shares?.count) };
 }
@@ -99,7 +109,7 @@ export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TI
     } catch (err) {
       if (err.code === 'needs_reconnect') await markReconnect(env, a.id);
       // Anything else: try again next time, not every minute.
-      else await env.DB.prepare('UPDATE accounts SET stats_at = ? WHERE id = ?').bind(t, a.id).run();
+      else console.error('stats account', a.id, err.message), await env.DB.prepare('UPDATE accounts SET stats_at = ? WHERE id = ?').bind(t, a.id).run();
     }
   }
 
@@ -114,12 +124,15 @@ export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TI
   for (const p of posts) {
     try {
       const { account, token } = await load(p.account_id);
-      const s = account.platform === 'instagram' ? await readInstagram(env, mt, token, p, account, t) : await readFacebook(mt, token, p);
-      await env.DB.prepare('UPDATE posts SET stats = ?, stats_at = ? WHERE id = ?').bind(JSON.stringify(s), t, p.id).run();
-      done.posts++;
+      const s = account.platform === 'instagram' ? await readInstagram(env, mt, token, p, account, t) : await readFacebook(env, mt, token, p, account, t);
+      await env.DB.prepare('UPDATE posts SET stats = ?, stats_at = ? WHERE id = ?').bind(s ? JSON.stringify(s) : null, t, p.id).run();
+      if (s) done.posts++;
     } catch (err) {
       if (err.code === 'needs_reconnect') await markReconnect(env, p.account_id);
-      else await env.DB.prepare('UPDATE posts SET stats_at = ? WHERE id = ?').bind(t, p.id).run();
+      else {
+        console.error('stats post', p.id, err.message);
+        await env.DB.prepare('UPDATE posts SET stats_at = ? WHERE id = ?').bind(t, p.id).run();
+      }
     }
   }
   return done;
@@ -153,7 +166,7 @@ export async function getStats(env, w, days, t = now()) {
   const top = withStats.sort((a, b) => b.score - a.score).slice(0, 5).map(x => postJson(env, x.r));
 
   const asc = inScope(w);
-  const { results: accs } = await env.DB.prepare(`SELECT id, username, platform, avatar_url, followers, stats_at FROM accounts
+  const { results: accs } = await env.DB.prepare(`SELECT id, username, platform, avatar_url, followers, stats_at, insights_denied_at FROM accounts
       WHERE workspace_id = ?${asc.sql} ORDER BY platform, username`).bind(wsOf(w), ...asc.binds).all();
   const startDay = utcDay(from), today = utcDay(t);
   const accounts = [];
@@ -165,7 +178,8 @@ export async function getStats(env, w, days, t = now()) {
       if (first && first.day < today) change = a.followers - first.followers;
     }
     accounts.push({ id: a.id, username: a.username, platform: a.platform || 'tiktok', avatar_url: a.avatar_url,
-      followers: a.followers, change, updated_at: a.stats_at });
+      followers: a.followers, change, updated_at: a.stats_at,
+      limited: !!a.insights_denied_at && a.insights_denied_at > t - INSIGHTS_RETRY });
   }
   const known = accounts.filter(a => a.followers !== null);
   const changes = known.filter(a => a.change !== null);
@@ -177,5 +191,6 @@ export async function getStats(env, w, days, t = now()) {
       change: changes.length ? changes.reduce((n, a) => n + a.change, 0) : null },
     accounts, top,
     tiktok_pending: accounts.some(a => a.platform === 'tiktok'),
+    facebook_limited: accounts.some(a => a.platform === 'facebook' && a.limited),
   };
 }
