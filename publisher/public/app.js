@@ -19,7 +19,7 @@ const IG_HASHTAGS = 30;
 const hashtags = s => (String(s).match(/#[^\s#]+/g) || []).length;
 
 const S = {
-  me: null, view: 'compose', flash: null,
+  me: null, view: 'overview', flash: null, counts: { drafts: 0, failed: 0 }, ov: null,
   images: [], cover: 0, title: '', caption: '',
   // Every account the post goes to, any platform. TikTok accounts each carry
   // their own creator info, privacy and comment choice in S.tt.
@@ -85,6 +85,7 @@ async function loadMe() {
   }
   S.targets = []; S.tt = {};
   restoreTargets();
+  refreshCounts();
 }
 
 // The accounts last posted to come back preselected: someone running ten
@@ -96,30 +97,211 @@ function restoreTargets() {
 }
 function saveTargets() { try { localStorage.setItem(SAVED, JSON.stringify(S.targets)); } catch {} }
 
+const VIEWS = ['overview', 'compose', 'calendar', 'drafts', 'accounts', 'settings'];
 function route() {
-  S.view = (location.hash || '#compose').slice(1);
-  if (!['compose', 'calendar', 'drafts', 'accounts', 'settings'].includes(S.view)) S.view = 'compose';
+  S.view = (location.hash || '#overview').slice(1);
+  if (!VIEWS.includes(S.view)) S.view = 'overview';
+  if (S.view === 'overview') loadOverview();
   if (S.view === 'calendar') loadWeek();
   if (S.view === 'drafts') loadDrafts();
   render();
+  window.scrollTo(0, 0);
 }
 
 // ---- render ------------------------------------------------------------
 
+// UI icons: one stroke weight everywhere.
+const UI = {
+  home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m14 6 4 4"/>',
+  cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  draft: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  retry: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/>',
+  chev: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>', check: '<path d="m5 12 5 5 9-10"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+};
+const ui = (n, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI[n]}</svg>`;
+
+// The workspace and its switcher, shown at the top of the menu.
+function wsBox() {
+  const w = S.me.workspace, list = S.me.workspaces || [];
+  const label = w.role === 'owner' ? 'Owner' : w.role === 'admin' ? 'Admin' : w.brand_scope ? 'Member, some brands' : 'Member';
+  return `<div class="ws"><div class="wsbox"><span class="sq">${esc((w.name || 'W')[0].toUpperCase())}</span>
+      <span class="nm"><span>${esc(w.name)}</span><small>${label}</small></span>${list.length > 1 ? ui('chev', 16) : ''}</div>
+    ${list.length > 1 ? `<select id="wsswitch" aria-label="Switch workspace">${list.map(x =>
+      `<option value="${x.id}" ${x.id === w.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}</div>`;
+}
+
+function menu() {
+  const items = [['overview', 'Overview', 'home'], ['compose', 'Create', 'edit'], ['calendar', 'Calendar', 'cal', S.counts.failed, 'bad'],
+    ['drafts', 'Drafts', 'draft', S.counts.drafts], ...(can('admin') ? [['accounts', 'Accounts', 'users']] : [])];
+  const email = S.me.user?.email || '';
+  return `<a class="brand-row" href="#overview"><span class="logo"><i></i></span><b>ARCO Publisher</b></a>
+    ${wsBox()}
+    <a class="create-side" href="#compose">${ui('plus', 16)}Create post</a>
+    <nav class="nav" aria-label="Main">${items.map(([k, l, i, n, tone]) =>
+      `<a href="#${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${ui(i)}${l}${n ? `<span class="n ${tone || ''}">${n}</span>` : ''}</a>`).join('')}</nav>
+    <div class="grow"></div>
+    <nav class="nav"><a href="#settings" class="${S.view === 'settings' ? 'on' : ''}">${ui('gear')}Settings</a></nav>
+    <div class="me"><span class="av-me">${esc((email[0] || '?').toUpperCase())}</span>
+      <div><b>${esc(email)}</b><a href="/api/auth/logout">Sign out</a></div></div>`;
+}
+
+function tabbar() {
+  const t = (k, l, i) => `<a href="#${k}" class="${S.view === k ? 'on' : ''}">${ui(i, 20)}${l}</a>`;
+  return t('overview', 'Overview', 'home') + t('calendar', 'Calendar', 'cal') +
+    `<a href="#compose" aria-label="Create post"><span class="plus">${ui('plus', 22)}</span></a>` +
+    t('drafts', 'Drafts', 'draft') + (can('admin') ? t('accounts', 'Accounts', 'users') : t('settings', 'Settings', 'gear'));
+}
+
+const HEADS = {
+  compose: () => ['Create post', S.targets.length ? `Goes to ${S.targets.length} account${S.targets.length === 1 ? '' : 's'}.` : 'Choose accounts, add photos, write the caption.'],
+  calendar: () => ['Calendar', `Everything scheduled and published, in ${tz().replace(/_/g, ' ')} time.`],
+  drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.'],
+  accounts: () => ['Accounts', 'Connect accounts and group them into brands.'],
+  settings: () => ['Settings', 'Workspace, people and your account.'],
+};
+const pageHead = (title, sub, action = '') => `<div class="pagehead"><div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${action}</div>`;
+
+function toast(text, kind = '') {
+  const el = document.createElement('div');
+  el.className = `toast ${kind === 'err' ? 'err' : ''}`;
+  el.setAttribute('role', kind === 'err' ? 'alert' : 'status');
+  el.innerHTML = `<span>${esc(text)}</span><button aria-label="Dismiss">${ui('x', 14)}</button>`;
+  el.querySelector('button').onclick = () => el.remove();
+  $('toasts').appendChild(el);
+  setTimeout(() => el.remove(), kind === 'err' ? 9000 : 5000);
+}
+
 function render() {
   const signedIn = !!S.me && !S.me.needs_email;
-  $('tabs').hidden = !signedIn;
-  $('wsbar').innerHTML = signedIn ? wsBar() : '';
-  document.querySelectorAll('#tabs a').forEach(a => {
-    a.classList.toggle('on', a.dataset.v === S.view);
-    a.hidden = a.dataset.v === 'accounts' && !can('admin');
-  });
-  const flash = S.flash ? `<div class="status ${S.flash.kind}">${esc(S.flash.text)}</div>` : '';
-  if (!signedIn) { $('app').innerHTML = flash + signInView(); bind(); return; }
-  if (S.view === 'accounts' && !can('admin')) S.view = 'compose';
-  const views = { calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
-  $('app').innerHTML = flash + views[S.view]() + (S.view === 'calendar' && S.detail ? detailView() : '');
+  // Messages become toasts; the page keeps only inline errors.
+  if (S.flash) { toast(S.flash.text, S.flash.kind); S.flash = null; }
+  $('shell').classList.toggle('bare', !signedIn);
+  $('side').hidden = $('mtop').hidden = $('tabbar').hidden = !signedIn;
+  if (!signedIn) { $('app').innerHTML = signInView(); bind(); return; }
+  if (S.view === 'accounts' && !can('admin')) S.view = 'overview';
+  $('side').innerHTML = menu();
+  $('mtop').innerHTML = `<span class="logo"><i></i></span>${wsBox()}`;
+  $('tabbar').innerHTML = tabbar();
+  const views = { overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
+  const head = S.view === 'overview' ? '' : pageHead(...HEADS[S.view]());
+  $('app').innerHTML = head + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '');
   bind();
+}
+
+// ---- overview ----------------------------------------------------------------
+// What goes out today, what needs a hand, how the week looks, what just went
+// live. Built from the posts, drafts and accounts the workspace already has.
+
+async function loadOverview() {
+  const now = Math.floor(Date.now() / 1000);
+  try {
+    const [posts, drafts] = await Promise.all([
+      api(`/posts?from=${now - 14 * 86400}&to=${now + 14 * 86400}`), api('/drafts')]);
+    S.posts = posts.posts;
+    S.drafts = drafts.drafts;
+    S.counts = { drafts: draftGroups().length, failed: S.posts.filter(p => p.status === 'failed' && p.scheduled_at > now - 7 * 86400).length };
+    S.ov = { at: now };
+  } catch (e) { S.flash = { kind: 'err', text: e.message }; S.ov = { at: now, err: true }; }
+  if (S.view === 'overview') render();
+}
+
+function greeting() {
+  const h = zoned(Date.now()).h;
+  return h < 5 ? 'Good evening' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+}
+
+const thumbOf = p => p.images?.[p.cover_index] || p.images?.[0];
+const at = (sec, o = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) => fmt(sec, o);
+
+function overviewView() {
+  const acc = S.me.accounts;
+  if (!acc.length) return firstRun();
+  if (!S.ov) return pageHead(greeting(), 'Loading today…') + '<div class="panel empty">Loading…</div>';
+  const now = Math.floor(Date.now() / 1000), todayKey = dayKey(today());
+  const live = S.posts.filter(p => p.status !== 'cancelled');
+  const todays = live.filter(p => dayOf(p.scheduled_at) === todayKey).sort((a, b) => a.scheduled_at - b.scheduled_at);
+  const upcoming = live.filter(p => p.status === 'queued' && p.scheduled_at >= now).sort((a, b) => a.scheduled_at - b.scheduled_at);
+  const next = upcoming[0];
+  const leftToday = todays.filter(p => p.status === 'queued' && p.scheduled_at >= now).length;
+  const sub = next
+    ? `${leftToday ? `<b>${leftToday} post${leftToday === 1 ? '' : 's'}</b> still to go out today. ` : ''}Next is <b>${dayOf(next.scheduled_at) === todayKey ? at(next.scheduled_at) : fmtFull(next.scheduled_at)}</b> on ${PLATFORM[next.platform] || 'TikTok'} ${next.platform === 'facebook' ? '' : '@'}${esc(next.username)}.`
+    : 'Nothing is scheduled yet.';
+
+  const slot = p => {
+    const isNext = next && p.id === next.id;
+    const cls = isNext ? 'next' : p.status;
+    const label = isNext ? 'Next up' : { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
+    const img = thumbOf(p);
+    return `<div class="slot ${cls}"><time>${at(p.scheduled_at)}</time><div class="dot"><i></i></div>
+      <div class="rpost" data-open="${p.id}">${img ? `<img class="thumb" src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}
+        <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
+        <span class="st ${cls}">${label}</span></div></div>`;
+  };
+  const before = todays.filter(p => p.scheduled_at < now), after = todays.filter(p => p.scheduled_at >= now);
+  const rail = todays.length
+    ? `<div class="rail">${before.map(slot).join('')}<div class="nowline"><time>${at(now)}</time><div class="bar"></div></div>${after.map(slot).join('')}</div>`
+    : `<div class="empty"><b>Nothing goes out today.</b>${next ? `The next post is ${fmtFull(next.scheduled_at)}.` : 'Create a post, or add it to the queue to fill your posting times.'}
+        <div><a class="btn" href="#compose">${ui('plus', 16)}Create post</a></div></div>`;
+
+  const failed = live.filter(p => p.status === 'failed' && p.scheduled_at > now - 7 * 86400);
+  const reconnect = acc.filter(a => a.needs_reconnect);
+  const drafts = draftGroups();
+  const attn = [
+    failed.length && `<a href="#calendar"><span class="ic bad">${ui('x', 16)}</span><div><b>${failed.length} post${failed.length === 1 ? '' : 's'} failed</b><span>${esc(failed[0].fail_reason || 'See why in the calendar')}</span></div><em>Review</em></a>`,
+    ...reconnect.slice(0, 3).map(a => `<a href="#accounts"><span class="ic warn">${ui('retry', 16)}</span><div><b>${a.platform === 'facebook' ? '' : '@'}${esc(a.username)} needs reconnecting</b><span>${PLATFORM[platformOf(a)]} access expired or was removed</span></div><em>Reconnect</em></a>`),
+    drafts.length && `<a href="#drafts"><span class="ic mute">${ui('draft', 16)}</span><div><b>${drafts.length} draft${drafts.length === 1 ? '' : 's'} waiting</b><span>Saved ${fmt(drafts[drafts.length - 1][0].updated_at, { dateStyle: 'medium' })} or later</span></div><em>Open</em></a>`,
+  ].filter(Boolean);
+
+  // This week, Monday to Sunday, by platform.
+  const t0 = today(), wd = new Date(Date.UTC(t0.y, t0.m - 1, t0.d)).getUTCDay(), mon = addDays(t0, -((wd + 6) % 7));
+  const days = [...Array(7)].map((_, i) => addDays(mon, i));
+  const per = days.map(d => ORDER.map(pl => live.filter(p => (p.platform || 'tiktok') === pl && dayOf(p.scheduled_at) === dayKey(d)).length));
+  const maxDay = Math.max(1, ...per.map(x => x[0] + x[1] + x[2]));
+  const weekTotal = per.reduce((n, x) => n + x[0] + x[1] + x[2], 0);
+  const COL = { tiktok: 'var(--graphite)', instagram: '#E1306C', facebook: '#0866FF' };
+
+  const published = live.filter(p => p.status === 'published').sort((a, b) => b.scheduled_at - a.scheduled_at).slice(0, 4);
+
+  return pageHead(greeting(), sub, `<a class="btn" href="#compose">${ui('plus', 16)}Create post</a>`) + `
+  <div class="ovw">
+    <section class="panel"><header><h2>Today</h2><a href="#calendar">Open calendar</a></header>${rail}</section>
+    <div class="stack">
+      <section class="panel"><header><h2>Needs attention</h2></header>
+        <div class="attn">${attn.join('') || `<a href="#calendar"><span class="ic ok">${ui('check', 16)}</span><div><b>All good</b><span>No failed posts, every account is connected.</span></div></a>`}</div></section>
+      <section class="panel"><header><h2>This week</h2><a href="#calendar">${weekTotal} post${weekTotal === 1 ? '' : 's'}</a></header>
+        <div class="wk">${days.map((d, i) => `<div class="d ${dayKey(d) === todayKey ? 'today' : ''}"><div class="stk">${ORDER.map((pl, k) =>
+          per[i][k] ? `<i style="height:${Math.max(6, (per[i][k] / maxDay) * 90)}px;background:${COL[pl]}" title="${per[i][k]} on ${PLATFORM[pl]}"></i>` : '').join('')}</div>
+          <span>${dayLabel(d, { weekday: 'short' })}</span></div>`).join('')}</div>
+        <div class="legend">${ORDER.filter(pl => acc.some(a => platformOf(a) === pl)).map(pl => `<span><i style="background:${COL[pl]}"></i>${PLATFORM[pl]}</span>`).join('')}</div></section>
+    </div>
+    <section class="panel wide"><header><h2>Performance</h2><span class="note">Last 7 days</span></header>
+      <div class="perf-empty">${['Views', 'Likes', 'Comments', 'Shares', 'New followers'].map(l => `<div><span>${l}</span><b>–</b></div>`).join('')}</div>
+      <p class="perf-note">Views, likes, comments, shares and followers from TikTok, Instagram and Facebook show here once ARCO Publisher has permission to read them. That permission is being requested from each platform.</p></section>
+    <section class="panel wide"><header><h2>Recently published</h2><a href="#calendar">See all</a></header>
+      ${published.length ? `<div class="recent">${published.map(p => `<div class="rc">
+          <a class="img" ${p.post_url ? `href="${esc(p.post_url)}" target="_blank" rel="noopener"` : ''}>${thumbOf(p) ? `<img src="${esc(thumbOf(p))}" alt="">` : ''}<span class="badge-pl ${p.platform || 'tiktok'}">${icon(p.platform || 'tiktok', 11)}</span></a>
+          <div class="meta">${p.post_url ? `<a href="${esc(p.post_url)}" target="_blank" rel="noopener">View</a>` : ''}<b>${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</b><span>${fmt(p.scheduled_at, { dateStyle: 'medium' })}</span></div></div>`).join('')}</div>`
+      : '<div class="empty">Published posts appear here with a link to each one.</div>'}</section>
+  </div>`;
+}
+
+// Until the workspace has an account, the overview is a short path to the
+// first scheduled post.
+function firstRun() {
+  const steps = [
+    [S.me.accounts.length > 0, 'Connect an account', 'TikTok, Instagram or a Facebook Page. You log in on their own screen.', '#accounts', 'Connect'],
+    [false, 'Create your first post', 'Add photos, write a caption, see how it looks on each platform.', '#compose', 'Create post'],
+    [!!S.me.workspace.slots, 'Set your posting times', 'Then "Add to queue" picks the next free time for you.', '#settings', 'Set times'],
+  ];
+  return pageHead('Welcome to ARCO Publisher', 'Three steps to your first scheduled post.') + `
+    <section class="panel"><div class="checklist">${steps.map(([done, t, d, href, cta], i) => `<div class="step ${done ? 'done' : ''}">
+      <span class="num">${done ? ui('check', 14) : i + 1}</span><div><b>${t}</b><span>${d}</span></div>
+      ${done ? '' : `<a class="btn ${i ? 'sec' : ''}" href="${href}">${cta}</a>`}</div>`).join('')}</div></section>`;
 }
 
 // ---- sign in: email, then the 6-digit code it receives ---------------------
@@ -128,9 +310,11 @@ function signInView() {
   const L = S.login, claiming = S.me?.needs_email;
   let invited = false;
   try { invited = !!sessionStorage.getItem(INVITE); } catch {}
-  return `<div class="card signin"><div class="sec">
-    <span class="cap">${claiming ? 'Add your email' : 'Sign in or create an account'}</span>
-    <p style="margin:0 0 16px;color:var(--muted)">${claiming
+  return `<div class="signwrap"><div class="signside">
+    <a class="brand-row" href="/"><span class="logo"><i></i></span><b>ARCO Publisher</b></a>
+    <div class="card signin"><div class="sec">
+    <h1>${claiming ? 'Add your email' : 'Sign in or create an account'}</h1>
+    <p class="lead">${claiming
       ? 'ARCO Publisher now signs in with email. Add yours to keep this workspace, its accounts and its posts. From then on you sign in with it, and you can invite teammates.'
       : invited ? 'Sign in with the email the invite was sent to, and you will join the workspace.'
       : 'Schedule photo posts to TikTok, Instagram and Facebook Pages, one account or many. No password: we email you a code.'}</p>
@@ -150,7 +334,12 @@ function signInView() {
     ${claiming ? '' : `<p class="note" style="margin-top:18px">Signed up with TikTok before email sign-in existed?
       <a href="/api/auth/start">Continue with TikTok</a> once, then add your email.</p>`}
     <p class="note">By continuing you agree to the <a href="/terms.html">terms</a> and <a href="/privacy.html">privacy policy</a>.</p>
-  </div></div>`;
+  </div></div></div>
+  <div class="signart" aria-hidden="true"><div class="mini"><h3>Today</h3>
+    ${[['07:30', 'facebook', 'Your Page', 'published', 'Published'], ['now'], ['09:00', 'instagram', '@yourbrand', 'next', 'Next up'], ['18:00', 'tiktok', '@yourbrand', 'queued', 'Scheduled']].map(r => r[0] === 'now'
+      ? '<div class="nowline"><time>Now</time><div class="bar"></div></div>'
+      : `<div class="slot ${r[3]}"><time>${r[0]}</time><div class="dot"><i></i></div><div class="rpost"><span class="noimg"></span><div class="wh"><b>${icon(r[1], 14)}${r[2]}</b><span>Photo post</span></div><span class="st ${r[3]}">${r[4]}</span></div></div>`).join('')}
+  </div></div></div>`;
 }
 
 async function sendCode() {
@@ -845,9 +1034,22 @@ async function dropDrafts(ids) {
 }
 
 async function loadDrafts() {
-  try { S.drafts = (await api('/drafts')).drafts; } catch (e) { S.flash = { kind: 'err', text: e.message }; }
+  try { S.drafts = (await api('/drafts')).drafts; S.counts.drafts = draftGroups().length; } catch (e) { S.flash = { kind: 'err', text: e.message }; }
   render();
 }
+
+// The menu's counts (drafts waiting, posts failed this week), kept fresh
+// whichever page is open.
+async function refreshCounts() {
+  const now = Math.floor(Date.now() / 1000);
+  try {
+    const [d, p] = await Promise.all([api('/drafts'), api(`/posts?from=${now - 7 * 86400}&to=${now + 60}`)]);
+    const groups = new Set(d.drafts.map(x => x.group_id || x.id));
+    S.counts = { drafts: groups.size, failed: p.posts.filter(x => x.status === 'failed').length };
+    if (S.me && !S.me.needs_email) $('side').innerHTML = menu();
+  } catch {}
+}
+const reloadView = () => (S.view === 'overview' ? loadOverview() : loadWeek());
 
 // Drafts saved together come back as one card.
 function draftGroups() {
@@ -1345,15 +1547,15 @@ function bind() {
   on('#savecap', 'click', async () => {
     try { await send(`/posts/${S.detail}`, 'PATCH', { caption: $('dcap').value }); S.flash = { kind: 'ok', text: 'Caption saved.' }; }
     catch (x) { S.flash = { kind: 'err', text: x.message }; }
-    loadWeek(); });
+    reloadView(); });
   on('[data-mode]', 'click', e => { S.calMode = e.target.dataset.mode; loadWeek(); });
   on('[data-drag]', 'dragstart', e => { e.dataTransfer.setData('text/plain', e.currentTarget.dataset.drag); e.dataTransfer.effectAllowed = 'move'; });
   on('[data-day]', 'dragover', e => { e.preventDefault(); e.currentTarget.classList.add('drop'); });
   on('[data-day]', 'dragleave', e => e.currentTarget.classList.remove('drop'));
   on('[data-day]', 'drop', e => { e.preventDefault(); e.currentTarget.classList.remove('drop');
     const id = e.dataTransfer.getData('text/plain'); if (id) movePost(id, e.currentTarget.dataset.day); });
-  on('[data-cancel]', 'click', async e => { try { await api(`/posts/${e.target.dataset.cancel}`, { method: 'DELETE' }); } catch (x) { S.flash = { kind: 'err', text: x.message }; } loadWeek(); });
-  on('[data-retry]', 'click', async e => { try { await api(`/posts/${e.target.dataset.retry}/retry`, { method: 'POST' }); } catch (x) { S.flash = { kind: 'err', text: x.message }; } loadWeek(); });
+  on('[data-cancel]', 'click', async e => { try { await api(`/posts/${e.target.dataset.cancel}`, { method: 'DELETE' }); S.detail = null; S.flash = { kind: 'ok', text: 'Post cancelled.' }; } catch (x) { S.flash = { kind: 'err', text: x.message }; } reloadView(); refreshCounts(); });
+  on('[data-retry]', 'click', async e => { try { await api(`/posts/${e.target.dataset.retry}/retry`, { method: 'POST' }); S.detail = null; S.flash = { kind: 'ok', text: 'Retrying. It goes out within a minute.' }; } catch (x) { S.flash = { kind: 'err', text: x.message }; } reloadView(); refreshCounts(); });
   on('[data-edit]', 'click', e => { S.detail = null; edit(e.target.dataset.edit); });
   on('[data-disc]', 'click', async e => {
     if (!confirm('Disconnect this account? Its scheduled posts will be cancelled.')) return;
