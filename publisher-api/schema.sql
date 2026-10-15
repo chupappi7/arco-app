@@ -24,7 +24,10 @@ CREATE TABLE IF NOT EXISTS accounts (
   access_expires_at INTEGER,
   needs_reconnect INTEGER NOT NULL DEFAULT 0,
   connected_at INTEGER NOT NULL,
-  token_updated_at INTEGER NOT NULL
+  token_updated_at INTEGER NOT NULL,
+  followers INTEGER,                       -- last follower count read from the platform
+  stats_at INTEGER,                        -- when it was read
+  insights_denied_at INTEGER               -- the account's token cannot read insights (views, reach)
 );
 CREATE INDEX IF NOT EXISTS accounts_ws ON accounts(workspace_id);
 CREATE INDEX IF NOT EXISTS accounts_meta_user ON accounts(meta_user_id);
@@ -126,10 +129,21 @@ CREATE TABLE IF NOT EXISTS posts (
   created_by TEXT,                         -- user who made it (told if it fails)
   notified INTEGER NOT NULL DEFAULT 0,     -- 1 once a failure has been emailed
   fail_reason TEXT,
+  stats TEXT,                              -- JSON: likes, comments, shares, views, reach, saves
+  stats_at INTEGER,                        -- when they were read
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS posts_due ON posts(status, next_attempt_at);
+CREATE INDEX IF NOT EXISTS posts_stats ON posts(status, stats_at);
+
+-- One follower count per account per UTC day, for "new followers".
+CREATE TABLE IF NOT EXISTS follower_history (
+  account_id TEXT NOT NULL,
+  day TEXT NOT NULL,
+  followers INTEGER NOT NULL,
+  PRIMARY KEY (account_id, day)
+);
 CREATE INDEX IF NOT EXISTS posts_ws ON posts(workspace_id, scheduled_at);
 CREATE INDEX IF NOT EXISTS posts_drafts ON posts(workspace_id, status, updated_at);
 

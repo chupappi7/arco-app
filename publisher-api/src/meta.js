@@ -94,6 +94,20 @@ export function meta({ appId, appSecret, igAppId, igAppSecret, fetch }) {
       method: 'POST', label: 'facebook post',
       params: { message, access_token: token,
         ...Object.fromEntries(photoIds.map((id, i) => [`attached_media[${i}]`, JSON.stringify({ media_fbid: id })])) } }),
+
+    // Numbers. Likes and comments need only instagram_business_basic; views,
+    // reach, saves and shares need instagram_business_manage_insights.
+    igMediaStats: (token, mediaId, { insights = false } = {}) => call(`/${mediaId}`, { base: GRAPH_IG, label: 'instagram stats',
+      params: { access_token: token,
+        fields: 'like_count,comments_count' + (insights ? ',insights.metric(views,reach,saved,shares)' : '') } }),
+    igAccountStats: token => call('/me', { base: GRAPH_IG, label: 'instagram account stats',
+      params: { fields: 'followers_count,media_count', access_token: token } }),
+    // pages_read_engagement covers a Page post's reactions, comments and shares.
+    fbPostStats: (token, postId) => call(`/${postId}`, { label: 'facebook stats',
+      params: { access_token: token,
+        fields: 'reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares' } }),
+    fbPageStats: (token, pageId) => call(`/${pageId}`, { label: 'facebook page stats',
+      params: { fields: 'followers_count,fan_count', access_token: token } }),
   };
 }
 

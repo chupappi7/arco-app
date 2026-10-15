@@ -12,6 +12,7 @@ import { tick, publishNow } from './publisher.js';
 import { notifyFailures } from './notify.js';
 import { writeCaptions, aiUsage } from './ai.js';
 import { runCleanup, deleteWorkspace } from './cleanup.js';
+import { refreshStats, getStats, STATS_PER_TICK } from './stats.js';
 import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './brands.js';
 
 async function me(req, env, { who }) {
@@ -98,6 +99,7 @@ export const ROUTES = [
     }
     return json({ posts: await listPosts(env, who, from, to) });
   }, 'member'],
+  ['GET', '/v1/stats', async (req, env, { who, url }) => json(await getStats(env, who, Number(url.searchParams.get('days') || 7))), 'member'],
   ['POST', '/v1/ai/captions', async (req, env, { who }) => json(await writeCaptions(env, who, await body(req))), 'member'],
   ['GET', '/v1/ai/usage', async (req, env, { who }) => json(await aiUsage(env, who)), 'member'],
   ['GET', '/v1/drafts', async (req, env, { who }) => json({ drafts: await listDrafts(env, who) }), 'member'],
@@ -151,10 +153,14 @@ export default {
 
   async scheduled(event, env, ctx) {
     ctx.waitUntil((async () => {
-      const counts = await tick(env, tkFor(env));
+      const tk = tkFor(env);
+      const counts = await tick(env, tk);
       if (counts.started || counts.published || counts.failed) console.log('tick', JSON.stringify(counts));
       await notifyFailures(env).catch(e => console.error('notify', e));
       await refreshInstagramTokens(env, metaFor(env)).catch(e => console.error('ig refresh', e));
+      // Stats use only what publishing left of the per-run call allowance.
+      const spare = L.TICK_FETCH_BUDGET - counts.calls - 3;
+      await refreshStats(env, metaFor(env), tk, now(), Math.min(STATS_PER_TICK, spare)).catch(e => console.error('stats', e));
       await runCleanup(env);
     })());
   },

@@ -97,13 +97,14 @@ function restoreTargets() {
 }
 function saveTargets() { try { localStorage.setItem(SAVED, JSON.stringify(S.targets)); } catch {} }
 
-const VIEWS = ['overview', 'compose', 'calendar', 'drafts', 'accounts', 'settings'];
+const VIEWS = ['overview', 'compose', 'calendar', 'analytics', 'drafts', 'accounts', 'settings'];
 function route() {
   S.view = (location.hash || '#overview').slice(1);
   if (!VIEWS.includes(S.view)) S.view = 'overview';
   if (S.view === 'overview') loadOverview();
   if (S.view === 'calendar') loadWeek();
   if (S.view === 'drafts') loadDrafts();
+  if (S.view === 'analytics') loadStats();
   render();
   window.scrollTo(0, 0);
 }
@@ -122,6 +123,9 @@ const UI = {
   retry: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/>',
   chev: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>', check: '<path d="m5 12 5 5 9-10"/>',
   chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  heart: '<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/>',
+  comment: '<path d="M4 5h16v11H9l-5 4z"/>', share: '<path d="M4 13v6h16v-6M12 3v12M7 8l5-5 5 5"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
 };
 const ui = (n, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI[n]}</svg>`;
 
@@ -136,7 +140,7 @@ function wsBox() {
 }
 
 function menu() {
-  const items = [['overview', 'Overview', 'home'], ['compose', 'Create', 'edit'], ['calendar', 'Calendar', 'cal', S.counts.failed, 'bad'],
+  const items = [['overview', 'Overview', 'home'], ['compose', 'Create', 'edit'], ['calendar', 'Calendar', 'cal', S.counts.failed, 'bad'], ['analytics', 'Analytics', 'chart'],
     ['drafts', 'Drafts', 'draft', S.counts.drafts], ...(can('admin') ? [['accounts', 'Accounts', 'users']] : [])];
   const email = S.me.user?.email || '';
   return `<a class="brand-row" href="#overview"><img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30"><b>ARCO Publisher</b></a>
@@ -160,6 +164,7 @@ function tabbar() {
 const HEADS = {
   compose: () => ['Create post', S.targets.length ? `Goes to ${S.targets.length} account${S.targets.length === 1 ? '' : 's'}.` : 'Choose accounts, add photos, write the caption.'],
   calendar: () => ['Calendar', `Everything scheduled and published, in ${tz().replace(/_/g, ' ')} time.`],
+  analytics: () => ['Analytics', 'How your posts do, from the numbers each platform shares.'],
   drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.'],
   accounts: () => ['Accounts', 'Connect accounts and group them into brands.'],
   settings: () => ['Settings', 'Workspace, people and your account.'],
@@ -187,7 +192,7 @@ function render() {
   $('side').innerHTML = menu();
   $('mtop').innerHTML = `<img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30">${wsBox()}`;
   $('tabbar').innerHTML = tabbar();
-  const views = { overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
+  const views = { analytics: analyticsView, overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
   const head = S.view === 'overview' ? '' : pageHead(...HEADS[S.view]());
   $('app').innerHTML = head + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '');
   bind();
@@ -206,6 +211,7 @@ async function loadOverview() {
     S.drafts = drafts.drafts;
     S.counts = { drafts: draftGroups().length, failed: S.posts.filter(p => p.status === 'failed' && p.scheduled_at > now - 7 * 86400).length };
     S.ov = { at: now };
+    api('/stats?days=7').then(st => { S.ovStats = st; if (S.view === 'overview') render(); }).catch(() => {});
   } catch (e) { S.flash = { kind: 'err', text: e.message }; S.ov = { at: now, err: true }; }
   if (S.view === 'overview') render();
 }
@@ -292,7 +298,7 @@ function overviewView() {
 
   const published = live.filter(p => p.status === 'published').sort((a, b) => b.scheduled_at - a.scheduled_at).slice(0, 4);
   const pubRow = p => `<div class="rpost" data-open="${p.id}">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
-      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${handle(p)}</b><span>${fmt(p.scheduled_at, { dateStyle: 'medium' })}</span></div>
+      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${handle(p)}</b><span>${fmt(p.scheduled_at, { dateStyle: 'medium' })}${p.stats ? statLine(p.stats) : ''}</span></div>
       ${p.post_url ? `<a class="view" href="${esc(p.post_url)}" target="_blank" rel="noopener">View post</a>` : ''}</div>`;
 
   return pageHead(greeting(), sub) + `
@@ -310,10 +316,74 @@ function overviewView() {
     <section class="panel"><header><h2>Recently published</h2><a href="#calendar">See all</a></header>
       ${published.length ? `<div class="list">${published.map(pubRow).join('')}</div>`
         : '<div class="empty">Published posts appear here with a link to each one.</div>'}</section>
-    <section class="panel perf"><header><h2>Performance</h2><span class="soon">Coming soon</span></header>
-      <p>Views, likes, comments and new followers for every post, as soon as TikTok, Instagram and Facebook approve access to their numbers.</p>
-      <ul>${['Views', 'Likes', 'Comments', 'Followers'].map(l => `<li>${ui('chart', 14)}${l}</li>`).join('')}</ul></section>
+    ${perfCard()}
   </div>`;
+}
+
+// ---- stats ---------------------------------------------------------------
+// Numbers the platforms share: Instagram and Facebook today, TikTok once its
+// review grants the stats scopes. Read by the Worker every few hours.
+
+const METRIC = { views: 'Views', reach: 'Reach', likes: 'Likes', comments: 'Comments', shares: 'Shares', saves: 'Saves' };
+const STAT_KEYS = ['views', 'reach', 'likes', 'comments', 'shares', 'saves'];
+const STAT_ICON = { views: 'eye', reach: 'eye', likes: 'heart', comments: 'comment', shares: 'share', saves: 'draft' };
+const num = n => (n == null ? '–' : new Intl.NumberFormat(undefined, n >= 10000 ? { notation: 'compact', maximumFractionDigits: 1 } : {}).format(n));
+const signed = n => (n == null ? '' : `${n > 0 ? '+' : n < 0 ? '−' : ''}${num(Math.abs(n))}`);
+const statLine = st => `<span class="sline">${['views', 'likes', 'comments', 'shares'].filter(k => st[k] != null)
+  .map(k => `<span title="${METRIC[k]}">${ui(STAT_ICON[k], 12)}${num(st[k])}</span>`).join('')}</span>`;
+const ago = sec => { const m = Math.round((Date.now() / 1000 - sec) / 60);
+  return m < 60 ? `${Math.max(1, m)} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+
+async function loadStats(days = S.statsDays || 7) {
+  S.statsDays = days;
+  try { S.stats = await api(`/stats?days=${days}`); } catch (e) { S.stats = { err: e.message }; }
+  if (S.view === 'analytics') render();
+}
+
+function perfCard() {
+  const st = S.ovStats;
+  const head = `<header><h2>Performance</h2><a href="#analytics">Last 7 days</a></header>`;
+  if (!st) return `<section class="panel perf">${head}<div class="empty">Loading…</div></section>`;
+  const cells = [...['views', 'likes', 'comments', 'shares'].filter(k => st.totals[k] != null).slice(0, 3).map(k => [METRIC[k], num(st.totals[k]), '']),
+    ['New followers', st.followers.change == null ? '–' : signed(st.followers.change), st.followers.change > 0 ? 'up' : '']];
+  return `<section class="panel perf">${head}
+    ${st.tracked || st.followers.total != null ? `<div class="pgrid">${cells.map(([l, v, c]) => `<div><span>${l}</span><b class="${c}">${v}</b></div>`).join('')}</div>`
+      : '<div class="empty">Numbers appear a few hours after your first Instagram or Facebook post goes out.</div>'}
+    <p class="pnote">Instagram and Facebook${st.updated_at ? `, updated ${ago(st.updated_at)}` : ''}.${st.tiktok_pending ? ' TikTok numbers come once TikTok approves access.' : ''}</p></section>`;
+}
+
+function analyticsView() {
+  const st = S.stats, days = S.statsDays || 7;
+  const seg = `<div class="seg" role="group" aria-label="Period">${[7, 30].map(d =>
+    `<button data-days="${d}" class="${d === days ? 'on' : ''}" aria-pressed="${d === days}">Last ${d} days</button>`).join('')}</div>`;
+  if (!st) return `<div class="calbar">${seg}</div><div class="panel empty">Loading…</div>`;
+  if (st.err) return `<div class="calbar">${seg}</div><div class="panel empty"><b>Couldn't load the numbers.</b>${esc(st.err)}</div>`;
+  const shown = STAT_KEYS.filter(k => st.totals[k] != null);
+  const kpis = [['Posts published', num(st.published), st.tracked < st.published ? `${st.tracked} with numbers so far` : 'all with numbers', ''],
+    ...shown.slice(0, 3).map(k => [METRIC[k], num(st.totals[k]), st.tracked ? `${num(Math.round(st.totals[k] / st.tracked))} per post` : '', '']),
+    ['Followers', num(st.followers.total), st.followers.change == null ? 'change shows after a day' : `${signed(st.followers.change)} in ${days} days`, st.followers.change > 0 ? 'up' : '']];
+  const row = p => `<div class="rpost" data-open="${p.id}">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
+      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
+      ${statLine(p.stats)}</div>`;
+  const acc = a => `<div class="arow">${icon(a.platform, 14)}<b>${a.platform === 'facebook' ? '' : '@'}${esc(a.username)}</b>
+      <span class="fv">${a.followers == null ? (a.platform === 'tiktok' ? '<em>Waiting on TikTok</em>' : '<em>Reading…</em>') : num(a.followers)}</span>
+      <span class="fc ${a.change > 0 ? 'up' : a.change < 0 ? 'down' : ''}">${a.change == null ? '' : signed(a.change)}</span></div>`;
+  const notes = [
+    st.tiktok_pending && 'TikTok views and likes come once TikTok approves the stats permissions for ARCO Publisher.',
+    st.tracked && st.totals.views == null && 'Instagram views, reach and saves need the insights permission; until then you see likes and comments.',
+  ].filter(Boolean);
+  // Let the pagehead title stand; put the period switch under it.
+  return `<div class="calbar">${seg}${st.updated_at ? `<span class="note">Updated ${ago(st.updated_at)}</span>` : ''}</div>
+    <div class="kpis">${kpis.map(([l, v, n, c]) => `<div class="kpi"><span>${l}</span><b>${v}</b><small class="${c}">${n}</small></div>`).join('')}</div>
+    <div class="ovw">
+      <section class="panel"><header><h2>Top posts</h2><span class="note">by views and engagement</span></header>
+        ${st.top.length ? `<div class="list">${st.top.map(row).join('')}</div>`
+          : `<div class="empty"><b>No numbers yet for this period.</b>Likes and comments show a few hours after a post goes out on Instagram or Facebook.</div>`}</section>
+      <section class="panel"><header><h2>Followers</h2><span class="note">change in ${days} days</span></header>
+        <div class="alist">${st.accounts.map(acc).join('') || '<div class="empty">Connect an account to see followers.</div>'}</div></section>
+    </div>
+    ${notes.length ? `<div class="snotes">${notes.map(n => `<p>${n}</p>`).join('')}</div>` : ''}
+    ${S.detail ? detailView() : ''}`;
 }
 
 // Until the workspace has an account, the overview is a short path to the
@@ -1225,7 +1295,7 @@ function calendarView() {
 // happened, and what can still be done. A post that has not started can have
 // its caption fixed right here.
 function detailView() {
-  const p = S.posts.find(x => x.id === S.detail);
+  const p = S.posts.find(x => x.id === S.detail) || S.stats?.top?.find(x => x.id === S.detail);
   if (!p) return '';
   const a = acct(p.account_id), editable = p.status === 'queued';
   return `<div class="overlay" id="overlay"><div class="panel" role="dialog" aria-modal="true" aria-label="Post details">
@@ -1233,6 +1303,8 @@ function detailView() {
       <b>${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</b><span class="pill ${p.status}">${p.status}</span>
       <button class="link" id="closedetail" style="margin-left:auto" aria-label="Close">Close ×</button></div>
     <p class="note">${fmtFull(p.scheduled_at)} · ${esc(tz().replace(/_/g, ' '))}</p>
+    ${p.stats ? `<div class="dstats">${STAT_KEYS.filter(k => p.stats[k] != null).map(k => `<div><b>${num(p.stats[k])}</b><span>${METRIC[k]}</span></div>`).join('')}</div>`
+      : p.status === 'published' && p.platform !== 'tiktok' ? '<p class="note">Likes and comments appear here within a few hours.</p>' : ''}
     <div class="thumbs">${p.images.map((u, n) => `<img src="${esc(u)}" alt="Slide ${n + 1}" class="${n === p.cover_index ? 'cv' : ''}">`).join('')
       || `<span class="note">${['published', 'failed', 'cancelled'].includes(p.status)
         ? 'The photos of this post were deleted (7 days after it finished).' : 'No photos.'}</span>`}</div>
@@ -1555,6 +1627,7 @@ function bind() {
   on('#at', 'change', e => { S.at = e.target.value; render(); });
   on('#go', 'click', submit);
   on('#savedraft', 'click', saveDraft);
+  on('[data-days]', 'click', e => loadStats(Number(e.currentTarget.dataset.days)));
   on('[data-opendraft]', 'click', e => openDraft(e.target.dataset.opendraft));
   on('[data-deldraft]', 'click', async e => {
     const key = e.target.dataset.deldraft, g = draftGroups().find(x => (x[0].group_id || x[0].id) === key);

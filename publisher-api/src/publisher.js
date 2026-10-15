@@ -278,7 +278,7 @@ async function startCost(env, post, token) {
 }
 
 export async function tick(env, tk, t = now()) {
-  const counts = { started: 0, published: 0, failed: 0, requeued: 0 };
+  const counts = { started: 0, published: 0, failed: 0, requeued: 0, calls: 0 };
   const token = tokenCache(env, tk);
 
   // Recover posts left by a tick that died. Not yet sent: safe to queue again.
@@ -304,6 +304,7 @@ export async function tick(env, tk, t = now()) {
     }
     perAccount.set(p.account_id, n + 1);
     budget = Math.max(0, budget - cost);
+    counts.calls += cost;
     const r = await start(env, tk, p, token, t);
     if (r === 'started') counts.started++; else counts[r]++;
   }
@@ -316,6 +317,7 @@ export async function tick(env, tk, t = now()) {
     const cost = p.publish_id.startsWith(IG_WAIT) ? 3 : 1;
     if (cost > budget) break;
     budget -= cost;
+    counts.calls += cost;
     const r = await poll(env, tk, p, token, t);
     if (r === 'published') counts.published++;
     else if (r === 'failed') counts.failed++;

@@ -76,6 +76,7 @@ export function postJson(env, row) {
     attempts: row.attempts, public_post_id: row.public_post_id, fail_reason: row.fail_reason,
     group_id: row.group_id ?? null, updated_at: row.updated_at,
     post_url: row.status === 'published' ? (row.post_url || tiktokUrl(row)) : null,
+    stats: row.stats ? JSON.parse(row.stats) : null, stats_at: row.stats_at ?? null,
   };
 }
 

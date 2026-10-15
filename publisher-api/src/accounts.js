@@ -85,6 +85,7 @@ export async function disconnect(env, w, id) {
         WHERE account_id = ? AND status IN ('queued', 'publishing')`).bind(t, id),
     env.DB.prepare(`UPDATE media SET delete_after = ? WHERE post_id IN
         (SELECT id FROM posts WHERE account_id = ?) AND delete_after IS NULL`).bind(t + KEEP_AFTER_DONE, id),
+    env.DB.prepare('DELETE FROM follower_history WHERE account_id = ?').bind(id),
     env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(id),
   ]);
 }
