@@ -104,6 +104,37 @@ The everyday loop has to be smooth before anything is added.
 
 ---
 
+## Library: keep and reuse files
+
+- [ ] Library screen: upload many files at once (drag and drop, progress), a
+      grid, search, filters by brand and type, folders, a "Not used yet" view
+- [ ] File drawer: preview, details, where it was posted; rename, move,
+      download, delete
+- [ ] "Use in new post" from the Library, and "Add from library" in Create
+- [ ] Storage: library files are kept until deleted; a per-workspace limit
+      (for example 2 GB free); posts copy from the library, so deleting a file
+      never breaks a scheduled post
+- [ ] Brand-limited members see only their brands' files
+
+## Analytics: performance from the platforms
+
+What each API gives, and the extra permission each needs (the TikTok app review
+and Meta App Review both cover these):
+
+| | Per post | Per account | Permission |
+|---|---|---|---|
+| TikTok | views, likes, comments, shares | followers, total likes, post count | `video.list`, `user.info.stats` |
+| Instagram | views, reach, likes, comments, shares, saves, interactions, profile visits, follows; Reels watch time | reach, views, followers and change, accounts engaged, link taps; demographics at 100+ followers | `instagram_business_manage_insights` |
+| Facebook | views, reach, reactions, comments, shares, clicks; video views | followers, follows, Page views, engagements | `read_insights` |
+
+- [ ] Request the permissions early, since the reviews are the slow part
+- [ ] The Worker pulls stats on a schedule: every few hours for posts under 3
+      days old, then daily for 30 days; stored per post with a history
+- [ ] A stats line on each published post; an Analytics screen with the best
+      posts, per-account trends and the best times to post
+- [ ] Note: TikTok's regular API has the four counts only; reach and watch time
+      need TikTok's separate Business API
+
 ## Phase 3: Video (weeks 5–6)
 
 Most creators post video; photos-only will not hold them.

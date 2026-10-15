@@ -130,6 +130,41 @@ button{cursor:pointer}
 .rc .meta span{color:var(--mute)}
 .rc .meta a{color:var(--graphite);font-weight:600;text-decoration:none;float:right}
 
+/* ---------- performance ---------- */
+.seg.sm button{padding:5px 10px;font-size:12.5px}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-top:1px solid var(--line-2);border-bottom:1px solid var(--line-2);margin-top:10px}
+.kpi{padding:14px 18px;border-right:1px solid var(--line-2);min-width:0}
+.kpi:last-child{border-right:0}
+.kpi span{display:block;color:var(--mute);font-size:13px}
+.kpi b{display:block;font:700 24px/1.2 var(--display);letter-spacing:-.01em;margin:4px 0 2px}
+.kpi em{font-style:normal;font-size:12px;font-weight:600}
+em.up{color:var(--success)}em.down{color:var(--danger)}
+.perfbody{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(240px,1fr);gap:24px;padding:16px 18px 18px}
+.bars{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;align-items:end;height:180px}
+.col{display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:flex-end;height:100%}
+.stackv{width:100%;max-width:34px;display:flex;flex-direction:column-reverse;gap:2px}
+.stackv i{display:block;border-radius:3px}
+.col span{font-size:12px;color:var(--mute)}.col.today span{color:var(--next-ink);font-weight:700}
+.byacct{display:flex;flex-direction:column;gap:4px}
+.ba{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-2)}
+.ba>span:not(.pf){flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.ba b{font-weight:700}.ba em{font-style:normal;font-size:12px;font-weight:600;width:44px;text-align:right}
+.src{font-size:12px;color:var(--soft);margin:10px 0 0}
+.tops{padding:4px 18px 14px}
+.top-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line-2)}
+.top-row:last-child{border-bottom:0}
+.rank{width:20px;font:700 15px var(--display);color:var(--soft);text-align:center}
+.top-row .ph{width:38px;height:46px;border-radius:6px;flex:none}
+.top-row .who{flex:1;min-width:0}.top-row .who b{display:flex;align-items:center;gap:6px;font-weight:600}
+.top-row .who span{display:block;color:var(--mute);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nums{display:flex;gap:16px;color:var(--mute);font-size:13px}
+.nums span{display:inline-flex;align-items:center;gap:5px;min-width:56px}
+.nums span:first-child{color:var(--graphite);font-weight:600}
+.rcstats{display:flex;gap:12px;margin-top:4px;color:var(--mute);font-size:12px}
+.rcstats span{display:inline-flex;align-items:center;gap:4px}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.perfbody{grid-template-columns:1fr}}
+@media (max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}.kpi{border-bottom:1px solid var(--line-2)}.nums span:not(:first-child){display:none}}
+
 /* ---------- create ---------- */
 .cr{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.9fr);gap:18px;align-items:start}
 .field{padding:16px 18px;border-bottom:1px solid var(--line-2)}
@@ -182,6 +217,47 @@ textarea{width:100%;min-height:130px;resize:vertical;border:1px solid var(--line
 .dock .when b{color:var(--graphite)}
 .dock .sp{display:none}
 
+/* ---------- library ---------- */
+.lib{display:grid;grid-template-columns:210px minmax(0,1fr) 290px;gap:18px;align-items:start}
+.libnav{padding:10px;display:flex;flex-direction:column;gap:2px;position:sticky;top:24px}
+.libnav button{display:flex;align-items:center;gap:9px;border:0;background:none;padding:8px 10px;border-radius:8px;color:var(--mute);font-weight:500;text-align:left}
+.libnav button span{margin-left:auto;font-size:12px;color:var(--soft)}
+.libnav button:hover{background:var(--canvas);color:var(--graphite)}
+.libnav button.on{background:var(--canvas);color:var(--graphite);font-weight:600}
+.libsep{font-size:12px;color:var(--soft);padding:12px 10px 4px}
+.libnav .newf{color:var(--mute);margin-top:6px}
+.libmain{padding:14px}
+.libbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.srch{flex:1 1 200px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:0 10px;color:var(--mute)}
+.srch input{border:0;outline:0;background:none;padding:8px 0;width:100%}
+.libbar select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface)}
+.selbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--saffron-tint);border-radius:10px;padding:8px 10px;margin-bottom:12px}
+.selbar b{margin-right:6px}.selbar .link{margin-left:auto;border:0;background:none;color:var(--mute);font-weight:600}
+.btn.danger{color:var(--danger)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
+.tile{cursor:pointer;min-width:0}
+.tile .thumb{aspect-ratio:4/5;border-radius:10px;position:relative;outline:2px solid transparent;outline-offset:2px}
+.tile.open .thumb{outline-color:var(--line)}
+.tile.sel .thumb{outline-color:var(--graphite)}
+.tile .pick{position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:6px;border:1.5px solid #fff;background:rgba(0,0,0,.18);color:#fff;display:grid;place-items:center;padding:0;opacity:0}
+.tile:hover .pick,.tile.sel .pick,.tile .pick:focus-visible{opacity:1}
+.tile.sel .pick{background:var(--graphite);border-color:var(--graphite)}
+.tile .used{position:absolute;bottom:8px;left:8px;background:rgba(255,255,255,.92);color:#1C2230;font-size:11px;font-weight:600;border-radius:6px;padding:1px 7px}
+.fname{display:block;font-size:12.5px;color:var(--mute);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drop{aspect-ratio:4/5;border:1.5px dashed var(--line);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--mute);text-align:center;padding:10px;font-size:12px}
+.drop b{color:var(--graphite);font-size:13px}
+.filedrawer{position:sticky;top:24px}
+.filedrawer header{display:flex;align-items:center;gap:10px;padding:14px 16px 0}
+.filedrawer header h2{font:650 14px var(--display);margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.filedrawer .link{border:0;background:none;color:var(--mute);font-weight:600}
+.filedrawer .big{aspect-ratio:4/5;margin:12px 16px;border-radius:10px}
+.filedrawer dl{display:grid;grid-template-columns:76px 1fr;gap:6px 10px;margin:0 16px;font-size:13px}
+.filedrawer dt{color:var(--mute)}.filedrawer dd{margin:0}
+.filedrawer dd .pf{vertical-align:-3px;margin-right:4px}
+.filedrawer .dacts{display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px 16px}
+@media (max-width:1280px){.lib{grid-template-columns:200px minmax(0,1fr)}.filedrawer{display:none}}
+@media (max-width:760px){.lib{grid-template-columns:1fr}.libnav{position:static;flex-direction:row;overflow-x:auto}.libsep,.libnav .newf{display:none}.libnav button{white-space:nowrap}}
+
 /* ---------- placeholder ---------- */
 .ph-view{display:grid;place-items:center;min-height:50vh;color:var(--mute);text-align:center}
 .ph-view h2{font:650 20px var(--display);color:var(--graphite);margin:0 0 6px}
@@ -211,8 +287,8 @@ textarea{width:100%;min-height:130px;resize:vertical;border:1px solid var(--line
 .tabbar a svg{width:20px;height:20px}
 .tabbar a.on{color:var(--graphite)}
 .tabbar .plus{width:44px;height:44px;border-radius:14px;background:var(--saffron);color:#1C2230;display:grid;place-items:center;margin-top:-18px}
-.mock-flag{position:fixed;right:14px;top:14px;background:var(--graphite);color:var(--surface);font-size:12px;border-radius:20px;padding:6px 12px;opacity:.85;z-index:9}
-@media (max-width:760px){.mock-flag{top:auto;bottom:84px}}
+.mock-flag{position:fixed;left:14px;bottom:14px;background:var(--graphite);color:var(--surface);font-size:12px;border-radius:20px;padding:6px 12px;opacity:.85;z-index:9}
+@media (max-width:760px){.mock-flag{bottom:84px}}
 </style>
 </head>
 <body>
@@ -245,6 +321,11 @@ const I = {
   link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   chev:'<path d="m6 9 6 6 6-6"/>', heart:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',
   bubble:'<path d="M21 12a8.5 8.5 0 0 1-12.3 7.6L3 21l1.4-5.4A8.5 8.5 0 1 1 21 12z"/>', send:'<path d="m22 2-11 11M22 2l-7 20-4-9-9-4z"/>',
+  lib:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
+  upload:'<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>', check:'<path d="m5 12 5 5 9-10"/>',
+  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
 };
 const ico = (n, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
 const MARK = {
@@ -259,7 +340,7 @@ const G = ['linear-gradient(160deg,#F6D3A8,#C9784A)','linear-gradient(160deg,#B9
            'linear-gradient(160deg,#E8C9DA,#9A5C80)','linear-gradient(160deg,#F1E5B5,#B79A3B)','linear-gradient(160deg,#C9CCE8,#5A5F9A)'];
 const ph = (n, cls = 'ph') => `<div class="${cls}" style="background:${G[n % G.length]}"></div>`;
 
-const NAV = [['overview','Overview','home'],['create','Create','edit'],['calendar','Calendar','cal'],['drafts','Drafts','draft',3],['accounts','Accounts','users']];
+const NAV = [['overview','Overview','home'],['create','Create','edit'],['calendar','Calendar','cal'],['drafts','Drafts','draft',3],['library','Library','lib'],['accounts','Accounts','users']];
 
 function shell(v) {
   document.getElementById('nav').innerHTML = NAV.map(([k, l, i, n]) =>
@@ -268,7 +349,23 @@ function shell(v) {
   document.getElementById('tabbar').innerHTML = [['overview','Overview','home'],['calendar','Calendar','cal']].map(([k,l,i]) =>
     `<a href="#${k}" class="${v===k?'on':''}">${ico(i)}${l}</a>`).join('') +
     `<a href="#create"><span class="plus">${ico('plus',22)}</span></a>` +
-    [['drafts','Drafts','draft'],['accounts','Accounts','users']].map(([k,l,i]) => `<a href="#${k}" class="${v===k?'on':''}">${ico(i)}${l}</a>`).join('');
+    [['library','Library','lib'],['accounts','Accounts','users']].map(([k,l,i]) => `<a href="#${k}" class="${v===k?'on':''}">${ico(i)}${l}</a>`).join('');
+}
+
+let perfTab = 0;
+// Daily views per platform for the last 7 days (sample).
+function chart() {
+  const days = ['Thu','Fri','Sat','Sun','Mon','Tue','Wed'];
+  const data = perfTab === 2
+    ? [[12,18,9],[20,26,11],[8,30,6],[14,22,9],[25,41,12],[19,33,10],[22,38,14]]
+    : perfTab === 1
+    ? [[310,420,120],[380,510,90],[260,640,70],[290,480,110],[520,760,160],[430,690,140],[470,720,180]]
+    : [[2.1,2.8,0.7],[2.6,3.4,0.9],[1.9,4.1,0.6],[2.2,3.2,0.8],[3.4,4.9,1.3],[2.9,4.4,1.1],[3.1,4.6,1.4]];
+  const max = Math.max(...data.map(d => d[0] + d[1] + d[2]));
+  const colors = ['#1C2230', '#E1306C', '#0866FF'];
+  return `<div class="bars">${data.map((d, i) => `<div class="col ${i===6?'today':''}"><div class="stackv">${d.map((v, k) =>
+      `<i style="height:${(v / max) * 150}px;background:${colors[k]}" title="${['TikTok','Instagram','Facebook'][k]}"></i>`).join('')}</div><span>${days[i]}</span></div>`).join('')}</div>
+    <div class="legend" style="padding:8px 0 0"><span><i style="background:#1C2230"></i>TikTok</span><span><i style="background:#E1306C"></i>Instagram</span><span><i style="background:#0866FF"></i>Facebook</span></div>`;
 }
 
 function overview() {
@@ -306,9 +403,25 @@ function overview() {
           <div class="stack">${['tiktok','instagram','facebook'].map((p, k) => week[i][k] ? `<i style="height:${week[i][k]*14}px;background:${colors[p]}"></i>` : '').join('')}</div><span>${d}</span></div>`).join('')}</div>
         <div class="legend"><span><i style="background:#1C2230"></i>TikTok</span><span><i style="background:#E1306C"></i>Instagram</span><span><i style="background:#0866FF"></i>Facebook</span></div></section>
     </div>
+    <section class="panel wide perf"><header><h2>Last 7 days</h2>
+        <div class="seg sm">${['Views','Engagement','Followers'].map((l,i) => `<button class="${perfTab===i?'on':''}" data-perf="${i}">${l}</button>`).join('')}</div></header>
+      <div class="kpis">${[['Views','48.2k','+18%',1],['Likes','3,914','+9%',1],['Comments','286','−4%',0],['Shares','412','+31%',1],['New followers','+356','+12%',1]].map(([l,v,d,up]) =>
+        `<div class="kpi"><span>${l}</span><b>${v}</b><em class="${up?'up':'down'}">${d} vs last week</em></div>`).join('')}</div>
+      <div class="perfbody">
+        <div class="chart">${chart()}</div>
+        <div class="byacct">${[['instagram','@get.arco','21.4k','+24%'],['tiktok','@productivity_god','17.9k','+11%'],['facebook','Grails_Store','6.3k','+15%'],['facebook','GolfTargetshop','2.6k','−8%']].map(([p,a,v,d]) =>
+          `<div class="ba">${pf(p)}<span>${a}</span><b>${v}</b><em class="${d.startsWith('−')?'down':'up'}">${d}</em></div>`).join('')}
+          <p class="src">Numbers come from TikTok, Instagram and Facebook, refreshed every few hours.</p></div>
+      </div></section>
+    <section class="panel wide"><header><h2>Top posts this week</h2><a href="#calendar">All posts</a></header>
+      <div class="tops">${[['instagram','@get.arco','Block your phone for one hour. Here is how','12.8k','1,204','96'],['tiktok','@productivity_god','The 5-minute plan I make every night','9.6k','812','41'],['facebook','Grails_Store','New drop: Jordan 4 Bred, sizes 40–45','3.1k','264','58']].map(([p,a,c,v,l,cm],n) =>
+        `<div class="top-row"><span class="rank">${n+1}</span><div class="ph" style="background:${G[(n+2)%G.length]}"></div>
+          <div class="who"><b>${pf(p)}${a}</b><span>${c}</span></div>
+          <div class="nums"><span>${ico('eye',14)}${v}</span><span>${ico('heart',14)}${l}</span><span>${ico('bubble',14)}${cm}</span></div></div>`).join('')}</div></section>
     <section class="panel wide"><header><h2>Recently published</h2><a href="#calendar">See all</a></header>
       <div class="recent">${[['facebook','Grails_Store','2 h ago'],['tiktok','@productivity_god','Yesterday'],['instagram','@get.arco','Yesterday'],['facebook','GolfTargetshop','Mon']].map(([p, w, t], n) =>
-        `<div class="rc"><div class="img" style="background:${G[(n + 3) % G.length]}">${pf(p)}</div><div class="meta"><a href="#">View</a><b>${w}</b><span>${t}</span></div></div>`).join('')}</div></section>
+        `<div class="rc"><div class="img" style="background:${G[(n + 3) % G.length]}">${pf(p)}</div><div class="meta"><a href="#">View</a><b>${w}</b><span>${t}</span>
+          <div class="rcstats"><span>${ico('eye',13)}${['1.2k','8.4k','3.9k','640'][n]}</span><span>${ico('heart',13)}${['96','702','311','28'][n]}</span></div></div></div>`).join('')}</div></section>
   </div>`;
 }
 
@@ -366,6 +479,51 @@ function create() {
   </div>`;
 }
 
+// ---------- library ----------
+let libFolder = 'all', libSel = new Set([2, 5]), libOpen = 5;
+const FILES = Array.from({ length: 18 }, (_, n) => ({
+  n, name: ['jordan-4-bred','sourdough-crust','morning-desk','yeezy-zebra','phone-lock','bakery-front','golf-set','laptop-plan',
+           'grails-drop-02','croissant','focus-timer','dunk-panda','coffee-notes','shoe-box','city-run','bread-slices','planner-pages','nb-550'][n] + '.jpg',
+  folder: [0,3,8,11,13,17].includes(n) ? 'grails' : [1,5,9,15].includes(n) ? 'bakery' : 'arco',
+  used: [0,1,3,5,8].includes(n) ? (n % 2 ? 1 : 2) : 0, size: (1.1 + (n % 5) * 0.4).toFixed(1),
+}));
+function library() {
+  const shown = FILES.filter(f => libFolder === 'all' || (libFolder === 'unused' ? !f.used : f.folder === libFolder));
+  const f = libOpen == null ? null : FILES[libOpen];
+  return `
+  <div class="top"><div><h1>Library</h1><p><b>148 files</b>, 1.2 GB of 2 GB used</p></div>
+    <button class="btn primary">${ico('upload',16)}Upload files</button></div>
+  <div class="lib">
+    <aside class="panel libnav">${[['all','All files',148],['unused','Not used yet',61]].map(([k,l,c]) =>
+      `<button class="${libFolder===k?'on':''}" data-lf="${k}">${l}<span>${c}</span></button>`).join('')}
+      <div class="libsep">Folders</div>
+      ${[['grails','Grails drops',52],['bakery','Bakery',31],['arco','ARCO app',65]].map(([k,l,c]) =>
+      `<button class="${libFolder===k?'on':''}" data-lf="${k}">${ico('folder',16)}${l}<span>${c}</span></button>`).join('')}
+      <button class="newf">${ico('plus',14)} New folder</button></aside>
+    <section class="panel libmain">
+      <div class="libbar"><label class="srch">${ico('search',16)}<input placeholder="Search files"></label>
+        <select><option>All brands</option><option>Grails_Store</option><option>ARCO</option></select>
+        <select><option>Photos and videos</option><option>Photos</option><option>Videos</option></select>
+        <select><option>Newest first</option><option>Oldest first</option><option>Name</option></select></div>
+      ${libSel.size ? `<div class="selbar"><b>${libSel.size} selected</b><button class="btn primary">${ico('edit',16)}Use in new post</button>
+        <button class="btn">${ico('folder',16)}Move to folder</button><button class="btn danger">Delete</button>
+        <button class="link" data-clear>Clear</button></div>` : ''}
+      <div class="grid">${shown.map(x => `<div class="tile ${libSel.has(x.n)?'sel':''} ${libOpen===x.n?'open':''}" data-file="${x.n}">
+          <div class="thumb" style="background:${G[x.n % G.length]}"><button class="pick" data-pick="${x.n}" aria-label="Select">${libSel.has(x.n)?ico('check',14):''}</button>
+          ${x.used ? `<span class="used">Used ${x.used}×</span>` : ''}</div>
+          <span class="fname">${x.name}</span></div>`).join('')}
+        <div class="drop">${ico('upload',22)}<b>Drop files to upload</b><span>JPG, PNG, HEIC up to 20 MB each</span></div></div>
+    </section>
+    ${f ? `<aside class="panel filedrawer"><header><h2>${f.name}</h2><button class="link" data-close>Close</button></header>
+      <div class="big" style="background:${G[f.n % G.length]}"></div>
+      <dl><dt>Size</dt><dd>${f.size} MB, 1080 × 1350</dd><dt>Folder</dt><dd>${{grails:'Grails drops',bakery:'Bakery',arco:'ARCO app'}[f.folder]}</dd>
+        <dt>Uploaded</dt><dd>Oct 12 by Thinh</dd>
+        <dt>Posted</dt><dd>${f.used ? `${pf('facebook')} Grails_Store, Oct 13${f.used > 1 ? `<br>${pf('instagram')} @get.arco, Oct 14` : ''}` : 'Not used yet'}</dd></dl>
+      <div class="dacts"><button class="btn primary">Use in new post</button><button class="btn">Rename</button><button class="btn">Download</button><button class="btn danger">Delete</button></div>
+    </aside>` : ''}
+  </div>`;
+}
+
 function placeholder(v) {
   const t = { calendar:'Calendar', drafts:'Drafts', accounts:'Accounts', settings:'Settings' }[v];
   return `<div class="top"><div><h1>${t}</h1></div></div><div class="panel ph-view"><div><h2>${t} comes in a later phase</h2>
@@ -375,10 +533,16 @@ function placeholder(v) {
 function render() {
   const v = (location.hash || '#overview').slice(1);
   shell(v);
-  document.getElementById('main').innerHTML = v === 'overview' ? overview() : v === 'create' ? create() : placeholder(v);
+  document.getElementById('main').innerHTML = v === 'overview' ? overview() : v === 'create' ? create() : v === 'library' ? library() : placeholder(v);
+  document.querySelectorAll('[data-lf]').forEach(b => b.onclick = () => { libFolder = b.dataset.lf; render(); });
+  document.querySelectorAll('[data-pick]').forEach(b => b.onclick = e => { e.stopPropagation(); const n = +b.dataset.pick; libSel.has(n) ? libSel.delete(n) : libSel.add(n); render(); });
+  document.querySelectorAll('[data-file]').forEach(b => b.onclick = () => { libOpen = +b.dataset.file; render(); });
+  document.querySelectorAll('[data-clear]').forEach(b => b.onclick = () => { libSel.clear(); render(); });
+  document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => { libOpen = null; render(); });
   document.querySelectorAll('[data-ctab]').forEach(b => b.onclick = () => { cTab = b.dataset.ctab; render(); });
   document.querySelectorAll('[data-ptab]').forEach(b => b.onclick = () => { pTab = b.dataset.ptab; render(); });
   document.querySelectorAll('[data-when]').forEach(b => b.onclick = () => { when = b.dataset.when; render(); });
+  document.querySelectorAll('[data-perf]').forEach(b => b.onclick = () => { perfTab = +b.dataset.perf; render(); });
   document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { location.hash = b.dataset.go; });
 }
 window.addEventListener('hashchange', render);
