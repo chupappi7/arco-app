@@ -143,7 +143,7 @@ function menu() {
     ${wsBox()}
     <a class="create-side" href="#compose">${ui('plus', 16)}Create post</a>
     <nav class="nav" aria-label="Main">${items.map(([k, l, i, n, tone]) =>
-      `<a href="#${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${ui(i)}${l}${n ? `<span class="n ${tone || ''}">${n}</span>` : ''}</a>`).join('')}</nav>
+      `<a href="#${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${ui(i)}${l}${n ? `<span class="n ${tone || ''}" title="${tone === 'bad' ? `${n} failed in the last 7 days` : `${n} waiting`}">${n}</span>` : ''}</a>`).join('')}</nav>
     <div class="grow"></div>
     <nav class="nav"><a href="#settings" class="${S.view === 'settings' ? 'on' : ''}">${ui('gear')}Settings</a></nav>
     <div class="me"><span class="av-me">${esc((email[0] || '?').toUpperCase())}</span>
@@ -251,42 +251,68 @@ function overviewView() {
   const failed = live.filter(p => p.status === 'failed' && p.scheduled_at > now - 7 * 86400);
   const reconnect = acc.filter(a => a.needs_reconnect);
   const drafts = draftGroups();
-  const attn = [
-    failed.length && `<a href="#calendar"><span class="ic bad">${ui('x', 16)}</span><div><b>${failed.length} post${failed.length === 1 ? '' : 's'} failed</b><span>${esc(failed[0].fail_reason || 'See why in the calendar')}</span></div><em>Review</em></a>`,
-    ...reconnect.slice(0, 3).map(a => `<a href="#accounts"><span class="ic warn">${ui('retry', 16)}</span><div><b>${a.platform === 'facebook' ? '' : '@'}${esc(a.username)} needs reconnecting</b><span>${PLATFORM[platformOf(a)]} access expired or was removed</span></div><em>Reconnect</em></a>`),
-    drafts.length && `<a href="#drafts"><span class="ic mute">${ui('draft', 16)}</span><div><b>${drafts.length} draft${drafts.length === 1 ? '' : 's'} waiting</b><span>Saved ${fmt(drafts[drafts.length - 1][0].updated_at, { dateStyle: 'medium' })} or later</span></div><em>Open</em></a>`,
-  ].filter(Boolean);
+  const handle = p => `${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}`;
 
-  // This week, Monday to Sunday, by platform.
+  // The numbers we already have, each a way into the screen that explains it.
+  const week = 7 * 86400;
+  const sched7 = upcoming.filter(p => p.scheduled_at < now + week).length;
+  const pub7 = live.filter(p => p.status === 'published' && p.scheduled_at >= now - week).length;
+  const platforms = new Set(acc.map(platformOf)).size;
+  const kpis = [
+    ['#calendar', 'Scheduled', sched7, 'in the next 7 days', ''],
+    ['#calendar', 'Published', pub7, 'in the last 7 days', ''],
+    ['#calendar', 'Failed', failed.length, failed.length ? 'in the last 7 days' : 'nothing failed this week', failed.length ? 'bad' : ''],
+    ['#accounts', 'Accounts', acc.length, reconnect.length ? `${reconnect.length} need${reconnect.length === 1 ? 's' : ''} reconnecting` : `on ${platforms} platform${platforms === 1 ? '' : 's'}`, reconnect.length ? 'warn' : ''],
+  ];
+
+  const attn = [
+    ...failed.slice(0, 3).map(p => `<div class="it" data-open="${p.id}" role="button" tabindex="0"><span class="ic bad">${ui('x', 16)}</span><div><b>Failed on ${handle(p)}</b><span>${esc(p.fail_reason || 'Open it to see why')}</span></div><em>Review</em></div>`),
+    ...reconnect.slice(0, 3).map(a => `<a href="#accounts"><span class="ic warn">${ui('retry', 16)}</span><div><b>Reconnect ${a.platform === 'facebook' ? '' : '@'}${esc(a.username)}</b><span>${PLATFORM[platformOf(a)]} access expired or was removed</span></div><em>Reconnect</em></a>`),
+  ];
+
+  // After today: the next few posts, so the week ahead is never a surprise.
+  const later = upcoming.filter(p => dayOf(p.scheduled_at) !== todayKey).slice(0, 4);
+  const laterRow = p => `<div class="rpost" data-open="${p.id}">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
+      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${handle(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
+      <time>${fmt(p.scheduled_at, { weekday: 'short' })} ${at(p.scheduled_at)}</time></div>`;
+
+  // This week, Monday to Sunday: how many posts each day, on which platforms.
   const t0 = today(), wd = new Date(Date.UTC(t0.y, t0.m - 1, t0.d)).getUTCDay(), mon = addDays(t0, -((wd + 6) % 7));
   const days = [...Array(7)].map((_, i) => addDays(mon, i));
-  const per = days.map(d => ORDER.map(pl => live.filter(p => (p.platform || 'tiktok') === pl && dayOf(p.scheduled_at) === dayKey(d)).length));
-  const maxDay = Math.max(1, ...per.map(x => x[0] + x[1] + x[2]));
-  const weekTotal = per.reduce((n, x) => n + x[0] + x[1] + x[2], 0);
-  const COL = { tiktok: 'var(--graphite)', instagram: '#E1306C', facebook: '#0866FF' };
+  const weekPosts = days.map(d => live.filter(p => dayOf(p.scheduled_at) === dayKey(d)));
+  const weekTotal = weekPosts.reduce((n, x) => n + x.length, 0);
+  const dayCell = (d, i) => {
+    const list = weekPosts[i], k = dayKey(d), isToday = k === todayKey, past = !isToday && list.length === 0 && i < (wd + 6) % 7;
+    const bad = list.some(p => p.status === 'failed');
+    return `<a class="wd ${isToday ? 'today' : ''} ${past ? 'past' : ''}" href="#calendar">
+      <span class="wl">${dayLabel(d, { weekday: 'short' })} <b>${d.d}</b></span>
+      <span class="wn ${list.length ? "" : "z"}">${list.length || "–"}</span>
+      <span class="wp">${ORDER.filter(pl => list.some(p => (p.platform || 'tiktok') === pl)).map(pl => icon(pl, 12)).join('')}${bad ? '<i class="wbad" title="A post failed"></i>' : ''}</span></a>`;
+  };
 
   const published = live.filter(p => p.status === 'published').sort((a, b) => b.scheduled_at - a.scheduled_at).slice(0, 4);
+  const pubRow = p => `<div class="rpost" data-open="${p.id}">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
+      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${handle(p)}</b><span>${fmt(p.scheduled_at, { dateStyle: 'medium' })}</span></div>
+      ${p.post_url ? `<a class="view" href="${esc(p.post_url)}" target="_blank" rel="noopener">View post</a>` : ''}</div>`;
 
-  return pageHead(greeting(), sub, `<a class="btn" href="#compose">${ui('plus', 16)}Create post</a>`) + `
+  return pageHead(greeting(), sub) + `
+  <div class="kpis">${kpis.map(([href, l, n, note, tone]) => `<a href="${href}" class="kpi ${tone}"><span>${l}</span><b>${n}</b><small>${note}</small></a>`).join('')}</div>
   <div class="ovw">
-    <section class="panel"><header><h2>Today</h2><a href="#calendar">Open calendar</a></header>${rail}</section>
+    <section class="panel today"><header><h2>Today</h2><a href="#calendar">Open calendar</a></header>${rail}</section>
     <div class="stack">
-      <section class="panel"><header><h2>Needs attention</h2></header>
-        <div class="attn">${attn.join('') || `<a href="#calendar"><span class="ic ok">${ui('check', 16)}</span><div><b>All good</b><span>No failed posts, every account is connected.</span></div></a>`}</div></section>
-      <section class="panel"><header><h2>This week</h2><a href="#calendar">${weekTotal} post${weekTotal === 1 ? '' : 's'}</a></header>
-        <div class="wk">${days.map((d, i) => `<div class="d ${dayKey(d) === todayKey ? 'today' : ''}"><div class="stk">${ORDER.map((pl, k) =>
-          per[i][k] ? `<i style="height:${Math.max(6, (per[i][k] / maxDay) * 90)}px;background:${COL[pl]}" title="${per[i][k]} on ${PLATFORM[pl]}"></i>` : '').join('')}</div>
-          <span>${dayLabel(d, { weekday: 'short' })}</span></div>`).join('')}</div>
-        <div class="legend">${ORDER.filter(pl => acc.some(a => platformOf(a) === pl)).map(pl => `<span><i style="background:${COL[pl]}"></i>${PLATFORM[pl]}</span>`).join('')}</div></section>
+      ${attn.length ? `<section class="panel"><header><h2>Needs attention</h2></header><div class="attn">${attn.join('')}</div></section>` : ''}
+      <section class="panel grow"><header><h2>Coming up</h2>${drafts.length ? `<a href="#drafts">${drafts.length} draft${drafts.length === 1 ? '' : 's'} waiting</a>` : ''}</header>
+        ${later.length ? `<div class="list">${later.map(laterRow).join('')}</div>`
+          : `<div class="empty"><b>Nothing after today.</b>Schedule a post, or add one to the queue.</div>`}</section>
     </div>
-    <section class="panel wide"><header><h2>Performance</h2><span class="note">Last 7 days</span></header>
-      <div class="perf-empty">${['Views', 'Likes', 'Comments', 'Shares', 'New followers'].map(l => `<div><span>${l}</span><b>–</b></div>`).join('')}</div>
-      <p class="perf-note">Views, likes, comments, shares and followers from TikTok, Instagram and Facebook show here once ARCO Publisher has permission to read them. That permission is being requested from each platform.</p></section>
-    <section class="panel wide"><header><h2>Recently published</h2><a href="#calendar">See all</a></header>
-      ${published.length ? `<div class="recent">${published.map(p => `<div class="rc">
-          <a class="img" ${p.post_url ? `href="${esc(p.post_url)}" target="_blank" rel="noopener"` : ''}>${thumbOf(p) ? `<img src="${esc(thumbOf(p))}" alt="">` : ''}<span class="badge-pl ${p.platform || 'tiktok'}">${icon(p.platform || 'tiktok', 11)}</span></a>
-          <div class="meta">${p.post_url ? `<a href="${esc(p.post_url)}" target="_blank" rel="noopener">View</a>` : ''}<b>${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</b><span>${fmt(p.scheduled_at, { dateStyle: 'medium' })}</span></div></div>`).join('')}</div>`
-      : '<div class="empty">Published posts appear here with a link to each one.</div>'}</section>
+    <section class="panel wide"><header><h2>This week</h2><span class="note">${weekTotal} post${weekTotal === 1 ? '' : 's'}</span></header>
+      <div class="wkstrip">${days.map(dayCell).join('')}</div></section>
+    <section class="panel"><header><h2>Recently published</h2><a href="#calendar">See all</a></header>
+      ${published.length ? `<div class="list">${published.map(pubRow).join('')}</div>`
+        : '<div class="empty">Published posts appear here with a link to each one.</div>'}</section>
+    <section class="panel perf"><header><h2>Performance</h2><span class="soon">Coming soon</span></header>
+      <p>Views, likes, comments and new followers for every post, as soon as TikTok, Instagram and Facebook approve access to their numbers.</p>
+      <ul>${['Views', 'Likes', 'Comments', 'Followers'].map(l => `<li>${ui('chart', 14)}${l}</li>`).join('')}</ul></section>
   </div>`;
 }
 
