@@ -139,7 +139,7 @@ function menu() {
   const items = [['overview', 'Overview', 'home'], ['compose', 'Create', 'edit'], ['calendar', 'Calendar', 'cal', S.counts.failed, 'bad'],
     ['drafts', 'Drafts', 'draft', S.counts.drafts], ...(can('admin') ? [['accounts', 'Accounts', 'users']] : [])];
   const email = S.me.user?.email || '';
-  return `<a class="brand-row" href="#overview"><span class="logo"><i></i></span><b>ARCO Publisher</b></a>
+  return `<a class="brand-row" href="#overview"><img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30"><b>ARCO Publisher</b></a>
     ${wsBox()}
     <a class="create-side" href="#compose">${ui('plus', 16)}Create post</a>
     <nav class="nav" aria-label="Main">${items.map(([k, l, i, n, tone]) =>
@@ -185,7 +185,7 @@ function render() {
   if (!signedIn) { $('app').innerHTML = signInView(); bind(); return; }
   if (S.view === 'accounts' && !can('admin')) S.view = 'overview';
   $('side').innerHTML = menu();
-  $('mtop').innerHTML = `<span class="logo"><i></i></span>${wsBox()}`;
+  $('mtop').innerHTML = `<img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30">${wsBox()}`;
   $('tabbar').innerHTML = tabbar();
   const views = { overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
   const head = S.view === 'overview' ? '' : pageHead(...HEADS[S.view]());
@@ -337,7 +337,7 @@ function signInView() {
   let invited = false;
   try { invited = !!sessionStorage.getItem(INVITE); } catch {}
   return `<div class="signwrap"><div class="signside">
-    <a class="brand-row" href="/"><span class="logo"><i></i></span><b>ARCO Publisher</b></a>
+    <a class="brand-row" href="/"><img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30"><b>ARCO Publisher</b></a>
     <div class="card signin"><div class="sec">
     <h1>${claiming ? 'Add your email' : 'Sign in or create an account'}</h1>
     <p class="lead">${claiming

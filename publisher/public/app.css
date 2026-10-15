@@ -32,8 +32,7 @@ button{cursor:pointer}
 .app.bare{grid-template-columns:1fr}
 .side{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 14px;position:sticky;top:0;height:100vh;overflow-y:auto}
 .brand-row{display:flex;align-items:center;gap:10px;padding:2px 8px 16px;text-decoration:none;color:inherit}
-.logo{width:30px;height:30px;border-radius:8px;background:var(--graphite);display:grid;place-items:center;flex:none}
-.logo i{width:12px;height:12px;border-radius:50%;background:var(--saffron);display:block}
+.logo{width:30px;height:30px;border-radius:8px;flex:none;display:block;box-shadow:0 0 0 1px var(--line)}
 .brand-row b{font:700 16px/1 var(--display);letter-spacing:-.01em}
 .ws{position:relative;margin-bottom:14px}
 .ws .wsbox{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--well);border-radius:var(--r-ctl);padding:8px 10px}
