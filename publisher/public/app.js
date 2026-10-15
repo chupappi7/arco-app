@@ -1167,18 +1167,16 @@ function postCard(p, compact) {
     return `<div class="pill-post ${p.status}" ${drag} data-open="${p.id}" title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.status}`)}">
       ${icon(p.platform || 'tiktok', 11)}<span>${time}</span></div>`;
   }
-  return `<div class="pc" ${drag} data-open="${p.id}">
-    ${p.images[p.cover_index] ? `<img src="${esc(p.images[p.cover_index])}" alt="">` : ''}
-    <div class="when" title="${PLATFORM[p.platform] || 'TikTok'}">${icon(p.platform || 'tiktok', 13)}${time}</div>
-    <div class="note">${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</div>
-    <span class="pill ${p.status}">${p.status}</span>
-    ${p.fail_reason ? `<div class="note ${p.status === 'failed' ? 'bad' : ''}">${esc(p.fail_reason)}</div>` : ''}
-    <div class="acts">
-      ${p.status === 'queued' ? `<button data-edit="${p.id}">Edit</button><button data-cancel="${p.id}">Cancel</button>` : ''}
-      ${p.status === 'failed' ? `<button data-retry="${p.id}">Retry</button><button data-edit="${p.id}">Edit</button>` : ''}
-      ${p.status === 'published' || p.status === 'cancelled' ? `<button data-again="${p.id}">Post again</button>` : ''}
-      ${p.post_url ? `<a href="${esc(p.post_url)}" target="_blank" rel="noopener">View</a>` : ''}
-    </div></div>`;
+  // Week view: a small row per post. Everything you can do with it is one
+  // click away in the drawer.
+  const img = p.images[p.cover_index] || p.images[0];
+  const label = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
+  return `<div class="pc ${p.status}" ${drag} data-open="${p.id}" role="button" tabindex="0"
+      title="${esc(`${label}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
+    ${img ? `<img src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}
+    <div class="pt"><b>${icon(p.platform || 'tiktok', 12)}${at(p.scheduled_at)}</b>
+      <span>${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</span>
+      <em>${label}</em></div></div>`;
 }
 
 function calendarView() {
@@ -1217,8 +1215,8 @@ function calendarView() {
       const ps = posts.filter(p => dayOf(p.scheduled_at) === dayKey(d));
       const out = month && d.m !== r.month;
       return `<div class="day ${dayKey(d) === now ? 'today' : ''} ${out ? 'out' : ''}" data-day="${d.y}-${d.m}-${d.d}">
-        <h4>${month ? d.d : dayLabel(d, { weekday: 'short', day: 'numeric' })}</h4>
-        ${ps.map(p => postCard(p, month)).join('') || (month ? '' : '<span class="note">Nothing yet</span>')}
+        <h4>${month ? d.d : `<span>${dayLabel(d, { weekday: 'short' })}</span><b>${d.d}</b>`}</h4>
+        ${ps.map(p => postCard(p, month)).join('') || ''}
       </div>`;
     }).join('')}</div>`;
 }
