@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARCO Publisher · redesign mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,750&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --graphite:#1C2230; --canvas:#F2F4F6; --surface:#FFFFFF; --line:#DFE3E8; --line-2:#EBEEF2;
+  --mute:#667085; --soft:#98A2B3; --saffron:#E9A23B; --saffron-tint:#FDF4E6;
+  --danger:#C2410C; --danger-tint:#FEF1EB; --success:#15803D; --success-tint:#ECF7EF; --next-ink:#9A5B0B;
+  --tt:#000; --ig:#E1306C; --fb:#0866FF;
+  --r-panel:12px; --r-ctl:8px;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --text:"Public Sans",ui-sans-serif,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --graphite:#E8ECF2; --canvas:#12161F; --surface:#1A1F2B; --line:#2A3140; --line-2:#222837;
+  --mute:#9AA4B5; --soft:#6B7487; --saffron-tint:#3A2E1A; --danger-tint:#3A1F16; --success-tint:#16301F;
+  --danger:#F28B5B; --success:#4ADE80; --next-ink:#F4C27A;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--canvas);color:var(--graphite);font:14px/1.5 var(--text);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--saffron);outline-offset:2px}
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+
+/* ---------- sidebar ---------- */
+.side{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 14px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:2px 8px 16px}
+.brand .logo{width:30px;height:30px;border-radius:8px;background:var(--graphite);display:grid;place-items:center}
+.brand .logo i{width:12px;height:12px;border-radius:50%;background:var(--saffron);display:block}
+.brand b{font:650 16px/1 var(--display);letter-spacing:-.01em}
+.ws{display:flex;align-items:center;gap:10px;width:100%;border:1px solid var(--line);background:var(--canvas);border-radius:var(--r-ctl);padding:8px 10px;margin-bottom:18px;text-align:left}
+.ws .sq{width:24px;height:24px;border-radius:6px;background:#2F6F5E;color:#fff;font-weight:700;font-size:12px;display:grid;place-items:center;flex:none}
+.ws span{flex:1;min-width:0;font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws small{display:block;color:var(--mute);font-weight:400;font-size:11.5px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--r-ctl);color:var(--mute);text-decoration:none;font-weight:500}
+.nav a svg{width:18px;height:18px;flex:none}
+.nav a:hover{background:var(--canvas);color:var(--graphite)}
+.nav a.on{background:var(--graphite);color:var(--surface)}
+.nav a .n{margin-left:auto;font-size:12px;min-width:20px;text-align:center;border-radius:10px;padding:0 6px;background:var(--canvas);color:var(--mute)}
+.nav a.on .n{background:rgba(255,255,255,.16);color:var(--surface)}
+.nav a .n.bad{background:var(--danger-tint);color:var(--danger)}
+.create-side{margin:4px 0 14px;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--saffron);color:#1C2230;border:0;border-radius:var(--r-ctl);padding:10px;font-weight:650}
+.side .grow{flex:1}
+.me{display:flex;align-items:center;gap:10px;padding:10px 8px;border-top:1px solid var(--line-2);margin-top:8px}
+.me .av{width:30px;height:30px;border-radius:50%;background:#C7D2FE;color:#3730A3;display:grid;place-items:center;font-weight:700;font-size:12px}
+.me div{font-size:13px;line-height:1.25}.me small{color:var(--mute)}
+
+/* ---------- main ---------- */
+.main{min-width:0;padding:28px 36px 60px}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px}
+.top h1{font:750 30px/1.1 var(--display);letter-spacing:-.02em;margin:0}
+.top p{margin:6px 0 0;color:var(--mute)}
+.top p b{color:var(--graphite);font-weight:600}
+.btn{white-space:nowrap;display:inline-flex;align-items:center;gap:8px;border-radius:var(--r-ctl);padding:9px 14px;font-weight:600;border:1px solid var(--line);background:var(--surface)}
+.btn.primary{background:var(--graphite);color:var(--surface);border-color:var(--graphite)}
+.btn svg{width:16px;height:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-panel)}
+.panel>header{display:flex;align-items:baseline;justify-content:space-between;padding:16px 18px 6px}
+.panel>header h2{font:650 16px/1.2 var(--display);margin:0}
+.panel>header a{color:var(--mute);font-size:13px;text-decoration:none}
+.panel>header a:hover{color:var(--graphite)}
+
+/* ---------- overview ---------- */
+.ov{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:18px}
+.ov .wide{grid-column:1/-1}
+.rail{position:relative;padding:8px 18px 18px 18px}
+.slot{display:grid;grid-template-columns:56px 18px 1fr;align-items:center;min-height:64px}
+.slot time{font-weight:600;color:var(--mute);font-size:13px}
+.slot .dot{position:relative;height:100%}
+.slot .dot::before{content:"";position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--line)}
+.slot .dot i{position:absolute;left:3px;top:50%;width:12px;height:12px;margin-top:-6px;border-radius:50%;background:var(--surface);border:2px solid var(--soft)}
+.slot.done .dot i{background:var(--success);border-color:var(--success)}
+.slot.failed .dot i{background:var(--danger);border-color:var(--danger)}
+.slot.next .dot i{border-color:var(--saffron);background:var(--saffron);box-shadow:0 0 0 5px var(--saffron-tint)}
+.post{display:flex;align-items:center;gap:12px;padding:8px 10px;margin-left:8px;border-radius:10px}
+.post:hover{background:var(--canvas)}
+.post img,.post .ph{width:40px;height:48px;border-radius:6px;object-fit:cover;flex:none}
+.post .who{flex:1;min-width:0}
+.post .who b{display:flex;align-items:center;gap:6px;font-weight:600}
+.post .who span{display:block;color:var(--mute);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status{font-size:12px;font-weight:600;border-radius:20px;padding:2px 9px;white-space:nowrap}
+.status.pub{background:var(--success-tint);color:var(--success)}
+.status.q{background:var(--canvas);color:var(--mute)}
+.status.fail{background:var(--danger-tint);color:var(--danger)}
+.status.next{background:var(--saffron-tint);color:var(--next-ink)}
+.now{display:grid;grid-template-columns:56px 18px 1fr;align-items:center;height:22px}
+.now time{font-weight:700;color:var(--saffron);font-size:12.5px}
+.now .bar{grid-column:2/4;height:2px;background:var(--saffron);position:relative}
+.now .bar::before{content:"";position:absolute;left:3px;top:-5px;width:12px;height:12px;border-radius:50%;background:var(--saffron)}
+.pf{width:16px;height:16px;border-radius:50%;display:inline-grid;place-items:center;flex:none}
+.pf svg{width:9px;height:9px;fill:#fff}
+.pf.tiktok{background:var(--tt)}.pf.instagram{background:radial-gradient(circle at 30% 110%,#fdf497 0%,#fd5949 45%,#d6249f 60%,#285AEB 90%)}.pf.facebook{background:var(--fb)}
+
+.attn{padding:4px 10px 12px}
+.attn a{display:flex;align-items:center;gap:12px;padding:11px 8px;border-radius:10px;text-decoration:none;color:inherit}
+.attn a:hover{background:var(--canvas)}
+.attn .ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none}
+.attn .ic svg{width:16px;height:16px}
+.attn .ic.bad{background:var(--danger-tint);color:var(--danger)}
+.attn .ic.warn{background:var(--saffron-tint);color:var(--next-ink)}
+.attn .ic.mute{background:var(--canvas);color:var(--mute)}
+.attn b{display:block;font-weight:600}.attn span{color:var(--mute);font-size:13px}
+.attn em{margin-left:auto;font-style:normal;font-weight:600;font-size:13px;color:var(--graphite);border:1px solid var(--line);border-radius:7px;padding:4px 10px}
+
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;padding:10px 18px 18px;align-items:end;height:150px}
+.week .d{display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+.week .stack{width:100%;max-width:28px;display:flex;flex-direction:column-reverse;gap:2px}
+.week .stack i{display:block;border-radius:3px}
+.week .d span{font-size:12px;color:var(--mute)}
+.week .d.today span{color:var(--next-ink);font-weight:700}
+.legend{display:flex;gap:14px;padding:0 18px 16px;font-size:12px;color:var(--mute)}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+
+.recent{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;padding:8px 18px 18px}
+.rc{border:1px solid var(--line-2);border-radius:10px;overflow:hidden}
+.rc .img{aspect-ratio:4/5;position:relative}
+.rc .img .pf{position:absolute;top:8px;left:8px;width:20px;height:20px;border:2px solid #fff}
+.rc .img .pf svg{width:10px;height:10px}
+.rc div.meta{padding:9px 10px 10px;font-size:13px}
+.rc .meta b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc .meta span{color:var(--mute)}
+.rc .meta a{color:var(--graphite);font-weight:600;text-decoration:none;float:right}
+
+/* ---------- create ---------- */
+.cr{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.9fr);gap:18px;align-items:start}
+.field{padding:16px 18px;border-bottom:1px solid var(--line-2)}
+.field:last-child{border-bottom:0}
+.field>label,.field>.lab{display:block;font-weight:600;margin-bottom:10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:30px;padding:4px 10px 4px 4px;background:var(--surface);font-size:13px;font-weight:500}
+.chip .av{width:26px;height:26px;border-radius:50%;position:relative;display:grid;place-items:center;font-weight:700;font-size:11px;color:#fff}
+.chip .av .pf{position:absolute;right:-3px;bottom:-3px;width:14px;height:14px;border:2px solid var(--surface)}
+.chip .av .pf svg{width:7px;height:7px}
+.chip .x{color:var(--soft);border:0;background:none;padding:0 0 0 2px}
+.chip.add{padding:6px 12px;border-style:dashed;color:var(--mute)}
+.media{display:flex;gap:10px;flex-wrap:wrap}
+.media .m{width:84px;height:105px;border-radius:9px;position:relative;overflow:hidden}
+.media .m.cover{outline:2px solid var(--graphite);outline-offset:2px}
+.media .m small{position:absolute;left:5px;top:5px;background:var(--graphite);color:var(--surface);font-size:10.5px;font-weight:700;border-radius:5px;padding:1px 6px}
+.media .add{width:84px;height:105px;border:1.5px dashed var(--line);border-radius:9px;display:grid;place-items:center;color:var(--mute);background:var(--canvas)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.tabs button{border:0;background:none;padding:8px 12px;color:var(--mute);font-weight:600;display:flex;align-items:center;gap:7px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--graphite);border-color:var(--graphite)}
+.tabs button .cust{width:6px;height:6px;border-radius:50%;background:var(--saffron)}
+textarea{width:100%;min-height:130px;resize:vertical;border:1px solid var(--line);border-radius:var(--r-ctl);padding:12px;background:var(--surface);line-height:1.55}
+.lims{display:flex;justify-content:flex-end;gap:16px;font-size:12px;color:var(--mute);margin-top:8px}
+.lims span{display:inline-flex;align-items:center;gap:5px}
+.fold{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:0;font-weight:600;text-align:left}
+.fold small{color:var(--mute);font-weight:400}
+.fold svg{width:16px;height:16px;margin-left:auto;color:var(--mute)}
+
+.prev{position:sticky;top:24px}
+.prev .tabs{padding:0 14px;margin:0}
+.phone{margin:18px auto 20px;width:300px;border:1px solid var(--line);border-radius:22px;overflow:hidden;background:var(--surface)}
+.ig-head{display:flex;align-items:center;gap:9px;padding:10px 12px;font-weight:600;font-size:13px}
+.ig-head .av{width:28px;height:28px;border-radius:50%;background:#111;color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700;box-shadow:0 0 0 2px #fff,0 0 0 3.5px #d6249f}
+.ig-img{aspect-ratio:4/5;position:relative}
+.ig-img .pager{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;border-radius:10px;padding:1px 8px}
+.ig-actions{display:flex;gap:14px;padding:10px 12px 4px}
+.ig-actions svg{width:22px;height:22px}
+.ig-dots{display:flex;justify-content:center;gap:4px;margin-top:-18px;margin-bottom:6px}
+.ig-dots i{width:5px;height:5px;border-radius:50%;background:var(--line)}.ig-dots i.on{background:var(--ig)}
+.ig-cap{padding:2px 12px 14px;font-size:13px;line-height:1.45}
+.ig-cap b{font-weight:600}
+.ig-cap .more{color:var(--soft)}
+.prev-note{font-size:12.5px;color:var(--mute);text-align:center;padding:0 18px 16px}
+
+.dock{position:sticky;bottom:0;margin-top:18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-panel);display:flex;align-items:center;gap:18px;padding:12px 14px;box-shadow:0 -6px 24px rgba(28,34,48,.06)}
+.seg{display:inline-flex;background:var(--canvas);border-radius:9px;padding:3px}
+.seg button{white-space:nowrap;border:0;background:none;border-radius:7px;padding:7px 12px;font-weight:600;color:var(--mute)}
+.seg button.on{background:var(--surface);color:var(--graphite);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.dock .when{color:var(--mute);font-size:13px;min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dock .when b{color:var(--graphite)}
+.dock .sp{display:none}
+
+/* ---------- placeholder ---------- */
+.ph-view{display:grid;place-items:center;min-height:50vh;color:var(--mute);text-align:center}
+.ph-view h2{font:650 20px var(--display);color:var(--graphite);margin:0 0 6px}
+
+.ov>*,.cr>*,.panel{min-width:0}
+.post .who{min-width:0}
+.slot>*{min-width:0}
+.post .who b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.post .who b .pf{vertical-align:-3px;margin-right:6px}
+@media (max-width:1100px){.ov,.cr{grid-template-columns:1fr}.prev{position:static}.recent{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr}
+  .side{display:none}
+  .main{padding:18px 16px 96px}
+  .top h1{font-size:24px}
+  .top{flex-wrap:wrap;align-items:flex-start}
+  .slot,.now{grid-template-columns:44px 18px 1fr}
+  .post{gap:9px;padding:6px}
+  .post img,.post .ph{width:32px;height:40px}
+  .status{font-size:11px;padding:2px 7px}
+  .recent{grid-template-columns:repeat(2,1fr)}
+  .tabbar{display:flex}
+  .dock{flex-wrap:wrap;bottom:70px}
+}
+.tabbar{display:none;position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);justify-content:space-around;padding:8px 6px 14px;z-index:5}
+.tabbar a{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--mute);text-decoration:none}
+.tabbar a svg{width:20px;height:20px}
+.tabbar a.on{color:var(--graphite)}
+.tabbar .plus{width:44px;height:44px;border-radius:14px;background:var(--saffron);color:#1C2230;display:grid;place-items:center;margin-top:-18px}
+.mock-flag{position:fixed;right:14px;top:14px;background:var(--graphite);color:var(--surface);font-size:12px;border-radius:20px;padding:6px 12px;opacity:.85;z-index:9}
+@media (max-width:760px){.mock-flag{top:auto;bottom:84px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo"><i></i></div><b>ARCO Publisher</b></div>
+    <button class="ws"><div class="sq">A</div><span>ARCO Agency<small>Owner</small></span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg></button>
+    <button class="create-side" data-go="create"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Create post</button>
+    <nav class="nav" id="nav"></nav>
+    <div class="grow"></div>
+    <nav class="nav"><a href="#settings" data-v="settings">${''}</a></nav>
+    <div class="me"><div class="av">TT</div><div>Thinh<br><small>thinht7110@gmail.com</small></div></div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<nav class="tabbar" id="tabbar"></nav>
+<div class="mock-flag">Mockup · sample data</div>
+
+<script>
+const I = {
+  home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m14 6 4 4"/>',
+  cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  draft:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/>',
+  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  x:'<path d="M18 6 6 18M6 6l12 12"/>', retry:'<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/>',
+  link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  chev:'<path d="m6 9 6 6 6-6"/>', heart:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',
+  bubble:'<path d="M21 12a8.5 8.5 0 0 1-12.3 7.6L3 21l1.4-5.4A8.5 8.5 0 1 1 21 12z"/>', send:'<path d="m22 2-11 11M22 2l-7 20-4-9-9-4z"/>',
+};
+const ico = (n, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
+const MARK = {
+  tiktok:'<path d="M16.6 5.8A4.3 4.3 0 0 1 15.5 3h-3.1v12.4a2.6 2.6 0 1 1-2.6-2.6c.3 0 .5 0 .8.1V9.7a5.8 5.8 0 1 0 5 5.7V9.3a7.4 7.4 0 0 0 4.3 1.4V7.6a4.3 4.3 0 0 1-3.3-1.8z"/>',
+  instagram:'<path d="M12 7.3A4.7 4.7 0 1 0 16.7 12 4.7 4.7 0 0 0 12 7.3zm0 7.7a3 3 0 1 1 3-3 3 3 0 0 1-3 3zm6-7.9a1.1 1.1 0 1 1-1.1-1.1A1.1 1.1 0 0 1 18 7.1z"/>',
+  facebook:'<path d="M13.5 21v-7.6h2.6l.4-3h-3V8.5c0-.9.2-1.5 1.5-1.5h1.6V4.3a21 21 0 0 0-2.3-.1c-2.3 0-3.9 1.4-3.9 4v2.2H8v3h2.6V21z"/>',
+};
+const pf = p => `<span class="pf ${p}"><svg viewBox="0 0 24 24">${MARK[p]}</svg></span>`;
+const PNAME = { tiktok:'TikTok', instagram:'Instagram', facebook:'Facebook' };
+// Sample photos: soft gradients standing in for real images.
+const G = ['linear-gradient(160deg,#F6D3A8,#C9784A)','linear-gradient(160deg,#B9D8E8,#4F7FA3)','linear-gradient(160deg,#D9E4C7,#6E8F55)',
+           'linear-gradient(160deg,#E8C9DA,#9A5C80)','linear-gradient(160deg,#F1E5B5,#B79A3B)','linear-gradient(160deg,#C9CCE8,#5A5F9A)'];
+const ph = (n, cls = 'ph') => `<div class="${cls}" style="background:${G[n % G.length]}"></div>`;
+
+const NAV = [['overview','Overview','home'],['create','Create','edit'],['calendar','Calendar','cal'],['drafts','Drafts','draft',3],['accounts','Accounts','users']];
+
+function shell(v) {
+  document.getElementById('nav').innerHTML = NAV.map(([k, l, i, n]) =>
+    `<a href="#${k}" class="${v === k ? 'on' : ''}">${ico(i)}${l}${n ? `<span class="n">${n}</span>` : ''}</a>`).join('');
+  document.querySelector('.side nav:last-of-type').innerHTML = `<a href="#settings" class="${v === 'settings' ? 'on' : ''}">${ico('gear')}Settings</a>`;
+  document.getElementById('tabbar').innerHTML = [['overview','Overview','home'],['calendar','Calendar','cal']].map(([k,l,i]) =>
+    `<a href="#${k}" class="${v===k?'on':''}">${ico(i)}${l}</a>`).join('') +
+    `<a href="#create"><span class="plus">${ico('plus',22)}</span></a>` +
+    [['drafts','Drafts','draft'],['accounts','Accounts','users']].map(([k,l,i]) => `<a href="#${k}" class="${v===k?'on':''}">${ico(i)}${l}</a>`).join('');
+}
+
+function overview() {
+  const today = [
+    { t:'07:30', s:'done', p:'facebook', who:'Grails_Store', cap:'New drop: Jordan 4 Bred, sizes 40–45 in stock', st:['pub','Published'] },
+    { t:'08:15', s:'failed', p:'instagram', who:'@get.arco', cap:'3 apps that saved my mornings this week', st:['fail','Failed'] },
+  ];
+  const later = [
+    { t:'09:00', s:'next', p:'instagram', who:'@get.arco', cap:'Block your phone for one hour. Here is how', st:['next','Next up'] },
+    { t:'12:30', s:'q', p:'tiktok', who:'@productivity_god', cap:'The 5-minute plan I make every night', st:['q','Scheduled'] },
+    { t:'18:00', s:'q', p:'facebook', who:'Grails_Store', cap:'Weekend restock: Yeezy 350 Zebra', st:['q','Scheduled'] },
+  ];
+  const slot = (x, n) => `<div class="slot ${x.s}"><time>${x.t}</time><div class="dot"><i></i></div>
+    <div class="post">${ph(n)}<div class="who"><b>${pf(x.p)}${x.who}</b><span>${x.cap}</span></div><span class="status ${x.st[0]}">${x.st[1]}</span></div></div>`;
+  const week = [[2,1,1],[1,2,0],[0,1,2],[2,2,1],[1,0,1],[0,1,0],[0,0,0]];
+  const colors = { tiktok:'#1C2230', instagram:'#E1306C', facebook:'#0866FF' };
+  return `
+  <div class="top"><div><h1>Good morning, Thinh</h1>
+    <p><b>5 posts</b> go out today. Next is <b>09:00</b> on Instagram @get.arco.</p></div>
+    <button class="btn primary" onclick="location.hash='create'">${ico('plus',16)}Create post</button></div>
+  <div class="ov">
+    <section class="panel"><header><h2>Today</h2><a href="#calendar">Open calendar</a></header>
+      <div class="rail">${today.map(slot).join('')}
+        <div class="now"><time>08:42</time><div class="bar"></div></div>
+        ${later.map((x, n) => slot(x, n + 2)).join('')}</div></section>
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <section class="panel"><header><h2>Needs attention</h2></header>
+        <div class="attn">
+          <a href="#calendar"><span class="ic bad">${ico('x',16)}</span><div><b>1 post failed</b><span>Instagram couldn't read the photos</span></div><em>Retry</em></a>
+          <a href="#accounts"><span class="ic warn">${ico('retry',16)}</span><div><b>@emilia needs reconnecting</b><span>TikTok access expired</span></div><em>Reconnect</em></a>
+          <a href="#drafts"><span class="ic mute">${ico('draft',16)}</span><div><b>3 drafts waiting</b><span>Oldest saved 2 days ago</span></div><em>Open</em></a>
+        </div></section>
+      <section class="panel"><header><h2>This week</h2><a href="#calendar">23 posts</a></header>
+        <div class="week">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d, i) => `<div class="d ${i === 2 ? 'today' : ''}">
+          <div class="stack">${['tiktok','instagram','facebook'].map((p, k) => week[i][k] ? `<i style="height:${week[i][k]*14}px;background:${colors[p]}"></i>` : '').join('')}</div><span>${d}</span></div>`).join('')}</div>
+        <div class="legend"><span><i style="background:#1C2230"></i>TikTok</span><span><i style="background:#E1306C"></i>Instagram</span><span><i style="background:#0866FF"></i>Facebook</span></div></section>
+    </div>
+    <section class="panel wide"><header><h2>Recently published</h2><a href="#calendar">See all</a></header>
+      <div class="recent">${[['facebook','Grails_Store','2 h ago'],['tiktok','@productivity_god','Yesterday'],['instagram','@get.arco','Yesterday'],['facebook','GolfTargetshop','Mon']].map(([p, w, t], n) =>
+        `<div class="rc"><div class="img" style="background:${G[(n + 3) % G.length]}">${pf(p)}</div><div class="meta"><a href="#">View</a><b>${w}</b><span>${t}</span></div></div>`).join('')}</div></section>
+  </div>`;
+}
+
+let cTab = 'all', pTab = 'instagram', when = 'queue';
+function create() {
+  const accs = [['instagram','get.arco','#111','G'],['facebook','Grails_Store','#7C5CBF','G'],['tiktok','productivity_god','#2F6F5E','P']];
+  const main = 'Warm crust, soft middle. Our new sourdough is out of the oven, weekends only. Come early, it goes fast.';
+  const ig = 'Warm crust, soft middle 🍞 Weekends only. #sourdough #bakery #weekendbake';
+  const cap = cTab === 'instagram' ? ig : main;
+  return `
+  <div class="top"><div><h1>Create post</h1><p>Goes to 3 accounts. Each one gets its own caption where you customize it.</p></div></div>
+  <div class="cr">
+    <div>
+      <section class="panel">
+        <div class="field"><span class="lab">Post to</span><div class="chips">
+          ${accs.map(([p, n, c, l]) => `<span class="chip"><span class="av" style="background:${c}">${l}${pf(p)}</span>${p === 'facebook' ? '' : '@'}${n}<button class="x" aria-label="Remove">${ico('x',14)}</button></span>`).join('')}
+          <button class="chip add">${ico('plus',14)} Add accounts</button></div></div>
+        <div class="field"><span class="lab">Photos</span><div class="media">
+          ${[0,1,2,3].map(n => `<div class="m ${n === 0 ? 'cover' : ''}" style="background:${G[n]}">${n === 0 ? '<small>Cover</small>' : ''}</div>`).join('')}
+          <button class="add" aria-label="Add photos">${ico('plus',20)}</button></div></div>
+        <div class="field"><span class="lab">Caption</span>
+          <div class="tabs">${[['all','Everywhere'],['instagram','Instagram',1],['facebook','Facebook'],['tiktok','TikTok']].map(([k, l, c]) =>
+            `<button class="${cTab === k ? 'on' : ''}" data-ctab="${k}">${k === 'all' ? '' : pf(k)}${l}${c ? '<span class="cust" title="Customized"></span>' : ''}</button>`).join('')}</div>
+          <textarea aria-label="Caption">${cap}</textarea>
+          <div class="lims"><span>${pf('instagram')} 72 / 2,200 · 3 of 30 #</span><span>${pf('facebook')} 104 / 63,206</span><span>${pf('tiktok')} 104 / 4,000</span></div></div>
+        <div class="field"><button class="fold">${pf('tiktok')} TikTok settings <small>1 account · who can view, comments, disclosure</small>${ico('chev',16)}</button></div>
+      </section>
+    </div>
+    <aside class="panel prev"><header><h2>Preview</h2></header>
+      <div class="tabs">${['instagram','facebook','tiktok'].map(k => `<button class="${pTab === k ? 'on' : ''}" data-ptab="${k}">${pf(k)}${PNAME[k]}</button>`).join('')}</div>
+      ${pTab === 'instagram' ? `<div class="phone">
+          <div class="ig-head"><span class="av">G</span>get.arco</div>
+          <div class="ig-img" style="background:${G[0]}"><span class="pager">1/4</span></div>
+          <div class="ig-actions">${ico('heart',22)}${ico('bubble',22)}${ico('send',22)}</div>
+          <div class="ig-dots"><i class="on"></i><i></i><i></i><i></i></div>
+          <div class="ig-cap"><b>get.arco</b> ${ig.slice(0, 64)}<span class="more">… more</span></div></div>
+        <p class="prev-note">Tall photos are padded to 4:5 for Instagram, nothing is cropped.</p>`
+      : pTab === 'facebook' ? `<div class="phone"><div class="ig-head"><span class="av" style="background:#7C5CBF;box-shadow:none">G</span><div>Grails_Store<br><small style="color:var(--mute);font-weight:400">Just now · Public</small></div></div>
+          <div class="ig-cap" style="padding-top:0">${main}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">${[0,1,2,3].map(n => `<div style="aspect-ratio:1;background:${G[n]}"></div>`).join('')}</div>
+          <div class="ig-actions" style="justify-content:space-around;color:var(--mute);font-size:13px;padding:10px"><span>Like</span><span>Comment</span><span>Share</span></div></div>
+        <p class="prev-note">One post with all 4 photos on the Page.</p>`
+      : `<div class="phone" style="background:#111;color:#fff;border-color:#111"><div style="aspect-ratio:9/14;background:${G[0]};position:relative">
+          <div style="position:absolute;left:12px;right:60px;bottom:14px;font-size:13px"><b>@productivity_god</b><br>The 5-minute plan I make every night<br><span style="opacity:.75">${main.slice(0, 60)}…</span></div>
+          <div style="position:absolute;top:10px;left:0;right:0;text-align:center;font-size:12px;opacity:.9">1 / 4</div></div></div>
+        <p class="prev-note">Photo post. Title is the first line.</p>`}
+    </aside>
+  </div>
+  <div class="dock">
+    <div class="seg">${[['now','Post now'],['queue','Next free slot'],['pick','Pick a time']].map(([k, l]) => `<button class="${when === k ? 'on' : ''}" data-when="${k}">${l}</button>`).join('')}</div>
+    <span class="when">${when === 'queue' ? 'Instagram <b>Wed 18:00</b> · Facebook <b>Wed 18:00</b> · TikTok <b>Thu 09:00</b>' : when === 'now' ? 'Goes out <b>right away</b>' : '<b>Choose a date and time</b>'}</span>
+    <span class="sp"></span>
+    <button class="btn">Save draft</button>
+    <button class="btn primary">${when === 'now' ? 'Post to 3 accounts' : 'Schedule 3 posts'}</button>
+  </div>`;
+}
+
+function placeholder(v) {
+  const t = { calendar:'Calendar', drafts:'Drafts', accounts:'Accounts', settings:'Settings' }[v];
+  return `<div class="top"><div><h1>${t}</h1></div></div><div class="panel ph-view"><div><h2>${t} comes in a later phase</h2>
+    <p>This mockup covers the menu, Overview and Create.<br>Try Overview and Create from the menu.</p></div></div>`;
+}
+
+function render() {
+  const v = (location.hash || '#overview').slice(1);
+  shell(v);
+  document.getElementById('main').innerHTML = v === 'overview' ? overview() : v === 'create' ? create() : placeholder(v);
+  document.querySelectorAll('[data-ctab]').forEach(b => b.onclick = () => { cTab = b.dataset.ctab; render(); });
+  document.querySelectorAll('[data-ptab]').forEach(b => b.onclick = () => { pTab = b.dataset.ptab; render(); });
+  document.querySelectorAll('[data-when]').forEach(b => b.onclick = () => { when = b.dataset.when; render(); });
+  document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { location.hash = b.dataset.go; });
+}
+window.addEventListener('hashchange', render);
+render();
+</script>
+</body>
+</html>
