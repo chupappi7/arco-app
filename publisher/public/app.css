@@ -80,6 +80,7 @@ button{cursor:pointer}
   .tabbar a{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--mute);text-decoration:none;min-width:56px}
   .tabbar a svg{width:20px;height:20px}
   .tabbar a.on{color:var(--graphite);font-weight:600}
+  .tabbar.flat .plus{margin-top:0;width:40px;height:32px;border-radius:10px}
   .tabbar .plus{width:46px;height:46px;border-radius:14px;background:var(--graphite);color:var(--on-dark);display:grid;place-items:center;margin-top:-20px}
 }
 
@@ -382,3 +383,108 @@ select.move{width:auto;max-width:180px;padding:7px 10px}
 .signart .mini{width:100%;max-width:420px;background:var(--surface);color:var(--graphite);border-radius:16px;padding:18px 18px 8px;box-shadow:0 30px 60px rgba(0,0,0,.35)}
 .signart .mini h3{font:650 15px var(--display);margin:0 0 6px}
 @media (max-width:900px){.signwrap{grid-template-columns:1fr}.signart{display:none}.signside{padding:32px 20px}}
+
+/* ---------- create: two panes and a bar that stays put ---------- */
+.composer{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;align-items:start;padding-bottom:84px}
+.cmain{display:flex;flex-direction:column;gap:14px;min-width:0}
+.cside{position:sticky;top:20px}
+.csec{padding:6px 18px 18px}
+.cbanner{display:flex;align-items:center;gap:12px;justify-content:space-between;background:var(--saffron-tint);color:var(--next-ink);border-radius:var(--r-panel);padding:10px 14px;margin-bottom:14px;font-weight:500}
+/* accounts as tiles */
+.pq{margin-bottom:12px}
+.agroup+.agroup{margin-top:14px}
+.ahead{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mute);margin-bottom:8px;cursor:pointer}
+.ahead b{font-weight:600;color:var(--graphite)}
+.atiles{display:flex;flex-wrap:wrap;gap:8px}
+.atile{position:relative;display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:999px;padding:4px 12px 4px 4px;cursor:pointer;font-size:13px;font-weight:500;background:var(--surface);user-select:none}
+.atile input{position:absolute;opacity:0;pointer-events:none}
+.atile:hover{border-color:var(--soft)}
+.atile.on{border-color:var(--graphite);background:var(--well)}
+.atile.off{opacity:.45;cursor:not-allowed}
+.atile:has(input:focus-visible){outline:2px solid var(--saffron);outline-offset:2px}
+.atile .av{width:28px;height:28px}.atile .badge-pl{width:14px;height:14px;right:-4px;bottom:-4px}
+.atile .tick{position:absolute;top:-5px;right:-5px;width:17px;height:17px;border-radius:50%;background:var(--graphite);color:var(--on-dark);display:grid;place-items:center}
+.amanage{display:inline-block;margin-top:12px;font-size:13px;color:var(--mute)}
+/* photos */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+.mt{position:relative;aspect-ratio:4/5;border-radius:10px;overflow:hidden;background:var(--well)}
+.mt img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer}
+.mt.cover{outline:2px solid var(--graphite);outline-offset:2px}
+.mt.up img{opacity:.5}
+.mt .mn{position:absolute;top:6px;right:6px;background:rgba(17,21,29,.6);color:#fff;font-size:11px;font-weight:700;border-radius:20px;padding:0 6px}
+.mt .badge{position:absolute;top:6px;left:6px;background:var(--graphite);color:var(--on-dark);font-size:10.5px;font-weight:700;border-radius:5px;padding:1px 6px}
+.mt .ctl{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;padding:6px;opacity:0;transition:opacity .12s;background:linear-gradient(transparent,rgba(0,0,0,.45))}
+.mt:hover .ctl,.mt:focus-within .ctl{opacity:1}
+.mt .ctl button{border:0;background:rgba(255,255,255,.92);color:#1C2230;border-radius:6px;width:24px;height:22px;font-size:13px;line-height:1;padding:0}
+@media (hover:none){.mt .ctl{opacity:1}}
+.addtile{aspect-ratio:4/5;border:1.5px dashed var(--line);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--mute);cursor:pointer;text-align:center;padding:10px}
+.addtile input{position:absolute;opacity:0;width:1px;height:1px}
+.addtile:hover,.addtile.over{border-color:var(--graphite);color:var(--graphite);background:var(--well)}
+.addtile.big{grid-column:1/-1;aspect-ratio:auto;padding:34px 16px}
+.addtile.big b{color:var(--graphite);font-size:15px}
+.addtile span{font-size:13px;max-width:34ch}
+.csec>.note{margin:10px 0 0}
+/* caption tabs */
+.ctabs{display:flex;gap:4px;border-bottom:1px solid var(--line-2);margin-bottom:10px;overflow-x:auto}
+.ctabs button{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:8px 10px;font-weight:600;color:var(--mute);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.ctabs button.on{color:var(--graphite);border-bottom-color:var(--graphite)}
+.ctabs .dot{width:6px;height:6px;border-radius:50%;background:var(--saffron)}
+.csec textarea{min-height:150px}
+.cempty{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px dashed var(--line);border-radius:var(--r-ctl);padding:16px;color:var(--mute)}
+.disc{display:flex;flex-wrap:wrap;gap:8px 18px;padding:10px 0}
+.disc p{flex-basis:100%;margin:0}
+.csec .consent{background:none;border:0;padding:12px 0 0;margin:0}
+.ptabs{display:flex;gap:4px;padding:0 14px 10px}
+.ptabs button{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12.5px;font-weight:600;color:var(--mute)}
+.ptabs button.on{background:var(--graphite);border-color:var(--graphite);color:var(--on-dark)}
+.ptabs button.on .pi{fill:currentColor}
+#preview{padding:0 14px 16px}
+/* previews: close to each app, not a copy of it */
+.pv{border:1px solid var(--line-2);border-radius:12px;overflow:hidden;background:var(--surface);font-size:13px}
+.pv-h{display:flex;align-items:center;gap:9px;padding:10px 12px}
+.pv-h .av{width:30px;height:30px}.pv-h .badge-pl{display:none}
+.pv-h small{display:block;color:var(--mute);font-size:11.5px}
+.pv-media{position:relative;background:var(--well);overflow:hidden}
+.pv-media.r45{aspect-ratio:4/5}.pv-media.r916{aspect-ratio:9/16;background:#111}
+.pv-media img{width:100%;height:100%;object-fit:cover;display:block}
+.pv.ig .pv-media img{object-fit:contain;background:#000}
+.pv-ph{position:absolute;inset:0;display:grid;place-items:center;color:var(--soft)}
+.pv-count{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;border-radius:20px;padding:2px 8px}
+.pv-dots{display:flex;justify-content:center;gap:4px;padding:8px 0 0}
+.pv-dots i{width:6px;height:6px;border-radius:50%;background:var(--line)}
+.pv-dots i.on{background:var(--link)}
+.pv-acts{display:flex;gap:14px;padding:10px 12px 4px;color:var(--graphite)}
+.pv-acts.fb{justify-content:space-around;border-top:1px solid var(--line-2);margin-top:8px;padding:8px 6px;gap:4px;align-items:center;color:var(--mute);font-weight:600;font-size:12.5px}
+.pv-cap{margin:4px 12px 12px;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.pv.fb .pv-cap{margin:0 12px 10px}
+.pv-grid{display:grid;gap:2px;position:relative;min-height:180px;background:var(--well)}
+.pv-grid.n1{grid-template-columns:1fr}.pv-grid.n2{grid-template-columns:1fr 1fr}
+.pv-grid.n3{grid-template-columns:1fr 1fr}.pv-grid.n3 div:first-child{grid-column:1/-1}
+.pv-grid.n4{grid-template-columns:1fr 1fr}
+.pv-grid div{position:relative;aspect-ratio:1}.pv-grid.n1 div{aspect-ratio:4/5}.pv-grid.n3 div:first-child{aspect-ratio:2/1}
+.pv-grid img{width:100%;height:100%;object-fit:cover;display:block}
+.pv-grid span{position:absolute;inset:0;background:rgba(0,0,0,.45);color:#fff;display:grid;place-items:center;font:700 22px var(--display)}
+.pv.tt{border:0;background:none}
+.pv.tt .pv-media{border-radius:14px}
+.pv-side{position:absolute;right:10px;bottom:90px;display:flex;flex-direction:column;gap:16px;color:#fff;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+.pv-over{position:absolute;left:12px;right:48px;bottom:22px;color:#fff;font-size:12.5px;text-shadow:0 1px 2px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:3px}
+.pv-over span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pv-over .t{font-weight:700}
+.pv-dots.tt{position:absolute;left:0;right:0;bottom:8px;padding:0}
+.pv-dots.tt i{background:rgba(255,255,255,.45)}.pv-dots.tt i.on{background:#fff}
+.pv-empty{border:1px dashed var(--line);border-radius:12px;padding:40px 18px;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--mute);text-align:center}
+/* the bar */
+.cbar{position:fixed;left:244px;right:0;bottom:0;z-index:6;display:flex;align-items:center;gap:10px;flex-wrap:nowrap;padding:12px 36px;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(17,21,29,.06)}
+.cbar .when{display:inline-flex;background:var(--canvas);border-radius:9px;padding:3px}
+.cbar .when label{padding:6px 12px;border-radius:7px;font-weight:600;color:var(--mute);cursor:pointer;white-space:nowrap}
+.cbar .when label.on{background:var(--surface);color:var(--graphite);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.cbar .when input{position:absolute;opacity:0;pointer-events:none}
+.cbar .when label:has(input:focus-visible){outline:2px solid var(--saffron)}
+.cbar input[type=datetime-local]{width:auto}
+.cbar .grow{flex:1}
+.cbar .need{color:var(--mute);font-size:13px;text-align:right;flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cbar .btn,.cbar .when,.cbar input{flex:none}
+.cbar .need.err{color:var(--danger)}.cbar .need.ok{color:var(--success)}
+.cbar .qline{font-size:13px;color:var(--mute)}.cbar .qline *{margin:0}
+@media (max-width:1100px){.composer{grid-template-columns:1fr}.cside{position:static;order:2}}
+@media (max-width:860px){.cbar{left:0;bottom:64px;padding:10px 16px;flex-wrap:wrap}.cbar{gap:8px}.cbar .when{flex:1 1 100%;display:flex}.cbar .when label{flex:1;text-align:center;padding:6px 4px}.cbar .need{flex:1 1 0;text-align:left;font-size:12px;white-space:normal;line-height:1.3}.cbar .grow{display:none}.cbar input[type=datetime-local]{flex:1 1 100%}.cbar>.note{display:none}.composer{padding-bottom:150px}}

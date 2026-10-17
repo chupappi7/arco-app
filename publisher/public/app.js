@@ -34,7 +34,7 @@ const S = {
   set: { music: false, disclose: false, brand: false, branded: false },
   when: 'now', at: '', busy: false, status: null,
   week: 0, month: 0, calMode: 'week', fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
-  pickOpen: false, pq: '',
+  pq: '', capTab: 'all', prevTab: null,
   login: { step: 'email', email: '', code: '', busy: false, err: '' }, members: null, invited: null,
 };
 const ORDER = ['tiktok', 'instagram', 'facebook'];
@@ -192,6 +192,7 @@ function render() {
   $('side').innerHTML = menu();
   $('mtop').innerHTML = `<img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30">${wsBox()}`;
   $('tabbar').innerHTML = tabbar();
+  $('tabbar').classList.toggle('flat', S.view === 'compose');
   const views = { analytics: analyticsView, overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
   const head = S.view === 'overview' ? '' : pageHead(...HEADS[S.view]());
   $('app').innerHTML = head + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '');
@@ -472,93 +473,165 @@ function wsBar() {
 }
 
 function composeView() {
-  if (!S.me.accounts.length) return `<div class="card"><div class="sec">${can('admin')
-    ? 'Connect an account in <a href="#accounts">Accounts</a> first.'
-    : 'No accounts are shared with you yet. Ask a workspace admin to give you access to a brand.'}</div></div>`;
+  if (!S.me.accounts.length) return `<div class="panel empty"><b>No accounts yet.</b>${can('admin')
+    ? 'Connect TikTok, Instagram or a Facebook Page first.<div><a class="btn" href="#accounts">Connect account</a></div>'
+    : 'No accounts are shared with you yet. Ask a workspace admin to give you access to a brand.'}</div>`;
   const tts = ttTargets();
   const label = S.set.branded ? 'Paid partnership' : S.set.brand ? 'Promotional content' : '';
   const need = missing();
-  return `${S.fromDraft ? `<div class="status">Editing a draft. Scheduling or posting it replaces the draft.
-      <button class="btn sec" id="stopedit" style="margin-left:8px">Close draft</button></div>` : ''}${S.replaces ? `<div class="status">Editing a scheduled post. The original stays scheduled until you save this one.
-      <button class="btn sec" id="stopedit" style="margin-left:8px">Stop editing</button></div>` : ''}
-  <div class="card">
-    <div class="sec"><span class="cap">Post to</span>${postToView()}</div>
-    <div class="sec"><span class="cap">Photos</span>
-      <div class="thumbs">${S.images.map((m, n) => `<div class="th ${n === S.cover ? 'cover' : ''}">
-          ${n === S.cover ? '<span class="badge">Cover</span>' : ''}
-          <img src="${esc(m.url)}" alt="Slide ${n + 1}" data-cover="${n}" title="Set as cover">
-          <div class="ctl"><button data-mv="${n}:-1" aria-label="Move left">‹</button>
-            <button data-rm="${n}" aria-label="Remove">×</button>
-            <button data-mv="${n}:1" aria-label="Move right">›</button></div></div>`).join('')}
-      </div>
-      <p><input type="file" id="files" accept="image/jpeg,image/png" multiple ${S.images.length >= 35 ? 'disabled' : ''}></p>
-      <span class="note">JPG or PNG, up to ${toInstagram() ? `${IG_MAX} for Instagram` : 35} images, 5 MB each. Click an image to make it the cover.
-        ${toInstagram() ? 'Tall slides are padded to 4:5 for Instagram, never cropped.' : ''}</span>
+  const pls = chosenPlatforms();
+  const banner = S.fromDraft ? ['Editing a draft. Scheduling or posting it replaces the draft.', 'Close draft']
+    : S.replaces ? ['Editing a scheduled post. The original stays scheduled until you save this one.', 'Stop editing'] : null;
+  const when = [['now', 'Post now'], ['queue', 'Add to queue'], ['later', 'Schedule']];
+  return `${banner ? `<div class="cbanner">${banner[0]}<button class="btn sec" id="stopedit">${banner[1]}</button></div>` : ''}
+  <div class="composer">
+    <div class="cmain">
+      <section class="panel"><header><h2>Post to</h2>${S.targets.length ? `<span class="note">${S.targets.length} selected</span>` : ''}</header>
+        <div class="csec">${accountPicker()}</div></section>
+
+      <section class="panel"><header><h2>Photos</h2>${S.images.length ? `<span class="note">${S.images.length} of ${toInstagram() ? IG_MAX : 35}</span>` : ''}</header>
+        <div class="csec">${mediaView()}</div></section>
+
+      <section class="panel"><header><h2>Caption</h2>${S.me.ai_enabled && !S.ai.open ? '' : ''}</header>
+        <div class="csec">
+          ${tts.length ? `<label class="f" for="title">TikTok title</label>
+            <input type="text" id="title" maxlength="200" value="${esc(S.title)}" placeholder="A short title for the photo post">
+            <div class="count ${len(S.title) > 90 ? 'bad' : ''}">${len(S.title)} / 90</div>` : ''}
+          ${S.me.ai_enabled ? aiPanel() : ''}
+          ${captionTabs(pls)}
+          <div class="limits" id="caplimits">${limitsLine()}</div>
+          ${S.me.ai_enabled && S.caption.trim() ? `<div class="rewrites"><span class="note">Rewrite</span>${Object.entries(REWRITE_LABEL)
+            .map(([k, l]) => `<button type="button" class="chip" data-rewrite="${k}" ${S.ai.busy ? 'disabled' : ''}>${l}</button>`).join('')}</div>` : ''}
+        </div></section>
+
+      ${tts.length ? `<section class="panel"><header><h2>${icon('tiktok', 15)} TikTok settings</h2><span class="note">${tts.length} account${tts.length === 1 ? '' : 's'}</span></header>
+        <div class="csec">
+          ${tts.length > 1 ? `<div class="bulk"><label class="f" for="bulkpriv">Set who can view for every TikTok account</label>
+            <select id="bulkpriv"><option value="">Choose…</option>
+              ${Object.keys(PRIVACY_LABEL).filter(o => !(o === 'SELF_ONLY' && S.set.branded)).map(o => `<option value="${o}">${PRIVACY_LABEL[o]}</option>`).join('')}
+            </select><span class="note">Accounts that do not offer that option keep their own choice.</span></div>` : ''}
+          ${tts.map(ttCard).join('')}
+          ${row('Duet', 'Video posts only, not available for photo posts.', '<input type="checkbox" disabled>')}
+          ${row('Stitch', 'Video posts only, not available for photo posts.', '<input type="checkbox" disabled>')}
+          ${row('Add recommended music', 'Lets TikTok pick a track for the slideshow.', `<input type="checkbox" data-k="music" ${S.set.music ? 'checked' : ''}>`)}
+          ${row('Disclose post content', 'Turn on if this post promotes yourself, a brand, product or service.',
+            `<input type="checkbox" data-k="disclose" ${S.set.disclose ? 'checked' : ''}>`)}
+          ${S.set.disclose ? `<div class="disc">
+            <label><input type="checkbox" data-k="brand" ${S.set.brand ? 'checked' : ''}> Your brand</label>
+            <label><input type="checkbox" data-k="branded" ${S.set.branded ? 'checked' : ''}> Branded content</label>
+            <p class="note ${label ? 'warn' : ''}">${label ? `Your photo post will be labeled "${label}".` : 'You need to indicate if your content promotes yourself, a third party, or both.'}</p>
+          </div>` : ''}
+          <p class="consent">By posting, you agree to TikTok's
+            ${S.set.branded ? '<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">Branded Content Policy</a> and ' : ''}
+            <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">Music Usage Confirmation</a>.</p>
+        </div></section>` : ''}
     </div>
-    <div class="sec">
-      ${tts.length ? `<label class="f" for="title">Title <span class="note">(TikTok only)</span></label>
-      <input type="text" id="title" maxlength="200" value="${esc(S.title)}">
-      <div class="count ${len(S.title) > 90 ? 'note bad' : ''}">${len(S.title)} / 90</div>` : ''}
-      ${S.me.ai_enabled ? aiPanel() : ''}
-      <label class="f" for="caption">Caption${chosenPlatforms().length > 1 ? ' <span class="note">(used everywhere unless customized below)</span>' : ''}</label>
-      <textarea id="caption">${esc(S.caption)}</textarea>
-      <div class="limits" id="caplimits">${limitsLine()}</div>
-      ${S.me.ai_enabled && S.caption.trim() ? `<div class="rewrites"><span class="note">Rewrite:</span>${Object.entries(REWRITE_LABEL)
-        .map(([k, l]) => `<button type="button" class="chip" data-rewrite="${k}" ${S.ai.busy ? 'disabled' : ''}>${l}</button>`).join('')}</div>` : ''}
-      ${overridesView()}
-    </div>
-    ${tts.length ? `<div class="sec"><span class="cap">TikTok settings</span>
-      ${tts.length > 1 ? `<div class="bulk"><label class="f" for="bulkpriv">Set who can view for every account</label>
-        <select id="bulkpriv"><option value="">Choose…</option>
-          ${Object.keys(PRIVACY_LABEL).filter(o => !(o === 'SELF_ONLY' && S.set.branded)).map(o => `<option value="${o}">${PRIVACY_LABEL[o]}</option>`).join('')}
-        </select><span class="note">Accounts that do not offer that option keep their own choice.</span></div>` : ''}
-      ${tts.map(ttCard).join('')}
-      ${row('Duet', 'Video posts only, not available for photo posts.', '<input type="checkbox" disabled>')}
-      ${row('Stitch', 'Video posts only, not available for photo posts.', '<input type="checkbox" disabled>')}
-      ${row('Add recommended music', 'Lets TikTok pick a track for the slideshow.', `<input type="checkbox" data-k="music" ${S.set.music ? 'checked' : ''}>`)}
-    </div>
-    <div class="sec"><span class="cap">Disclosure</span>
-      ${row('Disclose post content', 'Turn on if this post promotes yourself, a brand, product or service.',
-        `<input type="checkbox" data-k="disclose" ${S.set.disclose ? 'checked' : ''}>`)}
-      ${S.set.disclose ? `<div style="padding:8px 0">
-        <label><input type="checkbox" data-k="brand" ${S.set.brand ? 'checked' : ''}> Your brand</label>
-        &nbsp;&nbsp;<label><input type="checkbox" data-k="branded" ${S.set.branded ? 'checked' : ''}> Branded content</label>
-        <p class="note ${label ? 'warn' : ''}">${label ? `Your photo post will be labeled "${label}".` : 'You need to indicate if your content promotes yourself, a third party, or both.'}</p>
-      </div>` : ''}
-    </div>` : ''}
-    <div class="sec"><span class="cap">Preview</span>
-      <div class="thumbs">${S.images.map(m => `<img src="${esc(m.url)}" alt="" style="width:56px;height:100px;object-fit:cover;border-radius:6px">`).join('') || '<span class="note">Add photos to see them here.</span>'}</div>
-      ${S.title && tts.length ? `<p><b>${esc(S.title)}</b></p>` : ''}${S.caption ? `<p class="note" style="white-space:pre-wrap">${esc(S.caption)}</p>` : ''}
-    </div>
-    <div class="sec"><span class="cap">When</span>
-      <label><input type="radio" name="when" value="now" ${S.when === 'now' ? 'checked' : ''}> Post now</label>
-      &nbsp;&nbsp;<label><input type="radio" name="when" value="queue" ${S.when === 'queue' ? 'checked' : ''}> Add to queue</label>
-      &nbsp;&nbsp;<label><input type="radio" name="when" value="later" ${S.when === 'later' ? 'checked' : ''}> Pick a time</label>
-      ${S.when === 'queue' ? queuePreview() : ''}
-      ${S.when === 'later' ? `<p><input type="datetime-local" id="at" value="${esc(S.at)}" min="${localInput(Date.now() + 6 * 60e3)}"></p>
-        <span class="note">In ${esc(tz().replace(/_/g, ' '))} time${S.me.workspace.timezone ? ' (the workspace\'s zone)' : ''}. At least 5 minutes from now.</span>` : ''}
-    </div>
-    ${tts.length ? `<div class="consent">By posting, you agree to TikTok's
-      ${S.set.branded ? '<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">Branded Content Policy</a> and ' : ''}
-      <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">Music Usage Confirmation</a>.</div>` : ''}
-    <div class="foot">
-      <button class="btn" id="go" ${need || S.busy ? 'disabled' : ''} title="${esc(need || '')}">
-        ${S.busy ? 'Working…' : `${S.when === 'later' ? 'Schedule' : 'Post'}${S.targets.length ? ` to ${goLabel()}` : ''}`}</button>
-      <button class="btn sec" id="savedraft" ${draftBlocker() || S.busy ? 'disabled' : ''} title="${esc(draftBlocker())}">Save draft</button>
-      ${need ? `<span class="note">${esc(need)}</span>` : ''}
-      ${S.status ? `<div class="status ${S.status.kind}" style="flex-basis:100%">${esc(S.status.text)}</div>` : ''}
-      <span class="note" style="flex-basis:100%">After posting, it may take a few minutes for the post to process and appear on the profile.</span>
-    </div>
+
+    <aside class="cside"><section class="panel"><header><h2>Preview</h2></header>
+      ${pls.length > 1 ? `<div class="ptabs">${pls.map(pl => `<button data-prev="${pl}" class="${previewPl(pls) === pl ? 'on' : ''}">${icon(pl, 13)}${PLATFORM[pl]}</button>`).join('')}</div>` : ''}
+      <div id="preview">${previewView()}</div></section></aside>
+  </div>
+
+  <div class="cbar">
+    <div class="when" role="radiogroup" aria-label="When">${when.map(([v, l]) =>
+      `<label class="${S.when === v ? 'on' : ''}"><input type="radio" name="when" value="${v}" ${S.when === v ? 'checked' : ''}>${l}</label>`).join('')}</div>
+    ${S.when === 'later' ? `<input type="datetime-local" id="at" value="${esc(S.at)}" min="${localInput(Date.now() + 6 * 60e3)}" aria-label="Date and time">
+      <span class="note">${esc(tz().replace(/_/g, ' '))}</span>` : ''}
+    ${S.when === 'queue' ? `<span class="qline">${queuePreview()}</span>` : ''}
+    <span class="grow"></span>
+    ${need ? `<span class="need">${esc(need)}</span>` : S.status ? `<span class="need ${S.status.kind}">${esc(S.status.text)}</span>` : ''}
+    <button class="btn sec" id="savedraft" ${draftBlocker() || S.busy ? 'disabled' : ''} title="${esc(draftBlocker())}">Save draft</button>
+    <button class="btn" id="go" ${need || S.busy ? 'disabled' : ''} title="${esc(need || '')}">
+      ${S.busy ? 'Working…' : `${S.when === 'later' ? 'Schedule' : S.when === 'queue' ? 'Add to queue' : 'Post now'}${S.targets.length > 1 ? ` · ${S.targets.length}` : ''}`}</button>
   </div>`;
 }
+
+// Accounts as avatars you tap on and off, grouped by brand. A long list
+// (agencies) gets a search box.
+function accountPicker() {
+  const q = S.pq.trim().toLowerCase();
+  const many = S.me.accounts.length > 10;
+  const hit = a => !q || [a.username, a.display_name, PLATFORM[platformOf(a)], brandName(a.brand_id)]
+    .some(v => String(v || '').toLowerCase().includes(q));
+  const groups = brandGroups(S.me.accounts.filter(hit)).filter(g => g.accounts.length);
+  const showNames = groups.length > 1 || S.me.brands.length;
+  return `${many ? `<input type="text" id="pq" class="pq" placeholder="Search accounts or brands" value="${esc(S.pq)}" autocomplete="off">` : ''}
+    ${groups.map(g => {
+      const usable = g.accounts.filter(a => !a.needs_reconnect);
+      const on = usable.filter(a => S.targets.includes(a.id)).length;
+      const state = !on ? 'none' : on === usable.length ? 'all' : 'some';
+      return `<div class="agroup">${showNames ? `<label class="ahead"><input type="checkbox" data-bg="${g.id}" data-state="${state}" ${state === 'all' ? 'checked' : ''} ${usable.length ? '' : 'disabled'}>
+          <b>${esc(g.name)}</b></label>` : ''}
+        <div class="atiles">${g.accounts.map(a => `<label class="atile ${S.targets.includes(a.id) ? 'on' : ''} ${a.needs_reconnect ? 'off' : ''}"
+            title="${esc(`${PLATFORM[platformOf(a)]} ${a.username || a.display_name}${a.needs_reconnect ? ' (reconnect needed)' : ''}`)}">
+          <input type="checkbox" data-t="${a.id}" ${S.targets.includes(a.id) ? 'checked' : ''} ${a.needs_reconnect ? 'disabled' : ''}>
+          ${withBadge(avatar(a.avatar_url, a.username || a.display_name), platformOf(a))}
+          <span>${handle(a)}</span>${S.targets.includes(a.id) ? `<i class="tick">${ui('check', 11)}</i>` : ''}</label>`).join('')}</div></div>`;
+    }).join('') || '<p class="note">No account matches.</p>'}
+    ${can('admin') ? '<a class="amanage" href="#accounts">Manage accounts</a>' : ''}`;
+}
+
+function mediaView() {
+  const max = S.images.length >= 35;
+  const add = `<label class="addtile ${S.images.length ? '' : 'big'}" id="drop">
+      <input type="file" id="files" accept="image/jpeg,image/png" multiple ${max ? 'disabled' : ''}>
+      ${ui('plus', S.images.length ? 20 : 24)}<b>${S.images.length ? 'Add' : 'Add photos'}</b>
+      ${S.images.length ? '' : '<span>Drop JPG or PNG files here, or click to choose. Up to 5 MB each.</span>'}</label>`;
+  return `<div class="mgrid">${S.images.map((m, n) => `<div class="mt ${n === S.cover ? 'cover' : ''} ${m.uploading ? 'up' : ''}">
+      <img src="${esc(m.url)}" alt="Photo ${n + 1}" data-cover="${n}" title="Make this the cover">
+      <span class="mn">${n + 1}</span>${n === S.cover ? '<span class="badge">Cover</span>' : ''}
+      <div class="ctl"><button data-mv="${n}:-1" aria-label="Move left">‹</button>
+        <button data-rm="${n}" aria-label="Remove">×</button>
+        <button data-mv="${n}:1" aria-label="Move right">›</button></div></div>`).join('')}${add}</div>
+    ${S.images.length ? `<p class="note">Click a photo to make it the cover.${toInstagram() ? ' Tall photos are padded to 4:5 for Instagram, never cropped.' : ''}</p>` : ''}`;
+}
+
+// Everywhere, plus one tab per platform; a dot marks a platform with its own caption.
+function captionTabs(pls) {
+  const tab = pls.includes(S.capTab) ? S.capTab : 'all';
+  const tabs = pls.length > 1 ? `<div class="ctabs">${['all', ...pls].map(k => `<button type="button" data-captab="${k}" class="${tab === k ? 'on' : ''}">
+      ${k === 'all' ? 'Everywhere' : `${icon(k, 13)}${PLATFORM[k]}`}${k !== 'all' && S.over[k] != null ? '<i class="dot"></i>' : ''}</button>`).join('')}</div>` : '';
+  if (tab === 'all') return `${tabs}<textarea id="caption" placeholder="Write your caption…">${esc(S.caption)}</textarea>`;
+  return `${tabs}${S.over[tab] == null
+    ? `<div class="cempty"><span>${PLATFORM[tab]} uses the caption from Everywhere.</span>
+        <button type="button" class="btn sec" data-custom="${tab}">Write a different one</button></div>`
+    : `<textarea id="ov-${tab}" data-ov="${tab}" aria-label="${PLATFORM[tab]} caption">${esc(S.over[tab])}</textarea>
+       <button type="button" class="link" data-uncustom="${tab}">Use the Everywhere caption instead</button>`}`;
+}
+
+// How the post will look, per platform, updated as you type.
+const previewPl = pls => (pls.includes(S.prevTab) ? S.prevTab : pls[0]);
+function previewView() {
+  const pls = chosenPlatforms(), pl = previewPl(pls);
+  if (!pl) return `<div class="pv-empty">${ui('eye', 22)}<span>Choose an account to see how the post will look.</span></div>`;
+  const a = acct(S.targets.find(id => platformOf(acct(id)) === pl));
+  const name = a?.username || a?.display_name || PLATFORM[pl];
+  const imgs = S.images.map(m => m.url);
+  const cap = esc(captionFor(pl) || '');
+  const av = withBadge(avatar(a?.avatar_url, name), pl);
+  const ph = '<div class="pv-ph">' + ui('plus', 20) + '</div>';
+  if (pl === 'instagram') return `<div class="pv ig"><div class="pv-h">${av}<b>${esc(name)}</b></div>
+      <div class="pv-media r45">${imgs[0] ? `<img src="${esc(imgs[0])}" alt="">` : ph}${imgs.length > 1 ? `<span class="pv-count">1/${imgs.length}</span>` : ''}</div>
+      ${imgs.length > 1 ? `<div class="pv-dots">${imgs.slice(0, 10).map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}
+      <div class="pv-acts">${ui('heart', 20)}${ui('comment', 20)}${ui('share', 20)}</div>
+      <p class="pv-cap"><b>${esc(name)}</b> ${cap || '<span class="note">Your caption appears here.</span>'}</p></div>`;
+  if (pl === 'facebook') return `<div class="pv fb"><div class="pv-h">${av}<div><b>${esc(name)}</b><small>Just now</small></div></div>
+      <p class="pv-cap">${cap || '<span class="note">Your caption appears here.</span>'}</p>
+      <div class="pv-grid n${Math.min(imgs.length, 4)}">${imgs.slice(0, 4).map((u, i) => `<div><img src="${esc(u)}" alt="">${i === 3 && imgs.length > 4 ? `<span>+${imgs.length - 4}</span>` : ''}</div>`).join('') || ph}</div>
+      <div class="pv-acts fb">${ui('heart', 17)}<span>Like</span>${ui('comment', 17)}<span>Comment</span>${ui('share', 17)}<span>Share</span></div></div>`;
+  const cover = imgs[S.cover] || imgs[0];
+  return `<div class="pv tt"><div class="pv-media r916">${cover ? `<img src="${esc(cover)}" alt="">` : ph}
+      <div class="pv-side">${ui('heart', 22)}${ui('comment', 22)}${ui('share', 22)}</div>
+      <div class="pv-over"><b>@${esc(name)}</b>${S.title ? `<span class="t">${esc(S.title)}</span>` : ''}<span>${cap}</span></div>
+      ${imgs.length > 1 ? `<div class="pv-dots tt">${imgs.slice(0, 12).map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}</div></div>`;
+}
+const refreshPreview = () => { const el = $('preview'); if (el) el.innerHTML = previewView(); };
 
 const avatar = (url, name) => url
   ? `<img class="av" src="${esc(url)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'av ini',textContent:'${esc((name || '?')[0].toUpperCase())}'}))">`
   : `<span class="av ini">${esc((name || '?')[0].toUpperCase())}</span>`;
 const handle = a => `${platformOf(a) === 'facebook' ? '' : '@'}${esc(a.username || a.display_name)}`;
 
-// ---- the "Post to" picker: chips for what is chosen, and a searchable
-// panel grouped by brand, like Business Suite's account switcher.
 
 const brandName = id => S.me.brands.find(b => b.id === id)?.name;
 function brandGroups(list = S.me.accounts) {
@@ -570,43 +643,6 @@ function brandGroups(list = S.me.accounts) {
 }
 const marks = accounts => [...new Set(accounts.map(platformOf))].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b))
   .map(pl => icon(pl, 13)).join('');
-
-function postToView() {
-  const chosen = S.targets.map(acct).filter(Boolean);
-  return `<div class="chosen">
-      ${chosen.map(a => `<span class="chipacc">${withBadge(avatar(a.avatar_url, a.username || a.display_name), platformOf(a))}
-        <span>${handle(a)}</span><button class="x" data-unpick="${a.id}" aria-label="Remove ${esc(a.username)}">×</button></span>`).join('')
-        || '<span class="note">No accounts chosen yet.</span>'}
-      <button class="btn sec" id="openpick" aria-expanded="${S.pickOpen}">${S.pickOpen ? 'Done' : chosen.length ? 'Change accounts' : 'Choose accounts'}</button>
-    </div>
-    ${S.pickOpen ? pickPanel() : ''}`;
-}
-
-function pickPanel() {
-  const q = S.pq.trim().toLowerCase();
-  const hit = a => !q || [a.username, a.display_name, PLATFORM[platformOf(a)], brandName(a.brand_id)]
-    .some(v => String(v || '').toLowerCase().includes(q));
-  const groups = brandGroups(S.me.accounts.filter(hit)).filter(g => g.accounts.length);
-  return `<div class="pickpanel">
-    <input type="text" id="pq" placeholder="Search accounts or brands" value="${esc(S.pq)}" autocomplete="off">
-    ${groups.map(g => {
-      const usable = g.accounts.filter(a => !a.needs_reconnect);
-      const on = usable.filter(a => S.targets.includes(a.id)).length;
-      const state = !on ? 'none' : on === usable.length ? 'all' : 'some';
-      return `<div class="bgroup">
-        <label class="bhead"><input type="checkbox" data-bg="${g.id}" data-state="${state}" ${state === 'all' ? 'checked' : ''} ${usable.length ? '' : 'disabled'}>
-          <b>${esc(g.name)}</b><span class="marks">${marks(g.accounts)}</span><span class="note">${on ? `${on} of ` : ''}${g.accounts.length}</span></label>
-        ${g.accounts.map(a => `<label class="prow ${a.needs_reconnect ? 'off' : ''}">
-          <input type="checkbox" data-t="${a.id}" ${S.targets.includes(a.id) ? 'checked' : ''} ${a.needs_reconnect ? 'disabled' : ''}>
-          ${withBadge(avatar(a.avatar_url, a.username || a.display_name), platformOf(a))}
-          <span class="nm"><b>${handle(a)}</b><span class="note">${PLATFORM[platformOf(a)]}${a.needs_reconnect
-            ? ' · <a href="#accounts">reconnect</a>' : a.display_name && a.display_name !== a.username ? ` · ${esc(a.display_name)}` : ''}</span></span>
-        </label>`).join('')}
-      </div>`;
-    }).join('') || '<p class="note">No account matches.</p>'}
-    ${can('admin') ? '<p class="note" style="margin:8px 0 0"><a href="#accounts">Manage accounts and brands</a></p>' : ''}
-  </div>`;
-}
 
 function pickGroup(id, on) {
   const g = brandGroups().find(x => x.id === id);
@@ -652,15 +688,6 @@ function limitsLine() {
   }).join('') || `<span class="lim">${len(S.caption)} characters</span>`;
 }
 
-function overridesView() {
-  const pls = chosenPlatforms();
-  if (pls.length < 2 && !pls.some(pl => S.over[pl] != null)) return '';
-  return `<div class="overrides">${pls.map(pl => S.over[pl] == null
-    ? `<button type="button" class="chip" data-custom="${pl}">${icon(pl, 13)} Customize for ${PLATFORM[pl]}</button>`
-    : `<div class="ov"><label class="f" for="ov-${pl}">${icon(pl, 13)} ${PLATFORM[pl]} caption</label>
-        <textarea id="ov-${pl}" data-ov="${pl}">${esc(S.over[pl])}</textarea>
-        <button type="button" class="link" data-uncustom="${pl}">Use the main caption for ${PLATFORM[pl]}</button></div>`).join('')}</div>`;
-}
 const refreshLimits = () => { const el = $('caplimits'); if (el) el.innerHTML = limitsLine(); };
 function goLabel() {
   if (S.targets.length > 3) return `${S.targets.length} accounts`;
@@ -1569,9 +1596,9 @@ function bind() {
     if (S.cover === n) S.cover = m; else if (S.cover === m) S.cover = n;
     render();
   });
-  on('#title', 'input', e => { S.title = e.target.value; });
+  on('#title', 'input', e => { S.title = e.target.value; refreshPreview(); });
   on('#title', 'change', render);
-  on('#caption', 'input', e => { S.caption = e.target.value; refreshLimits(); });
+  on('#caption', 'input', e => { S.caption = e.target.value; refreshLimits(); refreshPreview(); });
   on('#aiopen', 'click', async () => { S.ai.open = true; render(); $('aibrief')?.focus();
     if (S.ai.remaining == null) { try { S.ai.remaining = (await api('/ai/usage')).remaining; render(); } catch {} } });
   on('#aiclose', 'click', () => { S.ai.open = false; render(); });
@@ -1591,14 +1618,17 @@ function bind() {
     try { await send(`/brands/${S.voiceEdit.id}`, 'PATCH', { voice: S.voiceEdit.text }); S.voiceEdit = null; S.flash = { kind: 'ok', text: 'Brand voice saved.' }; }
     catch (x) { S.flash = { kind: 'err', text: x.message }; }
     await refreshMe(); });
-  on('[data-ov]', 'input', e => { S.over[e.target.dataset.ov] = e.target.value; refreshLimits(); });
+  on('[data-ov]', 'input', e => { S.over[e.target.dataset.ov] = e.target.value; refreshLimits(); refreshPreview(); });
   on('[data-ov]', 'change', render);
-  on('[data-custom]', 'click', e => { const pl = e.currentTarget.dataset.custom; S.over[pl] = S.caption; render(); $(`ov-${pl}`)?.focus(); });
-  on('[data-uncustom]', 'click', e => { delete S.over[e.target.dataset.uncustom]; render(); });
+  on('[data-custom]', 'click', e => { const pl = e.currentTarget.dataset.custom; S.over[pl] = S.caption; S.capTab = pl; render(); $(`ov-${pl}`)?.focus(); });
+  on('[data-captab]', 'click', e => { S.capTab = e.currentTarget.dataset.captab; if (S.capTab !== 'all') S.prevTab = S.capTab; render(); });
+  on('[data-prev]', 'click', e => { S.prevTab = e.currentTarget.dataset.prev; render(); });
+  on('#drop', 'dragover', e => { e.preventDefault(); e.currentTarget.classList.add('over'); });
+  on('#drop', 'dragleave', e => e.currentTarget.classList.remove('over'));
+  on('#drop', 'drop', e => { e.preventDefault(); e.currentTarget.classList.remove('over'); addFiles(e.dataTransfer.files); });
+  on('[data-uncustom]', 'click', e => { delete S.over[e.target.dataset.uncustom]; S.capTab = 'all'; render(); });
   on('#caption', 'change', render);
   on('[data-t]', 'change', e => toggleTarget(e.target.dataset.t, e.target.checked));
-  on('#openpick', 'click', () => { S.pickOpen = !S.pickOpen; render(); if (S.pickOpen) $('pq')?.focus(); });
-  on('[data-unpick]', 'click', e => toggleTarget(e.currentTarget.dataset.unpick, false));
   on('[data-bg]', 'change', e => pickGroup(e.target.dataset.bg, e.target.checked));
   document.querySelectorAll('[data-state=some]').forEach(el => { el.indeterminate = true; });
   on('#pq', 'input', e => { S.pq = e.target.value; const at = e.target.selectionStart; render();
