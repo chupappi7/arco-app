@@ -62,7 +62,7 @@ hook_slide('bg-d07.jpg', ['the 5 tools that got me', 'through exam season'], f'{
 app_slide('bg-d03.jpg', 'icon-claude.jpg', '1. Claude',
           ['Explains what the textbook', 'would not. Practice questions,', 'worked examples, endless patience.',
            '', 'Like a tutor on retainer.'], f'{B}/02.jpg', grad=(0.42, 0.72, 1000, 1550))
-app_slide('bg-d05.jpg', 'icon-arco.png', '2. ARCO: Day Planner & Focus',
+app_slide('bg-n05.jpg', 'icon-arco.png', '2. App Blocker & Focus: ARCO',
           ['Class times and study blocks on', 'one timeline. Social apps lock', 'during revision hours.',
            '', 'The library, enforced.'], f'{B}/03.jpg', grad=(0.42, 0.72, 1000, 1550))
 app_slide('bg-d02.jpg', 'icon-obsidian.jpg', '3. Obsidian',

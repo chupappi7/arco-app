@@ -1564,6 +1564,20 @@
     "06.jpg"
    ],
    "_note": "built 2026-10-12 by gen-wish-i-knew-at-17-10.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/Antigravity/Notion/Cloudflare/Canva. ARCO angle f2 via next_arco_angle('study'). every teaching point checked against all captions in this file. bright villa frames n01/n03 kept off every slide after read-back showed washed-out copy. rebuild: python3 tools/gen-wish-i-knew-at-17-10.py"
+  },
+  {
+   "topic": "study-tools",
+   "title": "the 5 tools that got me through exam season",
+   "caption": "exam season is a logistics problem before it is a knowledge problem. claude explains what the textbook would not. arco keeps class times and study blocks on one timeline and locks the social apps during revision. obsidian holds notes that actually link. google calendar owns every deadline. endel plays focus sound with no decisions. the studying still hurts, the chaos does not. #studytok #exams #studytips #productivity #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "fix 2026-10-18: slide 03 re-rendered with the current App Store name \"2. App Blocker & Focus: ARCO\" (was \"ARCO: Day Planner & Focus\"). Its background moved from bg-d05 (retired low-res, copy band luma 82.2 > 70) to bg-n05 (desk-empty-day, 57.1), which also stops it repeating the villa pool of slides 02 and 04. Layout is the post's original app_slide (compose.py at 62aeea4) so 03 matches its siblings; 01, 02, 04, 05, 06 are byte-identical. rebuild: python3 tools/gen-2026-08-23.py"
   }
  ]
 }
