@@ -3,19 +3,47 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-l4OyJqktOhxLb5uRnwSKzIgCoCMeiFgAbXzcdq7Szn4='; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <title>Connect your AI — ARCO</title>
 <link rel="icon" type="image/png" href="icon.png">
 <script>
-  // Apple's iCloud sign-in lands here (its redirect is always https) and the
-  // token is handed straight to `arco login`, listening on this computer.
-  // Nothing is stored or sent anywhere else, and the page loads no other scripts.
+  // `arco login` opens this page with a one-time secret and its port in the
+  // fragment (never sent to any server). The page keeps them in this tab and
+  // goes on to Apple's sign-in. Apple's redirect, always https, lands back
+  // here, and the token goes to `arco login` on this computer together with
+  // the secret, which is how it knows the sign-in is the one it started.
+  // A link to this page made by anyone else has no secret in this tab, so
+  // it goes nowhere. Nothing is stored past that, and no other scripts load.
   (function () {
+    var KEY = "arco-login";
+    var hash = new URLSearchParams(location.hash.slice(1));
+    var next = hash.get("next");
+    if (next && hash.get("state") && /^\d+$/.test(hash.get("port") || "")) {
+      var to = new URL(next);
+      var port = Number(hash.get("port"));
+      // Only ever on to Apple's sign-in, and only ever back to this computer.
+      if (to.protocol !== "https:" || to.hostname !== "idmsa.apple.com") return;
+      if (port < 1024 || port > 65535 || !/^[\w-]{32,64}$/.test(hash.get("state"))) return;
+      sessionStorage.setItem(KEY, JSON.stringify({ state: hash.get("state"), port: hash.get("port") }));
+      location.replace(to.href);
+      return;
+    }
     var token = new URLSearchParams(location.search).get("ckWebAuthToken");
     if (!token) return;
     history.replaceState(null, "", location.pathname);
-    location.replace("http://127.0.0.1:8765/callback?ckWebAuthToken=" + encodeURIComponent(token));
+    var start = null;
+    try { start = JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch (e) {}
+    sessionStorage.removeItem(KEY);
+    if (!start) {
+      document.documentElement.className = "stale";
+      return;
+    }
+    location.replace(
+      "http://127.0.0.1:" + start.port + "/callback?ckWebAuthToken=" + encodeURIComponent(token) +
+        "&state=" + encodeURIComponent(start.state),
+    );
   })();
 </script>
 <style>
@@ -28,6 +56,7 @@
   h1 { font-size:32px; font-weight:900; letter-spacing:-1px; margin-bottom:12px; }
   p { color:#c9c9cd; font-size:15px; }
   p + p { margin-top:10px; }
+  .stale .live, .stale-only { display:none; } .stale .stale-only { display:block; }
   code { background:var(--card); box-shadow:inset 0 0 0 1px var(--line); border-radius:6px; padding:2px 7px; font-size:14px; color:var(--fg); }
 </style>
 </head>
@@ -35,9 +64,16 @@
 <div class="wrap">
   <img src="icon.png" alt="ARCO">
   <div class="eyebrow">Connect your AI</div>
-  <h1>Finishing sign-in…</h1>
-  <p>This page passes your iCloud sign-in to <code>arco login</code> on this computer.</p>
-  <p>If you see an error instead of “ARCO is connected”, run <code>arco login</code> in a terminal and sign in again.</p>
+  <div class="live">
+    <h1>Finishing sign-in…</h1>
+    <p>This page passes your iCloud sign-in to <code>arco login</code> on this computer.</p>
+    <p>If you see an error instead of “ARCO is connected”, run <code>arco login</code> in a terminal and sign in again.</p>
+  </div>
+  <div class="stale-only">
+    <h1>Start from your terminal</h1>
+    <p>This sign-in wasn't started by <code>arco login</code> in this browser tab, so it wasn't passed on.</p>
+    <p>Run <code>arco login</code> in a terminal and sign in from the page it opens.</p>
+  </div>
 </div>
 </body>
 </html>
