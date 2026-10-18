@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-l4OyJqktOhxLb5uRnwSKzIgCoCMeiFgAbXzcdq7Szn4='; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-sN6Eqy6SvmCMthJnYHjnbCTlBnI3rA+OgIbKLRk3aZw='; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <title>Connect your AI — ARCO</title>
@@ -24,8 +24,9 @@
       var to = new URL(next);
       var port = Number(hash.get("port"));
       // Only ever on to Apple's sign-in, and only ever back to this computer.
-      if (to.protocol !== "https:" || to.hostname !== "idmsa.apple.com") return;
-      if (port < 1024 || port > 65535 || !/^[\w-]{32,64}$/.test(hash.get("state"))) return;
+      if (to.protocol !== "https:" || to.hostname !== "idmsa.apple.com" || to.pathname.indexOf("/IDMSWebAuth/") !== 0) return;
+      // The ports arco login listens on, and no others on this computer.
+      if (port < 47800 || port > 47809 || !/^[\w-]{32,64}$/.test(hash.get("state"))) return;
       sessionStorage.setItem(KEY, JSON.stringify({ state: hash.get("state"), port: hash.get("port") }));
       location.replace(to.href);
       return;
