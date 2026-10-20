@@ -35,7 +35,7 @@ def build(topic, hook, bgs, arco_lines, rules):
     if not any(e.get('topic') == topic for e in hook_rules.history()):
         mark_hook_used(hook, topic)
 
-    rule_slide(bgs[1], 1, '1. ARCO: Day Planner & Focus', arco_lines,
+    rule_slide(bgs[1], 1, '1. ARCO Focus', arco_lines,
                f'{out}/02.jpg', badge=False, title_fill=c.YELLOW)
     for i, (title, body) in enumerate(rules, 2):
         rule_slide(bgs[i], i, f'{i}. {title}', body, f'{out}/{i + 1:02d}.jpg',

@@ -24,7 +24,17 @@ from compose import (app_slide, hook_slide, mark_hook_used, preflight,
                      record_post_bgs, record_post_tools)
 
 KICKER = 'here is why'
-ARCO_TITLE = '1. App Blocker & Focus: ARCO'
+# The store name is 'App Blocker & Focus: ARCO', and for a while the slide
+# carried it whole so a viewer who searched it landed on the app. Nobody
+# types that much. Checked against the store on 2026-10-20: 'arco' and
+# 'arco app' do not return this app at all (ARCO Rewards takes them), while
+# 'arco focus' returns it first. So the slide says the short string that
+# actually wins the search, and the full name stays in the caption.
+#
+# It is also the only title on the post shaped like a category rather than
+# a name -- the other four slides read '2. Claude', '3. Obsidian' -- which
+# is what made ARCO's slide look bought while the rest looked recommended.
+ARCO_TITLE = '1. ARCO Focus'
 BODY_SIZE = 50
 BODY_MAX_W = 820
 BODY_FLOOR = 1600      # last body baseline stays clear of TikTok's caption
@@ -72,7 +82,10 @@ def assert_fits(name, lines):
     for ln in lines:
         if ln and d.textbbox((0, 0), ln, font=f)[2] > BODY_MAX_W:
             raise SystemExit(f'{name}: "{ln}" is over {BODY_MAX_W}px')
-    y = 995 + 72 * sum(1 for l in lines if l) + 26 * lines.count('')
+    # compose owns the spacing; duplicating the numbers here is how a
+    # line-height change would start passing a check it no longer matches.
+    y = (995 + c.BODY_STEP * sum(1 for l in lines if l)
+         + c.PARA_GAP * lines.count(''))
     if y > BODY_FLOOR:
         raise SystemExit(f'{name}: copy runs to y={y}')
 
@@ -88,6 +101,20 @@ def build(topic, hook, theme, bgs, arco, tools, only=None):
         raise SystemExit('a tools post is five apps on six slides')
     if not any(h['lines'] == hook for h in hook_rules.eligible(topic, 'tools')):
         raise SystemExit(f'hook not eligible: {hook}')
+
+    # `theme` was accepted and then ignored -- the generator drew its own
+    # ARCO angle and nothing compared the two, so a hook about studying
+    # without your phone could be answered by a slide about planning the day
+    # in 30 seconds. The hook owns the theme now; this only checks the
+    # generator agrees with it.
+    want = hook_rules.theme_for(hook)
+    if want and theme != want:
+        raise SystemExit(
+            f'theme {theme!r} does not answer this hook, which asks for '
+            f'{want!r}. Draw ARCO with next_arco_angle({want!r}).')
+    lens = hook_rules.lens_for(hook)
+    if lens:
+        print(f'hook lens: every tool point answers -- {lens}')
     for name in roster:
         c.assert_audience([name])
 

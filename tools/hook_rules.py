@@ -134,6 +134,29 @@ def pillar_of(lines):
     return (src or {}).get('pillar')
 
 
+def theme_for(lines):
+    """The ARCO angle theme this hook asks for, or None if untagged.
+
+    pillar decides the post's shape; theme decides what ARCO's slide says, so
+    a study hook gets the angle about keeping the phone out of a study block
+    rather than the one about planning the day. It used to be a bare argument
+    the generator declared, which meant nothing ever checked it against the
+    hook sitting on slide one.
+    """
+    src = parent(lines)
+    return (src or {}).get('theme')
+
+
+def lens_for(lines):
+    """What every tool point after ARCO has to answer for this hook.
+
+    Returned for whoever writes the roster to work against. No guard can tell
+    whether a sentence answers a question, so this is printed, not enforced.
+    """
+    src = parent(lines)
+    return (src or {}).get('lens')
+
+
 def eligible(topic=None, pillar=None):
     """Approved hooks usable right now, least recently used first."""
     hist = [e for e in history() if e.get('topic') != topic]

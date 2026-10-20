@@ -35,141 +35,6 @@
    ]
   },
   {
-   "id": "v3",
-   "lines": [
-    "I manage all my tasks here and the",
-    "day takes 30 seconds to plan.",
-    "",
-    "Focus mode puts every distraction",
-    "away, and Blocked Hours does it on",
-    "a schedule."
-   ],
-   "themes": [
-    "planning",
-    "build",
-    "business"
-   ]
-  },
-  {
-   "id": "v4",
-   "lines": [
-    "All my tasks live here and I plan the",
-    "whole day in 30 seconds.",
-    "",
-    "Focus mode puts every distraction",
-    "away.",
-    "",
-    "My holy grail."
-   ],
-   "themes": [
-    "planning",
-    "build",
-    "business"
-   ]
-  },
-  {
-   "id": "v5",
-   "lines": [
-    "I keep every task in here and plan",
-    "tomorrow in 30 seconds.",
-    "",
-    "Focus mode puts every distraction",
-    "away the moment it starts.",
-    "",
-    "The one I would not delete."
-   ],
-   "themes": [
-    "planning",
-    "build",
-    "business"
-   ]
-  },
-  {
-   "id": "v6",
-   "lines": [
-    "I manage all my tasks here and plan",
-    "the day in 30 seconds.",
-    "",
-    "Focus mode puts every distraction",
-    "away, Blocked Hours keeps them",
-    "away on its own."
-   ],
-   "themes": [
-    "planning",
-    "build",
-    "business"
-   ]
-  },
-  {
-   "id": "v7",
-   "lines": [
-    "Every task, every habit, planned in",
-    "30 seconds.",
-    "",
-    "Focus mode puts every distraction",
-    "away.",
-    "",
-    "My holy grail."
-   ],
-   "themes": [
-    "planning",
-    "build",
-    "business"
-   ]
-  },
-  {
-   "id": "v8",
-   "lines": [
-    "I manage all my tasks here and the",
-    "day is planned in half a minute.",
-    "",
-    "Focus mode puts every distraction",
-    "away until I am done.",
-    "",
-    "My holy grail."
-   ],
-   "themes": [
-    "planning",
-    "build",
-    "business"
-   ]
-  },
-  {
-   "id": "v9",
-   "lines": [
-    "All of my tasks sit here and planning",
-    "the day takes 30 seconds.",
-    "",
-    "Focus mode puts every distraction",
-    "away, and Blocked Hours repeats it",
-    "every weekday.",
-    "",
-    "My holy grail."
-   ],
-   "themes": [
-    "planning",
-    "build",
-    "business"
-   ]
-  },
-  {
-   "id": "v10",
-   "lines": [
-    "I manage all my tasks here and plan",
-    "the day in 30 seconds.",
-    "",
-    "Focus mode puts every distraction",
-    "away.",
-    "",
-    "The one I actually open every day."
-   ],
-   "themes": [
-    "planning",
-    "build",
-    "business"
-   ]
-  },
-  {
    "id": "f1",
    "themes": [
     "focus",
@@ -343,31 +208,204 @@
     "business"
    ],
    "lines": [
-    "Habits repeat into the day and take",
-    "their own slot on the timeline.",
+    "Every task has a time and the block",
+    "that protects it is the same app.",
     "",
-    "The plan is half built before I open",
-    "it, and Focus mode guards each block.",
+    "I stopped running a planner and a",
+    "blocker that knew nothing about",
+    "each other.",
+    "",
+    "One app, one day."
+   ]
+  },
+  {
+   "id": "a1",
+   "lines": [
+    "I plan the whole day before I start",
+    "it, so nothing waits on a decision.",
+    "",
+    "I get more done by noon than I used",
+    "to manage by six.",
+    "",
+    "The plan does the deciding."
+   ],
+   "themes": [
+    "planning",
+    "build",
+    "business"
+   ]
+  },
+  {
+   "id": "a2",
+   "lines": [
+    "Blocked Hours shuts my apps from",
+    "six to eight, every evening.",
+    "",
+    "I set it once and my screen time is",
+    "down by half.",
+    "",
+    "I never argue with it."
+   ],
+   "themes": [
+    "screentime",
+    "schedule",
+    "discipline"
+   ]
+  },
+  {
+   "id": "a3",
+   "lines": [
+    "Every time I open TikTok the shield",
+    "comes up instead of the feed.",
+    "",
+    "The reflex still happens, it just",
+    "turns into a reminder to lock in.",
+    "",
+    "That is the whole app."
+   ],
+   "themes": [
+    "focus",
+    "screentime",
+    "discipline"
+   ]
+  },
+  {
+   "id": "a4",
+   "lines": [
+    "Every task I have sits on one page",
+    "with a time next to it.",
+    "",
+    "I stopped keeping half the list in",
+    "my head and losing the other half.",
+    "",
+    "One page, the whole day."
+   ],
+   "themes": [
+    "planning",
+    "build",
+    "business"
+   ]
+  },
+  {
+   "id": "a5",
+   "lines": [
+    "One button starts the block and",
+    "locks every app on the list.",
+    "",
+    "No settings and no deciding, I am",
+    "in and the phone is out.",
+    "",
+    "One tap and I am working."
+   ],
+   "themes": [
+    "focus",
+    "study",
+    "build"
+   ]
+  },
+  {
+   "id": "a6",
+   "lines": [
+    "Insights shows the week by app and",
+    "by day, in hours.",
+    "",
+    "Seeing four hours on one app is what",
+    "made me finally cut it.",
+    "",
+    "The number did the convincing."
+   ],
+   "themes": [
+    "insights",
+    "screentime",
+    "learn"
+   ]
+  },
+  {
+   "id": "a7",
+   "lines": [
+    "Habits take a real slot on the day,",
+    "the same as any task.",
+    "",
+    "Mine lasted past the first month",
+    "because the day made room for it.",
+    "",
+    "That is why they finally stuck."
+   ],
+   "themes": [
+    "planning",
+    "discipline",
+    "learn"
+   ]
+  },
+  {
+   "id": "a8",
+   "lines": [
+    "The block I am in sits on the Lock",
+    "Screen with the time left running.",
+    "",
+    "I pick the phone up and it tells me",
+    "to get back to work.",
     "",
     "My holy grail."
+   ],
+   "themes": [
+    "focus",
+    "planning",
+    "build"
+   ]
+  },
+  {
+   "id": "a9",
+   "lines": [
+    "Tasks with no time wait in Anytime",
+    "instead of crowding today.",
+    "",
+    "Today holds only what I gave an",
+    "hour to, so I actually finish it.",
+    "",
+    "The list stopped lying to me."
+   ],
+   "themes": [
+    "planning",
+    "business",
+    "build"
+   ]
+  },
+  {
+   "id": "a10",
+   "lines": [
+    "Focus mode puts every distracting",
+    "app away for the whole session.",
+    "",
+    "An hour of work is an hour now, not",
+    "forty minutes and a scroll.",
+    "",
+    "I get the time back."
+   ],
+   "themes": [
+    "focus",
+    "study",
+    "discipline"
    ]
   }
  ],
  "used": [
   "s1",
-  "v1",
-  "v2",
-  "v3",
-  "v4",
-  "v5",
-  "v6",
-  "v7",
-  "v8",
+  "l1",
   "f1",
-  "v9",
+  "v1",
   "f2",
-  "v10",
-  "v11"
+  "v2",
+  "v11",
+  "v12",
+  "a3",
+  "a5",
+  "v13",
+  "v14",
+  "a10",
+  "v15",
+  "a1",
+  "a4"
  ],
- "rule": "Variations of the approved line. Pick by THEME so the slide answers the hook: a study or screentime hook gets a focus or blocking angle, a build or business hook gets the planning angle. Closers stay in register; 'My holy grail.' carries most of them."
+ "rule": "Pick by THEME so the slide answers the hook -- hook_pool.json carries the theme and _tools_photo enforces it. Each angle names a different thing the app does and the payoff that follows from it; a mechanism with no outcome reads as a spec sheet, an outcome with no mechanism trips assert_teaches. Vary the closer too: nine of the old angles ended 'My holy grail.', which is as recognisable as a repeated opener."
 }

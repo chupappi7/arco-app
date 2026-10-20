@@ -30,60 +30,6 @@
  },
  "posts": [
   {
-   "topic": "btl",
-   "title": "How to block TikTok on iPhone (for real)",
-   "caption": "screen time limits never worked for me. this does. ARCO is free on the App Store. #focus #screentime #productivity #digitaldetox #creatorsearchinsights",
-   "slides": [
-    {
-     "bg": "rooftop-city-dusk.jpg",
-     "text": [
-      "how to block tiktok on iphone (for real).",
-      "not screen time limits. those never work."
-     ]
-    },
-    {
-     "bg": "bedroom-phone-night.jpg",
-     "text": [
-      "apple's limits ask nicely.",
-      "one tap on 'ignore limit' and you're back in. every time."
-     ]
-    },
-    {
-     "bg": "desk-lamp-city-window.jpg",
-     "text": [
-      "1) pick your worst apps once.",
-      "tiktok, instagram, whatever eats your day."
-     ]
-    },
-    {
-     "bg": "desk-laptop-lamp.jpg",
-     "text": [
-      "2) put them behind your plan.",
-      "they only lock during the hours you set to focus."
-     ]
-    },
-    {
-     "bg": "living-room-chandelier.jpg",
-     "text": [
-      "3) there is no ignore button.",
-      "the block holds until the block ends. that is the whole point."
-     ]
-    },
-    {
-     "bg": "poolside-sunset.jpg",
-     "align": "low",
-     "text": [
-      "i built the app that does this.",
-      "it is called ARCO and it just went live."
-     ]
-    },
-    {
-     "type": "cta",
-     "bg": "supercars-driveway.jpg"
-    }
-   ]
-  },
-  {
    "topic": "47-minutes",
    "title": "my screen time is 47 minutes a day",
    "caption": "47 minutes a day. not discipline — a system: every hour has a job, and the feed apps stay blocked until i say so. the planner and the blocker are one app. it's called ARCO, free on the App Store. #screentime #digitaldetox #productivity #focus #appblocker",
@@ -102,58 +48,16 @@
    "_note": "CheckVibe-style listicle; slides composited 2026-08-20 from existing draft bgs + 1 generated; sources in scratchpad/5apps"
   },
   {
-   "topic": "productivity-tools",
-   "title": "the 5 tools i actually use to stay productive",
-   "caption": "none of these are hacks, just the five tools that survived daily use. claude answers before google can. arco plans my day, runs focus sessions and blocks the feeds while i work (full name on the app store: ARCO: Day Planner & Focus). notion remembers everything so my head does not have to. google calendar makes plans real. endel plays focus sound with zero decisions. #productivity #focus #tools #screentime #studytok #creatorsearchinsights",
-   "_note": "app-stack listicle, productivity angle; composited 2026-08-21 from src photos (captions inpainted); ARCO slide uses full store name, no em dashes"
-  },
-  {
-   "topic": "lockin-apps",
-   "title": "5 apps i use to actually lock in",
-   "caption": "none of these are magic. together they're the reason i finish things. claude explains whatever i'm stuck on — half my study time used to be searching, now i just ask. arco plans the day and physically blocks tiktok during focus blocks, so the plan actually happens (full name on the app store: app blocker & focus — arco). google calendar holds the schedule — if it's not in there, it doesn't exist. notion remembers everything so my head doesn't have to. endel plays focus sound with no lyrics and no decisions. plan the hours, block the noise, start. #lockin #focus #productivity #studytok #screentime #creatorsearchinsights",
-   "_note": "app-stack listicle per July CLAUDE.md spec (ARCO #2 among famous apps); composited 2026-08-20"
-  },
-  {
    "topic": "plan-week",
    "title": "the 5 tools i use to plan my week",
    "caption": "planning only works if it survives contact with the phone. clickup holds the work, arco plans the day and runs focus sessions with the feeds locked, obsidian is for private thinking, notion is for structure, google calendar makes time real. plan on sunday, run the week on rails. #productivity #planning #focus #studytok",
    "_note": "batch2 listicle; composited 2026-08-22, lowkey ARCO, no store CTA"
   },
   {
-   "topic": "ai-stack",
-   "title": "the ai tools i actually use every day",
-   "caption": "the stack i actually open every day. claude for thinking and writing, codex for code that writes and fixes itself, higgsfield for visuals from a prompt, openclaw for a self hosted assistant that texts you on whatsapp, and arco to keep the feeds locked while the tools get used for real work. #ai #aitools #productivity #tech #creatorsearchinsights",
-   "_note": "batch2 listicle; composited 2026-08-22"
-  },
-  {
-   "topic": "builder-tools",
-   "title": "5 tools i would use to start an online business in 2026",
-   "caption": "starting an online business in 2026 is mostly assembling the right stack. shopify for the store, github for every line of code, higgsfield for the marketing visuals, clickup to run the operation, and arco to protect the hours that build it. the tools are cheap, the focus is not. #business #onlinebusiness #entrepreneur #buildinpublic #creatorsearchinsights",
-   "_note": "batch2 listicle; composited 2026-08-22"
-  },
-  {
-   "topic": "stay-productive",
-   "title": "5 tools to stay productive, i saved the best for last",
-   "caption": "five tools, and the honest reason each one stays on my phone. claude code runs in my terminal, reads the whole project and edits files directly, and skills save a workflow so it repeats exactly. notion stores everything as a database so one entry shows up in several views. google calendar working hours stop people booking over my deep work. endel plays focus sound with no decisions. and the one i saved for last, arco, manages my tasks, plans the day in 30 seconds and puts every distraction away while i work. my holy grail. #productivity #tools #aitools #focus #creatorsearchinsights",
-   "_note": "listicle, best-for-last variant; rebuilt 2026-08-23 (was app-demo)"
-  },
-  {
-   "topic": "phone-another-room",
-   "title": "i left my phone in another room. it lasted two days.",
-   "caption": "distance was never the fix. the phone came back to the desk by tuesday, because nothing actually stopped the first tap. what worked was scheduling the block instead: 9 to 12 every weekday, the feeds simply do not open, and there is no decision to make at 9am. three weeks later the mornings are quiet. planner and app blocker in one app, arco. #screentime #focus #digitaldetox #productivity #deepwork #creatorsearchinsights",
-   "_note": "story post, batch 2026-08-23; carries promo CTA slide"
-  },
-  {
    "topic": "study-tools",
    "title": "the 5 tools that got me through exam season",
    "caption": "exam season is a logistics problem before it is a knowledge problem. claude explains what the textbook would not. arco keeps class times and study blocks on one timeline and locks the social apps during revision. obsidian holds notes that actually link. google calendar owns every deadline. endel plays focus sound with no decisions. the studying still hurts, the chaos does not. #studytok #exams #studytips #productivity #focus #creatorsearchinsights",
    "_note": "listicle, batch 2026-08-23"
-  },
-  {
-   "topic": "one-app-day",
-   "title": "a full day, planned and protected by one app",
-   "caption": "the night before takes a minute: habits picked, tasks typed, times set. the day then runs on one timeline instead of six lists. distracting apps lock on their own schedule, so the plan survives contact with the phone. projects and priorities catch whatever is left. the app is arco, on the app store. #productivity #dayplanner #screentime #focus #adhd #creatorsearchinsights",
-   "_note": "app demo from redesign screenshots, batch 2026-08-23"
   },
   {
    "topic": "deep-work-stack",
@@ -170,7 +74,7 @@
   {
    "topic": "ship-alone",
    "title": "5 tools that replace a whole team",
-   "caption": "no team, no office, five tools. codex writes the feature from a description, runs it and fixes what breaks before i look at the diff. github actions runs my tests and builds on every push and branch protection stops me merging anything that failed. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. revenuecat handles receipts, renewals and refunds so i never built a payment server. notion keeps the roadmap and content calendar as one database with different views. #buildinpublic #indiedev #solofounder #aitools",
+   "caption": "no team, no office, five tools. codex writes the feature from a description, runs it and fixes what breaks before i look at the diff. github actions runs my tests and builds on every push and branch protection stops me merging anything that failed. arco manages my tasks, plans the day in 30 seconds and puts every distraction away while i work, my holy grail. revenuecat handles receipts, renewals and refunds so i never built a payment server. notion keeps the roadmap and content calendar as one database with different views. #buildinpublic #indiedev #solofounder #aitools #creatorsearchinsights",
    "_note": "listicle 2026-08-23"
   },
   {
@@ -188,7 +92,7 @@
   {
    "topic": "study-block",
    "title": "4 hours of study without touching my phone",
-   "caption": "not willpower, a schedule. arco keeps study blocks in the plan and locks the social apps while they run, so at 6pm there is nothing to decide. claude explains the part of the textbook that lost me and gives worked examples. obsidian keeps one note per concept, linked, so revision is faster every week. endel plays focus sound with no lyrics and no playlist to pick. google calendar holds every deadline so nothing surprises me on a sunday night. #studytok #studytips #exams #focus",
+   "caption": "not willpower, a schedule. arco keeps study blocks in the plan and locks the social apps while they run, so at 6pm there is nothing to decide. claude explains the part of the textbook that lost me and gives worked examples. obsidian keeps one note per concept, linked, so revision is faster every week. endel plays focus sound with no lyrics and no playlist to pick. google calendar holds every deadline so nothing surprises me on a sunday night. #studytok #studytips #exams #focus #creatorsearchinsights",
    "_note": "listicle 2026-08-23, students"
   },
   {
@@ -308,20 +212,14 @@
   {
    "topic": "work-by-noon",
    "title": "the tools i use to do a full day of work by noon",
-   "caption": "arco keeps every task in one place and the whole day gets planned in 30 seconds, with focus mode putting every distraction away. a manus task runs on its own cloud machine and keeps going after you close the tab, so you hand off the long job and come back to a finished file. n8n can be hosted on your own machine, so a workflow reaches local files and private apis a cloud tool cannot touch. a cloudflare tunnel puts your local server on a public https url with no port opened, so you send someone the link while the site still runs on your laptop. any past vercel deployment can be promoted back to production in one click, so a bad release is undone in seconds instead of rebuilt and shipped again. #productivity #tools #aitools #buildinpublic",
+   "caption": "arco keeps every task in one place and the whole day gets planned in 30 seconds, with focus mode putting every distraction away. a manus task runs on its own cloud machine and keeps going after you close the tab, so you hand off the long job and come back to a finished file. n8n can be hosted on your own machine, so a workflow reaches local files and private apis a cloud tool cannot touch. a cloudflare tunnel puts your local server on a public https url with no port opened, so you send someone the link while the site still runs on your laptop. any past vercel deployment can be promoted back to production in one click, so a bad release is undone in seconds instead of rebuilt and shipped again. #productivity #tools #aitools #buildinpublic #creatorsearchinsights",
    "_note": "tools pillar, ARCO at #1; hook from hook_pool, roster is one LLM (Manus) plus three tools whose teaching point had not been used yet"
   },
   {
    "topic": "business-at-19",
    "title": "the tools i use to run my business at 19 years old",
-   "caption": "i keep every task in arco and plan tomorrow in 30 seconds, and focus mode puts every distraction away the moment it starts. claude connects to your other apps through mcp servers, so it reads and edits inside them from the same chat with no exporting. a notion synced block shows the same content on several pages, so you change the price once and it updates everywhere it appears. a canva brand kit applies your fonts and colours to any template at once, so everything you make matches with no design work each time. revenuecat paywalls are configured in the dashboard and not in the build, so you change a price or a layout without shipping an app update. #buildinpublic #tools #productivity #solofounder",
+   "caption": "i keep every task in arco and plan tomorrow in 30 seconds, and focus mode puts every distraction away the moment it starts. claude connects to your other apps through mcp servers, so it reads and edits inside them from the same chat with no exporting. a notion synced block shows the same content on several pages, so you change the price once and it updates everywhere it appears. a canva brand kit applies your fonts and colours to any template at once, so everything you make matches with no design work each time. revenuecat paywalls are configured in the dashboard and not in the build, so you change a price or a layout without shipping an app update. #buildinpublic #tools #productivity #solofounder #creatorsearchinsights",
    "_note": "tools pillar, ARCO at #1; hook from hook_pool; one LLM (Claude); new dark backgrounds bg-h81+"
-  },
-  {
-   "topic": "showed-me-at-17",
-   "title": "5 apps i wish someone showed me at 17",
-   "caption": "arco manages all my tasks and plans the day in 30 seconds, and focus mode puts every distraction away while blocked hours keeps them away on its own. gemini takes a whole textbook as an upload instead of pasted chunks, so you ask about one chapter and it answers from those pages. obsidian notes are plain markdown files sitting in a folder, so they open on any device and keep working with no internet. a raycast snippet expands a keyword into a whole block of text anywhere you type, so your email intro types itself from two letters. endel follows your heart rate through an apple watch, so the sound settles as you settle instead of looping the same track. #productivity #apps #studytok #tools",
-   "_note": "tools pillar, ARCO at #1; hook from hook_pool; one LLM (Gemini)"
   },
   {
    "topic": "weekend-not-month",
@@ -332,7 +230,7 @@
   {
    "topic": "lock-in-anyway",
    "title": "this is how you lock in when you don't feel like it",
-   "caption": "arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. ask claude for a quiz on what you just read and it builds a working one, so you click through questions instead of rereading the page. raycast floating notes keeps a note above every window on one hotkey, so the next step stays on screen while you work somewhere else. cleanshot x captures park in a corner overlay instead of piling on the desktop, so you drag the diagram into your notes without saving a file. any canva design opens out into an infinite whiteboard, so the whole topic gets mapped before you write a word. #discipline #focus #productivity #studytok",
+   "caption": "arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. ask claude for a quiz on what you just read and it builds a working one, so you click through questions instead of rereading the page. raycast floating notes keeps a note above every window on one hotkey, so the next step stays on screen while you work somewhere else. cleanshot x captures park in a corner overlay instead of piling on the desktop, so you drag the diagram into your notes without saving a file. any canva design opens out into an infinite whiteboard, so the whole topic gets mapped before you write a word. #discipline #focus #productivity #studytok #creatorsearchinsights",
    "_note": "discipline pillar; registered by hand after an interrupted build left it unregistered"
   },
   {
@@ -408,12 +306,6 @@
    "_note": "re-shoot of lock-in-anyway: identical copy, six new backgrounds"
   },
   {
-   "topic": "deleted-everything",
-   "title": "the 5 apps i would keep if i deleted everything else",
-   "caption": "if everything else went, these five stay. arco holds every task i have and the whole day takes 30 seconds to plan, then focus mode puts every distraction away, my holy grail. superwhisper turns what you say into typed text from a hotkey anywhere on the machine, so the long email you kept putting off gets said out loud once and sent. granola sits on the call and fills in the notes you half typed from the audio, so the write up you would do at 6pm is already there when you hang up. paste the rambling version into claude and ask for the tight one back, and every piece of writing starts at the second draft instead of the first. cleanshot x lifts the text straight out of a screenshot, so an error code in a video or a photo goes into search without retyping. #productivity #aitools #tools #mac #creatorsearchinsights",
-   "_note": "reword of do-all-the-work: same concept (a stack that writes and captures for you), same roster arco/superwhisper/granola/claude/cleanshot x, same five teaching points, every sentence rewritten. this is the third phrasing of those points (do-all-the-work, then ten-x-2, now this) so no line repeats either. hook is the pool's 'the 5 apps i would keep / if i deleted everything else' (tools, last out 11 posts ago): do-all-the-work's own hook is off cooldown and hook_rules.parent would take a light rewording of it, but assert_hook_approved matches the pool exactly on purpose, so the reword would not render without weakening the guard that keeps hooks in thinh's voice. the 4x and 10x hooks ask the same question and were skipped because ten-x-2 already shot this roster on the multiplier framing. llm this post: claude. backgrounds bg-h66/37/21/29/32/31, none of them do-all-the-work's bg-h31/22/24/88/45/n04 except bg-h31, which lands on a different slide. the picker's bg-n06 (glass office, luma 54) was cut after reading the render, washed out beside the rest, and bg-h36 was cut as a near duplicate of bg-h37, same house and cars two metres apart. rebuild: python3 tools/gen-deleted-everything.py"
-  },
-  {
    "topic": "wish-at-17",
    "title": "5 apps i wish someone showed me at 17",
    "caption": "arco keeps every task in one place and tomorrow gets planned in 30 seconds, with focus mode putting every distraction away the moment it starts. chatgpt study mode answers a question with questions, one step at a time, so you come out of the homework able to redo it without the chat open. a notion database can be opened as a form and every answer lands as a row, so you collect signups or feedback without paying for a second tool. a canva presentation records your camera and the slides together with your script scrolling over them, so a narrated walkthrough goes out without opening an editor. capcut motion tracking pins text to an object while the shot moves, so the label stays on the thing you are pointing at with no keyframes. #productivity #apps #studytok #tools",
@@ -450,22 +342,10 @@
    "_note": "re-shoot of keep-five: identical copy, six new backgrounds; built 2026-09-01"
   },
   {
-   "topic": "work-by-noon-3",
-   "title": "the tools i use to do a full day of work by noon",
-   "caption": "arco keeps every task in one place and the whole day gets planned in 30 seconds, with focus mode putting every distraction away. a manus task runs on its own cloud machine and keeps going after you close the tab, so you hand off the long job and come back to a finished file. n8n can be hosted on your own machine, so a workflow reaches local files and private apis a cloud tool cannot touch. a cloudflare tunnel puts your local server on a public https url with no port opened, so you send someone the link while the site still runs on your laptop. any past vercel deployment can be promoted back to production in one click, so a bad release is undone in seconds instead of rebuilt and shipped again. #productivity #tools #aitools #buildinpublic #creatorsearchinsights",
-   "_note": "re-shoot of work-by-noon: identical hook, roster, card copy and caption, six new photographs. ARCO stays at #1 on angle v4, written out literally because next_arco_angle() has rotated past it and the caption describes v4. Slug is -3 because work-by-noon-2 is already live. Backgrounds bg-h73/31/29/32/22/n06, picked with the gen-daily-batch walk excluding the source post's own six frames, then frozen: one frame per vibe rather than darkest-five, because the darkest-five walk put the same villa and the same two supercars on slides 2, 4 and 6. rebuild: python3 tools/gen-work-by-noon-3.py"
-  },
-  {
    "topic": "type-less-3",
    "title": "i barely type anymore, these 5 tools do it for me",
    "caption": "superwhisper turns speech into clean text in any app at speaking speed. arco plans my day in 30 seconds instead of a journaling session, tasks and app blocking included, my holy grail. granola listens to meetings and the notes write themselves. claude turns a dictated rough idea into a finished draft, editing beats writing from zero. cleanshot x copies text straight out of any screenshot. #productivity #aitools #tools #mac",
    "_note": "second re-shoot of type-less: identical words, six new backgrounds (bg-h37/24/45/n01/88/n04). The source shot bg-h14/12/n09/06/21/08 and type-less-2 shot bg-h58/20/29/32/34/35; neither set is in bg_history.json, so both were read back off the rendered slides and excluded from the walk. bg-h36/38/39 were dropped too (same villa and supercar pair as the hook, bg-h37), the desk-city-day family was dropped after reading the render (daylight office, copy across bright cloud and monitor bezels) and bg-n03 puts the last lines on pale pool water. built 2026-09-01 by gen-type-less-3.py"
-  },
-  {
-   "topic": "all-of-it-at-19",
-   "title": "everything i run my business on at 19",
-   "caption": "arco holds every task i have and the whole day gets planned in 30 seconds, with focus mode putting every distraction away, the one i actually open every day. ask codex for several attempts and it runs the same task in parallel, so you compare finished diffs and pick one instead of prompting again. a notion button block creates a page from a template with the fields already filled in, so logging a client or a bug is one tap and not a blank page every time. every obsidian note lists the pages that mention it without linking to it, so old notes reconnect as you write instead of sinking into a folder. capcut auto reframe recuts a wide video to vertical and follows the subject, so one edit becomes the youtube and the tiktok version instead of two exports. #buildinpublic #productivity #aitools #tools #solofounder #creatorsearchinsights",
-   "_note": "built 2026-09-01 by gen-all-of-it-at-19.py. A replication of lock-in-anyway (marked performing by the sync), keeping only its shape: approved two-line hook, five tools, ARCO leading. Everything that would make it read as the same post is new -- the hook is \"everything i run my business on / at 19\", the longest-rested eligible tools/build hook at 22 posts, run as pillar build so assert_roster_allowed lets app_slide draw a roster; the roster is ARCO/Codex/Notion/Obsidian/CapCut with Codex as the single LLM; and all five teaching points (Codex parallel attempts, Notion button blocks, Obsidian unlinked mentions, CapCut auto reframe) appear in no other caption here. The ARCO card is pinned to angle v10 rather than taken from next_arco_angle('business'), which returns v9 -- the angle both lock-in shoots rendered. Backgrounds bg-h74/31/34/38/51/21, none of them in either lock-in set, ordered after reading the first render: bg-h52 was dropped because the copy landed across three white monitors and swallowed the dashes, and bg-h51, the one daylight frame left, was moved back to slide 5. rebuild: python3 tools/gen-all-of-it-at-19.py"
   },
   {
    "topic": "4x-productivity-4",
@@ -498,15 +378,9 @@
    "_note": "built 2026-09-02 by gen-ship-alone-3.py. A re-shoot of ship-alone: identical words, different photographs. ship-alone's generator was never committed, so the copy reaches here by way of gen-ship-alone-2.py, the first re-shoot, which read it back off drafts/ship-alone/*.jpg slide by slide; gen-ship-alone-3.py is a copy of that file with only the topic slug and the backgrounds changed, so the hook, the five titles, every body line, the roster and this title and caption are byte-identical to the source. Backgrounds picked with the gen-daily-batch walk (hook-only vibes at index 0 only, copy band under BAND_MAX_LUMA, no adjacent vibe repeat, at most one person, nothing assert_bg_fresh rejects), with twelve frames taken out of the walk by hand: ship-alone's own six (bg-h14/12/n09/09/04/02, identified by correlating its slides against the pool since it predates bg_history) and ship-alone-2's six (bg-h63/20/21/29/32/34), because a re-shoot that reuses the photographs it is re-shooting is not a re-shoot and two re-shoots sharing a set are one post twice. The walk returned bg-h76 hook, then bg-h24 (band luma 49.8), bg-h36 (20.3), bg-h46 (59.7), bg-h88 (28.2) and bg-n01 (66.3), in walk order, no person in the set. assert_hook_approved is the one guard disabled, because this hook left the rotating pool after the daily batch and the copy is not ours to change on a re-shoot; mark_hook_used recorded the outing so the cooldown counts it from here. rebuild: python3 tools/gen-ship-alone-3.py"
   },
   {
-   "topic": "lock-in-anyway-3",
-   "title": "this is how you lock in when you don't feel like it",
-   "caption": "arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. ask claude for a quiz on what you just read and it builds a working one, so you click through questions instead of rereading the page. raycast floating notes keeps a note above every window on one hotkey, so the next step stays on screen while you work somewhere else. cleanshot x captures park in a corner overlay instead of piling on the desktop, so you drag the diagram into your notes without saving a file. any canva design opens out into an infinite whiteboard, so the whole topic gets mapped before you write a word. #discipline #focus #productivity #studytok #creatorsearchinsights",
-   "_note": "re-shoot of lock-in-anyway: identical copy, six new backgrounds. Built by gen-lock-in-anyway-3.py, a copy of gen-lock-in-anyway-2.py (the first re-shoot) with only the topic slug and the backgrounds changed -- the copy is routed through that generator rather than the source's because the source draws its ARCO card from next_arco_angle(), which rotates; the angle the source rendered (v9) is written out literally there. Backgrounds bg-h80/29/31/32/34/21, picked by the gen-daily-batch walk with both earlier cuts' twelve frames excluded, then ordered by copy band luma so the two darkest carry slides 2 and 3 -- slide 2 is the ARCO card, eight lines, the longest block in the post. assert_roster_allowed stays stubbed as on lock-in-anyway-2: the hook is a discipline hook and the guard postdates the source, and a re-shoot changes photographs, not shape. rebuild: python3 tools/gen-lock-in-anyway-3.py"
-  },
-  {
    "topic": "wish-i-knew-at-17",
    "title": "5 apps i wish someone showed me at 17",
-   "caption": "five apps i wish someone had put in front of me at 17. arco keeps the study block in the plan and the distracting apps close with it, so the session ends when the timer does and not when i give in, my holy grail. a finished perplexity thread turns into a page written up with its sources, so a night of research ends as a link you can send. the notion web clipper drops any page into a database with your own fields, so every source for the essay lands in one table instead of thirty tabs. put a caret and an id after a line in obsidian and you can link to that line, so the essay points at the exact sentence and not the whole note. canva bulk create builds one design per row of a spreadsheet, so a list of forty terms comes back as forty finished cards. #productivity #studytok #apps #tools #aitools",
+   "caption": "five apps i wish someone had put in front of me at 17. arco keeps the study block in the plan and the distracting apps close with it, so the session ends when the timer does and not when i give in, my holy grail. a finished perplexity thread turns into a page written up with its sources, so a night of research ends as a link you can send. the notion web clipper drops any page into a database with your own fields, so every source for the essay lands in one table instead of thirty tabs. put a caret and an id after a line in obsidian and you can link to that line, so the essay points at the exact sentence and not the whole note. canva bulk create builds one design per row of a spreadsheet, so a list of forty terms comes back as forty finished cards. #productivity #studytok #apps #tools #aitools #creatorsearchinsights",
    "_note": "built 2026-09-03. first post with the icon-shelf hook: hook_slide(icons=[...]) draws the five roster icons 3-over-2 under the headline. hook is the least recently used eligible tools hook; ARCO on angle l1 via next_arco_angle('study') because the hook is a school-age one. all five teaching points are new against every caption in this file."
   },
   {
@@ -548,14 +422,6 @@
    "topic": "4x-productivity-6",
    "title": "the tools i used to 4x my productivity",
    "caption": "four times the work out of the same day. tasks without a time wait in arco's anytime list until the day has room for them, and focus mode blocks the apps i chose for exactly that block, my holy grail. antigravity's agent manager runs several agents at once on separate tasks, so you come back to three jobs finished in the time one prompt used to take. pin a step in n8n and it keeps that output while you build the rest, so you test step nine on real data without firing the trigger again. opusclip tracks the speaker and moves the crop, so a wide take goes vertical and one recording comes back as ten clips with the captions burned in. elevenlabs dubbing translates the video and keeps your own voice speaking it, so the same recording goes out in spanish without recording again. #productivity #apps #aitools #buildinpublic"
-  },
-  {
-   "topic": "founder-essentials-notes",
-   "title": "the eight things i pay for",
-   "caption": "the eight things i actually pay for at 19, building on my own. a domain before the product exists, so the name is yours when you need it. arco holds the day as a timeline and closes the distracting apps during the blocks i set. claude max writes and reviews the code with me. the rest is a chair, a mic and three books i keep going back to. #solofounder #buildinpublic #indiehacker #creatorsearchinsights",
-   "slides": [
-    "01.jpg"
-   ]
   },
   {
    "topic": "founder-essentials-dark",
@@ -916,20 +782,6 @@
    "_note": "built 2026-09-23 by gen-run-it-all-at-19-3.py. build pillar, stacked hook with icon shelf, third outing of the run-it-all hook. Roster ARCO, ChatGPT, n8n, Canva, Cloudflare with ARCO at #1 and ChatGPT the one LLM. ARCO angle v8 drawn via next_arco_angle('business') and pinned in the generator. Teaching points checked against every caption: ChatGPT transparent PNGs, n8n error workflow, Canva websites, Cloudflare R2 no egress fees. Backgrounds bg-h17/h35/h49/h31/h52/h37, hook from pick_hook_bg, none shared with business-at-19-3. rebuild: python3 tools/gen-run-it-all-at-19-3.py"
   },
   {
-   "topic": "boring-phone-2",
-   "title": "my phone is boring now and it changed everything",
-   "caption": "my phone is boring now and it changed everything. arco blocks the feeds on a timetable, not on willpower, so there is no decision left to make when the hour starts, my holy grail. raise to wake is off, so lifting the phone shows a black screen instead of a pile of alerts. the feed apps are hidden behind face id, so they drop off the home screen and out of search. a focus shows one home screen page of tools, so the page with the feeds is not there to swipe to. and badges are off for every app, so no icon sits there with a red number asking to be opened. #screentime #digitaldetox #focus #iphonetips #creatorsearchinsights",
-   "slides": [
-    "01.jpg",
-    "02.jpg",
-    "03.jpg",
-    "04.jpg",
-    "05.jpg",
-    "06.jpg"
-   ],
-   "_note": "built 2026-09-23 by gen-boring-phone-2.py (shared build in tools/_screentime_common.py). screentime method post: hook from hook_pool (screentime pillar, least recently used eligible), ARCO leads at 1 with angle s2 via next_arco_angle('screentime'), four stock iOS settings as steps 2-5, rule_slide with no badge and yellow titles per Thinh's screentime-100h notes. No icon shelf: a screentime post has no roster. Backgrounds bg-h30/h20/h21/h22/h24/h29 from the gen-daily-batch walk. Teaching points checked against every caption."
-  },
-  {
    "topic": "pay-for-twelve-3",
    "title": "i pay for 12 apps, these 5 do all the work",
    "caption": "twelve subscriptions, and these five are the ones doing the work. i keep every task in arco and plan tomorrow in 30 seconds, then focus mode puts every distraction away the moment it starts, the one i would not delete. gemini audio overview turns an uploaded doc into a two host podcast, so 40 pages of notes get covered on a walk with the screen off. zapier copilot builds the whole zap from one sentence, so you check the apps it picked and switch it on. descript remove retakes finds every line you restarted and keeps one take, so a recording full of false starts comes back as one clean read. the notion agent builds a database and fills it from your own pages, so a content calendar arrives with the posts already in it. #productivity #aitools #apps #automation #creatorsearchinsights",
@@ -1239,34 +1091,6 @@
    "_note": "built 2026-10-03 by gen-boring-phone-screens-2.py. screentime pillar, screens concept (_veiled_screens), second outing of the boring-phone hook on screens. Points: break ruler, Gentle/Focused per window, streak-on-the-line notification, Focus done notification. ARCO angle f1. Backgrounds bg-h04/h38/h48/n03/n06/h39. Card carries the arco focus search CTA. Teaching points checked against every caption and the iOS source on pivot-timer. rebuild: python3 tools/gen-boring-phone-screens-2.py"
   },
   {
-   "topic": "work-by-noon-9",
-   "title": "the tools i use to do a full day of work by noon",
-   "caption": "the tools i use to do a full day of work by noon, here is why. arco: open a habit in plan your day, step it to 13:00 and just this once moves it for today only, so the gym leaves the morning and is back at 09:00 tomorrow. gemini: write the update in canvas and pick web page from the create menu, so the client opens one link instead of scrolling ten pages. notion: type @remind tomorrow 9am anywhere in a page and it pings you then with that page open. clickup: give a task an estimate and start its timer, so 2h estimated against 40m tracked plans tomorrow on real numbers. search arco focus on the App Store. #productivity #aitools #apps #focus #creatorsearchinsights",
-   "slides": [
-    "01.jpg",
-    "02.jpg",
-    "03.jpg",
-    "04.jpg",
-    "05.jpg",
-    "06.jpg"
-   ],
-   "_note": "built 2026-10-04 by gen-work-by-noon-9.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look per Thinh's request: hook 'the tools i use to do / a full day of work by noon' (strongest eligible tools hook by median views) with the icon shelf and 'here is why' kicker; ARCO #1 on the real Plan your day screen (Just this once, PlanDayPrototypeView), Gemini Canvas web page, Notion @remind, ClickUp estimate vs tracked; card angle via next_arco_angle('planning') with the arco focus search line."
-  },
-  {
-   "topic": "ten-x-10",
-   "title": "how i 10x'd my productivity",
-   "caption": "how i 10x'd my productivity, here is why. arco: stop a 2 hour deep work timer at 50 minutes and after lunch play counts down only the 70 still left, so the morning's work is never redone. chatgpt: on a mac option + space opens a chatgpt bar over whatever app is in front, so you ask and keep typing in your doc. obsidian: turn on workspaces and save the panes open for a project, so loading it reopens every note where the last session stopped. raycast: run quit all applications before you start, so the screen holds nothing but the app you open next. search arco focus on the App Store. #productivity #aitools #mac #focus #creatorsearchinsights",
-   "slides": [
-    "01.jpg",
-    "02.jpg",
-    "03.jpg",
-    "04.jpg",
-    "05.jpg",
-    "06.jpg"
-   ],
-   "_note": "built 2026-10-04 by gen-ten-x-10.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look per Thinh's request: hook \"how i 10x'd / my productivity\" (second strongest eligible tools hook by median views) with the icon shelf and 'here is why' kicker; ARCO #1 on the real Today screen (timer resumes the minutes left, HabitTimerEngine alreadyDoneToday), ChatGPT Option+Space bar, Obsidian Workspaces, Raycast Quit All Applications; card angle via next_arco_angle('focus') with the arco focus search line."
-  },
-  {
    "topic": "three-hours-screens-2",
    "title": "i cut 3 hours of screen time without deleting a single app",
    "caption": "i cut 3 hours of screen time without deleting a single app, here is why. focus mode starts on until turned off, so the apps stay shut until i stop it, not when a timer runs out. ending a blocked hours window early can be undone: it reads skipped for today, and resume locks the apps again for the rest of it. each insights group card shows its top four apps, and every app in this group lists the rest with their hours, so the small ones get counted too. and a new blocked hours window uses your focus apps by default, so an app added once is locked in every window. all of it is arco. search arco focus on the App Store. #screentime #digitaldetox #phoneaddiction #focus #creatorsearchinsights",
@@ -1338,36 +1162,6 @@
     "07.jpg"
    ],
    "_note": "built 2026-10-07 by gen-keep-five-9.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look: hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker; ARCO PLAN_DAY Events chips (+ New, one tap places an Event card); Claude artifact Publish; Obsidian Audio recorder; Figma Make from a pasted frame; OpusClip ClipAnything. Card angle via next_arco_angle, App Store name App Blocker & Focus: ARCO on the ARCO slide and in the card's search line per Thinh's 2026-10-07 request. Teaching points checked against every caption."
-  },
-  {
-   "topic": "wish-i-knew-at-17-8",
-   "title": "5 apps i wish someone showed me at 17",
-   "caption": "5 apps i wish someone showed me at 17, here is why. arco: open a habit from today and after two weeks it writes one line, like tuesday is your day for this, friday is the weak one. cursor: open any open source project and switch the chat to ask mode, and it explains the app file by file without editing a line. elevenlabs: describe a track to eleven music and paid plans clear it for commercial use, so the video is not muted. capcut: turn on teleprompter in the camera and you read the script while looking into the lens. notion: type /math and write the formula in latex, and your notes read like the textbook. search app blocker & focus: arco on the App Store. #studytok #productivity #aitools #apps #creatorsearchinsights",
-   "slides": [
-    "01.jpg",
-    "02.jpg",
-    "03.jpg",
-    "04.jpg",
-    "05.jpg",
-    "06.jpg",
-    "07.jpg"
-   ],
-   "_note": "built 2026-10-07 by gen-wish-i-knew-at-17-8.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look: hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker; ARCO TODAY habit page weekday sentence (HabitPage sentence); Cursor Ask mode; Eleven Music commercial use; CapCut Teleprompter; Notion /math LaTeX block. Card angle via next_arco_angle, App Store name App Blocker & Focus: ARCO on the ARCO slide and in the card's search line per Thinh's 2026-10-07 request. Teaching points checked against every caption."
-  },
-  {
-   "topic": "rest-of-my-life-3",
-   "title": "5 apps i will use for the rest of my life",
-   "caption": "5 apps i will use for the rest of my life, here is why. arco: the best streak tile on insights rings your top three habits, and each ring closes at that habit's own best. gemini: upload a photo and type the change, and the face stays the same person in every version. github: turn on the auto-add workflow in a project with a filter like label:bug, and every matching issue lands on the board. framer: describe the page to wireframer and you start from a real responsive layout instead of a blank canvas. cloudflare: turnstile replaces the captcha on your signup form, so people get in without clicking traffic lights and bots stay out. search app blocker & focus: arco on the App Store. #productivity #aitools #apps #buildinpublic #creatorsearchinsights",
-   "slides": [
-    "01.jpg",
-    "02.jpg",
-    "03.jpg",
-    "04.jpg",
-    "05.jpg",
-    "06.jpg",
-    "07.jpg"
-   ],
-   "_note": "built 2026-10-07 by gen-rest-of-my-life-3.py (shared build in tools/_tools_screens.py). tools pillar in the ship-weekend-screens look: hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker; ARCO GOOD_HABITS Best streak rings (InsightsPrototypeView streakTile); Gemini photo edit; GitHub Projects Auto-add; Framer Wireframer; Cloudflare Turnstile. Card angle via next_arco_angle, App Store name App Blocker & Focus: ARCO on the ARCO slide and in the card's search line per Thinh's 2026-10-07 request. Teaching points checked against every caption."
   },
   {
    "topic": "work-by-noon-10",
@@ -1566,6 +1360,18 @@
    "_note": "built 2026-10-12 by gen-wish-i-knew-at-17-10.py (shared build in tools/_tools_photo.py). tools pillar in the photo look: all five apps on app_slide with icon, number, name and two dashed lines over a photo, ARCO included as \"1. App Blocker & Focus: ARCO\", no phone mockup and no closing card. hook from hook_rules.eligible(pillar='tools') word for word, icon shelf and 'here is why' kicker. roster ARCO/Antigravity/Notion/Cloudflare/Canva. ARCO angle f2 via next_arco_angle('study'). every teaching point checked against all captions in this file. bright villa frames n01/n03 kept off every slide after read-back showed washed-out copy. rebuild: python3 tools/gen-wish-i-knew-at-17-10.py"
   },
   {
+   "topic": "cut-four-screens",
+   "title": "4 things that cut my screen time, not one of them is willpower",
+   "caption": "4 things that cut my screen time, not one of them is willpower, here is why. tap wake up in plan your day and arco sets a real system alarm, so it rings even on silent and planning a different time tomorrow moves it. a blocked hours window set to 23:00 to 07:00 runs straight through midnight as one window, so the sleep hours are not two separate blocks. the morning plan puts whatever you did not finish under unfinished, and move all drops the whole list into today. and insights reads screen time on the device itself, so none of what it shows about your usage is sent anywhere. all of it is arco. search arco focus on the App Store. #screentime #digitaldetox #phoneaddiction #focus #creatorsearchinsights",
+   "_note": "built 2026-10-17 by gen-cut-four-screens.py. screentime pillar, screens concept, DESIGNS['big-screen'] — first live post on the new step-slide design (no photo, full-width copy band, handset centred and stacked under it). Paired with boring-phone-screens-3 (left-rail) against the control screens posts; hook, card and copy voice held constant so views read as a design result. Points: AlarmKit wake-up alarm, BlockedHours.wrapsMidnight, MorningPlanSheet rollover, Insights on-device. All checked in the committed iOS source on pivot-timer. rebuild: python3 tools/gen-cut-four-screens.py"
+  },
+  {
+   "topic": "boring-phone-screens-3",
+   "title": "my phone is boring now and it changed everything",
+   "caption": "my phone is boring now and it changed everything, here is why. blocked hours hands out breaks in fixed five minute pieces, and the editor shows the whole allowance before the window saves. insights reports how much of the day you finish on the days you do your first habit, a share of the day rather than a streak. the bad habits list draws each app with its own icon straight from screen time, so you recognise the hours instead of reading names. and plan your day totals the blocks as you place them and shows the hours booked, so the gaps are visible before the day starts. all of it is arco. search arco focus on the App Store. #screentime #digitaldetox #phoneaddiction #focus #creatorsearchinsights",
+   "_note": "built 2026-10-17 by gen-boring-phone-screens-3.py. screentime pillar, screens concept, DESIGNS['left-rail'] — posted layout mirrored, handset left, copy right and raised. Everything else matches the control posts so it isolates one change. Points: five-minute break pieces, Insights first-habit tile, real Screen Time icons, Plan your day booked total. All checked in the committed iOS source on pivot-timer. rebuild: python3 tools/gen-boring-phone-screens-3.py"
+  },
+  {
    "topic": "study-tools",
    "title": "the 5 tools that got me through exam season",
    "caption": "exam season is a logistics problem before it is a knowledge problem. claude explains what the textbook would not. arco keeps class times and study blocks on one timeline and locks the social apps during revision. obsidian holds notes that actually link. google calendar owns every deadline. endel plays focus sound with no decisions. the studying still hurts, the chaos does not. #studytok #exams #studytips #productivity #focus #creatorsearchinsights",
@@ -1578,6 +1384,172 @@
     "06.jpg"
    ],
    "_note": "fix 2026-10-18: slide 03 re-rendered with the current App Store name \"2. App Blocker & Focus: ARCO\" (was \"ARCO: Day Planner & Focus\"). Its background moved from bg-d05 (retired low-res, copy band luma 82.2 > 70) to bg-n05 (desk-empty-day, 57.1), which also stops it repeating the villa pool of slides 02 and 04. Layout is the post's original app_slide (compose.py at 62aeea4) so 03 matches its siblings; 01, 02, 04, 05, 06 are byte-identical. rebuild: python3 tools/gen-2026-08-23.py"
+  },
+  {
+   "topic": "use-for-life",
+   "title": "5 apps i will use for the rest of my life",
+   "caption": "five apps i will still be using in ten years. arco keeps every task in one place and plans the day in 30 seconds, with focus mode putting every distraction away while i work, my holy grail. a claude project keeps your files and instructions attached to the chat itself, so you stop re-explaining your own work at the top of every conversation. obsidian keeps every note as a plain markdown file on your own disk, so nothing you wrote is locked inside a company that might shut the app down. raycast keeps a searchable history of everything you have copied on one hotkey, so the link from an hour ago is still there instead of overwritten. endel generates focus sound as you listen instead of playing a fixed playlist, so there is no track to choose and nothing runs out halfway through the session. #productivity #tools #aitools #buildinpublic #creatorsearchinsights"
+  },
+  {
+   "topic": "4x-productivity-14",
+   "title": "the 4 tools that gave me back two hours a day",
+   "caption": "the tools i used to 4x my productivity, here is why. arco focus gives every task a time on the day timeline instead of a list, so the hour that was never going to fit shows up before you start it. a claude project keeps your files and standing instructions attached to the chat, so you stop re-explaining your own work every morning. raycast keeps everything you copied in a searchable history behind one hotkey, so the link from before lunch is still there. linear files an issue from the keyboard with no form, so the bug gets written down in the ten seconds you have. descript edits the audio when you edit the transcript, so an hour of recording becomes a usable cut without a timeline. #productivity #aitools #apps #techtok #creatorsearchinsights",
+   "variants": {
+    "vn": {
+     "title": "the 4 tools that gave me back two hours a day",
+     "caption": "the tools i used to 4x my productivity, here is why. arco focus gives every task a time on the day timeline instead of a list, so the hour that was never going to fit shows up before you start it. a claude project keeps your files and standing instructions attached to the chat, so you stop re-explaining your own work every morning. raycast keeps everything you copied in a searchable history behind one hotkey, so the link from before lunch is still there. linear files an issue from the keyboard with no form, so the bug gets written down in the ten seconds you have. descript edits the audio when you edit the transcript, so an hour of recording becomes a usable cut without a timeline. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    },
+    "getarco": {
+     "title": "the 4 tools that gave me back two hours a day",
+     "caption": "the tools i used to 4x my productivity, here is why. arco focus gives every task a time on the day timeline instead of a list, so the hour that was never going to fit shows up before you start it. a claude project keeps your files and standing instructions attached to the chat, so you stop re-explaining your own work every morning. raycast keeps everything you copied in a searchable history behind one hotkey, so the link from before lunch is still there. linear files an issue from the keyboard with no form, so the bug gets written down in the ten seconds you have. descript edits the audio when you edit the transcript, so an hour of recording becomes a usable cut without a timeline. #productivity #aitools #apps #techtok"
+    },
+    "us": {
+     "title": "the tools i used to 4x my productivity",
+     "caption": "four tools and a planner that gave me back about two hours a day. arco focus does the planning part. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    },
+    "jackson": {
+     "title": "the tools i used to 4x my productivity",
+     "caption": "four tools and a planner that gave me back about two hours a day. arco focus does the planning part. #productivity #aitools #apps #techtok"
+    }
+   }
+  },
+  {
+   "topic": "work-by-noon-13",
+   "title": "how my working day finishes before lunch",
+   "caption": "the tools i use to do a full day of work by noon, here is why. arco focus parks tasks with no time in anytime instead of crowding today, so today only holds what you gave an hour to. codex applies one instruction across every file that needs it, so the rename that ate a morning lands before the coffee goes cold. granola writes the meeting notes against your own agenda, so you leave the call with actions instead of a blank page. zapier moves the record the moment it changes, so nobody copies yesterday into today at nine. a canva brand kit locks the fonts and colours, so a new graphic starts already filled in. #productivity #aitools #apps #techtok #creatorsearchinsights",
+   "variants": {
+    "vn": {
+     "title": "how my working day finishes before lunch",
+     "caption": "the tools i use to do a full day of work by noon, here is why. arco focus parks tasks with no time in anytime instead of crowding today, so today only holds what you gave an hour to. codex applies one instruction across every file that needs it, so the rename that ate a morning lands before the coffee goes cold. granola writes the meeting notes against your own agenda, so you leave the call with actions instead of a blank page. zapier moves the record the moment it changes, so nobody copies yesterday into today at nine. a canva brand kit locks the fonts and colours, so a new graphic starts already filled in. #productivity #aitools #apps #techtok"
+    },
+    "getarco": {
+     "title": "the tools i use to do a full day of work by noon",
+     "caption": "my whole day is done by noon because four tools removed the parts that were never the work. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    },
+    "us": {
+     "title": "the tools i use to do a full day of work by noon",
+     "caption": "my whole day is done by noon because four tools removed the parts that were never the work. #productivity #aitools #apps #techtok"
+    },
+    "jackson": {
+     "title": "how my working day finishes before lunch",
+     "caption": "the tools i use to do a full day of work by noon, here is why. arco focus parks tasks with no time in anytime instead of crowding today, so today only holds what you gave an hour to. codex applies one instruction across every file that needs it, so the rename that ate a morning lands before the coffee goes cold. granola writes the meeting notes against your own agenda, so you leave the call with actions instead of a blank page. zapier moves the record the moment it changes, so nobody copies yesterday into today at nine. a canva brand kit locks the fonts and colours, so a new graphic starts already filled in. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    }
+   }
+  },
+  {
+   "topic": "best-for-last-9",
+   "title": "the 5 tools that keep me on task, best one last",
+   "caption": "5 tools to stay productive and i saved the best for last. arco focus brings up a shield every time you open tiktok, so the reflex turns into a reminder to lock in. claude keeps the whole thread, so picking a task back up costs you a sentence instead of the rest of the session. endel generates the focus sound as you listen, so nothing ends halfway and no track change breaks the session. obsidian keeps every note as a plain file in one folder, so you find it without leaving the app. make runs the handoff between your tools on a schedule, so the job still happens on the afternoon you forget it exists. #productivity #aitools #apps #techtok #creatorsearchinsights",
+   "variants": {
+    "vn": {
+     "title": "5 tools to stay productive, i saved the best for last",
+     "caption": "five tools that keep me on task. the last one puts a shield over tiktok and it is the only reason i work. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    },
+    "getarco": {
+     "title": "5 tools to stay productive, i saved the best for last",
+     "caption": "five tools that keep me on task. the last one puts a shield over tiktok and it is the only reason i work. #productivity #aitools #apps #techtok"
+    },
+    "us": {
+     "title": "the 5 tools that keep me on task, best one last",
+     "caption": "5 tools to stay productive and i saved the best for last. arco focus brings up a shield every time you open tiktok, so the reflex turns into a reminder to lock in. claude keeps the whole thread, so picking a task back up costs you a sentence instead of the rest of the session. endel generates the focus sound as you listen, so nothing ends halfway and no track change breaks the session. obsidian keeps every note as a plain file in one folder, so you find it without leaving the app. make runs the handoff between your tools on a schedule, so the job still happens on the afternoon you forget it exists. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    },
+    "jackson": {
+     "title": "the 5 tools that keep me on task, best one last",
+     "caption": "5 tools to stay productive and i saved the best for last. arco focus brings up a shield every time you open tiktok, so the reflex turns into a reminder to lock in. claude keeps the whole thread, so picking a task back up costs you a sentence instead of the rest of the session. endel generates the focus sound as you listen, so nothing ends halfway and no track change breaks the session. obsidian keeps every note as a plain file in one folder, so you find it without leaving the app. make runs the handoff between your tools on a schedule, so the job still happens on the afternoon you forget it exists. #productivity #aitools #apps #techtok"
+    }
+   }
+  },
+  {
+   "topic": "ten-x-13",
+   "title": "5 tools that each removed a step i did by hand",
+   "caption": "how i 10x'd my productivity, here is why. arco focus starts the block and locks every app on the list from one button, so there are no settings and nothing to decide. cursor edits across every file a change touches from one instruction, so the find-and-replace pass stops existing. superwhisper types what you say into whatever window is in front of you, so the blank page stage of a draft is gone. an airtable base gives you the table, the form and the views with no schema, so you skip building a crud screen nobody will see. photoroom cuts the background on the phone as you shoot, so the trip to a desktop editor disappears. #productivity #aitools #apps #techtok #creatorsearchinsights",
+   "variants": {
+    "vn": {
+     "title": "how i 10x'd my productivity",
+     "caption": "none of these added a feature. they each removed a step i was doing by hand. #productivity #aitools #apps #techtok"
+    },
+    "getarco": {
+     "title": "5 tools that each removed a step i did by hand",
+     "caption": "how i 10x'd my productivity, here is why. arco focus starts the block and locks every app on the list from one button, so there are no settings and nothing to decide. cursor edits across every file a change touches from one instruction, so the find-and-replace pass stops existing. superwhisper types what you say into whatever window is in front of you, so the blank page stage of a draft is gone. an airtable base gives you the table, the form and the views with no schema, so you skip building a crud screen nobody will see. photoroom cuts the background on the phone as you shoot, so the trip to a desktop editor disappears. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    },
+    "us": {
+     "title": "5 tools that each removed a step i did by hand",
+     "caption": "how i 10x'd my productivity, here is why. arco focus starts the block and locks every app on the list from one button, so there are no settings and nothing to decide. cursor edits across every file a change touches from one instruction, so the find-and-replace pass stops existing. superwhisper types what you say into whatever window is in front of you, so the blank page stage of a draft is gone. an airtable base gives you the table, the form and the views with no schema, so you skip building a crud screen nobody will see. photoroom cuts the background on the phone as you shoot, so the trip to a desktop editor disappears. #productivity #aitools #apps #techtok"
+    },
+    "jackson": {
+     "title": "how i 10x'd my productivity",
+     "caption": "none of these added a feature. they each removed a step i was doing by hand. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    }
+   }
+  },
+  {
+   "topic": "pay-for-twelve-8",
+   "title": "12 subscriptions and only 5 earn their place",
+   "caption": "i pay for 12 apps and these 5 do all the work. arco focus puts the block you are in on the lock screen with the time left running, so you pick the phone up and it tells you to get back to work. chatgpt drafts, rewrites and proofreads in one window with your files attached, which quietly replaced three writing tools. a notion database is the wiki and the task tracker reading the same rows, so one subscription covers what two were splitting. buffer queues and publishes per channel, doing the job the dedicated scheduler charged for. posthog puts analytics, replay and flags on the same events, so three bills became one. #productivity #aitools #apps #techtok #creatorsearchinsights",
+   "variants": {
+    "vn": {
+     "title": "12 subscriptions and only 5 earn their place",
+     "caption": "i pay for 12 apps and these 5 do all the work. arco focus puts the block you are in on the lock screen with the time left running, so you pick the phone up and it tells you to get back to work. chatgpt drafts, rewrites and proofreads in one window with your files attached, which quietly replaced three writing tools. a notion database is the wiki and the task tracker reading the same rows, so one subscription covers what two were splitting. buffer queues and publishes per channel, doing the job the dedicated scheduler charged for. posthog puts analytics, replay and flags on the same events, so three bills became one. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    },
+    "getarco": {
+     "title": "12 subscriptions and only 5 earn their place",
+     "caption": "i pay for 12 apps and these 5 do all the work. arco focus puts the block you are in on the lock screen with the time left running, so you pick the phone up and it tells you to get back to work. chatgpt drafts, rewrites and proofreads in one window with your files attached, which quietly replaced three writing tools. a notion database is the wiki and the task tracker reading the same rows, so one subscription covers what two were splitting. buffer queues and publishes per channel, doing the job the dedicated scheduler charged for. posthog puts analytics, replay and flags on the same events, so three bills became one. #productivity #aitools #apps #techtok"
+    },
+    "us": {
+     "title": "i pay for 12 apps, these 5 do all the work",
+     "caption": "twelve subscriptions and five of them do everything. the other seven are just habit. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    },
+    "jackson": {
+     "title": "i pay for 12 apps, these 5 do all the work",
+     "caption": "twelve subscriptions and five of them do everything. the other seven are just habit. #productivity #aitools #apps #techtok"
+    }
+   }
+  },
+  {
+   "topic": "wish-i-knew-at-17-11",
+   "title": "the 5 apps that would have saved me a year at 17",
+   "caption": "5 apps i wish someone showed me at 17. arco focus puts every distracting app away for the whole session, so an hour of work is an hour and not forty minutes and a scroll. perplexity answers with the sources underneath, so at seventeen i would have learned to check a claim instead of repeating it. clickup holds every assignment with its due date in one sortable list, so the deadline on a different app would not have been missed. capcut cuts, captions and exports vertical video entirely on the phone. figma is free for one person and every real design file opens in the browser, so you learn by taking apart work that shipped. #productivity #aitools #apps #techtok #creatorsearchinsights",
+   "variants": {
+    "vn": {
+     "title": "the 5 apps that would have saved me a year at 17",
+     "caption": "5 apps i wish someone showed me at 17. arco focus puts every distracting app away for the whole session, so an hour of work is an hour and not forty minutes and a scroll. perplexity answers with the sources underneath, so at seventeen i would have learned to check a claim instead of repeating it. clickup holds every assignment with its due date in one sortable list, so the deadline on a different app would not have been missed. capcut cuts, captions and exports vertical video entirely on the phone. figma is free for one person and every real design file opens in the browser, so you learn by taking apart work that shipped. #productivity #aitools #apps #techtok"
+    },
+    "getarco": {
+     "title": "5 apps i wish someone showed me at 17",
+     "caption": "at 17 nobody told me about any of these. the first one would have saved me a year. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    },
+    "us": {
+     "title": "5 apps i wish someone showed me at 17",
+     "caption": "at 17 nobody told me about any of these. the first one would have saved me a year. #productivity #aitools #apps #techtok"
+    },
+    "jackson": {
+     "title": "the 5 apps that would have saved me a year at 17",
+     "caption": "5 apps i wish someone showed me at 17. arco focus puts every distracting app away for the whole session, so an hour of work is an hour and not forty minutes and a scroll. perplexity answers with the sources underneath, so at seventeen i would have learned to check a claim instead of repeating it. clickup holds every assignment with its due date in one sortable list, so the deadline on a different app would not have been missed. capcut cuts, captions and exports vertical video entirely on the phone. figma is free for one person and every real design file opens in the browser, so you learn by taking apart work that shipped. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    }
+   }
+  },
+  {
+   "topic": "use-for-life-2",
+   "title": "the 5 apps i will still be opening in ten years",
+   "caption": "5 apps i will use for the rest of my life. arco focus gives every task a time and the block that protects it is the same app, so you stop running a planner and a blocker that know nothing about each other. manus takes a goal and runs the steps itself, and what it automates is your process, which outlives whichever model is underneath. vercel builds and deploys from the branch on every push, so shipping stays one command whatever framework comes next. elevenlabs reads a script in a voice you can reuse for years. stripe handles the card, the tax and the retry, and taking money never goes out of fashion. #productivity #aitools #apps #techtok #creatorsearchinsights",
+   "variants": {
+    "vn": {
+     "title": "5 apps i will use for the rest of my life",
+     "caption": "five apps i will still be opening in ten years. the planner is the one i would fight for. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    },
+    "getarco": {
+     "title": "5 apps i will use for the rest of my life",
+     "caption": "five apps i will still be opening in ten years. the planner is the one i would fight for. #productivity #aitools #apps #techtok"
+    },
+    "us": {
+     "title": "the 5 apps i will still be opening in ten years",
+     "caption": "5 apps i will use for the rest of my life. arco focus gives every task a time and the block that protects it is the same app, so you stop running a planner and a blocker that know nothing about each other. manus takes a goal and runs the steps itself, and what it automates is your process, which outlives whichever model is underneath. vercel builds and deploys from the branch on every push, so shipping stays one command whatever framework comes next. elevenlabs reads a script in a voice you can reuse for years. stripe handles the card, the tax and the retry, and taking money never goes out of fashion. #productivity #aitools #apps #techtok #creatorsearchinsights"
+    },
+    "jackson": {
+     "title": "the 5 apps i will still be opening in ten years",
+     "caption": "5 apps i will use for the rest of my life. arco focus gives every task a time and the block that protects it is the same app, so you stop running a planner and a blocker that know nothing about each other. manus takes a goal and runs the steps itself, and what it automates is your process, which outlives whichever model is underneath. vercel builds and deploys from the branch on every push, so shipping stays one command whatever framework comes next. elevenlabs reads a script in a voice you can reuse for years. stripe handles the card, the tax and the retry, and taking money never goes out of fashion. #productivity #aitools #apps #techtok"
+    }
+   }
   }
  ]
 }

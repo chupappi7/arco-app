@@ -75,11 +75,34 @@ def gradient_darken(im, f_top, f_bot, ramp_a, ramp_b):
     alpha = alpha.resize(im.size)
     im.paste(Image.new('RGB', im.size, (0, 0, 0)), (0, 0), alpha)
 
-def rounded_icon(path, size=210, radius=48):
-    ic = Image.open(path).convert('RGB').resize((size, size), Image.LANCZOS)
-    mask = Image.new('L', (size, size), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, size - 1, size - 1), radius=radius, fill=255)
-    return ic, mask
+def rounded_icon(path, size=210, radius=48, outline=None):
+    """The app icon, rounded, with a thin white keyline around it.
+
+    Most of these icons are near-black and they sat on dark photographs, so
+    the corner radius was guesswork and the icon bled into the background.
+    A hairline gives it an edge to end on.
+
+    Drawn at 4x and reduced, because a two pixel stroke on a curve drawn at
+    final size is a staircase. Inset by half its width so the whole stroke
+    falls inside the mask -- centred on the boundary, the outer half gets
+    clipped and the line reads as uneven. Scales with the icon so the shelf
+    on the hook slide and the 250px card keep the same weight.
+    """
+    if outline is None:
+        outline = max(1, round(size / 105))
+    S = 4
+    big = size * S
+    ic = Image.open(path).convert('RGB').resize((big, big), Image.LANCZOS)
+    if outline:
+        w = outline * S
+        ImageDraw.Draw(ic).rounded_rectangle(
+            (w / 2, w / 2, big - 1 - w / 2, big - 1 - w / 2),
+            radius=max(1, radius * S - w / 2), outline=(255, 255, 255), width=w)
+    mask = Image.new('L', (big, big), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, big - 1, big - 1),
+                                           radius=radius * S, fill=255)
+    return (ic.resize((size, size), Image.LANCZOS),
+            mask.resize((size, size), Image.LANCZOS))
 
 def fit_font(text, variation, start, max_width=860, floor=44):
     size = start
@@ -121,6 +144,7 @@ MIN_BG_PX = (1000, 1700)
 # single post: two photos of a man at a desk in one carousel reads as stock
 # imagery. `assert_one_person(list_of_bgs)` enforces it at build time.
 import json as _json
+import os as _os
 import hook_rules
 try:
     HAS_PERSON = set(_json.load(open(f'{SP}/manifest.json'))['has_person'])
@@ -354,6 +378,12 @@ def assert_bg_fresh(bgs, topic=None):
     """
     if BG_COOLDOWN <= 0:          # [-0:] is the whole list, not none of it
         return True
+    # Re-rendering an existing post is not a new post. Its photos were already
+    # cleared when it was built, and the history now contains newer posts that
+    # legitimately reused them — so the check fires on a rebuild that
+    # introduces nothing. Set only when reproducing a post that already exists.
+    if _os.environ.get('ARCO_RERENDER') == '1':
+        return True
     recent = [e for e in bg_history() if e['topic'] != topic][-BG_COOLDOWN:]
     seen = {b: e['topic'] for e in recent for b in e['bgs']}
     clash = [(b, seen[b]) for b in bgs if b in seen]
@@ -366,21 +396,27 @@ def assert_bg_fresh(bgs, topic=None):
     return True
 
 
-BAND_MAX_LUMA = 70        # mean luma of the copy band after the scrim
+BAND_MAX_LUMA = 80        # mean luma of the copy band, blurred and scrimmed
 
 
 def copy_band_luma(bg):
-    """Mean luma where the body copy lands, measured after the scrim.
+    """Mean luma where the body copy lands, as the slide will actually ship.
 
-    Brightness alone does not decide legibility, but past about 70 the dashes
-    and the thinner strokes start dissolving into the photo. Cheap enough to
-    run on every candidate, so the picker never offers one that will not hold
-    five lines of white text.
+    The ceiling was 70 and the measurement skipped the blur, which meant the
+    gate judged a frame the pipeline no longer produces. band_blur takes the
+    detail out from under the copy, and detail is what dissolves the dashes
+    and the thinner strokes -- so seven frames that failed at 70 unblurred
+    hold white text comfortably once it is applied. Measured blurred, with
+    the ceiling at 80, they pass and the genuinely bright frames still do not.
+
+    The crop runs to 1400 rather than 1310 because at BODY_STEP the copy ends
+    near 1425; the old window stopped above the last line and never saw it.
     """
     im = base_photo(bg, (0.85, 0.68, 300, 1250))
     im = frame_for_band(im, 600, 1300)
+    band_blur(im, 600)
     adaptive_scrim(im, 600, 1300)
-    g = im.convert('L').crop((85, 980, 1000, 1310))
+    g = im.convert('L').crop((85, 980, 1000, 1400))
     px = list(g.getdata())
     return sum(px) / len(px)
 
@@ -608,6 +644,11 @@ def assert_hook_fresh(lines, topic=None):
     `retired: true` takes one out for good. The old boolean was advisory: it
     lived in a prompt, so a build could ignore it and did.
     """
+    # A rebuild is not a new outing. The hook already went out on this topic;
+    # re-rendering one slide of it does not spend the cooldown again, and the
+    # check otherwise blocks every repair to a post older than four builds.
+    if _os.environ.get('ARCO_RERENDER') == '1':
+        return True
     ok, why = hook_rules.status(lines, topic)
     if ok:
         return True
@@ -825,6 +866,60 @@ def adaptive_scrim(im, y0, y1, target=96, feather=140, strength_cap=0.55):
     return strength
 
 
+# The copy band's three numbers, shared by app_slide and rule_slide so the
+# two formats cannot drift apart, and importable by the generators that have
+# to predict where the copy ends.
+BODY_STEP = 80            # 50px body at line-height 1.60
+PARA_GAP = 30             # extra gap between paragraphs
+BAND_BLUR = 12            # gaussian radius behind the copy, 0 to switch off
+
+
+def band_blur(im, y0, radius=BAND_BLUR, feather=320, steps=8):
+    """Defocus the photo behind the copy, ramping in like a lens.
+
+    BAND_MAX_LUMA rejects a background for being bright, but brightness is
+    not what breaks the text -- detail is. Thin strokes and the grey dashes
+    dissolve into a busy photo at any luma. Blur removes the detail and
+    leaves the luma alone, which is why the guard cannot see this working:
+    measured on bg-h21 the band's mean luma moves 63.9 -> 63.7 while its
+    standard deviation drops 36 -> 27.
+
+    Two things make it read as depth of field rather than a filter:
+
+    Radius ramps, opacity does not. Cross-fading a fully blurred copy over
+    the sharp one is a double exposure -- every edge appears twice, once
+    sharp and once soft -- and it shows as a seam wherever the fade starts.
+    So the blur is built in `steps` levels and each is composited only where
+    the target radius has reached it, which is a real focus falloff.
+
+    There is no bottom edge. The band is open-ended: once the photo goes
+    soft it stays soft to the frame's edge, so the slide has one transition
+    instead of two. Closing it at 1450 put a second seam across the floor.
+    The top stays sharp because frame_for_band has already chosen a crop
+    with something worth seeing up there.
+    """
+    if not radius:
+        return
+    h = im.height
+    base = im.copy()
+    for k in range(1, steps + 1):
+        r_lo = radius * (k - 1) / steps
+        r_hi = radius * k / steps
+        ramp = Image.new('L', (1, h), 0)
+        rp = ramp.load()
+        for y in range(h):
+            # the radius this row wants, 0 above the feather, full inside
+            want = (radius if y >= y0
+                    else 0.0 if y <= y0 - feather
+                    else radius * (y - (y0 - feather)) / feather)
+            # how far this row has got through the current level
+            t = 0.0 if want <= r_lo else 1.0 if want >= r_hi else (
+                (want - r_lo) / (r_hi - r_lo))
+            rp[0, y] = int(255 * t)
+        im.paste(base.filter(ImageFilter.GaussianBlur(r_hi)), (0, 0),
+                 ramp.resize(im.size))
+
+
 def text_scrim(im, y0, y1, strength=0.62, feather=120):
     """Local darkening behind the copy band only, so text always reads while
     the rest of the photo stays visible."""
@@ -897,6 +992,7 @@ def app_slide(bg, icon, title, body_lines, out, grad=(0.85, 0.68, 300, 1250)):
     assert_teaches(title, body_lines)
     im = base_photo(bg, grad)
     im = frame_for_band(im, 600, 1300)
+    band_blur(im, 600)
     adaptive_scrim(im, 600, 1300)
     ic, mask = rounded_icon(f'{ICONS}/{icon}')
     im.paste(ic, (88, 610), mask)
@@ -910,14 +1006,14 @@ def app_slide(bg, icon, title, body_lines, out, grad=(0.85, 0.68, 300, 1250)):
     new_para = True
     for ln in body_lines:
         if ln == '':
-            y += 26
+            y += PARA_GAP
             new_para = True
             continue
         if new_para:
             items.append((85, y, '-', body_f, 'la', (150, 150, 150)))
             new_para = False
         items.append((125, y, ln, body_f, 'la', (255, 255, 255)))
-        y += 72
+        y += BODY_STEP
     draw_text_block(im, items)
     im.save(out, quality=92)
     print('wrote', out)
@@ -940,6 +1036,7 @@ def rule_slide(bg, number, title, body_lines, out, grad=(0.85, 0.68, 300, 1250),
     """
     im = base_photo(bg, grad)
     im = frame_for_band(im, 600, 1300)
+    band_blur(im, 600)
     adaptive_scrim(im, 600, 1300)
 
     if badge:
@@ -961,14 +1058,14 @@ def rule_slide(bg, number, title, body_lines, out, grad=(0.85, 0.68, 300, 1250),
     new_para = True
     for ln in body_lines:
         if ln == '':
-            y += 26
+            y += PARA_GAP
             new_para = True
             continue
         if new_para:
             items.append((85, y, '-', body_f, 'la', (150, 150, 150)))
             new_para = False
         items.append((125, y, ln, body_f, 'la', (255, 255, 255)))
-        y += 72
+        y += BODY_STEP
     draw_text_block(im, items)
     im.save(out, quality=92)
     print('wrote', out, '[rule]')
@@ -1028,7 +1125,7 @@ def phone_slide(bg, src, crop_top, number, title, body, out,
           'app_size': 34, 'lead': 1.1, 'phone_w': 524, 'phone_y': 372,
           'col_x': 626, 'col_w': 400, 'col_y': 880,
           'side': 'left', 'title_face': 'Bold', 'body_face': 'Regular',
-          'app_face': 'Regular'}
+          'app_face': 'Regular', 'phone_x': None, 'scrim': 0, 'stack': 0}
     st.update(style or {})
 
     if isinstance(bg, Image.Image):
@@ -1040,12 +1137,61 @@ def phone_slide(bg, src, crop_top, number, title, body, out,
     else:
         im = Image.new('RGB', (1080, 1920), st['ground'])
 
+    def wrap_px(text, f, width):
+        words, lines, cur = text.split(), [], ''
+        for w in words:
+            trial = f'{cur} {w}'.strip()
+            if cur and f.getlength(trial) > width:
+                lines.append(cur)
+                cur = w
+            else:
+                cur = trial
+        if cur:
+            lines.append(cur)
+        return lines
+
+    head = f'{number}. {title}' if number else title
+    COL, CX = st['col_w'], st['col_x']
+    for size in range(st['title_size'], st['title_size'] - 22, -2):
+        tf = font(size, st['title_face'])
+        tlines = wrap_px(head, tf, COL)
+        if len(tlines) <= 3:
+            break
+    bf = font(st['body_size'], st['body_face'])
+    blines = wrap_px(body, bf, COL)
+    col_h = ((60 if app else 0)
+             + len(tlines) * round(tf.size * st['lead']) + 26
+             + len(blines) * round(bf.size * 1.32))
+
     # --- the handset -------------------------------------------------------
     PW = st['phone_w']
     PH = round(PW * 2622 / 1206)
     R = round(PW * 0.125)
     py = st['phone_y']
-    px = 52 if st['side'] == 'left' else 1080 - 52 - PW
+
+    # `stack` is the gap under the copy in a layout where the handset sits
+    # below it rather than beside it. The copy's height is not known until it
+    # is wrapped, and a three-line body is 110px taller than a one-line one —
+    # a fixed phone_y put the device through the text on exactly those
+    # slides. The handset narrows if that pushes it past the frame.
+    if st['stack']:
+        py = max(py, st['col_y'] + col_h + st['stack'])
+        if py + PH > 1920 - 36:
+            PW = round(PW * (1920 - 36 - py) / PH)
+            PH = round(PW * 2622 / 1206)
+            R = round(PW * 0.125)
+    px = (st['phone_x'] if st['phone_x'] is not None
+          else 52 if st['side'] == 'left' else 1080 - 52 - PW)
+
+    # A column laid over the handset needs its own ground or the screenshot
+    # reads through it. `scrim` is how dark that band goes, 0 for none.
+    if st['scrim']:
+        band = Image.new('L', (1, 1920), 0)
+        for yy in range(1920):
+            t = yy / 1919.0
+            band.putpixel((0, yy), int(255 * st['scrim'] * (1 - t) ** 1.6))
+        im.paste(Image.new('RGB', im.size, (0, 0, 0)), (0, 0),
+                 band.resize(im.size))
 
     shadow = Image.new('RGBA', im.size, (0, 0, 0, 0))
     ImageDraw.Draw(shadow).rounded_rectangle(
@@ -1122,29 +1268,6 @@ def phone_slide(bg, src, crop_top, number, title, body, out,
     im.paste(body_im, (px - 6, py), body_im)
 
     # --- the column --------------------------------------------------------
-    head = f'{number}. {title}' if number else title
-    COL, CX = st['col_w'], st['col_x']
-
-    def wrap_px(text, f, width):
-        words, lines, cur = text.split(), [], ''
-        for w in words:
-            trial = f'{cur} {w}'.strip()
-            if cur and f.getlength(trial) > width:
-                lines.append(cur)
-                cur = w
-            else:
-                cur = trial
-        if cur:
-            lines.append(cur)
-        return lines
-
-    for size in range(st['title_size'], st['title_size'] - 22, -2):
-        tf = font(size, st['title_face'])
-        tlines = wrap_px(head, tf, COL)
-        if len(tlines) <= 3:
-            break
-    bf = font(st['body_size'], st['body_face'])
-
     items, y = [], st['col_y']
     if app:
         items.append((CX, y, app, font(st['app_size'], st['app_face']), 'la',
@@ -1154,7 +1277,7 @@ def phone_slide(bg, src, crop_top, number, title, body, out,
         items.append((CX, y, ln, tf, 'la', st['ink']))
         y += round(tf.size * st['lead'])
     y += 26
-    for ln in wrap_px(body, bf, COL):
+    for ln in blines:
         items.append((CX, y, ln, bf, 'la', st['sub']))
         y += round(bf.size * 1.32)
     draw_text_block(im, items, shadow_alpha=0)

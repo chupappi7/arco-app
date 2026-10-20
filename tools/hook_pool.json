@@ -1,5 +1,5 @@
 {
- "_note": "Hooks Thinh wrote or approved. hook_slide refuses anything not in here or a close rewording of it. `pillar` is binding: a hook decides the post's shape, so a screentime hook cannot be answered with a tool roster.",
+ "_note": "Hooks Thinh wrote or approved. hook_slide refuses anything not in here or a close rewording of it. `pillar` is binding: a hook decides the post's shape, so a screentime hook cannot be answered with a tool roster. `theme` is binding too: it picks ARCO's angle, so the app slide answers the question the hook asked instead of whatever the generator felt like declaring. `lens` is what every tool point after ARCO has to answer -- guidance for whoever writes the roster, not something a regex can judge.",
  "hooks": [
   {
    "lines": [
@@ -7,7 +7,9 @@
     "4x my productivity"
    ],
    "used": true,
-   "pillar": "tools"
+   "pillar": "tools",
+   "theme": "planning",
+   "lens": "the time it gives back inside a working day"
   },
   {
    "lines": [
@@ -15,7 +17,11 @@
     "if i deleted everything else"
    ],
    "used": true,
-   "pillar": "tools"
+   "pillar": "tools",
+   "retired": true,
+   "retired_why": "10% breakout over 8 outings, median 561 — the weakest hook in the pool",
+   "theme": "planning",
+   "lens": "why this one survives the cut when the rest go"
   },
   {
    "lines": [
@@ -23,7 +29,9 @@
     "my productivity"
    ],
    "used": true,
-   "pillar": "tools"
+   "pillar": "tools",
+   "theme": "focus",
+   "lens": "the step it removes, not the feature it ships"
   },
   {
    "lines": [
@@ -31,7 +39,9 @@
     "is a schedule, not a personality"
    ],
    "used": true,
-   "pillar": "discipline"
+   "pillar": "discipline",
+   "theme": "schedule",
+   "lens": "the rule it enforces, so willpower is not the mechanism"
   },
   {
    "lines": [
@@ -39,7 +49,9 @@
     "at 19 years old"
    ],
    "used": true,
-   "pillar": "build"
+   "pillar": "build",
+   "theme": "business",
+   "lens": "the job it does in running the business"
   },
   {
    "lines": [
@@ -47,7 +59,9 @@
     "i saved the best for last"
    ],
    "used": true,
-   "pillar": "tools"
+   "pillar": "tools",
+   "theme": "focus",
+   "lens": "what it keeps you on task through"
   },
   {
    "lines": [
@@ -55,7 +69,9 @@
     "these 5 do all the work"
    ],
    "used": true,
-   "pillar": "tools"
+   "pillar": "tools",
+   "theme": "business",
+   "lens": "the work it absorbs that another subscription was doing"
   },
   {
    "lines": [
@@ -63,7 +79,9 @@
     "a full day of work by noon"
    ],
    "used": true,
-   "pillar": "tools"
+   "pillar": "tools",
+   "theme": "planning",
+   "lens": "the hours it compresses before noon"
   },
   {
    "lines": [
@@ -71,7 +89,9 @@
     "showed me at 17"
    ],
    "used": true,
-   "pillar": "tools"
+   "pillar": "tools",
+   "theme": "study",
+   "lens": "what it would have saved you at seventeen"
   },
   {
    "lines": [
@@ -79,7 +99,9 @@
     "what used to take a month"
    ],
    "used": true,
-   "pillar": "build"
+   "pillar": "build",
+   "theme": "build",
+   "lens": "the stage of shipping it collapses"
   },
   {
    "lines": [
@@ -87,7 +109,9 @@
     "at 19"
    ],
    "used": true,
-   "pillar": "build"
+   "pillar": "build",
+   "theme": "business",
+   "lens": "the business function it covers on its own"
   },
   {
    "lines": [
@@ -95,7 +119,9 @@
     "without touching my phone"
    ],
    "used": true,
-   "pillar": "learn"
+   "pillar": "learn",
+   "theme": "study",
+   "lens": "how it keeps the phone out of the study block"
   },
   {
    "lines": [
@@ -103,7 +129,9 @@
     "without deleting a single app"
    ],
    "used": true,
-   "pillar": "screentime"
+   "pillar": "screentime",
+   "theme": "screentime",
+   "lens": "the hours it removes without deleting anything"
   },
   {
    "lines": [
@@ -111,7 +139,9 @@
     "and it changed everything"
    ],
    "used": true,
-   "pillar": "screentime"
+   "pillar": "screentime",
+   "theme": "screentime",
+   "lens": "what it strips out of the phone pull"
   },
   {
    "lines": [
@@ -119,7 +149,9 @@
     "when you don't feel like it"
    ],
    "used": true,
-   "pillar": "discipline"
+   "pillar": "discipline",
+   "theme": "discipline",
+   "lens": "what it does when the motivation is simply absent"
   },
   {
    "lines": [
@@ -127,7 +159,9 @@
     "is still 100+ hours"
    ],
    "used": true,
-   "pillar": "screentime"
+   "pillar": "screentime",
+   "theme": "insights",
+   "lens": "the reason it exposes, with a number on it"
   },
   {
    "lines": [
@@ -135,7 +169,9 @@
     "for the rest of my life"
    ],
    "used": true,
-   "pillar": "tools"
+   "pillar": "tools",
+   "theme": "planning",
+   "lens": "why it outlasts a trend"
   },
   {
    "lines": [
@@ -144,7 +180,9 @@
    ],
    "used": true,
    "pillar": "build",
-   "_note": "shipped 2026-08-24 as launch-weekend, before the pool existed; added 2026-09-21 so the launch-weekend-3 re-shoot could reuse it verbatim and the cooldown counts it"
+   "_note": "shipped 2026-08-24 as launch-weekend, before the pool existed; added 2026-09-21 so the launch-weekend-3 re-shoot could reuse it verbatim and the cooldown counts it",
+   "theme": "build",
+   "lens": "the launch step it handles"
   },
   {
    "lines": [
@@ -152,7 +190,9 @@
     "not one of them is willpower"
    ],
    "used": true,
-   "pillar": "screentime"
+   "pillar": "screentime",
+   "theme": "discipline",
+   "lens": "the mechanism that works without willpower"
   }
  ]
 }

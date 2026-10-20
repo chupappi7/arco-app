@@ -7782,9 +7782,19 @@ function tabCount(k){
 // inbox waiting to be published, then what is waiting to be drafted. The
 // slot line is the constraint that decides how much you can do today.
 function tiktokView(){
+  // Two piles, and the sidebar badge counts both. It used to render only the
+  // second, so eleven posts sitting in the phone's inbox were invisible here
+  // while the badge went on counting them — the page said 6 and the nav said
+  // 17, and the eleven that needed a thumb on the phone were the ones you
+  // could not see.
+  const inbox = DATA.posts.filter(needsPublish).sort((a,b)=>whenOf(b)-whenOf(a));
   const todo = DATA.posts.filter(p=>stateOf(p)==='review').sort((a,b)=>whenOf(b)-whenOf(a));
-  document.getElementById('cnt').textContent = `${todo.length} to draft`;
-  return `<h4 class="csub">Built, not drafted</h4>
+  document.getElementById('cnt').textContent = inbox.length
+    ? `${inbox.length} to publish · ${todo.length} to draft`
+    : `${todo.length} to draft`;
+  return band('In your inbox', inbox,
+              'Open TikTok on your phone and publish these.')
+    + `<h4 class="csub">Built, not drafted</h4>
     ${todo.length ? groups(todo)
       : '<div class="empty">Review is clear — build more.</div>'}`;
 }

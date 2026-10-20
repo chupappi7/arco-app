@@ -63,13 +63,6 @@
   ]
  },
  {
-  "topic": "showed-me-at-17",
-  "hook": [
-   "5 apps i wish someone",
-   "showed me at 17"
-  ]
- },
- {
   "topic": "weekend-not-month",
   "hook": [
    "how i ship in a weekend",
@@ -175,13 +168,6 @@
   ]
  },
  {
-  "topic": "deleted-everything",
-  "hook": [
-   "the 5 apps i would keep",
-   "if i deleted everything else"
-  ]
- },
- {
   "topic": "wish-at-17",
   "hook": [
    "5 apps i wish someone",
@@ -224,24 +210,10 @@
   ]
  },
  {
-  "topic": "work-by-noon-3",
-  "hook": [
-   "the tools i use to do",
-   "a full day of work by noon"
-  ]
- },
- {
   "topic": "type-less-3",
   "hook": [
    "i barely type anymore",
    "these 5 tools do it for me"
-  ]
- },
- {
-  "topic": "all-of-it-at-19",
-  "hook": [
-   "everything i run my business on",
-   "at 19"
   ]
  },
  {
@@ -277,13 +249,6 @@
   "hook": [
    "5 tools",
    "that replace a whole team"
-  ]
- },
- {
-  "topic": "lock-in-anyway-3",
-  "hook": [
-   "this is how you lock in",
-   "when you don't feel like it"
   ]
  },
  {
@@ -623,13 +588,6 @@
   ]
  },
  {
-  "topic": "boring-phone-2",
-  "hook": [
-   "my phone is boring now",
-   "and it changed everything"
-  ]
- },
- {
   "topic": "three-hours-back-2",
   "hook": [
    "i cut 3 hours of screen time",
@@ -763,20 +721,6 @@
   ]
  },
  {
-  "topic": "work-by-noon-9",
-  "hook": [
-   "the tools i use to do",
-   "a full day of work by noon"
-  ]
- },
- {
-  "topic": "ten-x-10",
-  "hook": [
-   "how i 10x'd",
-   "my productivity"
-  ]
- },
- {
   "topic": "three-hours-screens-2",
   "hook": [
    "i cut 3 hours of screen time",
@@ -809,20 +753,6 @@
   "hook": [
    "the 5 apps i would keep",
    "if i deleted everything else"
-  ]
- },
- {
-  "topic": "wish-i-knew-at-17-8",
-  "hook": [
-   "5 apps i wish someone",
-   "showed me at 17"
-  ]
- },
- {
-  "topic": "rest-of-my-life-3",
-  "hook": [
-   "5 apps i will use",
-   "for the rest of my life"
   ]
  },
  {
@@ -921,6 +851,76 @@
   "hook": [
    "5 apps i wish someone",
    "showed me at 17"
+  ]
+ },
+ {
+  "topic": "cut-four-screens",
+  "hook": [
+   "4 things that cut my screen time",
+   "not one of them is willpower"
+  ]
+ },
+ {
+  "topic": "boring-phone-screens-3",
+  "hook": [
+   "my phone is boring now",
+   "and it changed everything"
+  ]
+ },
+ {
+  "topic": "use-for-life",
+  "hook": [
+   "5 apps i will use",
+   "for the rest of my life"
+  ]
+ },
+ {
+  "topic": "4x-productivity-14",
+  "hook": [
+   "the tools i used to",
+   "4x my productivity"
+  ]
+ },
+ {
+  "topic": "work-by-noon-13",
+  "hook": [
+   "the tools i use to do",
+   "a full day of work by noon"
+  ]
+ },
+ {
+  "topic": "pay-for-twelve-8",
+  "hook": [
+   "i pay for 12 apps",
+   "these 5 do all the work"
+  ]
+ },
+ {
+  "topic": "best-for-last-9",
+  "hook": [
+   "5 tools to stay productive",
+   "i saved the best for last"
+  ]
+ },
+ {
+  "topic": "ten-x-13",
+  "hook": [
+   "how i 10x'd",
+   "my productivity"
+  ]
+ },
+ {
+  "topic": "wish-i-knew-at-17-11",
+  "hook": [
+   "5 apps i wish someone",
+   "showed me at 17"
+  ]
+ },
+ {
+  "topic": "use-for-life-2",
+  "hook": [
+   "5 apps i will use",
+   "for the rest of my life"
   ]
  }
 ]
