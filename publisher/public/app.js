@@ -9,9 +9,21 @@ const MARK = {
   facebook: 'M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z',
 };
 const icon = (pl, size = 16, cls = '') => `<svg class="pi ${pl} ${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><path d="${MARK[pl]}"/></svg>`;
+// The platform's own app icon, in its colors: TikTok's black tile with the
+// cyan and red offset, Instagram's gradient, Facebook's blue circle.
+const appIcon = (pl, size = 32) => {
+  const g = `<path d="${MARK[pl]}"/>`;
+  const inner = pl === 'tiktok'
+    ? `<g transform="translate(5.6 5.4) scale(.53)"><g fill="#25F4EE" transform="translate(-.9 -.9)">${g}</g><g fill="#FE2C55" transform="translate(.9 .9)">${g}</g><g fill="#fff">${g}</g></g>`
+    : pl === 'instagram' ? `<g fill="#fff" transform="translate(5.5 5.5) scale(.54)">${g}</g>`
+    : `<circle cx="12" cy="12" r="9.2" fill="#fff"/><g fill="#0866FF" transform="translate(1.5 1.5) scale(.875)">${g}</g>`;
+  const bg = pl === 'tiktok' ? '<rect width="24" height="24" rx="6" fill="#000"/>'
+    : pl === 'instagram' ? `<defs><radialGradient id="igg${size}" cx="30%" cy="107%" r="150%"><stop offset="0" stop-color="#fdf497"/><stop offset=".05" stop-color="#fdf497"/><stop offset=".45" stop-color="#fd5949"/><stop offset=".6" stop-color="#d6249f"/><stop offset=".9" stop-color="#285AEB"/></radialGradient></defs><rect width="24" height="24" rx="6" fill="url(#igg${size})"/>`
+    : '<rect width="24" height="24" rx="6" fill="#fff"/>';
+  return `<svg class="appicon ${pl}" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${bg}${inner}</svg>`;
+};
 // The platform's mark pinned to the corner of an account's avatar.
 const withBadge = (av, pl) => `<span class="avw">${av}<span class="badge-pl ${pl}">${icon(pl, 10)}</span></span>`;
-const connectBtn = (pl, href, text) => `<a class="btn brand ${pl}" href="${href}">${icon(pl, 16)}<span>${text}</span></a>`;
 // Instagram takes JPEG between 4:5 (portrait) and 1.91:1 (landscape), 10 per post.
 const IG_MIN_RATIO = 4 / 5, IG_MAX_RATIO = 1.91, IG_MAX = 10, IG_CAPTION = 2200;
 const CAPTION_MAX = { tiktok: 4000, instagram: IG_CAPTION, facebook: 63206 };
@@ -101,10 +113,11 @@ const VIEWS = ['overview', 'compose', 'calendar', 'analytics', 'drafts', 'accoun
 function route() {
   S.view = (location.hash || '#overview').slice(1);
   if (!VIEWS.includes(S.view)) S.view = 'overview';
-  if (S.view === 'overview') loadOverview();
-  if (S.view === 'calendar') loadWeek();
-  if (S.view === 'drafts') loadDrafts();
-  if (S.view === 'analytics') loadStats();
+  const signedIn = !!S.me && !S.me.needs_email;
+  if (signedIn && S.view === 'overview') loadOverview();
+  if (signedIn && S.view === 'calendar') loadWeek();
+  if (signedIn && S.view === 'drafts') loadDrafts();
+  if (signedIn && S.view === 'analytics') loadStats();
   render();
   window.scrollTo(0, 0);
 }
@@ -1072,10 +1085,10 @@ function queuePreview() {
     <span class="note">Each account takes its next free posting time (${esc(tz().replace(/_/g, ' '))}).</span></div>`;
 }
 
-function slotsEditor(key, current, label) {
+function slotsEditor(key, current, label, fallback) {
   const x = S.slotEdit;
   if (!x || x.key !== key) {
-    return `<div class="slotline"><span class="note">${label}: <b>${esc(slotsText(current))}</b></span>
+    return `<div class="slotline"><span class="note">${label}: <b>${esc(slotsText(current || fallback))}</b>${!current && fallback ? ' <em class="dflt">workspace default</em>' : ''}</span>
       ${can('admin') ? `<button class="link" data-slotedit="${key}">Edit posting times</button>` : ''}</div>`;
   }
   return `<div class="sloted">
@@ -1408,118 +1421,107 @@ const connectHref = pl => pl === 'tiktok' ? '/api/auth/start?add=1'
   : pl === 'instagram' ? (S.me.instagram_enabled ? '/api/auth/instagram/start?add=1' : '')
   : (S.me.facebook_enabled ? '/api/auth/meta/start?add=1' : '');
 
-function accountRow(x) {
+function accountCard(x) {
   const pl = platformOf(x);
-  return `<div class="row acctrow"><span class="txt who">${withBadge(avatar(x.avatar_url, x.username || x.display_name), pl)}
-      <span><span class="t">${handle(x)}</span><span class="d">${x.needs_reconnect
-        ? '<span class="note bad">Access was revoked or expired. Reconnect to keep posting.</span>'
-        : `${PLATFORM[pl]}${x.display_name && x.display_name !== x.username ? ` · ${esc(x.display_name)}` : ''}`}</span></span></span>
-    <select data-move="${x.id}" aria-label="Brand for ${esc(x.username)}" class="move">
-      <option value="">Not in a brand</option>
-      ${S.me.brands.map(b => `<option value="${b.id}" ${x.brand_id === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
-    </select>
-    ${x.needs_reconnect && connectHref(pl) ? `<a class="btn sec" href="${connectHref(pl)}" style="text-decoration:none">Reconnect</a>` : ''}
-    <button class="btn danger" data-disc="${x.id}">Disconnect</button></div>`;
+  return `<div class="acard ${x.needs_reconnect ? 'bad' : ''}">
+    <div class="atop">${withBadge(avatar(x.avatar_url, x.username || x.display_name), pl)}
+      <div class="aname"><b>${handle(x)}</b><span>${PLATFORM[pl]}${x.display_name && x.display_name !== x.username ? ` · ${esc(x.display_name)}` : ''}</span></div>
+      <span class="state ${x.needs_reconnect ? 'bad' : 'ok'}">${x.needs_reconnect ? 'Reconnect' : 'Connected'}</span></div>
+    ${x.needs_reconnect ? '<p class="awarn">Access expired or was removed. Reconnect to keep posting.</p>' : ''}
+    <div class="aact">
+      <select data-move="${x.id}" aria-label="Brand for ${esc(x.username)}">
+        <option value="">No brand</option>
+        ${S.me.brands.map(b => `<option value="${b.id}" ${x.brand_id === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
+      </select>
+      ${x.needs_reconnect && connectHref(pl) ? `<a class="btn" href="${connectHref(pl)}">Reconnect</a>` : ''}
+      <button class="btn ghost danger" data-disc="${x.id}">Disconnect</button></div></div>`;
 }
 
 function accountsView() {
-  const a = S.me.accounts;
-  const groups = brandGroups();
-  return `<div class="card"><div class="sec">
-      <div class="phead"><b>Connect accounts</b><span class="note">${a.length} of ${S.me.limits.accounts} connected</span></div>
-      <div class="brands">${ORDER.filter(connectHref).map(pl => connectBtn(pl, connectHref(pl), `Add ${PLATFORM[pl]}`)).join('')}</div>
-      <details class="hints"><summary>Tips for adding more than one account</summary>
-        ${ORDER.map(pl => `<p class="note">${icon(pl, 12)} ${PLATFORM_HINT[pl]}</p>`).join('')}</details>
-    </div>
-    <div class="sec"><div class="phead"><b>Brands</b><span class="note">Group each client's or product's accounts, then post to the whole brand in one click.</span></div>
-      <form id="newbrand" class="newbrand"><input type="text" id="brandname" maxlength="60" placeholder="New brand name, e.g. Client Bakery">
-        <button class="btn">Create brand</button></form>
-    </div></div>
-    ${groups.map(g => `<div class="card brandcard">
-      <div class="sec"><div class="phead">
-        <b>${esc(g.name)}</b><span class="marks">${marks(g.accounts)}</span><span class="note">${g.accounts.length} account${g.accounts.length === 1 ? '' : 's'}</span>
-        ${g.id !== 'none' ? `<span class="bacts"><button class="link" data-rename="${g.id}">Rename</button>
-          <button class="link danger" data-delbrand="${g.id}">Delete</button></span>` : ''}</div>
-        ${g.id !== 'none' ? voiceLine(g.id) : ''}
-        ${g.id !== 'none' ? slotsEditor(g.id, S.me.brands.find(b => b.id === g.id)?.slots,
-          S.me.brands.find(b => b.id === g.id)?.slots ? 'Posting times' : `Posting times (workspace default: ${slotsText(S.me.workspace.slots)})`) : ''}
-        ${g.accounts.map(accountRow).join('') || '<p class="note">No accounts yet. Use "Brand" on any account below to move it here.</p>'}
-      </div></div>`).join('') || '<div class="card"><div class="sec"><p class="note">No accounts connected yet.</p></div></div>'}
-    <p class="note">Disconnecting an account deletes its token and cancels its scheduled posts. Deleting a brand only ungroups its accounts.
-      Revoke access any time in TikTok (Settings and privacy › Security &amp; permissions › Apps and services),
-      Instagram (Settings › Website permissions › Apps and websites) or Facebook (Settings › Business integrations).</p>`;
+  const a = S.me.accounts, groups = brandGroups();
+  const hint = { tiktok: 'Photo posts with TikTok\'s own privacy and disclosure settings.',
+    instagram: 'Business or Creator accounts. No Facebook Page needed.', facebook: 'Every Page you manage, in one go.' };
+  return `<section class="panel"><header><h2>Connect an account</h2><span class="note">${a.length} of ${S.me.limits.accounts} connected</span></header>
+      <div class="connect">${ORDER.filter(connectHref).map(pl => `<a class="ccard" href="${connectHref(pl)}">
+          ${appIcon(pl, 40)}<div><b>${PLATFORM[pl]}</b><span>${hint[pl]}</span></div><span class="go">${ui('plus', 16)}</span></a>`).join('')}</div>
+      <details class="hints"><summary>Adding more than one account per platform</summary>
+        ${ORDER.map(pl => `<p>${appIcon(pl, 16)}<span>${PLATFORM_HINT[pl]}</span></p>`).join('')}</details></section>
+
+    ${groups.map(g => {
+      const b = S.me.brands.find(x => x.id === g.id);
+      return `<section class="panel brand">
+        <header><h2>${esc(g.name)}</h2><span class="note">${g.accounts.length} account${g.accounts.length === 1 ? '' : 's'}</span>
+          ${b ? `<span class="hacts"><button class="btn ghost" data-rename="${g.id}">Rename</button><button class="btn ghost danger" data-delbrand="${g.id}">Delete</button></span>` : ''}</header>
+        ${b ? `<div class="bmeta">${slotsEditor(g.id, b.slots, 'Posting times', S.me.workspace.slots)}${voiceLine(g.id)}</div>` : ''}
+        <div class="agrid">${g.accounts.map(accountCard).join('') || '<p class="note">No accounts in this brand yet. Pick it in any account\'s brand menu.</p>'}</div></section>`;
+    }).join('') || '<section class="panel empty"><b>No accounts yet.</b>Connect TikTok, Instagram or a Facebook Page above.</section>'}
+
+    <form id="newbrand" class="panel newbrand2"><span>${ui('plus', 16)}</span>
+      <input type="text" id="brandname" maxlength="60" placeholder="New brand, e.g. Client Bakery" aria-label="New brand name">
+      <button class="btn">Create brand</button></form>
+    <p class="foot-note">Disconnecting deletes the account's token and cancels its scheduled posts. Deleting a brand only ungroups its accounts.
+      You can also revoke access in TikTok, Instagram or Facebook's own settings at any time.</p>`;
 }
+
+const SET_TABS = () => [['workspace', 'Workspace'], ...(can('admin') ? [['people', 'People']] : []), ['account', 'Your account'], ...(can('owner') ? [['developer', 'Developer']] : [])];
+const srow = (label, desc, control) => `<div class="srow"><div class="sl"><b>${label}</b>${desc ? `<span>${desc}</span>` : ''}</div><div class="sc">${control}</div></div>`;
 
 function settingsView() {
   const w = S.me.workspace, owner = can('owner'), admin = can('admin');
   if (admin && S.members === null) loadMembers();
+  const tabs = SET_TABS(), tab = tabs.some(t => t[0] === S.setTab) ? S.setTab : 'workspace';
   const brandPick = (name, chosen) => S.me.brands.length ? `<div class="scope">
       <label><input type="radio" name="${name}" value="all" ${!chosen ? 'checked' : ''}> All brands</label>
-      <label><input type="radio" name="${name}" value="some" ${chosen ? 'checked' : ''}> Only:</label>
+      <label><input type="radio" name="${name}" value="some" ${chosen ? 'checked' : ''}> Only</label>
       ${S.me.brands.map(b => `<label class="bchk"><input type="checkbox" data-scope="${name}" value="${b.id}" ${chosen?.includes(b.id) ? 'checked' : ''}> ${esc(b.name)}</label>`).join('')}
     </div>` : '';
   const m = S.members;
-  return `<div class="card">
-    <div class="sec"><span class="cap">Workspace</span>
-      ${admin ? `<form id="wsname" class="newbrand"><input type="text" id="wsnamein" maxlength="60" value="${esc(w.name)}" aria-label="Workspace name">
-        <button class="btn sec">Rename</button></form>
-        <label class="f" for="wstz" style="margin-top:12px">Time zone for scheduling and the calendar</label>
-        <select id="wstz"><option value="">Each person's own (${esc(Intl.DateTimeFormat().resolvedOptions().timeZone)})</option>
-          ${(Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : []).map(z => `<option value="${z}" ${w.timezone === z ? 'selected' : ''}>${z.replace(/_/g, ' ')}</option>`).join('')}
-        </select>
-        <label class="f" style="margin-top:12px">Default posting times for "Add to queue"</label>
-        ${slotsEditor('ws', w.slots, 'Every account not in a brand with its own times')}` : `<p style="margin:0"><b>${esc(w.name)}</b> · ${esc(tz().replace(/_/g, ' '))}</p>`}
-      <p class="note">Everything here (accounts, brands, posts and images) belongs to this workspace only. No other workspace can see it.</p>
-    </div>
-    ${admin ? `<div class="sec"><span class="cap">People</span>
-      ${!m ? '<p class="note">Loading…</p>' : `
-      ${m.members.map(x => `<div class="row acctrow"><span class="txt"><span class="t">${esc(x.email)}${x.user_id === S.me.user?.id ? ' (you)' : ''}</span>
-          <span class="d">${x.role === 'owner' ? 'Owner' : x.role === 'admin' ? 'Admin · accounts, brands, posts and invites' : x.brand_ids
-            ? `Member · ${x.brand_ids.map(id => esc(S.me.brands.find(b => b.id === id)?.name || 'removed brand')).join(', ')}` : 'Member · all brands'}</span></span>
-        ${x.role !== 'owner' && x.user_id !== S.me.user?.id ? `<select data-role="${x.user_id}" class="move" aria-label="Role for ${esc(x.email)}">
-            <option value="member" ${x.role === 'member' ? 'selected' : ''}>Member</option>
-            <option value="admin" ${x.role === 'admin' ? 'selected' : ''}>Admin</option></select>
+  const nav = `<div class="stabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" data-settab="${k}">${l}</button>`).join('')}</div>`;
+  let body = '';
+  if (tab === 'workspace') body = `<section class="panel">
+    ${admin ? srow('Name', 'Shown in the menu and in invites.', `<form id="wsname" class="inline"><input type="text" id="wsnamein" maxlength="60" value="${esc(w.name)}" aria-label="Workspace name"><button class="btn sec">Save</button></form>`)
+      + srow('Time zone', 'Every scheduled time and the calendar use it.', `<select id="wstz"><option value="">Each person's own (${esc(Intl.DateTimeFormat().resolvedOptions().timeZone)})</option>
+          ${(Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : []).map(z => `<option value="${z}" ${w.timezone === z ? 'selected' : ''}>${z.replace(/_/g, ' ')}</option>`).join('')}</select>`)
+      + srow('Posting times', '"Add to queue" uses these for accounts whose brand has none.', slotsEditor('ws', w.slots, 'Default'))
+      : srow('Workspace', '', `<b>${esc(w.name)}</b> · ${esc(tz().replace(/_/g, ' '))}`)}
+    ${srow('Your workspaces', 'Keep clients fully separate. Nothing is shared between workspaces.', `<div class="wslist">${(S.me.workspaces || []).map(x =>
+        `<div class="wsrow"><span>${esc(x.name)}${x.id === w.id ? ' <em>Current</em>' : ''}</span>${x.id !== w.id ? `<button class="btn sec" data-switch="${x.id}">Open</button>` : ''}</div>`).join('')}
+      <form id="newws" class="inline"><input type="text" id="newwsname" maxlength="60" placeholder="New workspace name"><button class="btn sec">Create</button></form></div>`)}
+    ${w.role !== 'owner' ? srow('Leave workspace', 'You lose access to its accounts and posts.', `<button class="btn ghost danger" data-remove="${S.me.user?.id}" data-leave="1">Leave</button>`) : ''}
+    ${owner ? srow('Delete workspace', 'Removes its accounts, brands, posts, images and members now. This cannot be undone.', '<button class="btn danger" id="delws">Delete workspace</button>') : ''}
+  </section>`;
+  if (tab === 'people') body = `<section class="panel">
+    ${!m ? '<div class="empty">Loading…</div>' : `<div class="plist">
+      ${m.members.map(x => `<div class="prow2"><span class="av-me">${esc(x.email[0].toUpperCase())}</span>
+        <div class="pn"><b>${esc(x.email)}${x.user_id === S.me.user?.id ? ' <em>You</em>' : ''}</b>
+          <span>${x.role === 'owner' ? 'Owner' : x.role === 'admin' ? 'Admin' : x.brand_ids
+            ? `Member · ${x.brand_ids.map(id => esc(S.me.brands.find(b => b.id === id)?.name || 'removed brand')).join(', ')}` : 'Member · all brands'}</span></div>
+        ${x.role !== 'owner' && x.user_id !== S.me.user?.id ? `<div class="pa"><select data-role="${x.user_id}" aria-label="Role for ${esc(x.email)}">
+            <option value="member" ${x.role === 'member' ? 'selected' : ''}>Member</option><option value="admin" ${x.role === 'admin' ? 'selected' : ''}>Admin</option></select>
           ${x.role === 'member' && S.me.brands.length ? `<button class="btn sec" data-editscope="${x.user_id}">Brands</button>` : ''}
-          ${owner ? `<button class="btn sec" data-transfer="${x.user_id}" data-email="${esc(x.email)}">Make owner</button>` : ''}
-          <button class="btn danger" data-remove="${x.user_id}">Remove</button>` : ''}
-        ${S.editScope === x.user_id ? `<div style="flex-basis:100%">${brandPick('sc-' + x.user_id, x.brand_ids)}
-          <button class="btn" data-savescope="${x.user_id}">Save access</button></div>` : ''}
+          ${owner ? `<button class="btn ghost" data-transfer="${x.user_id}" data-email="${esc(x.email)}">Make owner</button>` : ''}
+          <button class="btn ghost danger" data-remove="${x.user_id}">Remove</button></div>` : ''}
+        ${S.editScope === x.user_id ? `<div class="pscope">${brandPick('sc-' + x.user_id, x.brand_ids)}<button class="btn" data-savescope="${x.user_id}">Save access</button></div>` : ''}
       </div>`).join('')}
-      ${m.invites.map(x => `<div class="row acctrow"><span class="txt"><span class="t">${esc(x.email)}</span>
-          <span class="d">Invited as ${x.role}${x.brand_ids ? ` · ${x.brand_ids.length} brand${x.brand_ids.length === 1 ? '' : 's'}` : ''} · expires ${fmt(x.expires_at, { dateStyle: 'medium' })}</span></span>
-        <button class="btn sec" data-uninvite="${x.id}">Cancel invite</button></div>`).join('')}
-      <form id="inviteform" class="invite">
-        <input type="email" id="invemail" required placeholder="teammate@company.com" aria-label="Email to invite">
-        <select id="invrole" aria-label="Role"><option value="member">Member</option><option value="admin">Admin</option></select>
-        <button class="btn">Send invite</button>
+      ${m.invites.map(x => `<div class="prow2"><span class="av-me pend">${esc(x.email[0].toUpperCase())}</span>
+        <div class="pn"><b>${esc(x.email)} <em>Invited</em></b><span>${x.role === 'admin' ? 'Admin' : 'Member'}${x.brand_ids ? ` · ${x.brand_ids.length} brand${x.brand_ids.length === 1 ? '' : 's'}` : ''} · expires ${fmt(x.expires_at, { dateStyle: 'medium' })}</span></div>
+        <div class="pa"><button class="btn ghost" data-uninvite="${x.id}">Cancel invite</button></div></div>`).join('')}</div>
+      <form id="inviteform" class="invite2"><b>Invite someone</b>
+        <div class="irow"><input type="email" id="invemail" required placeholder="teammate@company.com" aria-label="Email to invite">
+          <select id="invrole" aria-label="Role"><option value="member">Member</option><option value="admin">Admin</option></select>
+          <button class="btn">Send invite</button></div>
         ${brandPick('inv', null)}
-      </form>
-      <p class="note"><b>Admins</b> connect accounts, manage brands and invite people. <b>Members</b> post and schedule,
-        and can be limited to some brands: they never see the others, their accounts or their posts.</p>`}
-    </div>` : ''}
-    <div class="sec"><span class="cap">Your workspaces</span>
-      ${(S.me.workspaces || []).map(x => `<div class="row"><span class="txt"><span class="t">${esc(x.name)}${x.id === w.id ? ' (current)' : ''}</span>
-          <span class="d">${x.role}</span></span>
-        ${x.id !== w.id ? `<button class="btn sec" data-switch="${x.id}">Open</button>` : ''}</div>`).join('')}
-      <form id="newws" class="newbrand"><input type="text" id="newwsname" maxlength="60" placeholder="New workspace, e.g. a separate client">
-        <button class="btn sec">Create workspace</button></form>
-      ${w.role !== 'owner' ? `<p><button class="btn danger" data-remove="${S.me.user?.id}" data-leave="1">Leave this workspace</button></p>` : ''}
-    </div>
-    ${owner ? `<div class="sec"><span class="cap">API key</span>
-      <p class="note">For posting from your own tools. The key can do everything an admin can do here. Creating a new key disables the old one.</p>
-      ${S.apiKey ? `<p><code style="user-select:all">${esc(S.apiKey)}</code></p><p class="note warn">Copy it now. It will not be shown again.</p>` : ''}
-      <button class="btn sec" id="apikey">${S.me.api_key_set ? 'Create a new key' : 'Create key'}</button>
-    </div>` : ''}
-    <div class="sec"><span class="cap">Security</span>
-      <p class="note">Signed in as ${esc(S.me.user?.email || '')}. Signing out everywhere ends every session on every device.</p>
-      <a class="btn sec" href="/api/auth/logout" style="text-decoration:none">Sign out</a>
-      <button class="btn sec" id="logoutall" style="margin-left:8px">Sign out everywhere</button>
-    </div>
-    ${owner ? `<div class="sec"><span class="cap">Delete workspace</span>
-      <p class="note">Removes this workspace's accounts, brands, posts, images and members immediately. It cannot be undone.</p>
-      <button class="btn danger" id="delws">Delete workspace</button>
-    </div>` : ''}
-  </div>`;
+        <p class="note"><b>Admins</b> connect accounts, manage brands and invite people. <b>Members</b> post and schedule, and can be limited to some brands: they never see the others.</p>
+      </form>`}</section>`;
+  if (tab === 'account') body = `<section class="panel">
+    ${srow('Email', 'You sign in with a code sent here.', `<b>${esc(S.me.user?.email || '')}</b>`)}
+    ${srow('Sign out', 'On this device, or on every device at once.', '<a class="btn sec" href="/api/auth/logout">Sign out</a><button class="btn ghost" id="logoutall">Sign out everywhere</button>')}
+  </section>`;
+  if (tab === 'developer') body = `<section class="panel">
+    ${srow('API key', 'For posting from your own tools. It can do everything an admin can. A new key disables the old one.',
+      `${S.apiKey ? `<code class="key">${esc(S.apiKey)}</code><span class="note warn">Copy it now. It won't be shown again.</span>` : ''}<button class="btn sec" id="apikey">${S.me.api_key_set ? 'Create a new key' : 'Create key'}</button>`)}
+  </section>`;
+  return nav + body;
 }
 
 async function loadMembers() {
@@ -1691,6 +1693,7 @@ function bind() {
     await api(`/accounts/${id}`, { method: 'DELETE' }); S.me = await api('/me');
     S.targets = S.targets.filter(x => x !== id); saveTargets(); render();
   });
+  on('[data-settab]', 'click', e => { S.setTab = e.currentTarget.dataset.settab; render(); });
   on('#apikey', 'click', async () => { S.apiKey = (await api('/api-key', { method: 'POST' })).api_key; S.me.api_key_set = true; render(); });
   on('#delws', 'click', async () => {
     if (prompt(`Type the workspace name to delete it: ${S.me.workspace.name}`) !== S.me.workspace.name) return;
