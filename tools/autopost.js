@@ -243,6 +243,13 @@ async function pollStatus({ accessToken, publishId }) {
 
     if (status !== 'PROCESSING_UPLOAD' && status !== 'PROCESSING_DOWNLOAD') {
       if (data.fail_reason) console.error(`  fail_reason: ${data.fail_reason}`);
+      // A finished direct post carries the id of the video it created. TikTok
+      // spells it "publicaly"; accept the correct spelling too in case that is
+      // ever fixed. Without this line the dashboard has to match the post back
+      // to the account by caption, which breaks the moment two posts share one.
+      const id = data.publicaly_available_post_id || data.publicly_available_post_id;
+      const one = Array.isArray(id) ? id[0] : id;
+      if (one) console.log(`  post_id: ${one}`);
       return data;
     }
     delay = Math.min(delay * 1.5, 15000);
@@ -260,6 +267,9 @@ const ACCOUNT_ENV = {
   max: { env: 'TIKTOK_REFRESH_TOKEN_MAX', label: 'maxmilian.dev' },
   prodgod: { env: 'TIKTOK_REFRESH_TOKEN_PRODGOD', label: 'productivity_god' },
   jackson: { env: 'TIKTOK_REFRESH_TOKEN_JACKSON', label: 'jackson21.dev' },
+  // LockViet, not ARCO. Nothing this repo builds belongs here; the
+  // dashboard's brand guard is what enforces that, not this map.
+  viet: { env: 'TIKTOK_REFRESH_TOKEN_VIET', label: 'huynhlearnsviet' },
 };
 
 // Two TikTok apps, two credential sets. The production app is approved to
@@ -414,10 +424,15 @@ async function main() {
   // TikTok rotates refresh tokens. If we don't surface the new one, the next
   // run fails with an expired-token error that looks like a config problem.
   if (tokens.refreshToken && tokens.refreshToken !== creds.refreshToken) {
+    // Printed twice on purpose: the warning is for a human reading a terminal,
+    // the tagged line is for the dashboard, which writes it back to .env. A
+    // rotation nobody persists kills the account's next run with what looks
+    // like a config error — that is how one account's token died unnoticed.
     console.warn(
       `\n  ! TikTok rotated your refresh token. Update ${tokenVar} in your env to:\n` +
         `    ${tokens.refreshToken}\n`
     );
+    console.log(`rotated_refresh_token ${tokenVar} ${tokens.refreshToken}`);
   }
 
   const requiredScope = opts.directPost ? 'video.publish' : 'video.upload';

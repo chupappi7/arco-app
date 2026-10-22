@@ -36,7 +36,6 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DRAFTS = os.path.join(REPO, 'drafts')
 HOOKS = os.path.join(REPO, 'tools', 'hooks.json')
 IDEAS = os.path.join(REPO, 'tools', 'ideas.json')
-IDEA_IMG = os.path.join(REPO, 'tools', 'ideas_img')
 LOG = os.path.join(REPO, 'tools', 'delivery_log.json')
 FEEDBACK = os.path.join(REPO, 'tools', 'post_feedback.json')
 REPLICATE = os.path.join(REPO, 'tools', 'replicate_queue.json')
@@ -65,6 +64,30 @@ SLIDE_CACHE = os.path.join(REPO, 'tools', '.slide-cache')
 # Users tab says so rather than showing an empty chart that looks like
 # nobody is using the app.
 METRICS_URL = (os.environ.get('ARCO_METRICS_URL') or '').rstrip('/')
+# When this is set, the Cloudflare Worker owns direct posting and this host
+# must not send one. Both firing the same job would publish it twice, and
+# both refreshing the same TikTok token would destroy it — a rotation only
+# the other host saw is how an account went dark for a week.
+WORKER_URL = (os.environ.get('ARCO_WORKER_URL') or '').rstrip('/')
+
+
+def _dotenv(name):
+    """One value from .env, which the LaunchAgent does not load.
+
+    The plist is world-readable, so a shared secret cannot live there; .env is
+    mode 600 and gitignored, and is where every other credential already is.
+    """
+    try:
+        for line in open(os.path.join(REPO, '.env')):
+            line = line.strip()
+            if line.startswith(name + '='):
+                return line.split('=', 1)[1]
+    except IOError:
+        pass
+    return ''
+
+
+WORKER_KEY = os.environ.get('ARCO_WORKER_KEY') or _dotenv('ARCO_WORKER_KEY')
 METRICS_KEY = os.environ.get('ARCO_METRICS_KEY') or ''
 # Writing to the Instagram queue is a different privilege from reading it.
 METRICS_WRITE = os.environ.get('ARCO_METRICS_WRITE') or ''
@@ -135,15 +158,41 @@ def warm_upstream(k=2):
             print('[proxy] warm-up failed: %s' % exc, flush=True)
             return
 
+# `brand` is which app an account speaks for. Everything this pipeline builds
+# is an ARCO post -- the tool pool has ARCO as `mine`, the hooks and angles are
+# ARCO's, the slides are served from the arco-app Pages site. Until LockViet
+# arrived every account was the same brand, so nothing needed to say so and
+# nothing checked. Now a row in the calendar belongs to a different app and a
+# different audience, and a public post cannot be recalled.
 ACCOUNTS = [
     # `short` is what fits on a card chip; three of them sit side by side.
-    {'key': 'vn', 'label': 'arco.app', 'short': 'arco.app'},
-    {'key': 'getarco', 'label': 'getarcoapp', 'short': 'getarco'},
-    {'key': 'us', 'label': 'emiliagonzalez389', 'short': 'emilia'},
-    {'key': 'max', 'label': 'maxmilian.dev', 'short': 'maxmilian'},
-    {'key': 'prodgod', 'label': 'productivity_god', 'short': 'prodgod'},
-    {'key': 'jackson', 'label': 'jackson21.dev', 'short': 'jackson21'},
+    {'key': 'vn', 'label': 'arco.app', 'short': 'arco.app', 'brand': 'arco'},
+    {'key': 'getarco', 'label': 'getarcoapp', 'short': 'getarco', 'brand': 'arco'},
+    {'key': 'us', 'label': 'emiliagonzalez389', 'short': 'emilia', 'brand': 'arco'},
+    {'key': 'max', 'label': 'maxmilian.dev', 'short': 'maxmilian', 'brand': 'arco'},
+    {'key': 'prodgod', 'label': 'productivity_god', 'short': 'prodgod', 'brand': 'arco'},
+    {'key': 'jackson', 'label': 'jackson21.dev', 'short': 'jackson21', 'brand': 'arco'},
+    {'key': 'viet', 'label': 'huynhlearnsviet', 'short': 'huynhviet',
+     'brand': 'lockviet'},
 ]
+DEFAULT_BRAND = 'arco'       # what a topic belongs to unless it says otherwise
+
+
+def brand_of_account(key):
+    for a in ACCOUNTS:
+        if a['key'] == key:
+            return a.get('brand') or DEFAULT_BRAND
+    return DEFAULT_BRAND
+
+
+def brand_of_topic(topic):
+    """Which app a post speaks for, from its registry entry.
+
+    Defaults to ARCO because every post that existed before LockViet is one,
+    and a default of None would make the guard below pass everything.
+    """
+    idx, _ = hooks_index()
+    return ((idx.get(topic) or {}).get('brand') or DEFAULT_BRAND)
 CAP = 5                      # pending shares per account per rolling 24h
 TOKEN_FILE = os.path.join(REPO, 'tools', '.dashboard_token')
 _lock = threading.Lock()
@@ -182,6 +231,30 @@ def load(path, default):
         return default
 
 
+def save_json(path, data, **kw):
+    """Write JSON so an interrupted write cannot destroy the old file.
+
+    `open(path, 'w')` truncates before anything is written, so a process
+    killed mid-dump leaves zero bytes. On 2026-10-17 that is exactly what
+    happened to schedule.json: 183 jobs became an empty file, and because
+    push_worker_schedule() hands the Worker whatever is on disk, the next
+    write would have wiped the live queue too. Writing a sibling temp file
+    and renaming it makes the swap atomic — a kill leaves either the whole
+    new file or the whole old one, never a truncated one.
+    """
+    kw.setdefault('indent', 1)
+    tmp = '%s.tmp%d' % (path, os.getpid())
+    try:
+        with open(tmp, 'w') as fh:
+            json.dump(data, fh, **kw)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
 def hooks_index():
     d = load(HOOKS, {})
     posts = d['posts'] if isinstance(d, dict) else d
@@ -199,13 +272,26 @@ def delivery_log():
 # each row rather than four files, because a note often turns out to be a
 # hook and retyping it into another store is how notes get lost.
 
+IDEA_FIELDS = ('id', 'text', 'pillar', 'used', 'at')
+
+
 def load_ideas():
+    """Briefs, flattened. Rows written by the old map carry x, y, links, img
+    and kind; none of them meant anything to the pipeline, so they are dropped
+    on the way out rather than migrated."""
     try:
         with open(IDEAS, encoding='utf-8') as fh:
             rows = json.load(fh)
-        return rows if isinstance(rows, list) else []
     except Exception:
         return []
+    if not isinstance(rows, list):
+        return []
+    out = []
+    for r in rows:
+        if not isinstance(r, dict) or not (r.get('text') or '').strip():
+            continue
+        out.append({k: r.get(k) for k in IDEA_FIELDS})
+    return out
 
 
 def save_ideas(rows):
@@ -215,15 +301,18 @@ def save_ideas(rows):
     os.replace(tmp, IDEAS)
 
 
-# The four that ship with the board. A kind is just a label, so anything
-# typed into the kind field is as valid as these — the colour is derived from
-# the string rather than looked up, which is what makes custom kinds free.
-IDEA_KINDS = ('idea', 'hook', 'ref', 'code')
-
-
-def clean_kind(k):
-    k = re.sub(r'[^a-z0-9 _-]', '', (k or '').strip().lower())[:24]
-    return k or 'idea'
+# A brief is a line of text waiting to become a post, and that is all it is.
+#
+# This was a pan-and-zoom mind map: five bubble kinds, SVG edges between them,
+# pasted screenshots, stored x/y, a localStorage pan offset. None of x, y,
+# links, img or kind was ever read by the pipeline — the only exit from the
+# board was a button that copied a bubble's text into the composer's note
+# field. Eight rows were in it, two of them placeholders reading "hook" and
+# "IDEA", and the hooks typed there were not in hook_pool.json, so the
+# generator could not use them until they were typed again somewhere else.
+#
+# What survives is the part that was load-bearing: a line of text, which
+# pillar it is for, and whether it has been used.
 
 
 def idea_apply(body):
@@ -231,100 +320,30 @@ def idea_apply(body):
     rows = load_ideas()
     op = body.get('op')
     if op == 'add':
-        row = {'id': 'i%d' % (time.time() * 1000),
-               'kind': clean_kind(body.get('kind')),
-               'text': (body.get('text') or '').strip()[:2000],
-               'note': (body.get('note') or '').strip()[:2000],
-               'pillar': body.get('pillar') or '',
-               'img': body.get('img') or '',
-               'used': False,
-               'x': int(body.get('x') or 0),
-               'y': int(body.get('y') or 0),
-               'links': [],
-               'at': int(time.time())}
-        parent = body.get('from')
-        if parent and any(r.get('id') == parent for r in rows):
-            row['links'] = [parent]
-        rows.insert(0, row)
+        text = (body.get('text') or '').strip()[:2000]
+        if not text:
+            return {'error': 'empty'}
+        rows.insert(0, {'id': 'i%d' % (time.time() * 1000),
+                        'text': text,
+                        'pillar': body.get('pillar') or '',
+                        'used': False,
+                        'at': int(time.time())})
     else:
         row = next((r for r in rows if r.get('id') == body.get('id')), None)
         if not row:
             return {'error': 'not found'}
         if op == 'del':
-            # The picture goes with the card; nothing else references it.
-            if row.get('img'):
-                f = os.path.join(IDEA_IMG, os.path.basename(row['img']))
-                if os.path.isfile(f):
-                    try:
-                        os.remove(f)
-                    except OSError:
-                        pass
             rows = [r for r in rows if r is not row]
-            for r in rows:
-                if r.get('links'):
-                    r['links'] = [x for x in r['links'] if x != row['id']]
         elif op == 'edit':
-            for k in ('text', 'note', 'pillar'):
+            for k in ('text', 'pillar'):
                 if k in body:
                     row[k] = (body.get(k) or '').strip()[:2000]
-            if 'kind' in body:
-                row['kind'] = clean_kind(body.get('kind'))
-            if 'img' in body:
-                # Swapping a picture leaves the old file with no card on it.
-                old = row.get('img')
-                row['img'] = os.path.basename(body.get('img') or '')
-                if old and old != row['img']:
-                    f = os.path.join(IDEA_IMG, os.path.basename(old))
-                    if os.path.isfile(f):
-                        try:
-                            os.remove(f)
-                        except OSError:
-                            pass
-        elif op == 'move':
-            row['x'] = int(body.get('x') or 0)
-            row['y'] = int(body.get('y') or 0)
-        elif op == 'link':
-            # One edge, stored once, on whichever end was dragged from. Both
-            # ends draw it, so which end holds it never matters.
-            other = body.get('to')
-            if other == row['id'] or not any(r.get('id') == other for r in rows):
-                return {'error': 'bad link'}
-            for r in rows:
-                r.setdefault('links', [])
-            has = other in row['links'] or row['id'] in next(
-                (r['links'] for r in rows if r.get('id') == other), [])
-            if has:
-                row['links'] = [x for x in row['links'] if x != other]
-                for r in rows:
-                    if r.get('id') == other:
-                        r['links'] = [x for x in r['links'] if x != row['id']]
-            else:
-                row['links'].append(other)
         elif op == 'used':
             row['used'] = bool(body.get('used'))
         else:
             return {'error': 'bad op'}
     save_ideas(rows)
     return {'rows': rows}
-
-
-def idea_save_image(data_url):
-    """A pasted screenshot, straight off the clipboard. Returns its filename."""
-    if not data_url.startswith('data:image/'):
-        return None
-    head, _, b64 = data_url.partition(',')
-    ext = {'jpeg': 'jpg', 'png': 'png', 'gif': 'gif',
-           'webp': 'webp'}.get(head.split('/')[1].split(';')[0], '')
-    if not ext:
-        return None
-    raw = base64.b64decode(b64)
-    if len(raw) > 12 * 1024 * 1024:
-        return None
-    os.makedirs(IDEA_IMG, exist_ok=True)
-    name = '%d.%s' % (time.time() * 1000, ext)
-    with open(os.path.join(IDEA_IMG, name), 'wb') as fh:
-        fh.write(raw)
-    return name
 
 
 def save_log(log):
@@ -351,6 +370,83 @@ def published_today():
     return out
 
 
+def calendar_week(offset=0):
+    """One week of the posting calendar, per account.
+
+    Not a list of scheduled jobs: a list of what each account did and will do,
+    hour by hour, because the question the calendar answers is "where are the
+    holes" and a hole is an account-day with nothing in it.
+    """
+    now = time.time()
+    lt = time.localtime(now)
+    midnight = time.mktime(lt[:3] + (0, 0, 0, 0, 0, -1))
+    monday = midnight - ((lt.tm_wday) * 86400) + offset * 7 * 86400
+    end = monday + 7 * 86400
+    rows = []
+    # Everything already delivered, from the log, so the past half of the week
+    # is real history rather than the schedule's opinion of it.
+    for topic, accts in delivery_log().items():
+        for key, rec in (accts.items() if isinstance(accts, dict) else []):
+            at = rec.get('published_at') or rec.get('at')
+            if not at or not (monday <= at < end):
+                continue
+            rows.append({'topic': topic, 'account': key, 'at': at,
+                         'kind': 'done' if rec.get('published') else 'sent',
+                         'mode': rec.get('mode') or ('direct' if rec.get('direct')
+                                                     else 'inbox'),
+                         'status': rec.get('status'),
+                         'detail': rec.get('detail') or ''})
+    for job in schedules():
+        if job.get('done'):
+            continue
+        at = job.get('at') or 0
+        if not (monday <= at < end):
+            continue
+        gap = int(job.get('stagger_min') or 0) * 60
+        accts = job.get('accounts') or [a['key'] for a in visible_accounts()]
+        for i, key in enumerate(accts):
+            rows.append({'topic': job['topic'], 'account': key,
+                         'at': at + i * gap, 'kind': 'planned',
+                         'mode': job.get('mode') or 'draft',
+                         'job_at': job['at'],
+                         'status': (job.get('results') or {}).get(key)})
+    return {'monday': monday, 'rows': rows,
+            'accounts': visible_accounts(), 'summary': account_summary(),
+            'assignable': assignable_posts(), 'now': now}
+
+
+def assignable_posts():
+    """Built, approved, registered, and not yet live everywhere.
+
+    What the tray offers. A post missing its caption is not offered at all —
+    the caption is what gets published, and a post without one fails at the
+    API with something that reads like a TikTok problem. Unapproved is the
+    same kind of mistake one step earlier: the tray used to offer them and the
+    server then refused the assignment with "not approved yet", which made
+    picking a post feel broken rather than premature.
+    """
+    st = statuses()
+    log = delivery_log()
+    out = []
+    for p in list_posts():
+        topic = p['topic']
+        rec = st.get(topic) or {}
+        if unregistered(topic):
+            continue
+        done = {k for k, r in (log.get(topic) or {}).items() if r.get('published')}
+        left = [a['key'] for a in ACCOUNTS if a['key'] not in done]
+        if not left:
+            continue
+        if not rec.get('approved'):
+            continue
+        out.append({'topic': topic, 'title': p.get('title') or topic,
+                    'slides': len(p.get('slides') or []),
+                    'mtime': p.get('mtime'), 'left': left,
+                    'approved': True})
+    out.sort(key=lambda r: -(r.get('mtime') or 0))
+    return out
+
+
 def account_summary():
     """Followers now and the change since the oldest sample we hold.
 
@@ -359,12 +455,15 @@ def account_summary():
     """
     stats = load(ACCT_STATS, {})
     last = last_posted()
+    flags = account_flags()
+    posts = load(STATS, {})
     out = {}
     for a in ACCOUNTS:
         v = stats.get(a['key']) or {}
         hist = v.get('history') or []
         first = hist[0]['followers'] if hist else None
         now = v.get('follower_count')
+        flag = flags.get(a['key']) or {}
         out[a['key']] = {
             'followers': now,
             'delta': (now - first) if (now is not None and first is not None) else None,
@@ -373,6 +472,14 @@ def account_summary():
             'posts': v.get('video_count'),
             'last_at': (last.get(a['key']) or {}).get('at'),
             'last_topic': (last.get(a['key']) or {}).get('topic'),
+            # Three different reasons an account might not be worth posting
+            # to, and they are not the same question. publish_ok is "can it",
+            # reach_dead is "is anyone seeing it", paused is "did you say no".
+            'publish_ok': v.get('publish_ok'),
+            'publish_error': v.get('publish_error'),
+            'reach_dead': reach_dead(a['key'], posts),
+            'paused': bool(flag.get('paused')),
+            'pause_note': flag.get('note') or '',
         }
     return out
 
@@ -528,6 +635,16 @@ def list_posts():
     for r in redo_queue():
         if not r.get('done') and r.get('status', 'queued') in LIVE:
             redos.setdefault(r['topic'], []).append(r)
+    # Review has to say *why* a post matters and why it cannot go out yet,
+    # and both answers were a page away: the hook lived in hook_history, the
+    # pillar in hook_pool, and the gate reason was only ever computed on the
+    # server at the moment a schedule was refused.
+    hook_of = {}
+    for e in load(os.path.join(REPO, 'tools', 'hook_history.json'), []):
+        if e.get('topic'):
+            hook_of[e['topic']] = ' / '.join(e['hook'])
+    pillar_of = {' / '.join(h['lines']).lower(): h.get('pillar')
+                 for h in load(HOOK_POOL, {}).get('hooks', [])}
     out = []
     for topic in sorted(os.listdir(DRAFTS)):
         if topic.startswith('_'):
@@ -575,6 +692,14 @@ def list_posts():
                               if v.get('from_replicate') == topic),
             'schedules': sched.get(topic, []),
             'roster': roster_for(topic),
+            'design': st.get(topic, {}).get('design') or 'control',
+            'hook': hook_of.get(topic, ''),
+            'pillar': pillar_of.get(hook_of.get(topic, '').lower()) or '',
+            # How many accounts have already run this concept. The thing that
+            # should decide whether to approve a tenth reshoot of a hook, and
+            # which was not visible anywhere at the moment of deciding.
+            'ran_on': len([k for k, c in (stats.get(topic) or {}).items()
+                           if c.get('posted_at')]),
         })
     out.sort(key=lambda p: p['mtime'], reverse=True)
     return out
@@ -638,8 +763,7 @@ def backfill_built_at():
                 st.setdefault(t, {})['built_at'] = first[t]
                 added += 1
         if added:
-            with open(STATUS, 'w') as fh:
-                json.dump(st, fh, indent=1, ensure_ascii=False)
+            save_json(STATUS, st, ensure_ascii=False)
     if added:
         print('[built_at] dated %d posts from git history' % added, flush=True)
     return added
@@ -716,6 +840,7 @@ def creator_info(key, max_age=300):
             ['node', 'tools/autopost.js', '--creator-info', '--account', key],
             cwd=REPO, env=_env(), capture_output=True, text=True, timeout=60)
         out = (p.stdout or '').strip()
+        absorb_rotated_tokens(out + (p.stderr or ''))
         data = json.loads(out[out.index('{'):]) if '{' in out else {}
         if not data:
             # Surface the one line that says what went wrong, not the tail of
@@ -727,6 +852,52 @@ def creator_info(key, max_age=300):
         data = {'error': str(exc)}
     _creator_cache[key] = (time.time(), data)
     return data
+
+
+ENV_FILE = os.path.join(REPO, '.env')
+_rotated_re = re.compile(r'^rotated_refresh_token (\S+) (\S+)$', re.M)
+
+
+def absorb_rotated_tokens(out):
+    """Persist any refresh token TikTok rotated during this run.
+
+    TikTok may hand back a different refresh token on any refresh, and the old
+    one stops working the moment it does. autopost only warned; nothing wrote
+    it down, so the account kept using a token that had already been retired
+    and died with invalid_grant that reads like a config mistake. One account
+    was lost this way before anyone noticed.
+
+    Returns the variable names rewritten, for the log.
+    """
+    done = []
+    for var, token in _rotated_re.findall(out or ''):
+        if not re.fullmatch(r'TIKTOK_[A-Z0-9_]+', var):
+            continue                       # never write a name we did not emit
+        try:
+            with _lock:
+                with open(ENV_FILE) as fh:
+                    text = fh.read()
+                line = '%s=%s' % (var, token)
+                pat = re.compile(r'^%s=.*$' % re.escape(var), re.M)
+                text = (pat.sub(lambda _m: line, text) if pat.search(text)
+                        else text.rstrip('\n') + '\n' + line + '\n')
+                with open(ENV_FILE, 'w') as fh:
+                    fh.write(text)
+                os.chmod(ENV_FILE, 0o600)
+            done.append(var)
+        except IOError as exc:
+            print('[token] could not persist %s: %s' % (var, exc), flush=True)
+    if done:
+        print('[token] rotated and saved: %s' % ', '.join(done), flush=True)
+    return done
+
+
+# One direct post per (topic, account) at a time. The panel disables its own
+# button, but that is one tab's opinion: a second tab, or a click that lands
+# while the page is re-rendering, used to start a second publish of the same
+# post. A draft costs a slot; a direct post is public and cannot be undone.
+_publishing = set()
+_publishing_lock = threading.Lock()
 
 
 def direct_blocked(key, settings):
@@ -771,27 +942,153 @@ def run_publish(topic, key, settings):
     if settings.get('branded_content'):
         cmd.append('--branded-content')
     print(f'[publish] {topic} -> {key}: {" ".join(cmd[3:])}', flush=True)
+    # Claim the pair before anything is spawned, release it in finally. The
+    # claim is the whole guard: everything below may take five minutes.
+    with _publishing_lock:
+        if (topic, key) in _publishing:
+            return {'status': 'FAILED', 'at': time.time(),
+                    'detail': 'already posting to this account'}
+        _publishing.add((topic, key))
     try:
-        p = subprocess.run(cmd, cwd=REPO, env=_env(), capture_output=True,
-                           text=True, timeout=900)
-        out = p.stdout + p.stderr
-    except Exception as exc:
-        out = f'runner error: {exc}'
+        try:
+            p = subprocess.run(cmd, cwd=REPO, env=_env(), capture_output=True,
+                               text=True, timeout=900)
+            out = p.stdout + p.stderr
+        except subprocess.TimeoutExpired:
+            out = 'timeout after 15 minutes'
+        except Exception as exc:
+            out = f'runner error: {exc}'
+    finally:
+        with _publishing_lock:
+            _publishing.discard((topic, key))
+    absorb_rotated_tokens(out)
     # TikTok reports a finished direct post as PUBLISH_COMPLETE; some
     # responses use PUBLICLY_AVAILABLE_POST for the same terminal state.
     if 'PUBLISH_COMPLETE' in out or 'PUBLICLY_AVAILABLE_POST' in out:
         rec = {'status': 'SENT', 'detail': 'published directly', 'at': time.time(),
-               'published': True, 'published_at': time.time(), 'direct': True}
+               'published': True, 'published_at': time.time(), 'direct': True,
+               'mode': 'direct'}
+        # Two ids, both worth keeping. publish_id is what the status endpoint
+        # answers to; post_id is the video itself, which is what sync pins
+        # against video.list. Without either, this post is findable only by
+        # its caption — and ten captions here are shared between siblings.
+        m = re.search(r'publish_id:\s*(\S+)', out)
+        if m:
+            rec['publish_id'] = m.group(1)
+        m = re.search(r'post_id:\s*(\S+)', out)
+        if m:
+            rec['video_id'] = m.group(1)
+        elif rec.get('publish_id'):
+            # TikTok reports PUBLISH_COMPLETE before it fills in the video's
+            # own id, so a direct post usually lands here. The publish id is
+            # enough: claim_published_ids asks what video it became on the
+            # next sync, and that is the pinned identity from then on.
+            rec['detail'] += ' · video id resolves on the next sync'
+        else:
+            rec['detail'] += ' · no ids captured, so this one matches by caption'
+            print('[publish] %s %s: NO publish_id or post_id in autopost output'
+                  % (topic, key), flush=True)
     else:
-        reason = [l.strip() for l in out.splitlines() if 'ERROR' in l or 'fail_reason' in l]
-        rec = {'status': 'FAILED', 'detail': (reason[0] if reason else out.strip()[-200:]),
-               'at': time.time()}
+        low = out.lower()
+        reason = [l.strip() for l in out.splitlines()
+                  if 'ERROR' in l or 'fail_reason' in l]
+        detail = reason[0] if reason else out.strip()[-200:]
+        if 'spam_risk_too_many_posts' in low:
+            # Not the inbox cap — that one counts unpublished drafts and does
+            # not apply here. This is the account's own daily ceiling.
+            status, detail = 'CAPPED', 'daily post limit on this account'
+        elif 'invalid_grant' in low:
+            status = 'FAILED'
+            detail = ('publisher token expired — re-run '
+                      'tools/tiktok-auth.js --account %s' % key)
+            mark_publish_broken(key, detail)
+        else:
+            status = 'FAILED'
+        rec = {'status': status, 'detail': detail, 'at': time.time(),
+               'mode': 'direct'}
     print(f'[publish] {topic} {key}: {rec["status"]} {rec["detail"][:90]}', flush=True)
     with _lock:
         log = delivery_log()
-        log.setdefault(topic, {})[key] = rec
+        acc = log.setdefault(topic, {})
+        # A direct post over an earlier inbox send must not erase it: the first
+        # outing is what _days_since_published measures from.
+        acc[key] = _keep_history(acc.get(key), rec)
         save_log(log)
     return rec
+
+
+def publish_gate(topic, keys, settings, repost=False):
+    """Split the requested accounts into those that may post and those that
+    may not, with a reason each.
+
+    The browser already disables what it can, but a button is one tab's
+    opinion and a schedule carries a choice made hours ago. A direct post is
+    public and cannot be undone from here, so every rule is re-checked at the
+    moment of sending, server-side, on each account separately.
+
+    Returns (accepted, skipped) where skipped is {account: why}.
+    """
+    accepted, skipped = [], {}
+    why_post = unregistered(topic)
+    if why_post:
+        return [], {k: why_post for k in keys}
+    # Approval is a boolean here, written by the Approve button; an earlier
+    # version of this checked a `state` string that nothing sets, so the gate
+    # passed everything and was decoration.
+    st = statuses().get(topic) or {}
+    if not st.get('approved'):
+        return [], {k: 'not approved yet' for k in keys}
+    log = delivery_log().get(topic, {})
+    flags = account_flags()
+    known = {a['key'] for a in ACCOUNTS}
+    for key in keys:
+        if key not in known:
+            skipped[key] = 'unknown account'
+            continue
+        if (flags.get(key) or {}).get('paused'):
+            skipped[key] = 'paused' + (
+                ': ' + flags[key]['note'] if (flags.get(key) or {}).get('note') else '')
+            continue
+        rec = log.get(key) or {}
+        if rec.get('published') and not repost:
+            skipped[key] = 'already live there'
+            continue
+        with _publishing_lock:
+            if (topic, key) in _publishing:
+                skipped[key] = 'already posting'
+                continue
+        blocked = direct_blocked(key, settings)
+        if blocked:
+            skipped[key] = blocked
+            continue
+        accepted.append(key)
+    return accepted, skipped
+
+
+def run_publish_batch(topic, keys, settings, stagger_min=0):
+    """Publish to several accounts one after another, never at once.
+
+    Serial with a gap because five identical uploads landing within a minute
+    of each other is the pattern the spam filter is built for — two accounts
+    here went to zero views the day after a burst. The stagger is the same
+    field the scheduler already carries.
+    """
+    gap = max(0, int(stagger_min)) * 60
+    out = {}
+    for i, key in enumerate(keys):
+        if i and gap:
+            time.sleep(gap)
+        # Re-check between accounts: a long stagger means the first decision
+        # is an hour stale by the time the last account comes up.
+        ok, skipped = publish_gate(topic, [key], settings)
+        if not ok:
+            out[key] = {'status': 'SKIPPED', 'detail': skipped.get(key, ''),
+                        'at': time.time()}
+            print('[publish] %s %s: SKIPPED %s' % (topic, key, out[key]['detail']),
+                  flush=True)
+            continue
+        out[key] = run_publish(topic, key, settings)
+    return out
 
 
 def _keep_history(prev, rec):
@@ -883,6 +1180,7 @@ def sync_account(key):
             ['node', 'tools/autopost.js', '--list-posts', '--account', key],
             cwd=REPO, env=_env(), capture_output=True, text=True, timeout=120)
         out = (p.stdout or '').strip()
+        absorb_rotated_tokens(out + (p.stderr or ''))
         data = json.loads(out[out.index('{'):]) if '{' in out else {}
     except Exception as exc:
         return {'error': str(exc)}
@@ -907,12 +1205,23 @@ def sync_account(key):
 
     by_caption, by_body = {}, {}
     for topic, post in idx.items():
-        cap = _norm(post.get('caption'))
-        if cap:
-            by_caption.setdefault(cap, []).append(topic)
-            b = _body(post.get('caption'))
-            if len(b) >= 40:
-                by_body.setdefault(b[:120], []).append(topic)
+        # Every caption this topic could have gone out under, not just the
+        # shared one. An account can carry its own wording now, and a post
+        # whose caption is not in this index is never matched back to a topic
+        # at all -- so a short variant went out, worked, and reported no
+        # numbers, which is indistinguishable from a post that failed.
+        caps = [post.get('caption')]
+        caps += [v.get('caption') for v in (post.get('variants') or {}).values()
+                 if isinstance(v, dict)]
+        for raw in caps:
+            cap = _norm(raw)
+            if not cap:
+                continue
+            if topic not in by_caption.setdefault(cap, []):
+                by_caption[cap].append(topic)
+            b = _body(raw)
+            if len(b) >= 40 and topic not in by_body.setdefault(b[:120], []):
+                by_body[b[:120]].append(topic)
     log_now = delivery_log()
 
     def pick_topic(cap, key, posted_at, taken):
@@ -1133,16 +1442,16 @@ def sync_account(key):
             print('[sync] %s/%s: folded in %d repost(s)' % (topic, k, len(extra)), flush=True)
 
         save_log(log)
-        with open(STATS, 'w') as fh:
-            json.dump(stats, fh, indent=1, ensure_ascii=False)
-        with open(STATS_HISTORY, 'w') as fh:
-            json.dump(hist, fh, ensure_ascii=False)
-        with open(STATS_DAILY, 'w') as fh:
-            json.dump(daily, fh, ensure_ascii=False)
-        with open(UNTRACKED, 'w') as fh:
-            json.dump(unmatched, fh, indent=1, ensure_ascii=False)
-        with open(FEEDBACK, 'w') as fh:
-            json.dump(fb, fh, indent=1, ensure_ascii=False)
+        # Five files in a row, every one of them the only copy of what it
+        # holds. `open(path,'w')` truncates before it writes, so a sync killed
+        # here used to leave a zero-byte post_stats.json — which is every
+        # number on the Analytics page. save_json renames a finished temp file
+        # into place instead, so a kill leaves the whole old file.
+        save_json(STATS, stats, ensure_ascii=False)
+        save_json(STATS_HISTORY, hist, indent=None, ensure_ascii=False)
+        save_json(STATS_DAILY, daily, indent=None, ensure_ascii=False)
+        save_json(UNTRACKED, unmatched, ensure_ascii=False)
+        save_json(FEEDBACK, fb, ensure_ascii=False)
     return {'seen': len(data['videos']), 'matched': matched,
             'newly_published': marked, 'has_more': data.get('has_more')}
 
@@ -1151,6 +1460,90 @@ ACCT_STATS = os.path.join(REPO, 'tools', 'account_stats.json')
 # When the last reconcile with TikTok finished. Kept on disk rather than in
 # memory so a restart does not claim the numbers are fresh when they are not.
 SYNC_STATE = os.path.join(REPO, 'tools', '.sync_state.json')
+# Per-account state the roster itself does not carry: whether you have paused
+# it, and whether its publisher token still works. ACCOUNTS stays a static
+# list because the analytics keys and _undelivered iterate it; this is a
+# sidecar so an account can be stopped without disappearing from history.
+ACCOUNT_FLAGS = os.path.join(REPO, 'tools', 'account_flags.json')
+
+
+def account_flags():
+    return load(ACCOUNT_FLAGS, {})
+
+
+def visible_accounts():
+    """ACCOUNTS minus the ones you have hidden.
+
+    Hiding is cosmetic and reversible: history, the publish gate and the
+    analytics account filter all still see the full roster, so a hidden
+    account cannot be posted to by accident and nothing it did is forgotten.
+    It exists so a dead account stops taking up room in every view.
+    """
+    flags = account_flags()
+    return [a for a in ACCOUNTS
+            if not (flags.get(a['key']) or {}).get('hidden')]
+
+
+def mark_publish_broken(key, why):
+    """Record a dead publisher token the moment a send proves it.
+
+    sync_all re-checks every account on its own beat, but that beat is slow
+    and the account is already failing. Writing it here means the next thing
+    that opens the roster sees the truth rather than yesterday's optimism.
+    """
+    try:
+        with _lock:
+            stats = load(ACCT_STATS, {})
+            stats.setdefault(key, {})['publish_ok'] = False
+            stats[key]['publish_error'] = why
+            with open(ACCT_STATS, 'w') as fh:
+                json.dump(stats, fh, indent=1, ensure_ascii=False)
+    except IOError:
+        pass
+
+
+def set_account_flag(key, **fields):
+    with _lock:
+        flags = load(ACCOUNT_FLAGS, {})
+        row = flags.setdefault(key, {})
+        row.update(fields)
+        row['at'] = time.time()
+        tmp = ACCOUNT_FLAGS + '.tmp'
+        with open(tmp, 'w') as fh:
+            json.dump(flags, fh, indent=1)
+        os.replace(tmp, ACCOUNT_FLAGS)
+    return flags.get(key, {})
+
+
+def reach_dead(key, stats=None):
+    """True when this account's recent posts all got nothing.
+
+    Not a TikTok signal — TikTok says nothing. It is the shape a suppressed
+    account makes in your own numbers: the last several posts at zero views
+    while other accounts carrying the same slides that hour did fine. Advisory
+    only, because the heuristic can be wrong and a hard block on a guess is
+    worse than a label.
+    """
+    stats = stats if stats is not None else load(STATS, {})
+    cut = time.time() - 48 * 3600
+    rows = []
+    for _topic, per in stats.items():
+        rec = (per or {}).get(key)
+        if isinstance(rec, dict) and rec.get('posted_at') and rec.get('views') is not None:
+            # Anything younger than two days has not had time to earn a view,
+            # so it is left out of the sample rather than used to judge. The
+            # first cut of this excluded the whole account whenever its newest
+            # post was recent, which hid exactly the account it was built for.
+            if rec['posted_at'] < cut:
+                rows.append((rec['posted_at'], rec['views']))
+    rows.sort(reverse=True)
+    recent = rows[:5]
+    if len(recent) < 4:
+        return None
+    if any(v for _at, v in recent):
+        return None
+    return {'since': recent[-1][0], 'posts': len(recent)}
+
 
 
 def sync_account_stats(key):
@@ -1160,6 +1553,7 @@ def sync_account_stats(key):
             ['node', 'tools/autopost.js', '--account-stats', '--account', key],
             cwd=REPO, env=_env(), capture_output=True, text=True, timeout=60)
         out = (p.stdout or '').strip()
+        absorb_rotated_tokens(out + (p.stderr or ''))
         return json.loads(out[out.index('{'):]) if '{' in out else {}
     except Exception:
         return {}
@@ -1172,6 +1566,14 @@ def sync_all():
     for a in ACCOUNTS:
         info = sync_account_stats(a['key'])
         if info:
+            # Reading works through the sandbox app, posting through the
+            # publisher app, and the two fail independently: one account read
+            # fine in the sidebar for days while its publisher token was dead.
+            # Ask the publisher app directly, on the same slow beat.
+            ci = creator_info(a['key'], max_age=0)
+            info['publish_ok'] = not ci.get('error')
+            info['publish_error'] = ci.get('error') or ''
+            info['privacy_options'] = ci.get('privacy_level_options') or []
             hist = (acct.get(a['key']) or {}).get('history') or []
             # One row per calendar day, rewritten as the day goes on, so
             # "+N followers today" is today's close minus yesterday's rather
@@ -1290,9 +1692,10 @@ def analytics(period='7', only=None, frm=None, to=None):
     st = statuses()
     # Filtering happens here rather than in the browser so every figure —
     # medians, cohorts, the matrix — comes from one place.
-    keys = [a['key'] for a in ACCOUNTS if not only or a['key'] in only]
+    keys = [a['key'] for a in (ACCOUNTS if only else visible_accounts())
+            if not only or a['key'] in only]
     if not keys:
-        keys = [a['key'] for a in ACCOUNTS]
+        keys = [a['key'] for a in visible_accounts()]
 
     hook_of = {}
     for e in load(os.path.join(REPO, 'tools', 'hook_history.json'), []):
@@ -1303,6 +1706,11 @@ def analytics(period='7', only=None, frm=None, to=None):
 
     untracked = load(UNTRACKED, {})
     promoted = set(load(PROMOTED, []))
+    # Comparisons run on posts that have stopped growing. A post nine hours
+    # old counted against one from July is not a weaker post, it is a younger
+    # one, and every rate on this page was quietly paying for that.
+    daily = load(STATS_DAILY, {})
+    now_ = time.time()
     rows, flat = [], []
     for topic, per in stats.items():
         cells = {k: (per.get(k) or {}).get('views') for k in keys}
@@ -1358,9 +1766,14 @@ def analytics(period='7', only=None, frm=None, to=None):
         })
         for k, v in cells.items():
             if v is not None:
+                cell = per.get(k) or {}
+                v48_ = v48(topic, k, cell, now_, daily)
                 flat.append({'account': k, 'views': v, 'promoted': topic in promoted,
-                             'likes': (per.get(k) or {}).get('likes', 0),
-                             'at': (per.get(k) or {}).get('posted_at')})
+                             'likes': cell.get('likes', 0),
+                             'at': cell.get('posted_at'),
+                             # None until the post is 48h old, which is what
+                             # makes it excludable rather than merely small.
+                             'v48': v48_, 'mature': v48_ is not None})
     rows.sort(key=lambda r: -r['best'])
 
     def median(xs):
@@ -1369,13 +1782,23 @@ def analytics(period='7', only=None, frm=None, to=None):
 
     organic = [f for f in flat if not f['promoted']]
     paid = [f for f in flat if f['promoted']]
+    ripe = [f for f in organic if f['mature']]
     per_account = {}
     for k in keys:
         vs = [f['views'] for f in organic if f['account'] == k]
         pv = [f['views'] for f in paid if f['account'] == k]
+        rv = [f['v48'] for f in ripe if f['account'] == k]
         per_account[k] = {
             'posts': len(vs), 'wins': sum(1 for v in vs if v >= PERFORMING_VIEWS),
             'median': median(vs), 'total': sum(vs),
+            # The comparable pair, beside the lifetime pair rather than
+            # instead of it: totals are a fair question about the past, rates
+            # are not unless everything in them has finished.
+            'mature': len(rv),
+            'breakout': round(100.0 * sum(1 for v in rv if v >= PERFORMING_VIEWS)
+                              / max(1, len(rv))),
+            'median48': median(rv),
+            'settling': len(vs) - len(rv),
             'followers': (accts.get(k) or {}).get('follower_count'),
             'history': (accts.get(k) or {}).get('history') or [],
             # Kept apart rather than hidden: TikTok's own analytics counts
@@ -1471,6 +1894,15 @@ def analytics(period='7', only=None, frm=None, to=None):
         'kpi': {
             'hit_rate': round(100 * sum(1 for f in organic if f['views'] >= PERFORMING_VIEWS)
                               / max(1, len(organic))),
+            # Breakout rate on mature uploads only — the headline figure.
+            # Median is kept beside it because one number cannot describe a
+            # distribution this skewed, not because the median is better.
+            'breakout': round(100.0 * sum(1 for f in ripe if f['v48'] >= PERFORMING_VIEWS)
+                              / max(1, len(ripe))),
+            'mature': len(ripe),
+            'settling': len(organic) - len(ripe),
+            'median48': median([f['v48'] for f in ripe]),
+            'mature_h': MATURE_H,
             'account_posts': len(organic),
             'promoted': len(flat) - len(organic),
             'broke_out': sum(1 for r in rows if r['breakouts']),
@@ -1502,7 +1934,11 @@ def _undelivered():
     accounts instead of three and the numbers looked merely weak.
     """
     log = delivery_log()
-    keys = [a['key'] for a in ACCOUNTS]
+    # Visible accounts only. An account you hid is one you decided not to post
+    # to, so "this post never reached it" is not a gap to fix — and five of
+    # them led the blocker list, which is how a list of blockers becomes a
+    # list you scroll past.
+    keys = [a['key'] for a in visible_accounts()]
     # An account that did not exist yet cannot have been missed. getarco and
     # us start on 22 Aug; without this every July post reads as a gap.
     born = {}
@@ -1731,6 +2167,7 @@ def run_draft(topic, keys):
             out = 'timeout after 10 minutes'
         except Exception as exc:
             out = f'runner error: {exc}'
+        absorb_rotated_tokens(out)
         if 'SEND_TO_USER_INBOX' in out:
             status, detail = 'SENT', ''
         elif 'spam_risk' in out.lower():
@@ -2047,9 +2484,128 @@ def spec_brief(spec):
             'the usual rules.\n\n' + '\n\n'.join(out) + '\n')
 
 
+BUILD_RULES = os.path.join(REPO, 'tools', 'build_rules.md')
+
+
+def build_rules_text():
+    """Standing corrections, read fresh on every build.
+
+    A redo note fixes one post and then evaporates: the same mistake came
+    back twice in one day because nothing carried the correction forward.
+    This file does, and it is plain prose so it can be edited or pruned by
+    hand when a rule stops being true.
+    """
+    try:
+        body = open(BUILD_RULES, encoding='utf-8').read().strip()
+    except IOError:
+        return ''
+    return ('STANDING RULES — these came from posts that shipped wrong. '
+            'They outrank your own judgement about format.\n\n'
+            + body + '\n') if body else ''
+
+
+def add_build_rule(line, section='Format'):
+    """Append one correction so every future build inherits it."""
+    line = (line or '').strip().rstrip('.')
+    if not line:
+        return False
+    with _lock:
+        try:
+            body = open(BUILD_RULES, encoding='utf-8').read()
+        except IOError:
+            body = '# Standing rules for building posts\n'
+        head = '## ' + section
+        entry = '- ' + line + '.\n'
+        if head in body:
+            i = body.index(head) + len(head)
+            j = body.find('\n## ', i)
+            j = len(body) if j < 0 else j
+            body = body[:j].rstrip('\n') + '\n' + entry + body[j:]
+        else:
+            body = body.rstrip('\n') + '\n\n' + head + '\n\n' + entry
+        with open(BUILD_RULES, 'w', encoding='utf-8') as fh:
+            fh.write(body)
+    return True
+
+
+def build_evidence(pillar=None):
+    """What actually worked, in numbers, for the agent to choose against.
+
+    The pipeline already lets a performing hook come back sooner, but that is
+    the only way performance has ever reached a build: as spacing, never as
+    evidence. An agent picking a hook sees a list of eligible strings with no
+    idea that one of them does five thousand views and another does two
+    hundred. This hands it the table.
+
+    Views are per account and vary 30x between them, so the figure here is
+    the median of each post's best account — the question is "did this idea
+    travel", not "how big is the roster".
+    """
+    stats = load(STATS, {})
+    pool = {' / '.join(h['lines']).lower(): h.get('pillar')
+            for h in (load(HOOK_POOL, {}).get('hooks') or [])}
+    hook_of, pillar_of = {}, {}
+    for e in load(os.path.join(REPO, 'tools', 'hook_history.json'), []):
+        if e.get('topic') and e.get('hook'):
+            key = ' / '.join(e['hook'])
+            hook_of[e['topic']] = key
+            pillar_of[e['topic']] = pool.get(key.lower())
+    by_hook, by_pillar = {}, {}
+    for topic, per in stats.items():
+        vals = [r['views'] for r in per.values()
+                if isinstance(r, dict) and r.get('views') is not None]
+        if not vals:
+            continue
+        best = max(vals)
+        h = hook_of.get(topic)
+        if h:
+            by_hook.setdefault(h, []).append(best)
+        p = pillar_of.get(topic)
+        if p:
+            by_pillar.setdefault(p, []).append(best)
+
+    def med(v):
+        v = sorted(v)
+        return v[len(v) // 2] if v else 0
+
+    lines = ['WHAT HAS ACTUALLY WORKED — each post measured by its best '
+             'account, because views swing 30x between accounts and the '
+             'question is whether an idea travelled.', '',
+             'Read the BREAKOUT column first, not the median. Distribution '
+             'here is a heavy tail: most posts land near 200 and a few clear '
+             'several thousand, and the few are where the growth is. One hook '
+             'medians 699 and breaks out 38% of the time; another medians '
+             '1342 and breaks out 25%. Ranking by median would have retired '
+             'the first, which has produced this account\'s best post.', '']
+    pl = sorted(((med(v), k, len(v)) for k, v in by_pillar.items()), reverse=True)
+    if pl:
+        lines.append('By pillar:')
+        lines += ['  %-11s %5d   (%d posts)' % (k, m, n) for m, k, n in pl]
+        lines.append('')
+    BREAK = 1500
+    rel = []
+    for k, v in by_hook.items():
+        if pillar and pool.get(k.lower()) != pillar:
+            continue
+        rate = sum(1 for x in v if x >= BREAK) / len(v)
+        rel.append((rate, med(v), max(v), len(v), k))
+    rel.sort(reverse=True)
+    if rel:
+        lines.append('Hooks in this pillar. breakout = share of outings over '
+                     '%d views.' % BREAK)
+        lines.append('  %-9s %-7s %-7s %-4s %s'
+                     % ('breakout', 'median', 'best', 'n', 'hook'))
+        lines += ['  %7.0f%% %7d %7d %4d  %s' % (r * 100, m, mx, n, k)
+                  for r, m, mx, n, k in rel[:12]]
+        lines.append('')
+    return '\n'.join(lines)
+
+
 BUILD_PROMPT = """Build {count} new {pillar} post(s) for the TikTok pipeline. Work in {repo}.
 
 {note}
+{rules}
+{evidence}
 Read ~/.claude/skills/tiktok-pipeline/examples.md FIRST for register, and
 content.md for the rules. Skipping examples.md is how hooks and copy drift out
 of Thinh's voice; it is not optional.
@@ -3043,8 +3599,7 @@ def run_replicate(job):
                     st.setdefault(m.group(1), {}).update({
                         'from_replicate': job['from'],
                         'replicate_mode': job.get('mode') or 'new'})
-                    with open(STATUS, 'w') as fh:
-                        json.dump(st, fh, indent=1, ensure_ascii=False)
+                    save_json(STATUS, st, ensure_ascii=False)
     # Three ways to reuse a post that worked, and they are genuinely different
     # jobs: reword keeps the concept, reshoot keeps the words, new-take keeps
     # only the shape.
@@ -3074,7 +3629,9 @@ def run_build(job):
     note = ('Thinh asked for: ' + job['note'] + '\n') if job.get('note') else ''
     brief = spec_brief(job.get('spec'))
     prompt = BUILD_PROMPT.format(count=job['count'], pillar=job.get('pillar', 'tools'),
-                                 repo=REPO, note=brief + note)
+                                 repo=REPO, note=brief + note,
+                                 rules=build_rules_text(),
+                                 evidence=build_evidence(job.get('pillar')))
 
     def mark(**kw):
         with _lock:
@@ -3085,9 +3642,6 @@ def run_build(job):
             save_builds(q)
 
     _agent(prompt, mark, 'BUILT', kind='build', job=job, check=_build_check)
-
-
-INBOX_SEEN = os.path.join(REPO, 'tools', 'inbox_seen.json')
 
 
 def inbox_items():
@@ -3107,6 +3661,11 @@ def inbox_items():
     stats = load(STATS, {})
     idx, _ = hooks_index()
     label = {a['key']: a['short'] for a in ACCOUNTS}
+    # Hidden accounts are decisions, not problems. A failed send to an account
+    # you took out of the roster is not something to go and fix, and four of
+    # them sat at the top of this list in red — which is how a blocker list
+    # turns into a list you scroll past.
+    live = {a['key'] for a in visible_accounts()}
 
     def add(kind, sev, title, detail, topic=None, at=None):
         out.append({'id': '%s:%s:%s' % (kind, topic or '', title[:40]),
@@ -3116,7 +3675,7 @@ def inbox_items():
     # A send that failed. The slides are fine; TikTok did not fetch them.
     for topic, per in log.items():
         for k, r in (per or {}).items():
-            if r.get('status') == 'FAILED':
+            if k in live and r.get('status') == 'FAILED':
                 add('delivery', 'bad', '%s never reached %s' % (topic, label.get(k, k)),
                     str(r.get('detail') or '')[:120] + ' — draft it again',
                     topic, r.get('at'))
@@ -3130,7 +3689,7 @@ def inbox_items():
                 g['topic'], g.get('at'))
 
     # A draft nobody published is a slot nobody can use.
-    for d in _stale_drafts():
+    for d in (x for x in _stale_drafts() if x['account'] in live):
         add('stale', 'warn', '%s has been waiting %dh on %s'
             % (d['topic'], d['hours'], label.get(d['account'], d['account'])),
             'Publish it in TikTok, or the slot stays spent — deleting does not free one.',
@@ -3145,7 +3704,7 @@ def inbox_items():
 
     # Accounts with no room left.
     for k, used in (pending_counts() or {}).items():
-        if used >= 5:
+        if k in live and used >= 5:
             add('slots', 'bad', '%s has no draft slots left' % label.get(k, k),
                 'Five pending is the cap. Only publishing frees one.', None)
 
@@ -3159,10 +3718,10 @@ def inbox_items():
         add('hooks', 'warn', 'No hooks are free',
             'Every approved hook is inside its cooldown. Add new ones, or wait.', None)
 
-    seen = set(load(INBOX_SEEN, []))
-    for x in out:
-        x['read'] = x['id'] in seen
-    out.sort(key=lambda x: (x['read'], {'bad': 0, 'warn': 1}.get(x['sev'], 2), -(x['at'] or 0)))
+    # No read/unread state. Every row here clears itself once the thing it
+    # names is done, so a "seen" flag could only ever hide a live blocker
+    # behind a click made yesterday. The list is short enough to read whole.
+    out.sort(key=lambda x: ({'bad': 0, 'warn': 1}.get(x['sev'], 2), -(x['at'] or 0)))
     return out
 
 
@@ -3178,8 +3737,267 @@ def schedules():
 
 
 def save_schedules(sc):
-    with open(SCHEDULE, 'w') as fh:
-        json.dump(sc, fh, indent=1)
+    save_json(SCHEDULE, sc)
+
+
+# How long a post takes to stop growing. Everything compared against
+# everything else is compared at this age, because a post from July has had
+# three months to collect views and one from this morning has had none.
+MATURE_H = 48
+# Where the clock lands in the day. Twenty-four hourly buckets over ~480
+# uploads across six accounts is noise; four parts of a day is a reading.
+SLOTS = [(0, 6, 'night'), (6, 12, 'morning'), (12, 18, 'afternoon'),
+         (18, 24, 'evening')]
+
+
+def v48(topic, key, cell, now=None, daily=None):
+    """Views at 48 hours — the only views figure two posts can be compared on.
+
+    Lifetime views answer "how big is this post now", and the answer is partly
+    "how long has it been up". The snapshot taken on the second day after
+    publishing is the comparable number. Once a post is past 48h its lifetime
+    views *are* that number, near enough, because it has stopped growing.
+    Immature posts return None and are excluded rather than counted low.
+    """
+    at = cell.get('posted_at')
+    if not at:
+        return None
+    now = now or time.time()
+    if daily is None:
+        daily = load(STATS_DAILY, {})
+    day2 = time.strftime('%Y-%m-%d', time.localtime(at + 2 * 86400))
+    snap = ((daily.get(topic) or {}).get(key) or {}).get(day2)
+    if snap and snap.get('views') is not None:
+        return snap['views']
+    if now - at >= MATURE_H * 3600:
+        return cell.get('views')
+    return None
+
+
+def prior_counts(stats):
+    """Per outing, how many accounts had already run that topic before it.
+
+    The duplicate-fatigue question, and it needs no extra state: the posted_at
+    timestamps inside one topic already say what order the accounts went in.
+    """
+    out = {}
+    for topic, per in stats.items():
+        order = sorted((cell.get('posted_at') or 0, k)
+                       for k, cell in (per or {}).items() if cell.get('posted_at'))
+        for i, (_, k) in enumerate(order):
+            out[(topic, k)] = i
+    return out
+
+
+def mature_uploads(stats=None, keys=None, now=None):
+    """Every (topic, account) outing old enough to compare, with its v48.
+
+    One list, built once, that every comparison on the Experiments tab reads
+    from — so the design table, the fatigue bars and the slot grid cannot
+    disagree about which posts counted.
+    """
+    now = now or time.time()
+    stats = stats if stats is not None else load(STATS, {})
+    keys = keys or [a['key'] for a in visible_accounts()]
+    daily = load(STATS_DAILY, {})
+    promoted = set(load(PROMOTED, []))
+    st = statuses()
+    hook_of = {}
+    for e in load(os.path.join(REPO, 'tools', 'hook_history.json'), []):
+        if e.get('topic'):
+            hook_of[e['topic']] = ' / '.join(e['hook']).lower()
+    pillar_of = {' / '.join(h['lines']).lower(): h.get('pillar')
+                 for h in load(HOOK_POOL, {}).get('hooks', [])}
+    prior = prior_counts(stats)
+    out, immature = [], 0
+    for topic, per in stats.items():
+        if topic in promoted:
+            continue
+        rec = st.get(topic) or {}
+        for k, cell in (per or {}).items():
+            if k not in keys or not cell.get('posted_at'):
+                continue
+            v = v48(topic, k, cell, now, daily)
+            if v is None:
+                immature += 1
+                continue
+            t = time.localtime(cell['posted_at'])
+            out.append({
+                'topic': topic, 'account': k, 'at': cell['posted_at'], 'v': v,
+                'hour': t.tm_hour, 'wday': t.tm_wday,
+                'slot': next(n for lo, hi, n in SLOTS if lo <= t.tm_hour < hi),
+                'prior': prior.get((topic, k), 0),
+                'design': rec.get('design') or 'control',
+                'pillar': pillar_of.get(hook_of.get(topic, ''), 'untagged') or 'untagged',
+            })
+    out.sort(key=lambda r: -(r['at'] or 0))
+    return out, immature
+
+
+def _grp(rows):
+    """One comparison cell. Breakout rate leads; median is the second number.
+
+    Views are heavy-tailed — one upload in a group of ten can carry its mean
+    past a group that did better nine times out of ten — so the share of
+    uploads that cleared the bar is the honest summary and the mean is not
+    offered at all.
+    """
+    vs = sorted(r['v'] for r in rows)
+    n = len(vs)
+    hits = sum(1 for v in vs if v >= PERFORMING_VIEWS)
+    return {'n': n, 'wins': hits,
+            'rate': round(100.0 * hits / n) if n else 0,
+            'median': (vs[n // 2] if n else 0),
+            'best': (vs[-1] if n else 0)}
+
+
+def experiments(only=None):
+    """The three comparisons the ad-hoc analyses had to be run by hand to get.
+
+    Replaces the Audience tab, which averaged all six accounts together on a
+    figure one account inverts, and counted nine-hour-old posts against
+    finished ones.
+    """
+    keys = [a['key'] for a in (ACCOUNTS if only else visible_accounts())
+            if not only or a['key'] in only]
+    if not keys:
+        keys = [a['key'] for a in visible_accounts()]
+    rows, immature = mature_uploads(keys=keys)
+
+    def by(field, order=None):
+        buckets = {}
+        for r in rows:
+            buckets.setdefault(r[field], []).append(r)
+        items = [dict(_grp(v), key=str(k)) for k, v in buckets.items()]
+        if order:
+            items.sort(key=lambda x: order(x))
+        else:
+            items.sort(key=lambda x: -x['rate'])
+        return items
+
+    slots = {}
+    for k in keys:
+        mine = [r for r in rows if r['account'] == k]
+        slots[k] = {name: _grp([r for r in mine if r['slot'] == name])
+                    for _, _, name in SLOTS}
+    return {
+        'design': by('design'),
+        'pillar': by('pillar'),
+        'prior': by('prior', order=lambda x: int(x['key'])),
+        'slot': by('slot', order=lambda x: [n for _, _, n in SLOTS].index(x['key'])),
+        'by_account': slots,
+        'slot_names': [n for _, _, n in SLOTS],
+        'accounts': [a for a in ACCOUNTS if a['key'] in keys],
+        'selected': keys,
+        'uploads': len(rows), 'immature': immature,
+        'threshold': PERFORMING_VIEWS, 'mature_h': MATURE_H,
+        # n below this is a glance, not a result. Said in the data rather than
+        # left to the reader, because a 100% rate on two uploads looks like a
+        # finding and is not one.
+        'min_n': 8,
+    }
+
+
+def runway():
+    """Days of scheduled content left per account.
+
+    The number that was missing everywhere. Followers and "last posted" both
+    look healthy on an account whose queue ran dry three days ago, because
+    neither of them is about the future, and an account going quiet is the one
+    failure here that nothing errors on.
+    """
+    now = time.time()
+    last = last_posted()
+    jobs = [x for x in schedules()
+            if not x.get('done') and (x.get('at') or 0) > now]
+    out = []
+    for a in visible_accounts():
+        k = a['key']
+        mine = sorted(x['at'] for x in jobs if k in (x.get('accounts') or []))
+        # How far the queue reaches, not how many posts are in it: six posts
+        # all on Friday is one day of cover, not six.
+        out.append({'key': k, 'label': a['short'], 'pending': len(mine),
+                    'next_at': mine[0] if mine else None,
+                    'days': round((mine[-1] - now) / 86400.0, 1) if mine else 0,
+                    'last_at': (last.get(k) or {}).get('at'),
+                    'last_topic': (last.get(k) or {}).get('topic')})
+    return out
+
+
+def just_matured(window_h=72):
+    """Uploads that crossed the 48h line in the last three days, with v48.
+
+    "How did that one do" used to be a question you had to remember to go and
+    ask, days after the answer existed. A post becomes comparable at a
+    knowable moment; this is that moment, on the page you already open.
+    """
+    now = time.time()
+    stats = load(STATS, {})
+    daily = load(STATS_DAILY, {})
+    st = statuses()
+    label = {a['key']: a['short'] for a in ACCOUNTS}
+    out = []
+    for topic, per in stats.items():
+        for k, cell in (per or {}).items():
+            at = cell.get('posted_at')
+            if not at:
+                continue
+            age = (now - at) / 3600.0
+            if not (MATURE_H <= age < MATURE_H + window_h):
+                continue
+            v = v48(topic, k, cell, now, daily)
+            if v is None:
+                continue
+            out.append({'topic': topic, 'account': k, 'label': label.get(k, k),
+                        'at': at, 'views': v,
+                        'breakout': v >= PERFORMING_VIEWS,
+                        'design': (st.get(topic) or {}).get('design') or 'control'})
+    out.sort(key=lambda r: -(r['at'] or 0))
+    return out[:12]
+
+
+def today_bundle():
+    """Everything the Today page shows, in one request.
+
+    Four fetches for one above-the-fold page is four chances to half-draw it,
+    and this page's whole job is to be trustworthy at a glance.
+    """
+    st = statuses()
+    log = delivery_log()
+    unapproved, ready = [], []
+    for p in list_posts():
+        topic = p['topic']
+        if not p.get('slides'):
+            continue
+        # Anything already sent anywhere is not waiting on a decision.
+        if any((r or {}).get('status') for r in (log.get(topic) or {}).values()):
+            continue
+        row = {'topic': topic, 'at': p.get('mtime'),
+               'slides': len(p.get('slides') or []),
+               'why': unregistered(topic) or ''}
+        (ready if (st.get(topic) or {}).get('approved') else unapproved).append(row)
+    # Oldest first, both lists: these are the ones ageing out of Review into
+    # archive, and the ones that have been schedulable longest.
+    unapproved.sort(key=lambda r: (r.get('at') or 0))
+    ready.sort(key=lambda r: (r.get('at') or 0))
+
+    free = {}
+    for h in hook_rules.eligible():
+        p = h.get('pillar') or 'untagged'
+        free[p] = free.get(p, 0) + 1
+    ex = experiments()
+    return {
+        'runway': runway(),
+        'blockers': inbox_items(),
+        'unapproved': unapproved[:24], 'unapproved_n': len(unapproved),
+        'ready': ready[:24], 'ready_n': len(ready),
+        'matured': just_matured(),
+        'hooks_free': free,
+        'pillar': ex['pillar'], 'min_n': ex['min_n'],
+        'stale': _stale_drafts(), 'undelivered': _undelivered(),
+        'threshold': PERFORMING_VIEWS,
+        'now': time.time(),
+    }
 
 
 def replicate_busy(topic):
@@ -3262,6 +4080,21 @@ def reconcile_queues():
     waiting for a long time and a restart used to delete all of it.
     """
     closed, resumed = 0, 0
+    # A schedule claimed by the previous server never finished. Releasing the
+    # claim lets the loop pick it up again; the per-account results it already
+    # wrote are what stop it re-sending what already went out. This is the
+    # difference between resuming and publishing the same post twice.
+    with _lock:
+        sc = schedules()
+        freed = 0
+        for x in sc:
+            if x.get('claimed_at') and not x.get('done'):
+                x.pop('claimed_at', None)
+                freed += 1
+        if freed:
+            save_schedules(sc)
+            print('[startup] released %d interrupted schedule(s)' % freed,
+                  flush=True)
     # Builds belong here too. Leaving them out meant a queued build sat
     # forever after a restart with nothing to start it.
     for path, load, runner, save in (
@@ -3298,6 +4131,29 @@ def reconcile_queues():
 
 
 _last_sync = [0.0]
+_syncing = [False]
+
+# The clock was never the thing keeping two accounts from posting the same
+# slides at once — it only looked like it. Schedule three sends eleven minutes
+# apart, let the machine sleep through all three, and they come due together
+# and go out in the same minute. Every batch this pipeline has sent did
+# exactly that. So the gap is enforced here, at the moment of sending, where
+# it is a fact rather than an intention.
+MIN_GAP = 240                 # seconds between two sends of the same post
+_last_fire = {}               # topic -> when it last went out anywhere
+
+
+def _sync_once():
+    """One reconcile, on its own thread, never two at a time."""
+    _syncing[0] = True
+    started = time.time()
+    try:
+        sync_all()
+    except Exception as exc:
+        print('[sync] failed: %s' % exc, flush=True)
+    finally:
+        _syncing[0] = False
+        print('[sync] done in %ds' % int(time.time() - started), flush=True)
 
 
 def scheduler_loop():
@@ -3316,49 +4172,264 @@ def scheduler_loop():
                 settle_orphans()
             except Exception as exc:
                 print('[sweep] failed: %s' % exc, flush=True)
-            # Reconcile with TikTok on a slow beat. It is an HTTPS call, not an
-            # agent, so it costs nothing but a token refresh.
-            if now - _last_sync[0] > SYNC_EVERY:
+            # Reconcile with TikTok on a slow beat, on its own thread.
+            # It used to run here, inline, and the due-job check below waited
+            # for it: six accounts, each a node process and several HTTPS
+            # round trips. Three posts scheduled 13:58/14:03/14:09 all went
+            # out at 15:46, in the same minute, because a sync was in front of
+            # them — which also collapsed the stagger that keeps three
+            # accounts from publishing the same slides at once.
+            if now - _last_sync[0] > SYNC_EVERY and not _syncing[0]:
                 _last_sync[0] = now
-                try:
-                    sync_all()
-                except Exception as exc:
-                    print('[sync] failed: %s' % exc, flush=True)
-            due = [x for x in schedules() if not x.get('done') and x['at'] <= now]
+                threading.Thread(target=_sync_once, daemon=True).start()
+            due = [x for x in schedules()
+                   if not x.get('done') and not x.get('claimed_at')
+                   and x['at'] <= now]
             for job in due:
-                accts = job.get('accounts') or [a['key'] for a in ACCOUNTS]
-                gap = int(job.get('stagger_min') or 0) * 60
-                results = {}
-                direct = job.get('mode') == 'direct'
-                for i, key in enumerate(accts):
-                    if i and gap:
-                        time.sleep(gap)
-                    if not direct:
-                        results.update(run_draft(job['topic'], [key]))
-                        continue
-                    # The settings were chosen when the job was made, which may
-                    # be days ago. A privacy level the creator has since given
-                    # up would be refused by TikTok anyway; failing here says
-                    # why instead of leaving a bare API error in the log.
-                    st = job.get('settings') or {}
-                    why = direct_blocked(key, st)
-                    if why:
-                        results[key] = {'status': 'FAILED', 'detail': why,
-                                        'at': time.time()}
-                        print(f'[schedule] {job["topic"]} -> {key}: {why}', flush=True)
-                        continue
-                    results[key] = run_publish(job['topic'], key, st)
-                with _lock:
-                    sc = schedules()
-                    for x in sc:
-                        if x['topic'] == job['topic'] and x['at'] == job['at']:
-                            x['done'] = True
-                            x['results'] = {k: v['status'] for k, v in results.items()}
-                            x['ran_at'] = time.time()
-                    save_schedules(sc)
+                # Hold a late job back rather than let it burst. The loop ticks
+                # every 30s, so a backlog drains at one send per MIN_GAP
+                # instead of all at once — late, but still spaced, which is
+                # the property that actually matters.
+                since = now - _last_fire.get(job['topic'], 0)
+                if since < MIN_GAP:
+                    continue
+                # Claim it before anything runs. A job with an hour's stagger
+                # used to execute on this thread, which stopped sync and every
+                # other schedule for that hour; and a restart part-way through
+                # re-ran it from the first account, which for a direct post
+                # means publishing the same thing twice in public.
+                if not claim_schedule(job):
+                    continue
+                _last_fire[job['topic']] = now
+                threading.Thread(target=run_schedule_job, args=(job,),
+                                 daemon=True).start()
         except Exception as exc:      # never let the loop die on one bad job
             print('scheduler error:', exc)
         time.sleep(30)
+
+
+def _same_job(x, job):
+    return x.get('topic') == job.get('topic') and x.get('at') == job.get('at')
+
+
+def worker_jobs():
+    """The pending direct schedule, in the shape the Worker wants.
+
+    It holds no content of its own: a job is a caption, six public URLs and a
+    time. The slides are already on GitHub Pages, which is where TikTok pulls
+    them from either way.
+    """
+    idx, _ = hooks_index()
+    out = []
+    for x in schedules():
+        if x.get('done') or x.get('mode') != 'direct':
+            continue
+        topic = x['topic']
+        d = os.path.join(DRAFTS, topic)
+        if not os.path.isdir(d):
+            continue
+        imgs = ['%s/%s/%s' % (PAGES, topic, f)
+                for f in sorted(os.listdir(d)) if f.endswith('.jpg')]
+        rec = idx.get(topic) or {}
+        cap = (rec.get('caption') or '').strip()
+        if not imgs or not cap:
+            continue
+        # Title and caption used to be one pair per topic, copied to every
+        # account. That made a caption test impossible to run honestly: the
+        # slides were shared but so was the thing under test, so any effect
+        # was confounded with which post it was. `variants` overrides the
+        # pair for one account and falls back to the shared one, so a topic
+        # without variants produces exactly the jobs it produced before.
+        var = rec.get('variants') or {}
+        for acct in (x.get('accounts') or []):
+            v = var.get(acct) or {}
+            out.append({'topic': topic, 'account': acct, 'at': int(x['at']),
+                        'title': v.get('title') or rec.get('title') or topic,
+                        'caption': (v.get('caption') or '').strip() or cap,
+                        'images': imgs, 'cover': 0,
+                        'settings': x.get('settings') or {}})
+    out.sort(key=lambda j: j['at'])
+    return out
+
+
+def worker_health():
+    """The Worker's own view of its queue, or None if it cannot be reached.
+
+    /health needs no key, so this works even when the key is wrong — which
+    matters, because it is the check that stands between a corrupt local file
+    and the live queue.
+    """
+    if not WORKER_URL:
+        return None
+    import ssl
+    import urllib.request
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+        req = urllib.request.Request(WORKER_URL + '/health', None,
+                                     {'User-Agent': 'arco-dashboard/1.0'})
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as r:
+            return json.loads(r.read())
+    except Exception as exc:
+        print('[worker] health check failed: %s' % exc, flush=True)
+        return None
+
+
+def push_refusal(jobs, health):
+    """Why this push must not happen, or None if it is safe.
+
+    A push replaces the Worker's whole schedule, so the blast radius of a bad
+    local file is every post not yet sent. Compare like with like: the Worker
+    counts jobs still in the future with no result, so count those here too.
+    """
+    if not health or not health.get('ok'):
+        return None                      # unreachable: let the push try
+    live = health.get('pending') or 0
+    mine = len([j for j in jobs if j.get('at', 0) > time.time()])
+    if live >= 3 and mine == 0:
+        return ('local schedule has no future jobs but the worker has %d '
+                'pending — refusing to clear the live queue' % live)
+    if live >= 10 and mine < live / 3.0:
+        return ('local schedule has %d future jobs against the worker\'s %d '
+                'pending — refusing a drop that large' % (mine, live))
+    return None
+
+
+def push_worker_schedule(force=False):
+    """Hand the Worker the whole pending schedule.
+
+    Called after every schedule write. Without it a job made here would sit in
+    schedule.json forever: this host stands down on direct posts because the
+    Worker owns them, and the Worker would never have been told. That failure
+    is silent, which is the worst kind — the calendar would show the post and
+    nothing would ever send it.
+
+    Results are keyed by topic, account and time on the far side, so replacing
+    the schedule can never resend something that already went out.
+    """
+    if not (WORKER_URL and WORKER_KEY):
+        return {'off': True}
+    import ssl
+    import urllib.request
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return {'error': 'certifi is not installed, so the worker is unreachable'}
+    jobs = worker_jobs()
+    if not force:
+        why = push_refusal(jobs, worker_health())
+        if why:
+            print('[worker] NOT pushed: %s' % why, flush=True)
+            return {'error': why, 'refused': True}
+    body = json.dumps(jobs).encode()
+    # Cloudflare turns away Python's default user-agent as a bot, before the
+    # request ever reaches the Worker — a 403 that looks exactly like a bad
+    # key and is not one. Any ordinary name gets through.
+    req = urllib.request.Request(WORKER_URL + '/schedule', body,
+                                 {'Content-Type': 'application/json',
+                                  'User-Agent': 'arco-dashboard/1.0',
+                                  'X-Arco-Key': WORKER_KEY}, method='PUT')
+    try:
+        with urllib.request.urlopen(req, timeout=30, context=ctx) as r:
+            out = json.loads(r.read())
+        print('[worker] pushed %d job(s)' % len(jobs), flush=True)
+        return out
+    except Exception as exc:
+        print('[worker] push failed: %s' % exc, flush=True)
+        return {'error': str(exc)}
+
+
+def claim_schedule(job):
+    """Mark a job as mine before running it. False if someone already has it."""
+    with _lock:
+        sc = schedules()
+        for x in sc:
+            if _same_job(x, job):
+                if x.get('claimed_at') or x.get('done'):
+                    return False
+                x['claimed_at'] = time.time()
+                x.setdefault('results', {})
+                save_schedules(sc)
+                return True
+    return False
+
+
+def record_schedule_result(job, key, rec):
+    """Write one account's outcome as soon as it is known.
+
+    Results used to be written once, after the last account. A restart in the
+    middle lost the record of everything already sent, and the job then
+    resumed from account one.
+    """
+    with _lock:
+        sc = schedules()
+        for x in sc:
+            if _same_job(x, job):
+                x.setdefault('results', {})[key] = rec.get('status')
+                x.setdefault('detail', {})[key] = (rec.get('detail') or '')[:120]
+        save_schedules(sc)
+
+
+def finish_schedule(job):
+    with _lock:
+        sc = schedules()
+        for x in sc:
+            if _same_job(x, job):
+                x['done'] = True
+                x['ran_at'] = time.time()
+        save_schedules(sc)
+
+
+def run_schedule_job(job):
+    """One scheduled job, on its own thread.
+
+    Accounts with a result already recorded are skipped, so a job interrupted
+    by a restart resumes where it stopped instead of starting over.
+    """
+    topic = job['topic']
+    accts = job.get('accounts') or [a['key'] for a in visible_accounts()]
+    gap = int(job.get('stagger_min') or 0) * 60
+    direct = job.get('mode') == 'direct'
+    st = job.get('settings') or {}
+    if direct and WORKER_URL:
+        # Not an error and not a skip to be retried: the Worker has this job,
+        # fires it on a one-minute cron, and is awake when this machine is not.
+        print('[schedule] %s: direct posting belongs to the worker' % topic,
+              flush=True)
+        finish_schedule(job)
+        return
+    done_already = set((job.get('results') or {}).keys())
+    flags = account_flags()
+    try:
+        first = True
+        for key in accts:
+            if key in done_already:
+                continue
+            if not first and gap:
+                time.sleep(gap)
+            first = False
+            if (flags.get(key) or {}).get('paused'):
+                rec = {'status': 'SKIPPED', 'detail': 'paused', 'at': time.time()}
+                print('[schedule] %s -> %s: paused' % (topic, key), flush=True)
+            elif not direct:
+                rec = run_draft(topic, [key])[key]
+            else:
+                # The settings were chosen when the job was made, which may be
+                # days ago. A privacy level the creator has since given up
+                # would be refused by TikTok anyway; failing here says why
+                # instead of leaving a bare API error in the log.
+                ok, skipped = publish_gate(topic, [key], st)
+                if not ok:
+                    rec = {'status': 'SKIPPED', 'detail': skipped.get(key, ''),
+                           'at': time.time()}
+                    print('[schedule] %s -> %s: %s'
+                          % (topic, key, rec['detail']), flush=True)
+                else:
+                    rec = run_publish(topic, key, st)
+            record_schedule_result(job, key, rec)
+    finally:
+        finish_schedule(job)
 
 
 def queue_redo(topic, slides, note):
@@ -3518,14 +4589,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             })
         if path == '/api/ideas':
             return self._send(200, {'rows': load_ideas()})
-        if path.startswith('/ideas_img/'):
-            f = os.path.normpath(os.path.join(
-                IDEA_IMG, os.path.basename(path[len('/ideas_img/'):])))
-            if not f.startswith(IDEA_IMG) or not os.path.isfile(f):
-                return self._send(404, {'error': 'not found'})
-            with open(f, 'rb') as fh:
-                return self._send(200, fh.read(),
-                                  mimetypes.guess_type(f)[0] or 'image/png')
+        if path == '/api/today':
+            # The home page. inbox_items() has existed for months with no
+            # route to reach it from, which is why a failed delivery could sit
+            # unnoticed for two days.
+            return self._send(200, today_bundle())
+        if path == '/api/experiments':
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            a = (q.get('a') or [''])[0]
+            return self._send(200, experiments(
+                only=[x for x in a.split(',') if x] or None))
         if path == '/api/bgs':
             return self._send(200, bg_catalog())
         if path == '/api/ig':
@@ -3578,11 +4651,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                                    and isinstance(pool[k], list))})
         if path == '/':
             return self._send(200, PAGE, 'text/html; charset=utf-8')
-        if path == '/phone':
-            # A device frame so the phone layout can be designed on the desktop.
-            # The iframe is same-origin, so it authenticates as localhost and
-            # needs no key of its own.
-            return self._send(200, PHONE_FRAME, 'text/html; charset=utf-8')
         if path == '/favicon.png':
             # The real app icon, so the tab is findable among twenty others.
             try:
@@ -3614,8 +4682,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if key not in [a['key'] for a in ACCOUNTS]:
                 return self._send(400, {'error': 'unknown account'})
             return self._send(200, creator_info(key))
+        if path == '/api/calendar':
+            # The week's commitments, per account, plus everything already
+            # out. The grid is drawn from this alone, so it carries the
+            # account health too: a row you cannot post to should look
+            # different from a row you have simply not filled.
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            off = int((q.get('week') or ['0'])[0])
+            return self._send(200, calendar_week(off))
         if path == '/api/posts':
-            return self._send(200, {'posts': list_posts(), 'accounts': ACCOUNTS,
+            vis = {a['key'] for a in visible_accounts()}
+            return self._send(200, {'posts': list_posts(),
+                                    # The gate Review has to check before it
+                                    # can let Approve light up.
+                                    'required_tag': REQUIRED_TAG,
+                                    'accounts': visible_accounts(),
+                                    'hidden_accounts': [
+                                        a for a in ACCOUNTS
+                                        if a['key'] not in vis],
                                     'pending': pending_counts(), 'cap': CAP,
                                     'published_today': published_today(),
                                     'account_stats': account_summary(),
@@ -3673,16 +4757,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         body = json.loads(raw)
         if path == '/api/draft':
             topic = body['topic']
-            keys = body.get('accounts') or [a['key'] for a in ACCOUNTS]
+            keys = body.get('accounts') or [a['key'] for a in visible_accounts()]
             return self._send(200, {'results': run_draft(topic, keys),
                                     'pending': pending_counts()})
         if path == '/api/ideas':
             return self._send(200, idea_apply(body))
-        if path == '/api/ideas/img':
-            name = idea_save_image(body.get('data') or '')
-            if not name:
-                return self._send(400, {'error': 'not an image'})
-            return self._send(200, {'img': name})
         if path == '/api/autofill':
             # Choosing was never the judgment call — the words are. So the
             # photos, the roster and the hook come straight from the rules,
@@ -3829,30 +4908,80 @@ class Handler(http.server.BaseHTTPRequestHandler):
             with _lock:
                 st = statuses()
                 st.setdefault(body['topic'], {})['seen'] = True
-                with open(STATUS, 'w') as fh:
-                    json.dump(st, fh, indent=1)
+                save_json(STATUS, st)
             return self._send(200, {'ok': True})
         if path == '/api/approve':
+            # One topic or a list of them. Ten reshoots of the same hook are
+            # one decision, and making them ten requests meant Review either
+            # waited on ten round trips or lost track of which had landed.
+            topics = body.get('topics') or [body['topic']]
+            ok = bool(body['approved'])
             with _lock:
                 st = statuses()
-                st.setdefault(body['topic'], {})['approved'] = bool(body['approved'])
-                st[body['topic']]['approved_at'] = time.time()
-                with open(STATUS, 'w') as fh:
-                    json.dump(st, fh, indent=1)
+                for t in topics:
+                    st.setdefault(t, {})['approved'] = ok
+                    st[t]['approved_at'] = time.time()
+                save_json(STATUS, st)
+            return self._send(200, {'ok': True, 'n': len(topics)})
+        if path == '/api/design':
+            # Which slide design a post was built with. Nothing recorded it,
+            # so the two live format experiments could not be told apart from
+            # everything else by anything but memory.
+            with _lock:
+                st = statuses()
+                for t in (body.get('topics') or [body['topic']]):
+                    st.setdefault(t, {})['design'] = str(body.get('design') or '')
+                save_json(STATUS, st)
             return self._send(200, {'ok': True})
         if path == '/api/schedule':
             with _lock:
                 sc = schedules()
+                # A topic used to hold at most one pending job: scheduling it
+                # again silently dropped the first. The calendar assigns the
+                # same post to several accounts at different times, so a job
+                # is now identified by topic AND time, and only an explicit
+                # replace_at drops an earlier one.
+                pend = lambda x: not x.get('done') and not x.get('claimed_at')
                 if body.get('cancel'):
-                    sc = [x for x in sc if not (x['topic'] == body['topic'] and not x.get('done'))]
+                    at = body.get('at')
+                    sc = [x for x in sc if not (
+                        x['topic'] == body['topic'] and pend(x)
+                        and (at is None or abs(x['at'] - float(at)) < 1))]
                 else:
-                    sc = [x for x in sc if not (x['topic'] == body['topic'] and not x.get('done'))]
+                    old_at = body.get('replace_at')
+                    if old_at is not None:
+                        sc = [x for x in sc if not (
+                            x['topic'] == body['topic'] and pend(x)
+                            and abs(x['at'] - float(old_at)) < 1)]
+                    # Approval gates the calendar, not just the send. A post
+                    # nobody has looked at should not be able to reach a slot;
+                    # twenty-seven carrying the old App Store name did exactly
+                    # that. Jobs already queued are untouched — this only
+                    # stands between a new post and a new slot.
+                    if not (statuses().get(body['topic']) or {}).get('approved'):
+                        return self._send(400, {
+                            'error': '%s is not approved yet — review it first'
+                                     % body['topic']})
+                    # An ARCO listicle on a Vietnamese-learning account is not
+                    # a bad post, it is the wrong app talking to the wrong
+                    # audience, and it is public the moment it fires. Approval
+                    # cannot catch it: the post is perfectly good, the
+                    # destination is not.
+                    want = brand_of_topic(body['topic'])
+                    for key in (body.get('accounts') or []):
+                        got = brand_of_account(key)
+                        if got != want:
+                            return self._send(400, {
+                                'error': '%s is a %s post and %s is a %s '
+                                         'account' % (body['topic'], want,
+                                                      key, got)})
                     mode = 'direct' if body.get('mode') == 'direct' else 'draft'
                     st = body.get('settings') or {}
                     if mode == 'direct':
                         # Refuse an unpostable job at the point it is made,
                         # rather than letting it sit until it fires and fails.
-                        for key in (body.get('accounts') or [a['key'] for a in ACCOUNTS]):
+                        for key in (body.get('accounts')
+                                    or [a['key'] for a in visible_accounts()]):
                             why = direct_blocked(key, st)
                             if why:
                                 return self._send(400, {'error': '%s: %s' % (key, why)})
@@ -3862,7 +4991,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                'mode': mode, 'settings': st if mode == 'direct' else {},
                                'done': False})
                 save_schedules(sc)
-            return self._send(200, {'ok': True})
+            pushed = push_worker_schedule()
+            return self._send(200, {'ok': True, 'worker': pushed})
         if path == '/api/delete':
             # Move rather than remove: a post that took a render pass and a
             # review should not vanish because of a misclick.
@@ -3884,6 +5014,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     json.dump(raw, fh, indent=1, ensure_ascii=False)
                 hook_rules.forget(topic)
             return self._send(200, {'ok': True, 'moved_to': dest})
+        if path == '/api/build_rule':
+            if not add_build_rule(body.get('rule', ''), body.get('section') or 'Format'):
+                return self._send(400, {'error': 'empty rule'})
+            return self._send(200, {'ok': True, 'rules': build_rules_text()})
         if path == '/api/redo':
             slides = body.get('slides') or [body.get('slide')]
             n = queue_redo(body['topic'], [int(x) for x in slides if x],
@@ -3921,16 +5055,41 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     json.dump(q, fh, indent=1, ensure_ascii=False)
             threading.Thread(target=run_replicate, args=(q[-1],), daemon=True).start()
             return self._send(200, {'ok': True})
+        if path == '/api/account_flag':
+            key = body.get('account')
+            if key not in [a['key'] for a in ACCOUNTS]:
+                return self._send(400, {'error': 'unknown account'})
+            fields = {'paused': bool(body.get('paused')),
+                      'note': (body.get('note') or '')[:120]}
+            if 'hidden' in body:
+                fields['hidden'] = bool(body['hidden'])
+            row = set_account_flag(key, **fields)
+            return self._send(200, {'ok': True, 'flag': row})
         if path == '/api/publish_direct':
-            topic, key = body['topic'], body['account']
+            topic = body['topic']
+            # One account or several. The old shape was one; the calendar
+            # sends a list, and the gates below are the reason this is not
+            # simply a loop in the browser.
+            keys = body.get('accounts') or (
+                [body['account']] if body.get('account') else [])
             st = body.get('settings') or {}
+            if not keys:
+                return self._send(400, {'error': 'no account chosen'})
             if not st.get('privacy'):
                 return self._send(400, {'error': 'pick a privacy level first'})
             if st.get('branded_content') and st['privacy'] == 'SELF_ONLY':
                 return self._send(400, {'error': 'branded content cannot be private'})
-            threading.Thread(target=run_publish, args=(topic, key, st),
-                             daemon=True).start()
-            return self._send(200, {'ok': True})
+            accepted, skipped = publish_gate(
+                topic, keys, st, repost=bool(body.get('repost')))
+            if not accepted:
+                return self._send(400, {'error': 'nothing to post',
+                                        'skipped': skipped})
+            threading.Thread(
+                target=run_publish_batch,
+                args=(topic, accepted, st, int(body.get('stagger_min') or 0)),
+                daemon=True).start()
+            return self._send(200, {'ok': True, 'accounts': accepted,
+                                    'skipped': skipped})
         if path == '/api/publish':
             # Publishing happens by hand in the TikTok app and the API cannot
             # see it, so it is recorded here. A published draft stops counting
@@ -3968,17 +5127,40 @@ class Handler(http.server.BaseHTTPRequestHandler):
             with _lock:
                 idx, raw = hooks_index()
                 posts = raw['posts'] if isinstance(raw, dict) else raw
+                # `variants` is {account: {title, caption}} and is merged per
+                # account rather than replaced, so saving one arm of a caption
+                # test does not wipe the others. Passing null for an account
+                # drops just that override and returns it to the shared pair.
+                def _merge_variants(old, new):
+                    if new is None:
+                        return old or {}
+                    out = dict(old or {})
+                    for acct, v in new.items():
+                        if v is None:
+                            out.pop(acct, None)
+                        else:
+                            out[acct] = v
+                    return out
+
                 for p in posts:
                     if p['topic'] == body['topic']:
                         p['title'] = body.get('title', p.get('title', ''))
                         p['caption'] = body.get('caption', p.get('caption', ''))
+                        merged = _merge_variants(p.get('variants'),
+                                                 body.get('variants'))
+                        if merged:
+                            p['variants'] = merged
+                        else:
+                            p.pop('variants', None)
                         break
                 else:
-                    posts.append({'topic': body['topic'],
-                                  'title': body.get('title', ''),
-                                  'caption': body.get('caption', '')})
-                with open(HOOKS, 'w') as fh:
-                    json.dump(raw, fh, indent=1, ensure_ascii=False)
+                    rec = {'topic': body['topic'],
+                           'title': body.get('title', ''),
+                           'caption': body.get('caption', '')}
+                    if body.get('variants'):
+                        rec['variants'] = body['variants']
+                    posts.append(rec)
+                save_json(HOOKS, raw, ensure_ascii=False)
             return self._send(200, {'ok': True})
         return self._send(404, {'error': 'not found'})
 
@@ -4762,6 +5944,11 @@ nav{display:flex;flex-direction:column;gap:2px}
 
 /* ---------- accounts ---------- */
 .accounts{margin-top:auto;display:flex;flex-direction:column;gap:9px}
+.hidnote{margin:2px 0 0;font:500 10.5px/1.5 system-ui;color:var(--dim);
+  letter-spacing:.02em}
+.hidnote button{background:none;border:0;padding:0 1px;cursor:pointer;
+  font:inherit;color:var(--dim);text-decoration:underline dotted}
+.hidnote button:hover{color:var(--text)}
 .acct{display:block;text-decoration:none;background:var(--surface-2);
   border:1px solid var(--line-2);border-radius:var(--r);padding:11px 12px;
   transition:border-color .15s}
@@ -4816,145 +6003,29 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .sub{color:var(--dim);font-size:12px}
 .wrap{padding:14px 28px 60px}
 
-/* Accent picker. Every colour on the page derives from --accent-rgb, so
-   the whole theme turns on one value. */
-.cpick{position:relative;flex:none}
-.cpdot{width:26px;height:26px;border-radius:50%;border:1px solid var(--line-2);
-  background:var(--accent);cursor:pointer;padding:0;display:block;
-  box-shadow:0 0 14px -3px var(--glow);transition:transform .16s ease}
-.cpdot:hover{transform:scale(1.1)}
-.cppop{position:absolute;right:0;top:34px;z-index:60;width:212px;padding:12px;
-  background:var(--surface-2);border:1px solid var(--line-2);border-radius:var(--r);
-  box-shadow:0 18px 44px -12px #000,0 0 26px -12px var(--glow)}
-.cppop[hidden]{display:none}
-.cppop .lbl{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
-  color:var(--dim);margin:0 0 8px}
-.cpsw{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:11px}
-.cpsw button{width:100%;aspect-ratio:1;border-radius:50%;border:1px solid transparent;
-  cursor:pointer;padding:0}
-.cpsw button[aria-pressed="true"]{border-color:#fff;
-  box-shadow:0 0 0 2px var(--surface-2),0 0 0 3px currentColor}
-.cprow{display:flex;gap:8px;align-items:center}
-.cprow input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--line-2);
-  border-radius:var(--r);background:none;cursor:pointer}
-.cprow .btn{flex:1;justify-content:center}
-
-/* ---------- ideas: the map ----------
-   A pannable surface with bubbles on it. Everything is positioned in map
-   coordinates inside .mmin, which is the only thing that moves when you pan —
-   so a bubble's stored x/y never has to know where the viewport is. */
-.mmwrap{position:relative}
-.mmbar{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin:0 0 11px}
-.mmhint{flex:1;min-width:180px;font-size:11.5px;color:var(--dim)}
-.kchips{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
-.kchip{background:none;border:1px solid var(--line);border-radius:7px;cursor:pointer;
-  color:var(--muted);font:600 10.5px/1 "Fira Code",monospace;letter-spacing:.06em;
-  text-transform:uppercase;padding:6px 8px;display:flex;align-items:center;gap:6px;
-  transition:color .15s,border-color .15s}
-.kchip::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--kc)}
-.kchip.add::before{display:none}
-.kchip:hover{color:var(--text);border-color:var(--line-2)}
-.kchip.on{color:var(--text);border-color:var(--kc);
-  box-shadow:0 0 0 1px var(--kc) inset,0 0 14px -6px var(--kc)}
-.kin{width:104px;background:var(--surface-2);border:1px solid var(--accent);
-  border-radius:7px;color:var(--text);font:600 10.5px/1 "Fira Code",monospace;
-  padding:7px 8px;text-transform:uppercase}
-.kin:focus{outline:none}
-
-.mmap{position:relative;overflow:hidden;touch-action:none;cursor:grab;
-  height:calc(100vh - 232px);min-height:440px;
-  background:var(--surface);border:1px solid var(--line);border-radius:14px}
-.mmap:active{cursor:grabbing}
-.mmin{position:absolute;inset:0;will-change:transform;transform-origin:0 0}
-.mmlines{position:absolute;left:-4000px;top:-4000px;width:8000px;height:8000px;
-  overflow:visible;pointer-events:none}
-/* the svg is offset, so the paths are too — cancel it on the group */
-.mmlines path{transform:translate(4000px,4000px)}
-.mmempty{position:absolute;inset:0;display:flex;align-items:center;
-  justify-content:center;text-align:center;line-height:1.7;
-  color:var(--dim);font-size:13px;pointer-events:none}
-
-.bub{position:absolute;width:186px;box-sizing:border-box;cursor:grab;
-  background:var(--surface-2);border:1px solid var(--line-2);border-radius:11px;
-  padding:9px 10px;display:flex;flex-direction:column;gap:6px;
-  box-shadow:0 10px 26px -14px #000;transition:box-shadow .16s,border-color .16s}
-.bub:hover{border-color:var(--kc)}
-.bub.sel{border-color:var(--kc);box-shadow:0 0 0 1px var(--kc),0 0 26px -10px var(--kc)}
-.bub.target{border-style:dashed}
-.bub:active{cursor:grabbing}
-.bkind{display:flex;align-items:center;gap:5px;
-  font:700 8.5px/1 "Fira Code",monospace;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--kc);opacity:.85}
-.bkind::before{content:"";width:6px;height:6px;border-radius:50%;
-  background:var(--kc);flex:none}
-/* In the inspector it keeps its box — there it is a heading, not a tag. */
-.mmins .bkind{border:1px solid var(--kc);border-radius:5px;padding:4px 6px;opacity:1}
-.bub .btx{font-size:12.5px;line-height:1.5;color:var(--text);word-break:break-word;
-  display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
-.bub .bpic{width:100%;max-height:132px;object-fit:cover;border-radius:7px;display:block}
-.bub .btx.ph{color:var(--dim);font-style:italic}
-/* Typing happens on the bubble. The box is invisible so the bubble does not
-   change shape the moment you click into it. */
-.bed{width:100%;box-sizing:border-box;background:none;border:0;padding:0;resize:none;
-  color:var(--text);font:400 12.5px/1.5 system-ui;overflow:hidden;min-height:38px}
-.bed:focus{outline:none}
-.bub .bed::placeholder{color:var(--dim)}
-
-.zoomer{display:flex;align-items:center;gap:2px;border:1px solid var(--line);
-  border-radius:8px;padding:2px}
-.zoomer button{width:26px;height:24px;background:none;border:0;cursor:pointer;
-  color:var(--muted);font:500 15px/1 system-ui;border-radius:6px}
-.zoomer button:hover{color:var(--accent);background:rgba(var(--accent-rgb),.08)}
-.zoomer span{min-width:38px;text-align:center;font:600 10.5px/1 "Fira Code",monospace;
-  color:var(--dim)}
-/* A head title is the thing everything else hangs off, so it looks like one. */
-.bub.k-title{width:214px;background:var(--surface);border-width:2px;
-  align-items:center;text-align:center}
-.bub.k-title .btx{font-size:15px;font-weight:600;line-height:1.35;text-align:center}
-.bub.k-title .bed{text-align:center;font-size:15px;font-weight:600}
-
-/* The four handles. They sit outside the bubble's box and only appear when
-   the pointer is on it, so the board is quiet until you reach for a branch. */
-.hnd{position:absolute;width:20px;height:20px;border-radius:50%;padding:0;
-  display:flex;align-items:center;justify-content:center;cursor:pointer;
-  background:var(--surface-2);border:1px solid var(--kc);color:var(--kc);
-  font:600 13px/1 system-ui;opacity:0;transition:opacity .14s,transform .14s;
-  z-index:3}
-.bub:hover .hnd,.bub.sel .hnd{opacity:.75}
-.hnd:hover{opacity:1;transform:scale(1.18);
-  background:var(--kc);color:var(--bg)}
-.hnd.n{top:-11px;left:50%;margin-left:-10px}
-.hnd.s{bottom:-11px;left:50%;margin-left:-10px}
-.hnd.e{right:-11px;top:50%;margin-top:-10px}
-.hnd.w{left:-11px;top:50%;margin-top:-10px}
-
-/* The inspector, not an inline editor: editing in place on a draggable thing
-   fights the drag on every click. */
-.mmins{position:absolute;right:14px;top:60px;width:264px;z-index:12;
-  background:var(--surface-2);border:1px solid var(--line-2);border-radius:13px;
-  padding:13px;display:flex;flex-direction:column;gap:9px;
-  box-shadow:0 22px 50px -18px #000,0 0 24px -14px var(--glow)}
-.mmins .ihead{display:flex;align-items:center;justify-content:space-between}
-.mmins .rm{background:none;border:0;color:var(--dim);font-size:17px;cursor:pointer;
-  line-height:1;padding:0 2px}
-.mmins .rm:hover{color:var(--text)}
-.mmins textarea{min-height:92px;resize:vertical;background:var(--surface);
-  border:1px solid var(--line);border-radius:8px;color:var(--text);
-  font:400 13px/1.55 system-ui;padding:9px 10px}
-.mmins textarea:focus{outline:none;border-color:var(--accent);
-  box-shadow:0 0 0 3px rgba(var(--accent-rgb),.12)}
-.mmins .iref{width:100%;border-radius:8px;display:block;cursor:zoom-in}
-.mmins .ilab{margin:2px 0 0;font:700 9.5px/1 "Fira Code",monospace;
-  letter-spacing:.13em;text-transform:uppercase;color:var(--dim)}
-.mmins .iacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
-.mmins .iacts button{background:none;border:1px solid var(--line);border-radius:7px;
-  color:var(--muted);font:600 10.5px/1 system-ui;padding:7px 9px;cursor:pointer;
-  transition:color .15s,border-color .15s}
-.mmins .iacts button:hover{color:var(--accent);border-color:var(--accent)}
-.mmins .iacts button.warn:hover{color:var(--bad);border-color:var(--bad)}
-.mmins .ifoot{margin:0;font-size:10.5px;color:var(--dim)}
-@media(max-width:900px){.mmins{position:static;width:auto;margin-top:11px}}
-
+/* ---------- briefs ----------
+   A line of text waiting to become a post. What stood here was a pan-and-zoom
+   mind map — bubbles, SVG edges, drag handles, pasted screenshots — over a
+   store of eight rows, two of them placeholders. */
+.brwrap{margin:22px 0 0;border-top:1px solid var(--line);padding-top:18px}
+.brhead{display:flex;align-items:baseline;gap:10px;margin:0 0 10px}
+.brhead h4{margin:0;font-size:13px;font-weight:600}
+.brhead .why{margin:0;font-size:11px;color:var(--dim)}
+.brnew{display:flex;gap:8px;margin:0 0 12px}
+.brnew input{flex:1;background:var(--surface-2);border:1px solid var(--line-2);
+  color:var(--text);border-radius:9px;padding:10px 12px;font:500 13px/1 system-ui}
+.brlist{list-style:none;margin:0;padding:0}
+.brlist li{display:flex;align-items:center;gap:10px;padding:9px 0;
+  border-bottom:1px solid var(--line);font-size:12.5px}
+.brlist li:last-child{border-bottom:0}
+.brlist li.used{opacity:.42}
+.brlist .brtxt{flex:1;min-width:0;color:var(--muted);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.brlist .brpil{font-size:10.5px;color:var(--dim);flex:none}
+.brlist .brdel{background:none;border:0;color:var(--dim);cursor:pointer;
+  font-size:14px;line-height:1;padding:2px 5px;flex:none}
+.brlist .brdel:hover{color:var(--bad)}
+.brlist li.none{color:var(--dim);justify-content:center;padding:16px 0}
 /* ---------- cards ---------- */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:12px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
@@ -5226,6 +6297,173 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .sub.ghost:disabled{opacity:.85;cursor:default}
 .sub.ghost .spin{width:11px;height:11px;border-width:2px}
 .sub.ghost .ok{font-size:12px}
+/* ---------- the calendar ----------
+   Accounts down, days across. The cell is an account-day rather than a time
+   slot: six accounts over three fixed hours is 126 cells of nothing, and the
+   question is "which account has room today", not "what happens at 12:00". */
+/* The page's #modal is a singleton with a fixed title/body/confirm shape;
+   this one carries its own controls, so it brings its own shell. */
+.calmodal{position:fixed;inset:0;z-index:var(--z-modal,90);
+  background:rgba(var(--ink-rgb),.8);display:flex;align-items:center;
+  justify-content:center;padding:20px}
+.calsheet{background:var(--surface);border:1px solid var(--line-2);
+  border-radius:16px;width:min(520px,100%);max-height:86vh;overflow:auto;
+  box-shadow:0 30px 70px rgba(0,0,0,.6)}
+.calsheet .sec{display:flex;flex-direction:column;gap:9px;padding:20px}
+.calsheet .cap-l{font:600 11px/1 system-ui;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
+.calsheet .cap-l:first-child{margin-top:0;font-size:13px;text-transform:none;
+  letter-spacing:0;color:var(--text)}
+.calsheet select,.calsheet input[type=time]{background:var(--surface-2);
+  border:1px solid var(--line-2);color:var(--text);border-radius:9px;
+  padding:9px 10px;font:500 13px/1 system-ui;color-scheme:dark;width:100%}
+.calsheet input[type=time]{width:auto}
+.calsheet .sub{font:500 11px/1.45 system-ui;color:var(--dim)}
+.awarn{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;
+  font:500 10px/1.3 system-ui;padding:4px 7px;border-radius:7px}
+.awarn.bad{background:rgba(239,68,68,.12);color:#FCA5A5}
+.awarn.pause{background:rgba(245,158,11,.12);color:#FCD34D}
+.awarn button{background:none;border:0;padding:0;cursor:pointer;font:600 10px/1 system-ui;
+  color:inherit;text-decoration:underline;opacity:.85}
+.awarn button:hover{opacity:1}
+.awarn .fix{display:block;width:100%;font:500 9.5px/1.3 ui-monospace,monospace;opacity:.75}
+/* ---------- review ----------
+   One post, big enough to actually read, with the verdict under it. The
+   buttons are large and far apart on purpose: this is the one screen where a
+   misclick publishes something or deletes it. */
+.rev{max-width:1080px}
+.revtop{display:flex;align-items:center;gap:12px;margin:0 0 14px}
+.revname{font:600 14px/1 system-ui;color:var(--text)}
+/* The contact sheet. One slide at a time meant a six-slide post took six
+   clicks to see, so in practice it was judged on slide one. At this size a
+   1080x1920 slide is legible without zooming, and the whole post is one
+   look — which is the only way a sixty-post backlog gets cleared. */
+.revsheet{display:grid;gap:10px;margin:0 0 16px;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.revcard{position:relative;background:none;border:0;padding:0;cursor:zoom-in;
+  display:block}
+.revcard img{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:11px;
+  border:2px solid var(--line-2);display:block}
+.revcard:hover img{border-color:var(--accent)}
+.revcard.bad img{border-color:var(--bad)}
+.revcard i{position:absolute;top:6px;left:8px;font:700 11px/1 system-ui;
+  color:#fff;font-style:normal;text-shadow:0 1px 4px rgba(0,0,0,.85)}
+.revhook{margin:-6px 0 14px;font:600 14px/1.45 system-ui;color:var(--text);
+  max-width:62ch}
+/* The second gate, on the same screen as the first. Fixing a missing tag
+   used to mean leaving Review for the detail page and losing your place in
+   the queue, which is why fifty captions still had no tag. */
+.revcapbox{background:var(--surface);border:1px solid var(--line-2);
+  border-radius:13px;padding:13px 14px;display:flex;flex-direction:column;gap:9px}
+.revcapbox.blocked{border-color:rgba(245,185,69,.5)}
+.revgate{display:flex;gap:14px;flex-wrap:wrap}
+.gchk{font:500 11px/1 system-ui}
+.gchk.ok{color:var(--ok)}
+.gchk.no{color:var(--warn)}
+.revcapbox textarea{width:100%;resize:vertical;background:var(--surface-2);
+  border:1px solid var(--line-2);color:var(--text);border-radius:9px;
+  padding:10px 11px;font:500 12.5px/1.6 system-ui}
+.revcapbar{display:flex;align-items:center;gap:12px}
+.revcapbar .sub{flex:1;min-width:0}
+.revfilt{display:flex;gap:4px;margin-left:auto}
+/* What kind of work this is, before which post it is. */
+.revwhich{display:flex;gap:4px;margin:0 0 14px}
+.revwhich .seg b{margin-left:6px;opacity:.6;font-weight:600}
+.revwhich .seg:disabled{opacity:.35;cursor:default}
+.revbatch{text-align:center;font:500 11.5px/1.5 system-ui;color:var(--dim);
+  margin:0 0 10px;display:flex;align-items:center;gap:10px;justify-content:center}
+.revbatch b{color:var(--muted)}
+.revacts{display:flex;gap:22px;justify-content:center;margin:18px 0 6px}
+.revbtn{width:64px;height:64px;border-radius:50%;border:1px solid var(--line-2);
+  background:var(--surface-2);font-size:24px;line-height:1;cursor:pointer;
+  transition:transform .12s ease,border-color .12s ease}
+.revbtn:hover{transform:scale(1.07)}
+.revbtn.yes{color:var(--ok);border-color:rgba(34,197,94,.45)}
+.revbtn.no{color:var(--bad);border-color:rgba(239,68,68,.45)}
+.revbtn.fix{color:var(--muted)}
+.revbtn:disabled{opacity:.5;cursor:default;transform:none}
+.revhint{text-align:center;font:500 10.5px/1 system-ui;color:var(--dim);margin:0}
+.revrule{display:flex;align-items:center;gap:9px;margin-top:4px;cursor:pointer;
+  font:500 12px/1.4 system-ui;color:var(--muted)}
+.revrule input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer}
+.revfix{display:flex;flex-direction:column;gap:9px;margin-top:22px;
+  background:var(--surface);border:1px solid var(--line-2);border-radius:14px;padding:18px}
+.revfix input{background:var(--surface-2);border:1px solid var(--line-2);
+  color:var(--text);border-radius:9px;padding:10px 11px;font:500 13px/1 system-ui}
+@media (max-width:760px){
+  /* Two across on a phone keeps a slide big enough to read the hook on. */
+  .revsheet{grid-template-columns:repeat(2,1fr)}
+  .revtop{flex-wrap:wrap}
+  .revfilt{margin-left:0;width:100%;overflow-x:auto}
+}
+.calhead{margin:0 0 14px}
+.calrange{font:600 13px/1 system-ui;color:var(--text);min-width:112px;text-align:center}
+.calkey{display:flex;align-items:center;gap:5px;margin-left:auto;
+  font:500 10.5px/1 system-ui;color:var(--dim)}
+.calkey .calchip{margin-left:9px}
+.calkey .calchip:first-child{margin-left:0}
+.calgrid{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
+  border-radius:12px;overflow:hidden}
+.calh{background:var(--surface);padding:9px 8px;text-align:center}
+.calh b{display:block;font:600 11px/1.3 system-ui;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.06em}
+.calh i{font:500 15px/1.2 system-ui;color:var(--text);font-style:normal}
+.calh.today b,.calh.today i{color:var(--accent)}
+.calacc{background:var(--surface);padding:10px 11px;display:flex;
+  flex-direction:column;gap:2px;justify-content:center;min-width:0}
+.calacc b{font:600 12px/1.2 system-ui;color:var(--text);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.calacc i{font:500 10.5px/1.2 system-ui;color:var(--dim);font-style:normal}
+/* A row you cannot post to has to look different from one you have simply
+   not filled yet, or you keep assigning work to an account nobody sees. */
+.calacc.paused,.calacc.broken,.calacc.dead{opacity:.55}
+.calacc.broken i,.calacc.dead i{color:var(--bad)}
+.calacc.paused i{color:var(--warn,#F59E0B)}
+.calcell{background:var(--bg);min-height:62px;padding:7px 6px;position:relative;
+  display:flex;flex-direction:column;gap:5px}
+.calcell.past{background:rgba(var(--ink-rgb),.5)}
+.calcell.off{background:repeating-linear-gradient(135deg,
+  rgba(var(--ink-rgb),.4) 0 6px,transparent 6px 12px)}
+.calchips{display:flex;flex-wrap:wrap;gap:3px;line-height:1}
+/* Three states, three colours. A scheduled post used to draw as a grey ring,
+   which is also what an empty cell looks like, so a full week and an empty
+   one were the same picture at a glance. Blue is a commitment, green is out,
+   amber is sitting on the phone waiting for a thumb. */
+.calchip{font-size:13px;line-height:1;color:var(--dim)}
+.calchip.done{color:var(--ok)}
+.calchip.planned{color:#60A5FA}
+.calchip.sent{color:#FBBF24}
+.calfree{font:500 9.5px/1 system-ui;color:var(--dim);font-style:normal;margin-top:auto}
+.caladd{position:absolute;top:4px;right:4px;width:19px;height:19px;padding:0;
+  border:1px solid var(--line-2);border-radius:6px;background:var(--surface-2);
+  color:var(--dim);font:500 13px/1 system-ui;cursor:pointer;opacity:0;
+  transition:opacity .12s ease}
+.calcell:hover .caladd{opacity:1}
+.caladd:hover{color:var(--accent);border-color:var(--accent)}
+.caltray{display:flex;gap:10px;overflow-x:auto;padding:2px 0 8px}
+.caltile{flex:none;width:92px}
+.caltile img{width:92px;aspect-ratio:9/16;object-fit:cover;border-radius:9px;
+  border:1px solid var(--line-2);display:block}
+.caltile b{display:block;font:600 10.5px/1.3 system-ui;color:var(--text);
+  margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.caltile i{font:500 10px/1.2 system-ui;color:var(--dim);font-style:normal}
+.calchoose{display:flex;gap:8px;overflow-x:auto;padding:2px 0 6px}
+.calopt{flex:none;width:76px;background:none;border:0;padding:0;cursor:pointer}
+.calopt img{width:76px;aspect-ratio:9/16;object-fit:cover;border-radius:8px;
+  border:2px solid transparent;display:block}
+.calopt.on img{border-color:var(--accent)}
+.calopt span{display:block;font:500 9.5px/1.25 system-ui;color:var(--muted);
+  margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.calopt.on span{color:var(--text)}
+.fastrow.end{justify-content:flex-end;margin-top:16px;position:sticky;bottom:-20px;
+  background:var(--surface);padding:12px 0 2px;margin-bottom:0;
+  box-shadow:0 -10px 14px -8px var(--surface)}
+/* Seven day columns do not fit a phone. Below 900 the grid scrolls sideways
+   with the account column pinned, which keeps the row labels readable. */
+@media (max-width:900px){
+  .calgrid{overflow-x:auto;grid-template-columns:112px repeat(7,minmax(74px,1fr))!important}
+  .calacc{position:sticky;left:0;z-index:2}
+}
 .sect{display:flex;align-items:baseline;gap:10px;margin:22px 0 12px}
 .sect h3{margin:0;font-size:14px;font-weight:600;color:var(--text)}
 .sect p{margin:0;font-size:11.5px;color:var(--dim)}
@@ -5292,6 +6530,66 @@ tr:hover .ad{opacity:.9}
 .age.ok{color:var(--ok);background:rgba(34,197,94,.10);border-color:#14532d}
 /* Two columns, and cards in a row match height — align-items:start was what
    left a short card floating above a gap. */
+/* ---------------------------------------------------------------- today */
+/* The runway strip is the only thing on this page allowed to shout. It is the
+   one failure here that nothing errors on: an account whose queue ran dry
+   looks healthy by every other number on the page. */
+.rwrap{margin:4px 0 18px}
+.rwhead h4{margin:0 0 2px;font-size:13px;font-weight:600}
+.rwhead .why{margin:0 0 10px;font-size:11px;color:var(--dim)}
+.rwstrip{display:grid;gap:10px;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.rwcell{background:var(--surface);border:1px solid var(--line);border-radius:11px;
+  padding:11px 12px;display:flex;flex-direction:column;gap:2px;
+  border-left-width:3px}
+.rwcell b{font-size:12px;font-weight:600;color:var(--muted)}
+.rwcell .rwd{font-size:23px;font-weight:700;line-height:1.1;letter-spacing:-.02em}
+.rwcell i,.rwcell u{font-size:10.5px;color:var(--dim);font-style:normal;
+  text-decoration:none}
+.rwcell.good{border-left-color:var(--ok,#34d399)}
+.rwcell.good .rwd{color:var(--ok,#34d399)}
+.rwcell.ok{border-left-color:var(--accent)}
+.rwcell.ok .rwd{color:var(--accent)}
+.rwcell.low{border-left-color:var(--warn,#fb923c)}
+.rwcell.low .rwd{color:var(--warn,#fb923c)}
+.rwcell.out{border-left-color:var(--bad,#f87171)}
+.rwcell.out .rwd{color:var(--bad,#f87171)}
+.rwalarm{margin:10px 0 0;font-size:11.5px;color:var(--bad,#f87171);
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+/* A count with a word under it, for the two numbers that decide what you do
+   next. A row in a table would make them look like the rest of the data. */
+.bignum{font-size:34px;font-weight:700;line-height:1;letter-spacing:-.03em;
+  display:flex;align-items:baseline;gap:9px;margin:2px 0 12px}
+.bignum span{font-size:11px;font-weight:500;color:var(--dim);letter-spacing:0}
+.pcard.warn .bignum{color:var(--warn,#fb923c)}
+/* Oldest-first thumbnails: a face on the queue, so 29 is 29 posts and not a
+   number. Small on purpose — this is a count you can click, not a gallery. */
+.tstrip{display:flex;gap:5px;flex-wrap:wrap;margin:0 0 12px}
+.tth{position:relative;width:34px;height:60px;padding:0;border:1px solid var(--line);
+  border-radius:5px;overflow:hidden;background:var(--bg);cursor:pointer}
+.tth:hover{border-color:var(--accent)}
+.tth img{width:100%;height:100%;object-fit:cover;display:block}
+.tth .tbad{position:absolute;inset:auto 0 0 0;background:var(--warn,#fb923c);
+  color:#111;font-size:9px;font-weight:700;font-style:normal;line-height:12px}
+/* A blocker is a sentence, not a measurement: the fix belongs under the
+   problem, where it can be read, rather than squeezed into the right-hand
+   column the numeric rows use and clipped at the card's edge. */
+/* Scoped through .pcard on purpose: the generic .pcard .is rules are defined
+   further down this sheet, so an equally specific selector here would lose
+   the cascade and the fix would silently right-align and clip again. */
+.pcard .blk li{flex-direction:column;align-items:stretch;gap:3px}
+.pcard .blk li .il{display:flex;align-items:center;gap:7px;flex:none}
+.pcard .blk li .is{min-width:0;text-align:left;padding-left:13px;line-height:1.5;
+  white-space:normal;font-size:10.5px}
+.dot{width:6px;height:6px;border-radius:50%;flex:none;background:var(--dim)}
+.dot.bad{background:var(--bad,#f87171)}
+.dot.warn{background:var(--warn,#fb923c)}
+.panelrow.one{grid-template-columns:1fr}
+/* A rate on four uploads looks exactly like a rate on four hundred unless
+   the table says otherwise, and on this tab most groups are small. */
+.mx.cmp tr.thin{opacity:.45}
+.mx.cmp .worst{margin-left:7px}
+.mx.cmp .hr.lead{outline:1px solid var(--accent);outline-offset:1px}
 .panelrow{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:20px 0}
 .pcard{display:flex;flex-direction:column}
 .pcard ul.tight{flex:1}
@@ -5897,20 +7195,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 2v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/></svg></button>
-  <div id="runs" style="margin-left:auto"></div>
-  <div class="cpick">
-    <button class="cpdot" id="cpdot" onclick="toggleAccent(event)"
-      aria-label="Dashboard colour"></button>
-    <div class="cppop" id="cppop" hidden>
-      <p class="lbl">Dashboard colour</p>
-      <div class="cpsw" id="cpsw"></div>
-      <div class="cprow">
-        <input type="color" id="cpin" aria-label="Custom colour"
-          oninput="previewAccent(this.value)">
-        <button class="btn" onclick="saveAccent()">Apply</button>
-      </div>
-    </div>
-  </div></div>
+  <div id="runs" style="margin-left:auto"></div></div>
 <div id="jobs"></div>
   <div class="wrap" id="view"></div>
 </main>
@@ -5945,9 +7230,10 @@ const ICONS = {
   all:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>',
   new:'<path d="M12 5v14M5 12h14"/>',
   ig:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
-  tiktok:'<path d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/>',
   lib:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>',
-  ideas:'<path d="M9 18h6M10 22h4"/><path d="M8 14a6 6 0 1 1 8 0c-.7.6-1 1.2-1 2H9c0-.8-.3-1.4-1-2Z"/>',
+  today:'<path d="m4 14 5-5 4 4 7-7"/><path d="M15 6h5v5"/>',
+  cal:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  stats:'<path d="M3 3v18h18"/><path d="M7 16v-5M12 16V7M17 16v-8"/>',
   users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>'+'<circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/>'
 };
 const ic = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
@@ -5955,7 +7241,7 @@ const ic = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const tk = c => `<svg viewBox="0 0 24 24" fill="${c||'currentColor'}" aria-hidden="true"><path d="${TIKTOK}"/></svg>`;
 const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-let DATA=null, cur=null, filter='review', sel=0, redoMode=false, zi=-1;
+let DATA=null, cur=null, filter='today', sel=0, redoMode=false, zi=-1;
 let redoSel=new Set(), openMenu=null;
 // Direct Post panel: which account's panel is open, that creator's settings as
 // TikTok reports them, and what has been chosen. dpInfo is never reused across
@@ -5966,15 +7252,22 @@ let dpSet={privacy:'', disable_comment:false, auto_add_music:false,
            disclose:false, brand_organic:false, branded_content:false};
 const PILLARS=[['tools','Tools'],['screentime','Screen time'],['discipline','Discipline'],
                ['build','Building'],['learn','Studying']];
-// Four tabs, one per thing he actually does: make posts, work the TikTok
-// queue, fill the Instagram week, look at numbers. Ten tabs was ten places
-// to check when the question is only ever "what is waiting on me".
-const FILTERS=[['ideas','Ideas'],['new','New post'],['tiktok','TikTok'],
-               ['ig','Instagram'],['lib','Library'],['stats','Analytics']];
+// If the question is always "what is waiting on me", one page should answer
+// it — so Today is first and is where the tool opens. The rest are the four
+// verbs in order: judge what is built, make more, place it, look at what
+// happened.
+//
+// Gone: Ideas (a mind map holding eight placeholder rows, whose only exit to
+// the pipeline was copying its text into the composer) and TikTok (built and
+// not drafted — the same posts Review and the Schedule tray already list,
+// filtered by an age test that made the page empty while Review held 29).
+const FILTERS=[['today','Today'],['review','Review'],['new','Make'],
+               ['cal','Schedule'],['ig','Instagram'],['lib','Library'],
+               ['stats','Analytics']];
 // Library is one grid with a segmented control rather than four tabs that
-// each held a slice of the same list.
-const LIBS=[['liked','Performing'],['out','Published'],
-            ['unsent','Unsent'],['all','All']];
+// each held a slice of the same list. Unsent is gone from it: it was the
+// third place showing the same list as Review and the Schedule tray.
+const LIBS=[['liked','Performing'],['out','Published'],['all','All']];
 let libTab = 'liked';
 const isOut = p => ['drafted','published','failed'].includes(stateOf(p));
 // Drafted but not published everywhere: this is the TikTok worklist.
@@ -5999,562 +7292,243 @@ function stateOf(p){
   if ((Date.now()/1000 - p.mtime) > 7*DAY) return 'archive';
   return 'review';
 }
-// ------------------------------------------------------------------ ideas
+// ------------------------------------------------------------------ today
 //
-// Where a post starts. Four kinds of thing live on one board: ideas to make,
-// hooks to open with, references to steal a look from, and promo codes to
-// give away. They share a board because they are the same act — noticing
-// something now that you will want at 9am on a Tuesday — and because a note
-// often turns out to be a hook, which a four-page version would make you
-// retype.
+// What is waiting on me, and what to make next. Nothing that is only
+// interesting.
 //
-// The bar at the top never changes shape, and an idea goes straight from its
-// card into the generator with the text as the brief.
+// This pipeline's real failure mode is not a bad post, it is a quiet
+// account: the queue runs dry, nothing errors anywhere, and the first sign is
+// a flat week in Analytics ten days later. Runway is that alarm, and it did
+// not exist on any page. Everything under it is ordered by what it blocks —
+// approvals first, because a built post that is not approved cannot be
+// scheduled at all, which is why 29 posts sat on disk while four accounts
+// ran out of queue.
+let TODAY = null;
 
-let NOTES = null, noteSel = null, noteLink = null, noteKind = 'idea';
-let noteEdit = null, panX = 0, panY = 0, mzoom = 1, notePic = null, newKind = false;
-// True while a pointer is down on a bubble or the canvas. The dashboard polls
-// in the background and re-renders when the pipeline changes; rebuilding the
-// map out from under a pointer is what made dragging tear.
-let mmDrag = false;
-const ZMIN = 0.35, ZMAX = 2.2;
-
-// The four the board ships with. A kind is only a label, so anything typed
-// into the kind box is as real as these — the colour is derived from the
-// string rather than looked up, which is what makes a custom kind free.
-const NKINDS = [['title','Title'],['idea','Idea'],['hook','Hook'],
-                ['ref','Reference'],['code','Code']];
-const NCOL = {title:'#E8EDFA', idea:'#B46BFF', hook:'#3BA8FF',
-              ref:'#26D0C4', code:'#E4C24A'};
-const BUBW = 196, BUBH = 86, GAP = 66;
-// Which way each handle grows, in the order they read around the bubble.
-const DIRS = [['n','↑'],['e','→'],['s','↓'],['w','←']];
-
-function kindColour(k){
-  if(NCOL[k]) return NCOL[k];
-  let h = 0;
-  for(const c of k) h = (h*31 + c.charCodeAt(0)) % 360;
-  return `hsl(${h} 68% 63%)`;
+async function loadToday(){
+  try { TODAY = await (await fetch('/api/today')).json(); }
+  catch(e){ TODAY = {error: e.message}; }
+  render();
 }
 
-function allKinds(){
-  const seen = new Set(NKINDS.map(k => k[0]));
-  (NOTES||[]).forEach(r => seen.add(r.kind));
-  return [...seen];
+const tfmt = n => (n || 0).toLocaleString('en-GB');
+
+// Relative time, forwards and backwards, in the one unit that reads fastest.
+function rel(at){
+  if(!at) return 'never';
+  const s = Math.round(at - Date.now()/1000), a = Math.abs(s);
+  const n = a < 90 ? 'now'
+    : a < 5400 ? Math.round(a/60) + 'm'
+    : a < 36*3600 ? Math.round(a/3600) + 'h'
+    : Math.round(a/86400) + 'd';
+  return n === 'now' ? 'now' : (s > 0 ? 'in ' + n : n + ' ago');
 }
+
+// Days of queue left, coloured by how long you have to do something about it.
+// Under three days is the number that should make you stop reading and go
+// approve something.
+function runwayStrip(){
+  const rows = TODAY.runway || [];
+  if(!rows.length) return '';
+  const cell = r => {
+    const cls = r.pending === 0 ? 'out' : r.days < 3 ? 'low' : r.days < 7 ? 'ok' : 'good';
+    return `<div class="rwcell ${cls}">
+      <b>@${esc(r.label)}</b>
+      <span class="rwd">${r.pending === 0 ? 'empty' : r.days + 'd'}</span>
+      <i>${r.pending} queued${r.next_at ? ' · next ' + rel(r.next_at) : ''}</i>
+      <u>last ${rel(r.last_at)}</u></div>`;
+  };
+  const dry = rows.filter(r => r.pending === 0 || r.days < 3);
+  return `<div class="rwrap">
+    <div class="rwhead"><h4>Runway</h4>
+      <p class="why">How far each account's queue reaches — not how many posts
+        are in it. Six posts all on Friday is one day of cover.</p></div>
+    <div class="rwstrip">${rows.map(cell).join('')}</div>
+    ${dry.length ? `<p class="rwalarm">${dry.length === rows.length
+        ? 'Every account is out of queue.'
+        : dry.map(r => '@' + esc(r.label)).join(', ') + (dry.length === 1 ? ' is' : ' are') + ' about to go quiet.'}
+      <button class="btn sm" onclick="setFilter('cal')">Schedule posts</button></p>` : ''}
+  </div>`;
+}
+
+function todayView(){
+  if(!TODAY) return '<div class="empty">Reading the state…</div>';
+  if(TODAY.error) return `<div class="cwarn"><b>Could not read it.</b> ${esc(TODAY.error)}</div>`;
+  const T = TODAY, thr = T.threshold || 1000;
+
+  // Approvals before builds. An unapproved post is work already paid for that
+  // the gate will not let out; a hook is work not started.
+  const thumbs = (rows, n) => `<div class="tstrip">${rows.slice(0, n).map(r =>
+    `<button class="tth" title="${esc(r.topic)}${r.why ? ' — ' + esc(r.why) : ''}"
+       onclick="open_('${esc(r.topic)}')">
+       <img src="/slide/${esc(r.topic)}/01.jpg" alt="" loading="lazy">
+       ${r.why ? '<i class="tbad">!</i>' : ''}</button>`).join('')}</div>`;
+
+  const approve = `<div class="pcard ${T.unapproved_n ? 'warn' : ''}">
+    <h4>Waiting on a verdict</h4>
+    <p class="why">Built, never sent, not approved. Until it is approved the
+      scheduler cannot touch it, whatever the runway says.</p>
+    <div class="bignum">${T.unapproved_n}<span>oldest first</span></div>
+    ${T.unapproved_n ? thumbs(T.unapproved, 10) : ''}
+    ${T.unapproved_n ? `<button class="btn" onclick="setFilter('review')">Review them</button>`
+      : '<p class="do">Nothing built is unjudged.</p>'}</div>`;
+
+  const ready = `<div class="pcard">
+    <h4>Approved, not placed</h4>
+    <p class="why">Through the gate and schedulable right now.</p>
+    <div class="bignum">${T.ready_n}<span>ready</span></div>
+    ${T.ready_n ? thumbs(T.ready, 10) : ''}
+    ${T.ready_n ? `<button class="btn" onclick="setFilter('cal')">Put them in the week</button>`
+      : '<p class="do">Nothing is waiting to be placed.</p>'}</div>`;
+
+  // Hooks are the ceiling on how much can be built at all, and the pillar
+  // rates say which kind is worth building. Both on one card, because the
+  // decision is a single one: build what, how many.
+  const free = T.hooks_free || {};
+  const best = (T.pillar || []).filter(p => p.n >= (T.min_n || 8) && p.key !== 'untagged');
+  const pick = best.find(p => (free[p.key] || 0) > 0);
+  const makeCard = `<div class="pcard">
+    <h4>What to make next</h4>
+    <p class="why">Hooks free per pillar — the ceiling on what can be built —
+      against the share of that pillar's mature posts that cleared ${tfmt(thr)}.</p>
+    <ul class="tight">${(T.pillar || []).map(p => {
+      const n = free[p.key] || 0;
+      return `<li><span class="il">${esc(p.key)}</span>
+        <span class="ir ${p.rate >= 30 ? 'hit' : ''}">${p.n >= (T.min_n||8) ? p.rate + '%' : '–'}</span>
+        <span class="is">${n} hook${n===1?'':'s'} free${p.n < (T.min_n||8) ? ' · n=' + p.n : ''}</span></li>`;
+    }).join('')}</ul>
+    ${pick ? `<button class="btn" onclick="makeFrom('${esc(pick.key)}',${Math.min(3, free[pick.key])})">Build
+      ${Math.min(3, free[pick.key])} ${esc(pick.key)} post${Math.min(3, free[pick.key])===1?'':'s'}</button>`
+      : `<p class="do">${Object.values(free).some(v=>v>0)
+          ? 'No pillar has enough mature posts to call yet — pick one in Make.'
+          : 'Every approved hook is inside its cooldown.'}</p>`}</div>`;
+
+  // A post is comparable the moment it stops growing, and that moment is
+  // knowable. Before this, "how did that one do" was a question you had to
+  // remember to go and ask days after the answer existed.
+  const mat = T.matured || [];
+  const maturedCard = `<div class="pcard">
+    <h4>Just matured</h4>
+    <p class="why">Crossed 48 hours in the last three days, so these numbers
+      have stopped moving and can be compared with anything else.</p>
+    <ul class="tight">${mat.length ? mat.map(m =>
+      `<li class="go" onclick="open_('${esc(m.topic)}')">
+         <span class="il">${esc(m.topic)}</span>
+         <span class="ir ${m.breakout ? 'hit' : ''}">${tfmt(m.views)}</span>
+         <span class="is">@${esc(m.label)}${m.design && m.design !== 'control'
+            ? ' · ' + esc(m.design) : ''}</span></li>`).join('')
+      : '<li class="none">Nothing crossed 48h this week</li>'}</ul>
+    ${mat.length ? `<p class="do">${mat.filter(m=>m.breakout).length} of ${mat.length}
+      cleared ${tfmt(thr)}</p>` : ''}</div>`;
+
+  const sev = {bad: 2, warn: 1};
+  const bl = (T.blockers || []);
+  const blockers = `<div class="pcard ${bl.some(b=>b.sev==='bad') ? 'warn' : ''}">
+    <h4>Blockers</h4>
+    <p class="why">Things that end in an action. Everything here clears itself
+      once the thing it names is done, so there is nothing to tick off.</p>
+    <ul class="tight blk">${bl.length ? bl.map(b =>
+      `<li class="${b.topic ? 'go' : ''}" ${b.topic ? `onclick="open_('${esc(b.topic)}')"` : ''}>
+         <span class="il"><i class="dot ${esc(b.sev)}"></i>${esc(b.title)}</span>
+         <span class="is">${esc(b.detail || '')}</span></li>`).join('')
+      : '<li class="none">Nothing is blocked</li>'}</ul></div>`;
+
+  document.getElementById('cnt').textContent =
+    `${T.unapproved_n} to judge · ${T.ready_n} ready · ${bl.length} blocker${bl.length===1?'':'s'}`;
+
+  return runwayStrip()
+    + `<div class="panelrow">${approve}${ready}</div>`
+    + `<div class="panelrow">${makeCard}${maturedCard}</div>`
+    + `<div class="panelrow one">${blockers}</div>`;
+}
+
+// Straight from the Today hint into a started build, with the pillar already
+// chosen. The old path was: read the hint, go to New post, pick the pillar
+// again, type a count.
+function makeFrom(pillar, count){
+  buildPillar = pillar;
+  if(count) buildCount = Math.min(3, count);
+  setFilter('new');
+}
+
+// ----------------------------------------------------------------- briefs
+//
+// Where a post starts, and the whole distance from "line of text" to
+// "Generate" is one click.
+//
+// This was a spatial board: five bubble kinds, four-direction branch handles,
+// link edges drawn as SVG, pasted screenshots, custom kinds, a stored pan
+// offset. The pipeline read none of it. The only way out of the board was a
+// button that copied a bubble's text into the composer's note field — which
+// a text input does — and hooks typed on it were not in hook_pool.json, so
+// the generator could not use them until they were retyped in the composer.
+//
+// It now lives under the pillar picker on Make, because a brief that is not
+// in front of you at the moment you press Generate may as well not exist.
+let NOTES = null, brText = '';
 
 async function loadNotes(){
   try { NOTES = (await (await fetch('/api/ideas')).json()).rows || []; }
   catch(e){ NOTES = []; }
-  try {
-    panX = +(localStorage.getItem('pf.mm.x') || 0);
-    panY = +(localStorage.getItem('pf.mm.y') || 0);
-    mzoom = +(localStorage.getItem('pf.mm.z') || 1) || 1;
-  } catch(e){}
-  await seedPositions();
-  paintIdeaCount();
-  if(filter==='ideas') render();
-}
-
-// Notes written before the board became a map have no coordinates. Lay them
-// out once, in a grid, and persist — so they never move on their own again.
-async function seedPositions(){
-  const loose = (NOTES||[]).filter(r => !r.x && !r.y);
-  if(loose.length < 2 && (NOTES||[]).length === loose.length && loose.length < 2) {
-    if(!loose.length) return;
-  }
-  if(!loose.length) return;
-  for(let i = 0; i < loose.length; i++){
-    loose[i].x = 60 + (i % 4) * (BUBW + 40);
-    loose[i].y = 60 + Math.floor(i / 4) * 150;
-    await noteWrite({op:'move', id:loose[i].id, x:loose[i].x, y:loose[i].y}, true);
-  }
-}
-
-function paintIdeaCount(){
-  const cell = document.querySelector('.nav[onclick*="ideas"] .ct');
-  if(cell) cell.textContent = tabCount('ideas');
-}
-
-// ---------------------------------------------------------------- the map
-
-function ideasView(){
-  const rows = NOTES || [];
-  document.getElementById('cnt').textContent =
-    `${rows.length} bubble${rows.length===1?'':'s'}`;
-
-  return `<div class="mmwrap">
-    <div class="mmbar">
-      <button class="btn" onclick="addHead()">+ Title</button>
-      <div class="kchips">${allKinds().map(k =>
-        `<button class="kchip ${noteKind===k?'on':''}" style="--kc:${kindColour(k)}"
-           onclick="noteKind='${esc(k)}';render()">${esc(k)}</button>`).join('')}
-        ${newKind
-          ? `<input class="kin" id="kin" placeholder="new kind" maxlength="24"
-               onkeydown="if(event.key==='Enter')takeKind();if(event.key==='Escape'){newKind=false;render()}"
-               onblur="takeKind()">`
-          : `<button class="kchip add" onclick="newKind=true;render()">+ kind</button>`}
-      </div>
-      <span class="mmhint">${noteLink
-        ? 'Now click the bubble to connect it to — or press Esc.'
-        : 'Hover a bubble and press + on the side you want the branch. New branches are '
-          + `<b style="color:${kindColour(noteKind)}">${esc(noteKind)}</b>.`}</span>
-      <div class="zoomer">
-        <button onclick="zoomBy(1/1.2)" aria-label="Zoom out">−</button>
-        <span>${Math.round(mzoom*100)}%</span>
-        <button onclick="zoomBy(1.2)" aria-label="Zoom in">+</button>
-      </div>
-      <button class="btn sec sm" onclick="fitMap()">Fit</button>
-    </div>
-
-    <div class="mmap" id="mmap" onpointerdown="panStart(event)"
-         ondblclick="addBubbleAt(event)" onwheel="wheelZoom(event)">
-      <div class="mmin" id="mmin"
-           style="transform:translate(${panX}px,${panY}px) scale(${mzoom})">
-        <svg class="mmlines" id="mmlines"></svg>
-        ${rows.map(bubble).join('')}
-      </div>
-      ${rows.length ? '' : `<div class="mmempty">Nothing on the board.<br>
-        Start with a title, then branch off it with the + handles.</div>`}
-    </div>
-
-    <div id="mmins-host">${inspector()}</div>
-  </div>`;
-}
-
-function bubble(r){
-  const c = kindColour(r.kind);
-  const sel = noteSel === r.id;
-  const pic = r.img
-    ? `<img class="bpic" src="/ideas_img/${esc(r.img)}" alt="" loading="lazy">` : '';
-  const body = r.text || (r.img ? '' : 'Write it here');
-  // The four handles are the whole interaction: a branch is one click on the
-  // side you want it, and it arrives connected.
-  const hands = DIRS.map(([d,gl]) =>
-    `<button class="hnd ${d}" title="Add ${esc(NKINDS.find(k=>k[0]===noteKind)?'a '+noteKind:'a bubble')} ${d==='n'?'above':d==='s'?'below':d==='e'?'right':'left'}"
-       onpointerdown="event.stopPropagation()"
-       onclick="branch(event,'${r.id}','${d}')">+</button>`).join('');
-  return `<div class="bub k-${esc(r.kind)} ${sel?'sel':''} ${noteLink&&noteLink!==r.id?'target':''}"
-    id="b-${r.id}" style="left:${r.x||0}px;top:${r.y||0}px;--kc:${c}"
-    onpointerdown="bubDown(event,'${r.id}')"
-    ondblclick="editBubble(event,'${r.id}')">
-    <span class="bkind">${esc(r.kind)}</span>
-    ${pic}
-    ${noteEdit===r.id
-      ? `<textarea class="bed" id="bed" rows="2"
-           onpointerdown="event.stopPropagation()" ondblclick="event.stopPropagation()"
-           onblur="saveEdit('${r.id}',this.value)"
-           onkeydown="edKey(event,'${r.id}')">${esc(r.text)}</textarea>`
-      : `<div class="btx ${r.text?'':'ph'}">${esc(body)}</div>`}
-    ${hands}
-  </div>`;
-}
-
-function inspector(){
-  const r = (NOTES||[]).find(x => x.id === noteSel);
-  if(!r) return '';
-  const linked = ((r.links)||[]).length +
-    (NOTES||[]).filter(o => (o.links||[]).includes(r.id)).length;
-  return `<aside class="mmins">
-    <div class="ihead"><span class="bkind" style="--kc:${kindColour(r.kind)}">${esc(r.kind)}</span>
-      <button class="rm" onclick="noteSel=null;render()">×</button></div>
-    ${r.img?`<img class="iref" src="/ideas_img/${esc(r.img)}" alt=""
-      onclick="zoomNote('${esc(r.img)}')">`:''}
-    <p class="ilab">Picture</p>
-    <div class="iacts">
-      <button onclick="document.getElementById('ifile').click()">
-        ${r.img?'Replace':'Add picture'}</button>
-      ${r.img?`<button class="warn" onclick="noteWrite({op:'edit',id:'${r.id}',img:''})">Remove</button>`:''}
-      <input type="file" id="ifile" accept="image/*" hidden
-        onchange="attachPic('${r.id}', this)">
-    </div>
-    <p class="ilab">Kind</p>
-    <div class="kchips">${allKinds().map(k =>
-      `<button class="kchip ${r.kind===k?'on':''}" style="--kc:${kindColour(k)}"
-         onclick="noteWrite({op:'edit',id:'${r.id}',kind:'${esc(k)}'})">${esc(k)}</button>`).join('')}</div>
-    <div class="iacts">
-      ${r.kind==='idea'?`<button onclick="buildFromNote('${r.id}')">Build this</button>`:''}
-      <button onclick="startLink('${r.id}')">${noteLink===r.id?'Pick a bubble…':'Connect'}</button>
-      <button onclick="copyNote('${esc(r.text).replace(/'/g,'&#39;')}',this)">Copy</button>
-      <button class="warn" onclick="delNote('${r.id}')">Delete</button>
-    </div>
-    <p class="ifoot">${linked} connection${linked===1?'':'s'} ·
-      ${new Date((r.at||0)*1000).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</p>
-  </aside>`;
-}
-
-// ---------------------------------------------------------------- edges
-//
-// Drawn from where the bubbles actually are rather than from the stored
-// coordinates, so a line keeps up with a bubble mid-drag.
-
-// Where the line from one bubble's centre towards another crosses the first
-// bubble's border.
-function edgePoint(from, to){
-  const cx = from.offsetLeft + from.offsetWidth/2;
-  const cy = from.offsetTop + from.offsetHeight/2;
-  const dx = (to.offsetLeft + to.offsetWidth/2) - cx;
-  const dy = (to.offsetTop + to.offsetHeight/2) - cy;
-  if(!dx && !dy) return {x:cx, y:cy};
-  const hw = from.offsetWidth/2 + 2, hh = from.offsetHeight/2 + 2;
-  const t = Math.min(dx ? hw/Math.abs(dx) : Infinity,
-                     dy ? hh/Math.abs(dy) : Infinity);
-  return {x: Math.round(cx + dx*t), y: Math.round(cy + dy*t)};
-}
-
-function focusEditor(){
-  const t = document.getElementById('bed');
-  if(t && document.activeElement !== t){
-    t.focus();
-    t.setSelectionRange(t.value.length, t.value.length);
-  }
-}
-
-function drawLinks(){
-  const svg = document.getElementById('mmlines'); if(!svg) return;
-  const seen = new Set(), out = [];
-  (NOTES||[]).forEach(r => ((r.links)||[]).forEach(to => {
-    const key = [r.id, to].sort().join('|');
-    if(seen.has(key)) return;
-    seen.add(key);
-    const a = document.getElementById('b-'+r.id), b = document.getElementById('b-'+to);
-    if(!a || !b) return;
-    // Meet the boundary, not the centre: a line that runs under a bubble and
-    // out the other side reads as one long line through it.
-    const A = edgePoint(a, b), B = edgePoint(b, a);
-    const d = Math.abs(B.x-A.x) >= Math.abs(B.y-A.y)
-      ? `M${A.x},${A.y} C${(A.x+B.x)/2},${A.y} ${(A.x+B.x)/2},${B.y} ${B.x},${B.y}`
-      : `M${A.x},${A.y} C${A.x},${(A.y+B.y)/2} ${B.x},${(A.y+B.y)/2} ${B.x},${B.y}`;
-    out.push(`<path d="${d}" fill="none" stroke="${kindColour(r.kind)}"
-      stroke-width="1.5" opacity=".5"/>`);
-  }));
-  svg.innerHTML = out.join('');
-}
-
-// ---------------------------------------------------------------- input
-
-function bubDown(e, id){
-  e.stopPropagation();
-  const el = e.currentTarget;
-  const r = (NOTES||[]).find(x => x.id === id); if(!r) return;
-
-  if(noteLink && noteLink !== id){
-    const from = noteLink; noteLink = null;
-    return noteWrite({op:'link', id:from, to:id});
-  }
-
-  const sx = e.clientX, sy = e.clientY, ox = r.x||0, oy = r.y||0;
-  let moved = false;
-  mmDrag = true;
-  try { el.setPointerCapture(e.pointerId); } catch(err){}
-  const mv = ev => {
-    const dx = ev.clientX - sx, dy = ev.clientY - sy;
-    if(Math.abs(dx) + Math.abs(dy) > 3) moved = true;
-    // Screen pixels are map pixels divided by the zoom.
-    r.x = Math.round(ox + dx/mzoom); r.y = Math.round(oy + dy/mzoom);
-    el.style.left = r.x + 'px'; el.style.top = r.y + 'px';
-    drawLinks();
-  };
-  const up = () => {
-    el.removeEventListener('pointermove', mv);
-    el.removeEventListener('pointerup', up);
-    try { el.releasePointerCapture(e.pointerId); } catch(err){}
-    mmDrag = false;
-    if(moved) noteWrite({op:'move', id, x:r.x, y:r.y}, true);
-    else selectBubble(id);
-  };
-  el.addEventListener('pointermove', mv);
-  el.addEventListener('pointerup', up);
-}
-
-function panStart(e){
-  if(e.target.closest('.bub')) return;
-  const el = document.getElementById('mmin');
-  const sx = e.clientX, sy = e.clientY, ox = panX, oy = panY;
-  let moved = false;
-  mmDrag = true;
-  const mv = ev => {
-    panX = ox + ev.clientX - sx; panY = oy + ev.clientY - sy;
-    if(Math.abs(panX-ox) + Math.abs(panY-oy) > 3) moved = true;
-    el.style.transform = `translate(${panX}px,${panY}px)`;
-  };
-  const up = () => {
-    document.removeEventListener('pointermove', mv);
-    document.removeEventListener('pointerup', up);
-    mmDrag = false;
-    savePan();
-    if(!moved && (noteSel || noteEdit)){
-      noteSel = null; noteEdit = null; render();
-    }
-  };
-  document.addEventListener('pointermove', mv);
-  document.addEventListener('pointerup', up);
-}
-
-function addHead(){
-  const map = document.getElementById('mmap');
-  const w = map ? map.clientWidth : 800, h = map ? map.clientHeight : 500;
-  newBubble(Math.round(w/2 - panX - BUBW/2), Math.round(h/2 - panY - 40), 'title');
-}
-
-function addBubbleAt(e){
-  if(e.target.closest('.bub')) return;
-  const p = toMap(e.clientX, e.clientY);
-  newBubble(Math.round(p.x - BUBW/2), Math.round(p.y - 22));
-}
-
-// Screen point to map point, through the pan and the zoom.
-function toMap(cx, cy){
-  const box = document.getElementById('mmap').getBoundingClientRect();
-  return {x: (cx - box.left - panX)/mzoom, y: (cy - box.top - panY)/mzoom};
-}
-
-function applyView(){
-  const el = document.getElementById('mmin');
-  if(el) el.style.transform = `translate(${panX}px,${panY}px) scale(${mzoom})`;
-  const lab = document.querySelector('.zoomer span');
-  if(lab) lab.textContent = Math.round(mzoom*100) + '%';
-}
-
-function setZoom(z, cx, cy){
-  const next = Math.round(Math.max(ZMIN, Math.min(ZMAX, z)) * 1000) / 1000;
-  if(next === mzoom) return;
-  const box = document.getElementById('mmap').getBoundingClientRect();
-  // Keep whatever is under the cursor (or the middle) where it is.
-  const px = (cx == null ? box.width/2 : cx - box.left);
-  const py = (cy == null ? box.height/2 : cy - box.top);
-  panX = px - (px - panX) * (next/mzoom);
-  panY = py - (py - panY) * (next/mzoom);
-  mzoom = next;
-  applyView();
-  savePan();
-}
-
-const zoomBy = f => setZoom(mzoom * f);
-
-function wheelZoom(e){
-  // Only a deliberate pinch or ⌘/ctrl+wheel zooms. A plain two-finger scroll
-  // belongs to the page, and nothing zooms while a drag is in progress.
-  if(mmDrag || (!e.ctrlKey && !e.metaKey) || !e.deltaY) return;
-  e.preventDefault();
-  setZoom(mzoom * (e.deltaY > 0 ? 1/1.12 : 1.12), e.clientX, e.clientY);
-}
-
-function savePan(){
-  try {
-    localStorage.setItem('pf.mm.x', panX);
-    localStorage.setItem('pf.mm.y', panY);
-    localStorage.setItem('pf.mm.z', mzoom);
-  } catch(e){}
-}
-
-// Grow a branch out of one side. The child lands clear of everything already
-// on the board — a mind map that stacks its own branches on top of each other
-// is worse than a list.
-function branch(e, id, dir){
-  e.stopPropagation();
-  const r = (NOTES||[]).find(x => x.id === id); if(!r) return;
-  const el = document.getElementById('b-'+id);
-  const w = el ? el.offsetWidth : BUBW, h = el ? el.offsetHeight : BUBH;
-  let x = r.x||0, y = r.y||0;
-  if(dir==='e') x += w + GAP;
-  if(dir==='w') x -= BUBW + GAP;
-  if(dir==='s') y += h + GAP;
-  if(dir==='n') y -= BUBH + GAP;
-  // Slide perpendicular to the branch until the spot is empty.
-  const step = (dir==='n'||dir==='s') ? [BUBW+GAP, 0] : [0, BUBH+GAP];
-  for(let i = 0; i < 12 && occupied(x, y); i++){
-    const k = Math.ceil((i+1)/2) * ((i % 2) ? -1 : 1);
-    x = (dir==='n'||dir==='s' ? (r.x||0) + step[0]*k : x);
-    y = (dir==='e'||dir==='w' ? (r.y||0) + step[1]*k : y);
-  }
-  newBubble(Math.round(x), Math.round(y), noteKind, id);
-}
-
-function occupied(x, y){
-  return (NOTES||[]).some(o => {
-    const el = document.getElementById('b-'+o.id);
-    const w = el ? el.offsetWidth : BUBW, h = el ? el.offsetHeight : BUBH;
-    return Math.abs((o.x||0) - x) < w - 8 && Math.abs((o.y||0) - y) < h - 8;
-  });
-}
-
-async function newBubble(x, y, kind, from){
-  const body = {op:'add', kind:kind || noteKind, text:'', x, y};
-  if(from) body.from = from;
-  await noteWrite(body);
-  const first = (NOTES||[])[0];
-  if(first){ noteSel = first.id; noteEdit = first.id; render(); }
-}
-
-// Selecting touches two classes and one panel — never the whole board.
-function selectBubble(id){
-  if(noteSel === id) return;
-  noteSel = id;
-  document.querySelectorAll('.bub.sel').forEach(b => b.classList.remove('sel'));
-  const el = document.getElementById('b-'+id);
-  if(el) el.classList.add('sel');
-  const host = document.getElementById('mmins-host');
-  if(host) host.innerHTML = inspector();
-}
-
-function editBubble(e, id){
-  e.stopPropagation();
-  noteSel = id; noteEdit = id;
   render();
 }
 
-function saveEdit(id, text){
-  const r = (NOTES||[]).find(x => x.id === id);
-  noteEdit = null;
-  if(r && text.trim() === (r.text||'').trim()){ render(); return; }
-  noteWrite({op:'edit', id, text});
-}
-
-function edKey(e, id){
-  // Enter commits, because a bubble is a label rather than a paragraph;
-  // shift+Enter is there when a line break is genuinely wanted.
-  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); e.target.blur(); }
-  if(e.key === 'Escape'){ noteEdit = null; render(); }
-  // Tab out of one bubble and straight into a new sibling below it.
-  if(e.key === 'Tab'){ e.preventDefault(); e.target.blur();
-    setTimeout(() => branch({stopPropagation(){}}, id, 's'), 60); }
-}
-
-function startLink(id){
-  noteLink = noteLink === id ? null : id;
-  render();
-}
-
-function takeKind(){
-  const el = document.getElementById('kin');
-  const v = el ? el.value.trim().toLowerCase().replace(/[^a-z0-9 _-]/g,'') : '';
-  newKind = false;
-  if(v) noteKind = v;
-  render();
-}
-
-// Bring everything back on screen — the one thing you cannot do by dragging
-// when you have panned away from all of it.
-function fitMap(){
-  const rows = NOTES || []; if(!rows.length) return;
-  const minX = Math.min(...rows.map(r => r.x||0));
-  const minY = Math.min(...rows.map(r => r.y||0));
-  // Zoom out far enough that the whole map fits, then sit it in the corner.
-  const map = document.getElementById('mmap');
-  const maxX = Math.max(...rows.map(r => (r.x||0) + BUBW));
-  const maxY = Math.max(...rows.map(r => (r.y||0) + BUBH*1.6));
-  const fit = Math.min(1, (map.clientWidth - 80)/Math.max(1, maxX - minX),
-                          (map.clientHeight - 80)/Math.max(1, maxY - minY));
-  mzoom = Math.round(Math.max(ZMIN, Math.min(ZMAX, fit)) * 1000) / 1000;
-  panX = 40 - minX*mzoom; panY = 40 - minY*mzoom;
-  applyView();
-  savePan();
-}
-
-// ---------------------------------------------------------------- writes
-
-async function noteWrite(body, quiet){
-  try {
+async function noteWrite(body){
+  try{
     const r = await (await fetch('/api/ideas', {method:'POST',
-      headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})).json();
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)})).json();
     if(r.rows) NOTES = r.rows;
-    paintIdeaCount();
-    if(!quiet) render(); else drawLinks();
-  } catch(e){ nsay('Could not save'); }
+  } catch(e){ say('Could not save that: ' + e.message); }
+  render();
 }
 
-function delNote(id){
-  const r = (NOTES||[]).find(x => x.id===id);
-  showModal({
-    title: 'Delete this bubble?',
-    body: r && r.img
-      ? 'The picture goes with it. There is no copy anywhere else.'
-      : (r ? (r.text || 'It is empty.').slice(0, 160) : ''),
-    ok: 'Delete', danger: true,
-    action: () => { noteSel = null; return noteWrite({op:'del', id}); },
-  });
+function briefsView(){
+  const rows = NOTES || [];
+  const open = rows.filter(r => !r.used), done = rows.filter(r => r.used);
+  const row = r => `<li class="${r.used ? 'used' : ''}">
+    <span class="brtxt" title="${esc(r.text)}">${esc(r.text)}</span>
+    ${r.pillar ? `<span class="brpil">${esc(r.pillar)}</span>` : ''}
+    ${r.used ? '<span class="brpil">used</span>'
+      : `<button class="btn sec sm" onclick="briefBuild('${r.id}')">Build</button>`}
+    <button class="brdel" title="Delete" onclick="noteWrite({op:'del',id:'${r.id}'})">✕</button>
+  </li>`;
+
+  return `<div class="brwrap">
+    <div class="brhead"><h4>Briefs</h4>
+      <p class="why">A line each. Build sends it to the generator as the note,
+        with the pillar above already chosen, and marks it used.</p></div>
+    <form class="brnew" onsubmit="briefAdd(event)">
+      <input id="brin" value="${esc(brText)}" oninput="brText=this.value"
+        placeholder="e.g. lead with Raycast, keep it to four tools">
+      <button class="btn" type="submit" ${brText.trim() ? '' : 'disabled'}>Add</button>
+    </form>
+    <ul class="brlist">${open.length || done.length
+      ? [...open, ...done].map(row).join('')
+      : '<li class="none">Nothing written down yet</li>'}</ul>
+  </div>`;
 }
 
-function copyNote(text, el){
-  navigator.clipboard.writeText(text).then(() => {
-    if(el){ const was = el.textContent; el.textContent = 'Copied';
-      setTimeout(() => { el.textContent = was; }, 900); }
-  });
+function briefAdd(e){
+  e.preventDefault();
+  const t = brText.trim();
+  if(!t) return;
+  brText = '';
+  noteWrite({op:'add', text: t, pillar: buildPillar});
 }
 
-// The point of the board: an idea leaves it as a brief, not as a memory.
-function buildFromNote(id){
-  const r = (NOTES||[]).find(x => x.id===id); if(!r) return;
+// Straight into a started build. The old path was: read the bubble, press a
+// button that filled the note, switch page, pick the pillar again, press
+// Generate.
+function briefBuild(id){
+  const r = (NOTES || []).find(x => x.id === id);
+  if(!r) return;
   buildNote = r.text;
   if(r.pillar) buildPillar = r.pillar;
-  setFilter('new');
+  noteWrite({op:'used', id, used:true});
+  startBuild();
 }
-
-// One upload path, whether the bytes came from a file picker or the
-// clipboard. Attaching to an existing bubble beats making a new one — a
-// reference almost always belongs to something already on the board.
-async function uploadPic(dataUrl){
-  const up = await (await fetch('/api/ideas/img', {method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({data:dataUrl})})).json();
-  return up.img || null;
-}
-
-function attachPic(id, input){
-  const f = input.files && input.files[0]; if(!f) return;
-  const rd = new FileReader();
-  rd.onload = async () => {
-    const img = await uploadPic(rd.result);
-    if(!img) return nsay('That file is not an image');
-    await noteWrite({op:'edit', id, img});
-  };
-  rd.readAsDataURL(f);
-}
-
-function zoomNote(img){
-  const el = document.getElementById('zoomimg');
-  el.src = '/ideas_img/' + img;
-  el.alt = 'Reference';
-  document.getElementById('zcount').textContent = '';
-  document.getElementById('mzoom').style.display = 'flex';
-}
-
-function nsay(msg){
-  const t = document.getElementById('toast'); if(!t) return;
-  t.innerHTML = `<div class="toast"><h5>${esc(msg)}</h5></div>`;
-  setTimeout(() => { if(t.firstChild) t.innerHTML = ''; }, 2600);
-}
-
-// Paste anywhere on the board to drop a screenshot in as its own bubble.
-document.addEventListener('paste', e => {
-  if(filter!=='ideas' || cur) return;
-  const item = [...(e.clipboardData&&e.clipboardData.items||[])]
-    .find(i => i.type.startsWith('image/'));
-  if(!item) return;
-  e.preventDefault();
-  const rd = new FileReader();
-  rd.onload = async () => {
-    try {
-      const img = await uploadPic(rd.result);
-      if(!img) return nsay('That file is not an image');
-      // Onto the selected bubble if there is one; otherwise it becomes its own.
-      if(noteSel) return noteWrite({op:'edit', id:noteSel, img});
-      const map = document.getElementById('mmap');
-      await noteWrite({op:'add', kind:'ref', text:'', img,
-        x: Math.round((map?map.clientWidth:800)/2 - panX - BUBW/2),
-        y: Math.round((map?map.clientHeight:500)/2 - panY - 60)});
-    } catch(err){ nsay('Upload failed'); }
-  };
-  rd.readAsDataURL(item.getAsFile());
-});
-
-document.addEventListener('keydown', e => {
-  if(e.key !== 'Escape' || filter !== 'ideas') return;
-  if(noteLink){ noteLink = null; render(); }
-  else if(noteEdit){ noteEdit = null; render(); }
-  else if(noteSel){ noteSel = null; render(); }
-});
 
 // ---------------------------------------------------------------- new post
 //
@@ -6597,9 +7571,9 @@ function composeView(){
     </div>
     <p class="why">It writes the hook, picks the photos and the roster, writes
       every slide, the title and the caption, renders them and pushes them
-      live. A few minutes, then it appears under
-      <a href="#" onclick="setFilter('tiktok');return false">TikTok › Built, not
-      drafted</a>.</p>
+      live. A few minutes, then it appears in
+      <a href="#" onclick="setFilter('review');return false">Review</a>, waiting
+      on a verdict.</p>
     ${running?`<p class="why">${running} already running. They go one at a
       time: two agents writing hooks.json at once lose each other's work.</p>`:''}
   </div>`;
@@ -6843,6 +7817,605 @@ function igWeekDays(){
     out.push({ day, slots });
   }
   return out;
+}
+
+// ------------------------------------------------------------ calendar
+//
+// The posting week, accounts down and days across. Instagram's calendar is
+// one account over three fixed times, which fits a week grid; six accounts
+// over three times is 126 cells and reads as noise. So the cell here is an
+// account-day: what that account did or will do that day, and how much room
+// is left in it.
+//
+// Slots are not clock times. CADENCE already says what good spacing is —
+// under an hour is too soon, past two and a half is slipping — so a day's
+// capacity is derived from that rather than from a list of hours someone
+// typed once.
+let CAL = null, calWeek = 0, calPick = null, calBusy = false;
+const CAL_PER_DAY = 8;            // 8 posts a day at ~100 min apart is a full day
+
+async function loadCal(){
+  try{
+    const r = await fetch('/api/calendar?week=' + calWeek);
+    CAL = await r.json();
+  } catch(e){ CAL = {error: e.message}; }
+  render();
+}
+
+function calDayKey(at){
+  const d = new Date(at * 1000);
+  return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+}
+
+// One bucket per (account, day), so a cell can be drawn without walking the
+// whole row every time.
+function calBuckets(){
+  const by = new Map();
+  (CAL.rows || []).forEach(r => {
+    const k = r.account + '|' + calDayKey(r.at);
+    if(!by.has(k)) by.set(k, []);
+    by.get(k).push(r);
+  });
+  by.forEach(v => v.sort((a,b) => a.at - b.at));
+  return by;
+}
+
+function calDays(){
+  const out = [];
+  for(let i = 0; i < 7; i++){
+    const d = new Date(CAL.monday * 1000);
+    d.setDate(d.getDate() + i);
+    out.push(d);
+  }
+  return out;
+}
+
+// Why an account should not be posted to, in the order that matters: a dead
+// token beats a quiet one, and a pause you set beats both.
+function calAcctWarn(key){
+  const s = (CAL.summary || {})[key] || {};
+  if(s.paused) return ['paused', s.pause_note || 'you paused this account'];
+  if(s.publish_ok === false) return ['broken', 'publisher token expired'];
+  if(s.reach_dead) return ['dead', s.reach_dead.posts + ' posts at zero views'];
+  return null;
+}
+
+// ------------------------------------------------------------ review
+//
+// Everything built and not yet judged, one post at a time. The gate it feeds
+// is real: an unapproved post cannot be scheduled. That rule existed before
+// this page did, against a field nothing ever wrote, so forty-two posts went
+// out unreviewed — including twenty-seven carrying the old App Store name.
+//
+// Three verdicts, not two. Approve and reject are a button each; the third,
+// "this slide is wrong and here is why", is the one that actually happens,
+// and it needs a slide and a sentence. Losing that to a clean binary would
+// make the page faster and useless.
+let revIdx = 0, revShot = 0, revFix = null, revBusy = false;
+// Which account's gap to put at the top, and whether the caption box is open.
+let revOnly = '', revCap = null, revSaving = false, revWhich = 'ready';
+
+function reviewAll(){
+  if(!DATA || !DATA.posts) return [];
+  return DATA.posts.filter(p => !p.approved && p.slides && p.slides.length && !isOut(p));
+}
+
+function reviewQueue(){
+  let q = reviewAll();
+  // Two different jobs wear the same badge here. A post that passes the gate
+  // needs a yes or a no; a post with no hooks.json entry needs a caption
+  // written first. Mixed together and sorted by age alone, fourteen
+  // caption-less drafts from the launch batch sat in front of nine posts that
+  // could have gone out that afternoon — which is how a backlog stops being
+  // worked at all.
+  const pass = p => revGate(p).every(g => g.ok);
+  if(revWhich === 'ready') q = q.filter(pass);
+  else if(revWhich === 'blocked') q = q.filter(p => !pass(p));
+  // Oldest built first. Newest-first was backwards: the posts about to age
+  // out of Review into Archive at seven days are the ones at the far end of
+  // a newest-first list, so the queue silently lost its tail.
+  q.sort((a,b) => (pass(b) - pass(a)) || (whenOf(a) - whenOf(b)));
+  if(revOnly){
+    // Not a filter — a reordering. Posts this account has never run come
+    // first, because those are the ones that fill its gap.
+    q = q.slice().sort((a,b) => (ranFor(a,revOnly) - ranFor(b,revOnly)) || (whenOf(a) - whenOf(b)));
+  }
+  return q;
+}
+
+function ranFor(p, key){
+  return ((p.stats || {})[key] || {}).posted_at ? 1 : 0;
+}
+
+// The two gates, said as a checklist rather than discovered as a 400 from
+// the scheduler. Approve stays dark until both pass, so a post cannot be
+// approved into a state where it still cannot be sent.
+function revGate(p){
+  const cap = (p.caption || '').trim();
+  const tag = (DATA.required_tag || '#creatorsearchinsights');
+  return [
+    {ok: !!p.registered, label: 'registered in hooks.json'},
+    {ok: !!cap, label: 'has a caption'},
+    {ok: cap.toLowerCase().includes(tag.toLowerCase()), label: 'caption carries ' + tag},
+  ];
+}
+
+function reviewView(){
+  const all = reviewAll();
+  const nReady = all.filter(p => revGate(p).every(g => g.ok)).length;
+  const nBlocked = all.length - nReady;
+  const WHICH = [['ready', 'Ready', nReady], ['blocked', 'Needs a caption', nBlocked],
+                 ['all', 'All', all.length]];
+  const whichBar = `<div class="revwhich">${WHICH.map(([v, lab, n]) =>
+    `<button class="seg ${revWhich === v ? 'on' : ''}" ${n ? '' : 'disabled'}
+      onclick="revWhich='${v}';revIdx=0;revCap=null;render()">${lab}
+      <b>${n}</b></button>`).join('')}</div>`;
+
+  const q = reviewQueue();
+  document.getElementById('cnt').textContent = q.length
+    ? `${Math.min(revIdx + 1, q.length)} of ${q.length}` : '';
+  if(!q.length) return whichBar + `<div class="empty">${
+    revWhich === 'ready'
+      ? `Nothing is ready to judge. ${nBlocked} post${nBlocked === 1 ? '' : 's'}
+         need a caption first — they have no hooks.json entry, so there is
+         nothing to publish them with.`
+      : 'Nothing waiting. Everything built has been judged.'}</div>`;
+  if(revIdx >= q.length) revIdx = q.length - 1;
+  const p = q[revIdx];
+  const shots = p.slides || [];
+  if(revShot >= shots.length) revShot = 0;
+
+  const gate = revGate(p), pass = gate.every(g => g.ok);
+  const cap = revCap === null ? (p.caption || '') : revCap;
+  const dirty = revCap !== null && revCap !== (p.caption || '');
+
+  // Who still needs this post, and who has already had it. The second half is
+  // the one that changes a verdict: a tenth outing of the same concept is a
+  // different decision from a first.
+  const gaps = (DATA.accounts || []).filter(a => !ranFor(p, a.key));
+  const ctx = [
+    p.pillar ? esc(p.pillar) : '',
+    p.design && p.design !== 'control' ? esc(p.design) : '',
+    p.ran_on ? `already on ${p.ran_on} account${p.ran_on === 1 ? '' : 's'}` : 'never posted',
+  ].filter(Boolean).join(' · ');
+
+  const accFilter = `<div class="revfilt">
+    <button class="seg ${revOnly ? '' : 'on'}" onclick="revOnly='';revIdx=0;render()">All</button>
+    ${(DATA.accounts || []).map(a =>
+      `<button class="seg ${revOnly === a.key ? 'on' : ''}"
+        onclick="revOnly='${a.key}';revIdx=0;render()"
+        title="Put posts @${esc(a.label)} has never run at the top">@${esc(a.short)}</button>`).join('')}
+  </div>`;
+
+  return `<div class="cx rev">
+    ${whichBar}
+    <div class="revtop">
+      <button class="btn sec sm" ${revIdx ? '' : 'disabled'}
+        onclick="revGo(-1)">←</button>
+      <b class="revname">${esc(p.topic)}</b>
+      <span class="sub">${times(p)}${ctx ? ' · ' + ctx : ''}</span>
+      ${accFilter}
+      <button class="btn sec sm" ${revIdx < q.length - 1 ? '' : 'disabled'}
+        onclick="revGo(1)">→</button>
+    </div>
+
+    ${p.hook ? `<p class="revhook">${esc(p.hook)}</p>` : ''}
+
+    <!-- The whole post in one look. One slide at a time meant judging a
+         six-slide post took six clicks, so it was judged on slide one. -->
+    <div class="revsheet">${shots.map((f, i) => `
+      <button class="revcard ${revFix && revFix.slides.includes(i + 1) ? 'bad' : ''}"
+        onclick="zoomPost('${esc(p.topic)}',${i})" title="Slide ${i + 1} — click to zoom">
+        <img src="/slide/${esc(p.topic)}/${esc(f)}" alt="slide ${i + 1}" loading="lazy">
+        <i>${i + 1}</i></button>`).join('')}</div>
+
+    <!-- The caption is the second gate and used to live on another page, so
+         fixing a missing tag meant leaving Review and losing your place. -->
+    <div class="revcapbox ${pass ? '' : 'blocked'}">
+      <div class="revgate">${gate.map(g =>
+        `<span class="gchk ${g.ok ? 'ok' : 'no'}">${g.ok ? '✓' : '✕'} ${esc(g.label)}</span>`).join('')}</div>
+      <textarea id="revcap" rows="3" placeholder="No caption yet — this post cannot be sent without one."
+        oninput="revCap=this.value;revPaintGate()">${esc(cap)}</textarea>
+      <div class="revcapbar">
+        <span class="sub">${gaps.length
+          ? 'Still needed by ' + gaps.map(a => '@' + esc(a.short)).join(', ')
+          : 'Every account has run this'}</span>
+        <button class="btn sec sm" ${dirty && !revSaving ? '' : 'disabled'}
+          onclick="revSaveCap('${esc(p.topic)}')">${revSaving ? 'Saving…' : 'Save caption'}</button>
+      </div>
+    </div>
+
+    ${revFix ? revFixView(p, shots.length) : `
+    <div class="revacts">
+      <button class="revbtn no" onclick="revReject('${esc(p.topic)}')"
+        title="Delete — moves to drafts/_deleted, recoverable">✕</button>
+      <button class="revbtn fix" onclick="revOpenFix()"
+        title="Send slides back to be redone">↻</button>
+      <button class="revbtn yes" ${pass && !revBusy ? '' : 'disabled'}
+        onclick="revApprove('${esc(p.topic)}')"
+        title="${pass ? 'Approve — makes it schedulable'
+          : 'Blocked: ' + gate.filter(g => !g.ok).map(g => g.label).join(', ')}">✓</button>
+    </div>
+    ${revBatch(q)}
+    <p class="revhint">A approve · R redo · X delete · C caption · ← → posts · 1-6 zoom</p>`}
+  </div>`;
+}
+
+// Ten reshoots of one hook are one decision. Making them ten keypresses was
+// the difference between clearing the backlog and not.
+function revBatch(q){
+  const p = q[revIdx];
+  const stem = (p.topic || '').replace(/-\d+$/, '');
+  const kin = q.filter(x => x.topic.replace(/-\d+$/, '') === stem
+                            && revGate(x).every(g => g.ok));
+  if(kin.length < 3) return '';
+  return `<p class="revbatch">${kin.length} posts here are <b>${esc(stem)}</b>
+    and all pass the gate.
+    <button class="btn sec sm" onclick="revApproveMany(${JSON.stringify(
+      kin.map(x => x.topic)).replace(/"/g,'&quot;')})">Approve all ${kin.length}</button></p>`;
+}
+
+// Repainting the whole page on every keystroke would move the caret and drop
+// what is half-typed, so typing only re-colours the three gate chips.
+function revPaintGate(){
+  const q = reviewQueue(), p = q[Math.min(revIdx, q.length - 1)];
+  if(!p) return;
+  const box = document.getElementById('revcap');
+  if(!box) return;
+  const fake = {...p, caption: box.value};
+  const gate = revGate(fake), pass = gate.every(g => g.ok);
+  document.querySelectorAll('.revgate .gchk').forEach((el, i) => {
+    el.className = 'gchk ' + (gate[i].ok ? 'ok' : 'no');
+    el.textContent = (gate[i].ok ? '✓ ' : '✕ ') + gate[i].label;
+  });
+  const wrap = box.closest('.revcapbox');
+  if(wrap) wrap.classList.toggle('blocked', !pass);
+  const yes = document.querySelector('.revbtn.yes');
+  if(yes) yes.disabled = !pass || revBusy;
+  const save = document.querySelector('.revcapbar .btn');
+  if(save) save.disabled = (box.value === (p.caption || '')) || revSaving;
+}
+
+async function revSaveCap(topic){
+  const box = document.getElementById('revcap');
+  if(!box || revSaving) return;
+  revSaving = true;
+  const text = box.value;
+  try{
+    await fetch('/api/save', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({topic, caption: text})});
+    const p = DATA.posts.find(x => x.topic === topic);
+    if(p){ p.caption = text; p.registered = true; }
+    revCap = null;
+    say('Caption saved — ' + topic);
+  } catch(e){ say('Could not save that caption: ' + e.message); }
+  finally { revSaving = false; }
+  render();
+}
+
+// Zoom from the contact sheet. The viewer walks the slides of whatever post
+// is on screen, which on Review is the one in the queue, not `cur`.
+function zoomPost(topic, i){ revShot = i; zoomAt(i); }
+
+function revFixView(p, n){
+  const sel = revFix.slides;
+  return `<div class="revfix">
+    <span class="cap-l">Which slides are wrong</span>
+    <div class="fastrow">
+      ${Array.from({length: n}, (_, i) => i + 1).map(i =>
+        `<button class="btn ${sel.includes(i) ? '' : 'sec'} sm"
+          onclick="revPick(${i})">${i}</button>`).join('')}
+    </div>
+    <span class="cap-l">What is wrong with them</span>
+    <input id="revnote" value="${esc(revFix.note)}" placeholder="the CTA is missing"
+      oninput="revFix.note=this.value">
+    <label class="revrule">
+      <input type="checkbox" ${revFix.rule ? 'checked' : ''}
+        onchange="revFix.rule=this.checked;render()">
+      <span>Make this a standing rule, so every future build inherits it</span>
+    </label>
+    ${revFix.rule ? `<span class="sub">It goes into tools/build_rules.md, which
+      every build agent reads. Write it as a rule, not as a complaint about
+      this post: "a tools post never uses the phone mockup", not "slide 2 is
+      wrong".</span>` : ''}
+    <div class="fastrow end">
+      <button class="btn sec" onclick="revFix=null;render()">Cancel</button>
+      <button class="btn" ${sel.length && revFix.note.trim() ? '' : 'disabled'}
+        onclick="revSendFix('${esc(p.topic)}')">${revFix.rule
+          ? 'Send back and remember' : 'Send it back'}</button>
+    </div>
+  </div>`;
+}
+
+function revGo(d){
+  revIdx = Math.max(0, revIdx + d);
+  revShot = 0; revFix = null; revCap = null;
+  render();
+}
+function revOpenFix(){ revFix = {slides: [], note: '', rule: false}; render(); }
+function revPick(i){
+  const s = revFix.slides;
+  revFix.slides = s.includes(i) ? s.filter(x => x !== i) : [...s, i].sort((a,b)=>a-b);
+  render();
+}
+
+async function revApprove(topic){
+  const p = DATA.posts.find(x => x.topic === topic);
+  if(!p || !revGate(p).every(g => g.ok)) return;
+  // Optimistic and fire-and-forget. Approving used to await the POST and then
+  // a full reload of every post on disk before it would paint, which made
+  // sixty approvals sixty round trips — so the backlog never got cleared in
+  // one sitting. The gate is already checked here; the server only records it.
+  p.approved = true;
+  revCap = null; revShot = 0;
+  // The queue shrinks under us, so staying on the same index lands on the
+  // post that slid into this slot — which is the next one.
+  render();
+  try{
+    await fetch('/api/approve', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({topic, approved: true})});
+    TODAY = null;
+  } catch(e){
+    p.approved = false;
+    say('Could not approve ' + topic + ': ' + e.message);
+    render();
+  }
+}
+
+async function revApproveMany(topics){
+  topics.forEach(t => {
+    const p = DATA.posts.find(x => x.topic === t);
+    if(p) p.approved = true;
+  });
+  revCap = null; revShot = 0; revIdx = 0;
+  render();
+  try{
+    await fetch('/api/approve', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({topics, approved: true})});
+    TODAY = null;
+    say('Approved ' + topics.length + ' posts');
+  } catch(e){
+    topics.forEach(t => {
+      const p = DATA.posts.find(x => x.topic === t);
+      if(p) p.approved = false;
+    });
+    say('Could not approve those: ' + e.message);
+    render();
+  }
+}
+
+function revReject(topic){
+  showModal({title: 'Delete ' + topic, danger: true, ok: 'Delete',
+    body: 'The slides move to drafts/_deleted and the post leaves hooks.json. '
+        + 'Recoverable from disk, but it will not come back on its own.',
+    action: async () => {
+      await fetch('/api/delete', {method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({topic})});
+      await load(); revShot = 0; render();
+    }});
+}
+
+async function revSendFix(topic){
+  const fix = revFix;
+  revFix = null; render();
+  if(fix.rule){
+    await fetch('/api/build_rule', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({rule: fix.note})});
+  }
+  await fetch('/api/redo', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({topic, slides: fix.slides, note: fix.note})});
+  say('Sent slide' + (fix.slides.length > 1 ? 's ' : ' ') + fix.slides.join(', ')
+      + ' of ' + topic + ' back to be redone'
+      + (fix.rule ? ' — and every future build now carries that rule' : ''));
+  await load(); render();
+}
+
+function calView(){
+  if(!CAL) return '<div class="empty">Reading the week…</div>';
+  if(CAL.error) return `<div class="cwarn"><b>Could not read the calendar.</b> ${esc(CAL.error)}</div>`;
+  const days = calDays(), by = calBuckets();
+  const now = CAL.now;
+  const todayKey = calDayKey(now);
+  const mon = new Date(CAL.monday * 1000);
+  const sun = new Date(CAL.monday * 1000); sun.setDate(sun.getDate() + 6);
+  const range = mon.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})
+    + ' – ' + sun.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+
+  const head = `<div class="calhead">
+    <div class="fastrow">
+      <button class="btn sec sm" onclick="calWeek--;CAL=null;loadCal()">←</button>
+      <b class="calrange">${range}</b>
+      <button class="btn sec sm" onclick="calWeek++;CAL=null;loadCal()">→</button>
+      ${calWeek ? `<button class="btn sec sm" onclick="calWeek=0;CAL=null;loadCal()">This week</button>` : ''}
+      <span class="csum">${(CAL.rows||[]).length} this week ·
+        ${(CAL.assignable||[]).length} posts unassigned</span>
+      <span class="calkey">
+        <i class="calchip done">●</i> live
+        <i class="calchip planned">○</i> scheduled
+        <i class="calchip sent">◐</i> in your inbox
+      </span>
+    </div></div>`;
+
+  const grid = `<div class="calgrid" style="grid-template-columns:148px repeat(7,1fr)">
+    <div class="calh"></div>
+    ${days.map(d => `<div class="calh ${calDayKey(d.getTime()/1000)===todayKey?'today':''}">
+      <b>${d.toLocaleDateString('en-GB',{weekday:'short'})}</b>
+      <i>${d.getDate()}</i></div>`).join('')}
+    ${(CAL.accounts||[]).map(a => {
+      const warn = calAcctWarn(a.key);
+      const sm = (CAL.summary||{})[a.key] || {};
+      return `<div class="calacc ${warn?warn[0]:''}" title="${warn?esc(warn[1]):''}">
+          <b>@${esc(a.short || a.label)}</b>
+          <i>${warn ? esc(warn[0]) : (sm.followers != null ? sm.followers + ' followers' : '')}</i>
+        </div>
+        ${days.map(d => calCell(a, d, by, warn)).join('')}`;
+    }).join('')}
+  </div>`;
+
+  return `<div class="cx">${head}${grid}${calTray()}${calPickView()}</div>`;
+}
+
+function calCell(a, day, by, warn){
+  const k = a.key + '|' + calDayKey(day.getTime()/1000);
+  const rows = by.get(k) || [];
+  const dayStart = new Date(day); dayStart.setHours(0,0,0,0);
+  const past = (dayStart.getTime()/1000 + 86400) < CAL.now;
+  const free = Math.max(0, CAL_PER_DAY - rows.length);
+  const chips = rows.map(r => `<span class="calchip ${r.kind}"
+      title="${esc(r.topic)} · ${new Date(r.at*1000).toLocaleTimeString('en-GB',
+        {hour:'2-digit',minute:'2-digit'})} · ${esc(r.mode)}">
+      ${r.kind==='planned' ? '○' : r.kind==='sent' ? '◐' : '●'}</span>`).join('');
+  const add = (past || warn) ? '' :
+    `<button class="caladd" onclick="calOpen('${a.key}',${Math.floor(dayStart.getTime()/1000)})"
+       title="Assign a post to @${esc(a.label)} on ${day.toLocaleDateString('en-GB')}">+</button>`;
+  return `<div class="calcell ${past?'past':''} ${warn?'off':''} ${rows.length?'has':''}">
+    <div class="calchips">${chips}</div>${add}
+    ${(!past && !warn && free) ? `<i class="calfree">${free} free</i>` : ''}</div>`;
+}
+
+function calTray(){
+  const list = (CAL.assignable || []).slice(0, 12);
+  if(!list.length) return '';
+  return `<h4 class="csub">Unassigned — built, not live everywhere</h4>
+    <div class="caltray">${list.map(t => `<div class="caltile">
+      <img src="/slide/${esc(t.topic)}/01.jpg" alt="" loading="lazy">
+      <b>${esc(t.topic)}</b>
+      <i>${t.left.length} account${t.left.length===1?'':'s'} left</i>
+    </div>`).join('')}</div>`;
+}
+
+
+// Assigning is the one action on this page that ends in a public post, so it
+// asks for the three things the guidelines require every time: which post,
+// when, and who may see it — the last read from the creator's own options
+// with nothing preselected.
+async function calOpen(key, dayAt){
+  const sm = (CAL.summary || {})[key] || {};
+  // Music on by default. A photo post that goes out silent is the single
+  // biggest thing you can get wrong here, and it is invisible until you look
+  // at the post — 66 scheduled jobs were already queued without it.
+  calPick = {key, dayAt, topic: '', at: dayAt + 14*3600, privacy: '',
+             mode: 'direct', music: true, info: null, err: ''};
+  render();
+  try{
+    const r = await fetch('/api/creator_info?account=' + encodeURIComponent(key));
+    calPick.info = await r.json();
+  } catch(e){ calPick.info = {error: e.message}; }
+  render();
+}
+function calClose(){ calPick = null; render(); }
+function calSet(k, v){ calPick[k] = v; render(); }
+
+function calPickView(){
+  if(!calPick) return '';
+  const p = calPick;
+  const acct = (CAL.accounts||[]).find(a => a.key === p.key) || {};
+  const day = new Date(p.dayAt * 1000);
+  const choices = (CAL.assignable || []).filter(t => t.left.includes(p.key));
+  const info = p.info;
+  const opts = (info && info.privacy_level_options) || [];
+  const timeVal = new Date(p.at * 1000).toTimeString().slice(0,5);
+  const ready = p.topic && p.privacy && !p.err && !calBusy;
+
+  const body = !info
+    ? `<div class="sub">Reading @${esc(acct.label||p.key)}'s settings from TikTok…</div>`
+    : info.error
+    ? `<div class="cwarn"><b>TikTok would not answer for this account.</b>
+         <br>${esc(info.error)}</div>`
+    : `
+    <label class="cap-l">Which post</label>
+    ${choices.length ? `<div class="calchoose">${choices.slice(0,10).map(t =>
+      `<button class="calopt ${p.topic===t.topic?'on':''}"
+        onclick="calSet('topic','${esc(t.topic)}')">
+        <img src="/slide/${esc(t.topic)}/01.jpg" alt="" loading="lazy">
+        <span>${esc(t.topic)}</span></button>`).join('')}</div>`
+      : `<div class="sub">Nothing built that is not already live here.</div>`}
+
+    <label class="cap-l">When</label>
+    <div class="fastrow">
+      <input type="time" value="${timeVal}" onchange="calTime(this.value)">
+      <span class="sub">${day.toLocaleDateString('en-GB',
+        {weekday:'long', day:'2-digit', month:'short'})}</span>
+    </div>
+
+    <label class="cap-l">Who can view this</label>
+    <select onchange="calSet('privacy', this.value)">
+      <option value=""${p.privacy?'':' selected'}>Select who can view…</option>
+      ${opts.map(o => `<option value="${o}"${p.privacy===o?' selected':''}
+        >${PRIV_LABEL[o] || o}</option>`).join('')}
+    </select>
+    <span class="sub">These are the levels @${esc(acct.label||p.key)} actually
+      offers, read from TikTok just now.</span>
+
+    <label class="cap-l">How</label>
+    <div class="fastrow">
+      <button class="btn ${p.mode==='direct'?'':'sec'} sm"
+        onclick="calSet('mode','direct')">Post it</button>
+      <button class="btn ${p.mode==='draft'?'':'sec'} sm"
+        onclick="calSet('mode','draft')">Send to the inbox</button>
+    </div>
+    ${p.mode==='direct' ? `<div class="fastrow">
+      <button class="btn ${p.music?'':'sec'} sm"
+        onclick="calSet('music', ${p.music?'false':'true'})">
+        ${p.music ? '\u266a Music on' : 'No music'}</button>
+      <span class="sub">${p.music
+        ? "TikTok picks a recommended track. Publishing by hand lets you choose; this is the only music a direct post can get."
+        : 'The post goes out silent.'}</span>
+    </div>` : ''}
+    <span class="sub">${p.mode==='direct'
+      ? 'Publishes to the profile at that time. It cannot be undone from here.'
+      : 'Lands in the TikTok app for you to publish by hand. Costs one of five daily slots.'}</span>
+    ${p.err ? `<div class="cwarn">${esc(p.err)}</div>` : ''}`;
+
+  return `<div class="calmodal" onclick="if(event.target===this)calClose()">
+    <div class="calsheet"><div class="sec">
+      <span class="cap-l">Assign to @${esc(acct.label||p.key)}</span>
+      ${body}
+      <div class="fastrow end">
+        <button class="btn sec" onclick="calClose()">Cancel</button>
+        <button class="btn" ${ready?'':'disabled'} onclick="calCommit()">
+          ${calBusy ? 'Scheduling…' : 'Schedule it'}</button>
+      </div>
+    </div></div></div>`;
+}
+
+function calTime(hhmm){
+  const [h,m] = hhmm.split(':').map(Number);
+  const d = new Date(calPick.dayAt * 1000);
+  d.setHours(h, m, 0, 0);
+  calPick.at = Math.floor(d.getTime()/1000);
+  render();
+}
+
+async function calCommit(){
+  if(calBusy) return;
+  const p = calPick;
+  if(p.at * 1000 < Date.now() - 60000){
+    p.err = 'That time has already passed.'; render(); return;
+  }
+  calBusy = true; p.err = ''; render();
+  try{
+    const res = await fetch('/api/schedule', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({topic: p.topic, at: p.at, accounts: [p.key],
+                            mode: p.mode,
+                            settings: p.mode === 'direct'
+                              ? {privacy: p.privacy, auto_add_music: !!p.music}
+                              : {}})});
+    const j = await res.json();
+    if(j.error){ p.err = j.error; calBusy = false; render(); return; }
+    calBusy = false; calPick = null; CAL = null;
+    say('Scheduled ' + p.topic + ' for @' + p.key);
+    loadCal();
+  } catch(e){
+    p.err = e.message; calBusy = false; render();
+  }
 }
 
 function schedView(){
@@ -7441,7 +9014,8 @@ async function load(quiet){
           ${d ? `<i class="${d>0?'up':'down'}">${d>0?'+':''}${d}</i>` : ''}
         </div>
         ${cadence(st.last_at)}
-      </a>`;}).join('');
+        ${acctWarn(a.key, st)}
+      </a>`;}).join('') + hiddenNote();
   if(!quiet) render();
 
 }
@@ -7474,60 +9048,6 @@ function playNav(){
   void v.offsetWidth;            // restart the animation, not queue it
   v.classList.add('turned');
   v.addEventListener('animationend', () => v.classList.remove('turned'), {once:true});
-}
-
-/* Accent picker. One stored hex drives --accent and --accent-rgb; every
-   other colour token is written against those, so nothing else changes. */
-const DEFAULT_ACCENT = '#E8EDFA';
-const ACCENTS = ['#E8EDFA','#B46BFF','#7C6BFF','#3BA8FF','#26D0C4','#3ED27A',
-                 '#E4C24A','#FF9A3C','#FF5C7A','#F45CC8','#5AE0FF','#C9FF4A'];
-let accent = localStorage.getItem('pf.accent') || DEFAULT_ACCENT;
-
-function paintAccent(hex){
-  const n = parseInt(hex.slice(1), 16), r = document.documentElement;
-  r.style.setProperty('--accent', hex);
-  r.style.setProperty('--accent-rgb', [n>>16&255, n>>8&255, n&255].join(','));
-}
-function previewAccent(hex){ paintAccent(hex); drawSwatches(hex); }
-
-function drawSwatches(sel){
-  const el = document.getElementById('cpsw'); if(!el) return;
-  el.innerHTML = ACCENTS.map(h =>
-    `<button style="background:${h};color:${h}" title="${h}"` +
-    ` aria-pressed="${h.toLowerCase()===sel.toLowerCase()}"` +
-    ` onclick="previewAccent('${h}');document.getElementById('cpin').value='${h}'"></button>`
-  ).join('');
-}
-
-function toggleAccent(e){
-  e && e.stopPropagation();
-  const pop = document.getElementById('cppop');
-  if(pop.hidden){
-    // Open on the saved colour, not on whatever a cancelled preview left behind.
-    accent = localStorage.getItem('pf.accent') || DEFAULT_ACCENT;
-    paintAccent(accent);
-    document.getElementById('cpin').value = accent;
-    drawSwatches(accent);
-    pop.hidden = false;
-    setTimeout(() => document.addEventListener('click', closeAccentOnce), 0);
-  } else { closeAccent(); }
-}
-function closeAccent(){
-  document.getElementById('cppop').hidden = true;
-  document.removeEventListener('click', closeAccentOnce);
-  // Revert anything previewed but not applied.
-  paintAccent(localStorage.getItem('pf.accent') || DEFAULT_ACCENT);
-}
-function closeAccentOnce(e){
-  if(!e.target.closest('.cpick')) closeAccent();
-}
-function saveAccent(){
-  accent = document.getElementById('cpin').value;
-  localStorage.setItem('pf.accent', accent);
-  paintAccent(accent);
-  document.getElementById('cppop').hidden = true;
-  document.removeEventListener('click', closeAccentOnce);
-  nsay('Colour applied');
 }
 
 function setFilter(k){
@@ -7600,7 +9120,8 @@ function togglePages(){
 async function refreshNow(btn){
   if(btn) btn.classList.add('spinning');
   try{
-    if(filter === 'stats'){ await fetch('/api/sync'); AN = null; }
+    if(filter === 'stats'){ await fetch('/api/sync'); AN = null; EXP = null; }
+    if(filter === 'today') TODAY = null;
     await load();
     if(filter === 'stats') await loadAnalytics(); else render();
   } finally {
@@ -7662,25 +9183,20 @@ function render_(){
       stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M3 12h18"/>
       <path d="M3 18h18"/></svg>`;
   if (cur) return detail();
-  if(filter==='ideas'){
-    // A poll landing mid-drag, or mid-sentence, must not replace the node the
-    // pointer is holding or the box being typed into.
-    if(mmDrag || (noteEdit && document.activeElement
-                           && document.activeElement.id === 'bed')){
-      drawLinks();
-      return;
-    }
-    view.innerHTML = ideasView();
-    // The edges are measured from the laid-out bubbles, so they can only be
-    // drawn once the browser has placed them.
-    if(NOTES) requestAnimationFrame(() => { drawLinks(); focusEditor(); });
-    else loadNotes();
+  if(filter === 'today'){
+    view.innerHTML = todayView();
+    if(!TODAY) loadToday();
     return;
   }
   if(filter==='new'){
     document.getElementById('cnt').textContent = '';
-    view.innerHTML = composeView();
+    // A poll landing mid-sentence must not replace the box being typed into.
+    const typing = document.activeElement
+      && ['brin','npnote'].includes(document.activeElement.id);
+    if(typing) return;
+    view.innerHTML = composeView() + briefsView();
     if(!HOOKS) loadHooks();
+    if(!NOTES) loadNotes();
     return;
   }
   if(filter === 'ig'){
@@ -7688,8 +9204,15 @@ function render_(){
     view.innerHTML = schedView();
     return;
   }
-  if(filter === 'tiktok'){
-    view.innerHTML = tiktokView();
+  if(filter === 'review'){
+    view.innerHTML = reviewView();
+    return;
+  }
+  if(filter === 'cal'){
+    document.getElementById('cnt').textContent = CAL
+      ? `${(CAL.assignable||[]).length} unassigned` : '';
+    view.innerHTML = calView();
+    if(!CAL) loadCal();
     return;
   }
   if(filter === 'lib'){
@@ -7727,6 +9250,58 @@ const CADENCE = [
 // The elapsed time is the whole point, so it cannot wait for the next stats
 // sync to move. Only the .cad line is rewritten — repainting the sidebar would
 // throw away the follower counts mid-animation.
+// Three different reasons an account is not worth posting to, and they are
+// not interchangeable. A dead token is a thing you fix; no reach is a thing
+// you wait out; paused is a thing you chose. Saying "problem" for all three
+// is how an account sat broken for a week while the sidebar looked fine.
+function acctWarn(key, st){
+  if(st.paused) return `<div class="awarn pause">paused${
+    st.pause_note ? ' · ' + esc(st.pause_note) : ''}
+    <button onclick="event.preventDefault();event.stopPropagation();acctPause('${key}',false)">resume</button></div>`;
+  if(st.publish_ok === false) return `<div class="awarn bad">cannot publish${
+    st.publish_error ? ' · token expired' : ''}
+    <span class="fix">re-run tiktok-auth.js --account ${esc(key)}</span></div>`;
+  if(st.reach_dead) return `<div class="awarn bad">${st.reach_dead.posts} posts, no views
+    <button onclick="event.preventDefault();event.stopPropagation();acctPause('${key}',true,'no reach')">pause</button></div>`;
+  return '';
+}
+
+// Hidden accounts leave no trace in the roster, which is the point — but a
+// view with no way back out of it is a trap, so the count stays.
+function hiddenNote(){
+  const h = (DATA && DATA.hidden_accounts) || [];
+  if(!h.length) return '';
+  return `<p class="hidnote">${h.length} hidden ·
+    ${h.map(a => `<button onclick="acctHide('${a.key}',false)"
+      >@${esc(a.label)}</button>`).join(' ')}</p>`;
+}
+
+async function acctHide(key, on){
+  try{
+    await fetch('/api/account_flag', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({account:key, hidden:!!on,
+                            paused:true, note:'no reach'})});
+    say(on ? '@' + key + ' hidden' : '@' + key + ' back in the roster');
+    CAL = null;
+    await load();
+    render();
+  } catch(e){ say('Could not change that: ' + e.message); }
+}
+
+async function acctPause(key, on, note){
+  try{
+    await fetch('/api/account_flag', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({account:key, paused:!!on, note:note||''})});
+    say(on ? '@' + key + ' paused — schedules will skip it'
+           : '@' + key + ' resumed');
+    CAL = null;
+    await load();
+    render();
+  } catch(e){ say('Could not change that: ' + e.message); }
+}
+
 function paintCadence(){
   const AST = (DATA && DATA.account_stats) || {};
   document.querySelectorAll('.acct[data-k] .cad').forEach(c => {
@@ -7757,14 +9332,15 @@ function sinceMins(mins){
 }
 
 function tabCount(k){
-  if(k === 'ideas'){
-    // Unused codes are the only thing here with a deadline on it.
-    const n = (NOTES||[]).filter(r => r.kind==='code' && !r.used).length;
+  if(k === 'today'){
+    // Blockers and unjudged posts. Not "approved, not placed" — that one is
+    // work you can choose to do later; these two are work that is stuck.
+    if(!TODAY || TODAY.error) return '';
+    const n = (TODAY.unapproved_n || 0) + (TODAY.blockers || []).length;
     return n || '';
   }
-  if(k === 'tiktok'){
-    const n = DATA.posts.filter(p => needsPublish(p) || stateOf(p)==='review').length;
-    return n || '';
+  if(k === 'review'){
+    return reviewQueue().length || '';
   }
   if(k === 'ig'){
     // Empty slots in the next seven days: the "am I behind" number.
@@ -7778,34 +9354,12 @@ function tabCount(k){
   return '';
 }
 
-// TikTok, in the order the work happens: what is sitting in your phone's
-// inbox waiting to be published, then what is waiting to be drafted. The
-// slot line is the constraint that decides how much you can do today.
-function tiktokView(){
-  // Two piles, and the sidebar badge counts both. It used to render only the
-  // second, so eleven posts sitting in the phone's inbox were invisible here
-  // while the badge went on counting them — the page said 6 and the nav said
-  // 17, and the eleven that needed a thumb on the phone were the ones you
-  // could not see.
-  const inbox = DATA.posts.filter(needsPublish).sort((a,b)=>whenOf(b)-whenOf(a));
-  const todo = DATA.posts.filter(p=>stateOf(p)==='review').sort((a,b)=>whenOf(b)-whenOf(a));
-  document.getElementById('cnt').textContent = inbox.length
-    ? `${inbox.length} to publish · ${todo.length} to draft`
-    : `${todo.length} to draft`;
-  return band('In your inbox', inbox,
-              'Open TikTok on your phone and publish these.')
-    + `<h4 class="csub">Built, not drafted</h4>
-    ${todo.length ? groups(todo)
-      : '<div class="empty">Review is clear — build more.</div>'}`;
-}
-
 // Everything that exists, one grid, sliced by a segmented control. It was
 // four tabs holding four views of the same list.
 function libraryView(){
   const list = DATA.posts.filter(p =>
       libTab==='liked' ? p.liked
     : libTab==='out'   ? isOut(p)
-    : libTab==='unsent'? (!isOut(p) && p.slides && p.slides.length)
     : true).sort((a,b)=>whenOf(b)-whenOf(a));
   document.getElementById('cnt').textContent = `${list.length} post${list.length===1?'':'s'}`;
   // Two rows of identical chips said nothing about which one filtered and
@@ -7971,6 +9525,33 @@ function band(title, ps, note){
 
 // Reviewing ten posts is a keyboard job. J/K walk the current filter, D
 // drafts, P marks published, F opens it on TikTok, 1-6 pick redo slides.
+// Review is a keyboard job before it is a mouse one: judging forty posts with
+// a pointer is why nobody judges forty posts.
+document.addEventListener('keydown', e => {
+  if(filter !== 'review' || cur) return;
+  const t = e.target.tagName;
+  if(t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+  if(document.getElementById('modal').style.display === 'flex') return;
+  const q = reviewQueue();
+  if(!q.length) return;
+  const p = q[Math.min(revIdx, q.length - 1)];
+  const k = e.key.toLowerCase();
+  if(revFix){ if(e.key === 'Escape'){ revFix = null; render(); e.preventDefault(); } return; }
+  if(k === 'a'){ revApprove(p.topic); e.preventDefault(); }
+  else if(k === 'r'){ revOpenFix(); e.preventDefault(); }
+  else if(k === 'x'){ revReject(p.topic); e.preventDefault(); }
+  else if(k === 'c'){
+    const box = document.getElementById('revcap');
+    if(box){ box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+    e.preventDefault();
+  }
+  else if(e.key === 'ArrowLeft'){ revGo(-1); e.preventDefault(); }
+  else if(e.key === 'ArrowRight'){ revGo(1); e.preventDefault(); }
+  else if(/^[1-9]$/.test(e.key)){
+    const i = Number(e.key) - 1;
+    if(i < (p.slides || []).length){ zoomPost(p.topic, i); e.preventDefault(); }
+  }
+});
 document.addEventListener('keydown', e=>{
   const t=e.target.tagName;
   if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT') return;
@@ -8210,7 +9791,9 @@ async function loadAnalytics(){
 function toggleAcct(k){
   const solo = anAccs && anAccs.size === 1 && anAccs.has(k);
   anAccs = solo ? null : new Set([k]);
-  AN = null; paintAccountSel(); saveHash(); loadAnalytics();
+  // Experiments reads the same account filter from its own endpoint, so its
+  // cache has to drop with the analytics one or the tab shows the old roster.
+  AN = null; EXP = null; paintAccountSel(); saveHash(); loadAnalytics();
 }
 
 // The sidebar card is the same filter as the chip above the charts, so it
@@ -8271,6 +9854,119 @@ function aged(ts){
 // log10 position on a 1..3000 axis, which is the only honest scale here: the
 // data is bimodal, everything is either a few hundred or past a thousand.
 const lg = v => Math.log10(Math.max(1, v)) / Math.log10(3000);
+
+// ------------------------------------------------------------ experiments
+//
+// Replaces Audience, which could not have answered a question about the
+// audience: TikTok's Display API gives no country, age or gender, so the tab
+// was hour-and-weekday medians over every account pooled together, with no
+// maturity cutoff — an average of six accounts on a figure one of them
+// inverts, counting posts that were nine hours old against posts that had
+// finished.
+//
+// These three comparisons are the ones that have actually changed a decision
+// here, and every one of them had to be run by hand outside the tool.
+let EXP = null, expBy = 'design';
+
+async function loadExperiments(){
+  try {
+    const q = anAccs && anAccs.size ? '?a=' + [...anAccs].join(',') : '';
+    EXP = await (await fetch('/api/experiments' + q)).json();
+  } catch(e){ EXP = {error: e.message}; }
+  render();
+}
+
+function experimentsView(){
+  if(!EXP){ loadExperiments(); return '<div class="empty">Reading the uploads…</div>'; }
+  if(EXP.error) return `<div class="cwarn"><b>Could not read it.</b> ${esc(EXP.error)}</div>`;
+  const E = EXP, T = E.threshold, MIN = E.min_n || 8, f = n => (n||0).toLocaleString();
+
+  // Every table on this tab says its n and dims itself below the threshold,
+  // because the whole point of the tab is comparing small groups and the
+  // honest answer to most of them is still "not enough posts".
+  const table = (rows, head) => `<table class="mx cmp">
+    <thead><tr><th>${head}</th><th class="n">mature</th><th class="n">breakout</th>
+      <th class="n">median v48</th><th class="n">best</th></tr></thead>
+    <tbody>${rows.map(r => `<tr class="${r.n < MIN ? 'thin' : ''}">
+      <td class="t">${esc(r.key)}${r.n < MIN ? '<span class="worst">n too small</span>' : ''}</td>
+      <td class="n"><span class="sp">${r.n}</span></td>
+      <td class="n"><span class="hr ${rateBand(r.rate)}">${r.rate}%</span></td>
+      <td class="n"><span class="sp">${f(r.median)}</span></td>
+      <td class="n"><span class="sp">${f(r.best)}</span></td></tr>`).join('')}
+    </tbody></table>`;
+
+  const GROUPS = [['design','Design'],['pillar','Pillar'],['prior','Prior accounts'],['slot','Slot']];
+  const rows = E[expBy] || [];
+  const designCard = `<div class="chart wide"><h4>Compare by</h4>
+    <p class="why">Uploads past ${E.mature_h}h, measured at 48 hours, promoted
+      posts excluded. Breakout rate — the share clearing ${f(T)} views — leads,
+      because views are heavy-tailed enough that one upload can carry a mean
+      past a group that beat it nine times in ten. Rows with fewer than
+      ${MIN} uploads are dimmed: they are a glance, not a result.</p>
+    <div class="segs" style="margin:0 0 12px">${GROUPS.map(([v,l]) =>
+      `<button class="seg ${expBy===v?'on':''}" onclick="expBy='${v}';render()">${l}</button>`).join('')}</div>
+    ${rows.length ? table(rows, expBy === 'prior' ? 'accounts before it' : expBy)
+      : '<p class="why">Nothing mature in this group yet.</p>'}
+    ${expBy === 'design' && rows.length === 1 ? `<p class="why">Only the control
+      arm has matured. The two format experiments went out on 17 Oct, so they
+      join this table once they pass ${E.mature_h}h and the next sync runs.</p>` : ''}
+    ${expBy === 'prior' ? `<p class="why">How many accounts had already posted
+      that concept before this upload. If duplicates cost reach, this column
+      falls; measured over ${f(E.uploads)} uploads it does not, until the
+      groups get too small to read.</p>` : ''}</div>`;
+
+  // The finding the old tab averaged away: the best hour cluster-wide is not
+  // the best hour for every account.
+  const names = E.slot_names || [];
+  const byAcc = E.by_account || {};
+  const slotCard = `<div class="chart wide"><h4>When each account does best</h4>
+    <p class="why">Breakout rate by part of the day, per account. Twenty-four
+      hourly buckets over ${f(E.uploads)} uploads across ${(E.accounts||[]).length}
+      accounts is noise; four parts of a day is a reading. Pooling the accounts
+      hides the one that runs the other way.</p>
+    <table class="mx cmp"><thead><tr><th>account</th>
+      ${names.map(n => `<th class="n">${esc(n)}</th>`).join('')}</tr></thead>
+      <tbody>${(E.accounts||[]).map(a => {
+        const row = byAcc[a.key] || {};
+        const best = names.reduce((b,n) =>
+          (row[n]||{}).n >= MIN && (row[n]||{}).rate > ((row[b]||{}).rate ?? -1) ? n : b, null);
+        return `<tr><td class="t"><i style="background:${ACOL[a.key]}"></i>${esc(a.label)}</td>
+          ${names.map(n => {
+            const c = row[n] || {n:0, rate:0};
+            return `<td class="n" title="${c.n} mature upload${c.n===1?'':'s'}">
+              <span class="hr ${c.n < MIN ? '' : rateBand(c.rate)} ${n===best?'lead':''}"
+                >${c.n ? c.rate + '%' : '–'}</span>
+              <span class="sp" style="opacity:.5">${c.n || ''}</span></td>`;
+          }).join('')}</tr>`;
+      }).join('')}</tbody></table>
+    <p class="why">Small number under each rate is how many uploads it rests on.
+      The outlined cell is that account's best slot <i>with at least ${MIN}
+      uploads behind it</i> — which is not always its highest number.</p></div>`;
+
+  // The one card worth keeping from Audience. Reach that converts is a
+  // different thing from reach, and it is the only follower figure here.
+  const cv = (AN && AN.audience && AN.audience.convert) || [];
+  const convCard = cv.length ? `<div class="chart"><h4>Who actually follows</h4>
+    <p class="why">Followers gained per 1,000 views, over the selected range.</p>
+    <table class="mx cmp"><thead><tr><th>account</th><th class="n">views</th>
+      <th class="n">followers</th><th class="n">per 1k</th></tr></thead><tbody>
+      ${cv.map(c => {
+        const a = (AN.all_accounts||[]).find(x => x.key === c.key) || {label: c.key};
+        return `<tr><td class="t"><i style="background:${ACOL[c.key]}"></i>${esc(a.label)}</td>
+          <td class="n"><span class="sp">${f(c.views)}</span></td>
+          <td class="n"><span class="sp">${c.gained == null ? '–'
+            : (c.gained > 0 ? '+' : '') + c.gained}</span></td>
+          <td class="n"><span class="hr ${c.per_1k >= 1 ? 'r4' : c.per_1k >= 0.5 ? 'r3'
+            : c.per_1k >= 0.25 ? 'r2' : 'r1'}">${c.per_1k == null ? '–' : c.per_1k}</span></td>
+        </tr>`;}).join('')}</tbody></table></div>` : '';
+
+  return `<p class="why" style="margin:0 0 14px">${f(E.uploads)} uploads are old
+      enough to compare${E.immature ? `; ${E.immature} still settling` : ''}.
+      TikTok's API gives no country, age or gender — those need the Research
+      and Business APIs, which a sandbox app cannot request — so this tab
+      compares what the posts were, not who watched them.</p>`
+    + designCard + slotCard + (convCard ? `<div class="duo">${convCard}</div>` : '');
+}
 
 function analyticsView(){
   if(anError) return offlineNote(anError);
@@ -8340,32 +10036,36 @@ function analyticsView(){
 
   // The comparison itself: one row per account, same posts, different outcome.
   const bestKey = accs.slice().sort((a,b)=>pa[b.key].median-pa[a.key].median)[0].key;
-  const compare = `<div class="chart wide"><h4>Same posts, three accounts</h4>
-    <p class="why">Organic only, sorted by hit rate.</p>
-    <table class="mx cmp"><thead><tr><th>account</th><th class="n">uploads</th>
-      <th class="n">hit rate</th>
-      <th class="n">median</th><th class="n">views</th>
+  // Breakout rate leads, and it is computed on uploads past 48h only. The
+  // old hit rate counted a post published this morning as a miss, which made
+  // whichever account posted most recently look worst.
+  const settling = accs.reduce((n,a)=>n + (pa[a.key].settling||0), 0);
+  const br = k => pa[k].breakout || 0;
+  const compare = `<div class="chart wide"><h4>Same posts, every account</h4>
+    <p class="why">Organic uploads past ${AN.kpi.mature_h || 48}h, sorted by
+      breakout rate — the share clearing ${fmt(T)} views. Views and followers
+      are lifetime; the two rates are not, because a rate is only honest once
+      everything in it has stopped growing.${settling
+        ? ` ${settling} upload${settling===1?'':'s'} still settling.` : ''}</p>
+    <table class="mx cmp"><thead><tr><th>account</th><th class="n">mature</th>
+      <th class="n">breakout</th>
+      <th class="n">median v48</th><th class="n">views</th>
       <th class="n">followers</th></tr></thead>
-      <tbody>${accs.slice().sort((a,b)=>
-          (pa[b.key].wins/Math.max(1,pa[b.key].posts)) -
-          (pa[a.key].wins/Math.max(1,pa[a.key].posts))).map(a=>{
+      <tbody>${accs.slice().sort((a,b)=>br(b.key)-br(a.key)).map(a=>{
         const v = pa[a.key];
-        const hr = Math.round(100*v.wins/Math.max(1,v.posts));
-        const rank = accs.slice().sort((x, y) =>
-          (pa[y.key].wins / Math.max(1, pa[y.key].posts)) -
-          (pa[x.key].wins / Math.max(1, pa[x.key].posts)));
+        const hr = br(a.key);
+        const rank = accs.slice().sort((x,y)=>br(y.key)-br(x.key));
         const tag = a.key === rank[0].key
           ? ''
-          : a.key === rank[rank.length - 1].key
-            ? `<span class="worst">${Math.round(
-                (pa[rank[0].key].wins / Math.max(1, pa[rank[0].key].posts)) /
-                Math.max(0.01, pa[a.key].wins / Math.max(1, pa[a.key].posts)))}x behind</span>`
-            : '';
+          : a.key === rank[rank.length - 1].key && hr > 0
+            ? `<span class="worst">${(br(rank[0].key)/Math.max(1,hr)).toFixed(1)}x behind</span>`
+            : a.key === rank[rank.length - 1].key
+              ? `<span class="worst">nothing broke out</span>` : '';
         return `<tr class="${a.key===rank[0].key?'lead':''}">
           <td class="t"><i style="background:${ACOL[a.key]}"></i>${esc(a.label)}${tag}</td>
-          <td class="n"><span class="sp">${v.posts}</span></td>
+          <td class="n"><span class="sp">${v.mature||0}</span></td>
           <td class="n"><span class="hr ${rateBand(hr)}">${hr}%</span></td>
-          <td class="n"><span class="sp">${fmt(v.median)}</span></td>
+          <td class="n"><span class="sp">${fmt(v.median48||0)}</span></td>
           <td class="n"><span class="sp">${fmt(v.total)}</span></td>
           <td class="n"><span class="sp">${v.followers??'–'}</span></td></tr>`;
       }).join('')}</tbody></table></div>`;
@@ -8698,9 +10398,19 @@ function analyticsView(){
 
   // Four screens rather than one long scroll. Each fits without scrolling,
   // which is the point: analytics you have to scroll through does not get read.
+  // Audience is gone. It could not have answered a question about the
+  // audience — TikTok's Display API gives this app no country, age or gender
+  // — so it was hour-and-weekday medians pooled across every account, with no
+  // maturity cutoff. Experiments asks what the posts were instead.
+  //
+  // App is here rather than cut. It needs ARCO_METRICS_URL, which is set in
+  // the LaunchAgent plist and not in .env — so it reads as unconfigured from
+  // the repo and has in fact been serving real numbers all along, to a tab
+  // that could only be reached by typing #t=app into the address bar. An
+  // unreachable page is the same problem as an unused one.
   const TABS = [['published','Posts'],['accounts','Accounts'],
-                ['audience','Audience']];
-  // Four tabs fit a desktop and do not fit a phone, where they became a
+                ['experiments','Experiments'],['app','App']];
+  // Three tabs fit a desktop and do not fit a phone, where they became a
   // sideways scroll that hid the section you were not on. Same state, two
   // controls: the buttons on wide screens, one picker on narrow ones.
   const tabbar = `<div class="subtabs">
@@ -8827,70 +10537,8 @@ function analyticsView(){
   }
 
   let body;
-  if(anTab==='audience'){
-    const A = AN.audience || {};
-    const bar = (rows, labelOf, keyOf) => {
-      const max = Math.max(1, ...rows.map(r => r.median));
-      return rows.map(r => `<div class="pbar ${r.posts < 3 ? 'thin' : ''}"
-          title="${r.posts} upload${r.posts===1?'':'s'}">
-          <span class="pn">${labelOf(r)}</span>
-          <span class="pt"><i style="width:${Math.round(100*r.median/max)}%"></i></span>
-          <span class="pv">${fmt(r.median)}</span>
-          <span class="ps">${r.posts}</span></div>`).join('');
-    };
-    const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    const hh = h => String(h).padStart(2,'0') + ':00';
-
-    // Median, not total: an hour with thirty uploads will always win a sum,
-    // and the question is what one post does at that hour.
-    const whenCard = `<div class="chart"><h4>When an upload does best</h4>
-      <p class="why">Median views per upload by the hour it went out, your time.
-        Bars thinner than three uploads are not worth reading yet.</p>
-      ${(A.hours||[]).length ? bar(A.hours, r => hh(r.h)) : '<p class="why">No data yet.</p>'}</div>`;
-
-    const dayCard = `<div class="chart"><h4>Which day</h4>
-      <p class="why">Same measure, by weekday.</p>
-      ${(A.days||[]).length ? bar(A.days, r => DAYS[r.d]) : '<p class="why">No data yet.</p>'}</div>`;
-
-    const pl = Object.entries(AN.pillars || {})
-      .map(([name, v]) => ({name, ...v,
-            rate: Math.round(100 * v.broke_out / Math.max(1, v.posts))}))
-      .sort((a, b) => b.rate - a.rate);
-    const pmax = Math.max(1, ...pl.map(x => x.rate));
-    const whatCard = `<div class="chart"><h4>What they turn up for</h4>
-      <p class="why">Share of posts clearing ${fmt(T)} views on at least one
-        account, by pillar.</p>
-      ${pl.length ? pl.map(x => `<div class="pbar ${x.posts<5?'thin':''}">
-          <span class="pn">${esc(x.name)}</span>
-          <span class="pt"><i style="width:${Math.round(100*x.rate/pmax)}%"></i></span>
-          <span class="pv">${x.rate}%</span>
-          <span class="ps">${x.posts}</span></div>`).join('')
-        : '<p class="why">No pillars tagged yet.</p>'}</div>`;
-
-    const cv = A.convert || [];
-    const convCard = `<div class="chart"><h4>Who actually follows</h4>
-      <p class="why">Followers gained per 1,000 views. Reach that converts is a
-        different thing from reach.</p>
-      <table class="mx cmp"><thead><tr><th>account</th><th class="n">views</th>
-        <th class="n">followers</th><th class="n">per 1k</th></tr></thead><tbody>
-        ${cv.map(c => {
-          const a = (AN.all_accounts||[]).find(x => x.key === c.key) || {label: c.key};
-          return `<tr><td class="t"><i style="background:${ACOL[c.key]}"></i>${esc(a.label)}</td>
-            <td class="n"><span class="sp">${fmt(c.views)}</span></td>
-            <td class="n"><span class="sp">${c.gained == null ? '–'
-              : (c.gained > 0 ? '+' : '') + c.gained}</span></td>
-            <td class="n"><span class="hr ${c.per_1k >= 1 ? 'r4' : c.per_1k >= 0.5 ? 'r3'
-              : c.per_1k >= 0.25 ? 'r2' : 'r1'}">${c.per_1k == null ? '–' : c.per_1k}</span></td>
-          </tr>`;
-        }).join('')}</tbody></table></div>`;
-
-    body = rangeChips()
-      + `<p class="why" style="margin:0 0 12px">TikTok's API gives no country, age
-         or gender: those live behind the Research and Business APIs, which a
-         sandbox app cannot request. This is when they showed up, what for, and
-         whether they stayed.</p>`
-      + `<div class="duo">${whenCard}${dayCard}</div>`
-      + `<div class="duo">${whatCard}${convCard}</div>`;
+  if(anTab==='experiments'){
+    body = experimentsView();
   } else if(anTab==='published'){
     body = publishedView();
   } else if(anTab==='accounts'){
@@ -8906,76 +10554,12 @@ function analyticsView(){
           : '<li class="none">Nothing yet</li>'}</ul></div>`;}).join('')}</div>`;
     body = rangeChips() + compare
          + `<div class="duo">${trendCard}${countCard}</div>`;
-  } else if(anTab==='posts'){
-    body = sect('Every post, every account',
-           'Shade is log-scaled views. Click a number to open it on TikTok. '
-           + '$ marks a promoted post so paid reach stays out of the medians. '
-           + 'Last posted turns green once a post is old enough to run again.')
-         + matrix;
   } else if(anTab==='app'){
     // The app's own numbers belong beside the posts that sell it: a week of
     // reach that moves no installs is a content problem, and installs that
     // never turn blocking on are a product one.
     if(!USERS) loadUsers();
     body = usersView();
-  } else if(anTab==='todo'){
-    const stale = AN.stale || [];
-    const stalePanel = `<div class="pcard"><h4>Drafts holding a slot</h4>
-      <p class="why">Sent, never published. Five pending per account per day, and
-        only publishing frees one — deleting does not.</p>
-      <ul class="tight">${stale.length ? stale.map(x=>
-        `<li class="go" onclick="open_('${x.topic}')">
-           <span class="il">${esc(x.topic)}</span>
-           <span class="ir ${x.hours>48?'hit':''}">${x.hours}h</span>
-           <span class="is">${esc(x.account)}</span></li>`).join('')
-        : '<li class="none">Nothing waiting</li>'}</ul>
-      <p class="do">Publish these in the TikTok app to free the slots</p></div>`;
-
-    // AN.pillars is keyed by pillar name, not a list.
-    const pl = Object.entries(AN.pillars || {})
-      .map(([name, v]) => ({name, ...v,
-            rate: Math.round(100 * v.broke_out / Math.max(1, v.posts))}))
-      .sort((a, b) => b.rate - a.rate);
-    const pmax = Math.max(1, ...pl.map(x=>x.rate));
-    const pillarPanel = `<div class="chart"><h4>Which angle earns reach</h4>
-      <p class="why">Share of posts clearing ${fmt(T)} on at least one account,
-        by pillar. Bars rather than a pie: rates compared by length stay
-        readable on a phone.</p>
-      ${pl.length ? pl.map(x=>`<div class="pbar ${x.posts<5?'thin':''}"
-        title="${x.posts<5?'Too few posts to trust this rate':''}">
-        <span class="pn">${esc(x.name)}</span>
-        <span class="pt"><i style="width:${Math.round(100*x.rate/pmax)}%"></i></span>
-        <span class="pv">${x.rate}%</span>
-        <span class="ps">${x.posts} post${x.posts===1?'':'s'}</span></div>`).join('')
-        : '<p class="why">No pillars tagged yet.</p>'}
-      ${pl.some(x=>x.posts<5) ? `<p class="why">Dimmed rows have fewer than five
-        posts — one lucky upload reads as 100%.</p>` : ''}
-      ${(AN.pillars||{}).unknown ? `<p class="why">${AN.pillars.unknown.posts} posts
-        carry no pillar tag, so most of this chart is the "unknown" row. Tagging
-        hooks in the pool is what makes this comparison mean anything.</p>` : ''}</div>`;
-
-    const und = AN.undelivered || [];
-    const nameOf = k => (accs.find(a=>a.key===k)||{}).short || k;
-    const gapPanel = `<div class="pcard ${und.length?'warn':''}"><h4>Did not reach every account</h4>
-      <p class="why">A failed send says so. An account with no record at all says
-        nothing — the post just ran on two accounts instead of three.</p>
-      <ul class="tight">${und.length ? und.map(x=>{
-        const gaps = [...x.failed, ...x.missing];
-        return `<li>
-          <span class="il go" onclick="open_('${x.topic}')">${esc(x.topic)}</span>
-          <span class="ir ${x.failed.length?'bad':''}">${
-            x.failed.length ? 'failed' : 'missing'}</span>
-          <span class="is">${gaps.map(k=>esc(nameOf(k))).join(', ')}</span>
-          <button class="cta" onclick="draftGaps(event,'${x.topic}',
-            ${JSON.stringify(gaps).replace(/"/g,'&quot;')})">Draft to ${gaps.length===1
-              ? esc(nameOf(gaps[0])) : gaps.length + ' accounts'}</button>
-        </li>`;}).join('')
-        : '<li class="none">Every post reached every account</li>'}</ul>
-      ${und.some(x=>x.detail) ? `<p class="why">${esc(und.find(x=>x.detail).detail)}</p>` : ''}
-      <p class="do">Each send spends one of five pending slots on that account.</p></div>`;
-
-    body = `<div class="panelrow">${gapPanel}${stalePanel}</div>`
-         + `<div class="panelrow">${reshoot}${buried}</div>`;
   } else {
     body = publishedView();
   }
@@ -9725,9 +11309,20 @@ async function cancelSchedule(){
 
 function toggleRedo(){ redoMode=!redoMode; redoSel=new Set(); openMenu=null; render(); }
 
+// Which post the slide viewer is showing: the open one on a detail page, or
+// the one Review has up. Reading `cur` alone meant the viewer did nothing on
+// Review, where `cur` is null — so the contact sheet had nothing to zoom.
+function zoomSubject(){
+  if(cur) return DATA.posts.find(x => x.topic === cur);
+  if(filter === 'review'){
+    const q = reviewQueue();
+    return q[Math.min(revIdx, q.length - 1)] || null;
+  }
+  return null;
+}
 function zoomAt(i){
-  const p=DATA.posts.find(x=>x.topic===cur); if(!p) return;
-  saveHash();
+  const p=zoomSubject(); if(!p) return;
+  if(cur) saveHash();
   if(!p.slides || !p.slides.length) return;
   zi=Math.max(0,Math.min(i,p.slides.length-1));
   const f=p.slides[zi]; if(!f) return;
@@ -9740,7 +11335,7 @@ function zoomAt(i){
 }
 function step(d,e){
   if(e) e.stopPropagation();
-  const p=DATA.posts.find(x=>x.topic===cur); if(!p) return;
+  const p=zoomSubject(); if(!p) return;
   zoomAt((zi+d+p.slides.length)%p.slides.length);
 }
 function closeZoom(){ document.getElementById('zoom').style.display='none'; zi=-1;
@@ -9964,103 +11559,6 @@ load().then(() => {
 });
 </script></body></html>"""
 
-
-# A device frame for designing the phone layout on a desktop screen. Held
-# separate from PAGE so nothing here can leak into the real dashboard.
-PHONE_FRAME = r"""<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><title>ARCO — phone preview</title>
-<link rel="icon" href="/favicon.png">
-<style>
-:root{--bg:#020617;--surface:#0b1220;--line:#1e293b;--line2:#334155;
-      --text:#e2e8f0;--dim:#64748b;--accent:#38bdf8}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);
-  font:14px/1.4 ui-sans-serif,system-ui,-apple-system,"SF Pro Text",sans-serif;
-  min-height:100vh;display:flex;flex-direction:column;align-items:center}
-header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-  padding:14px 20px;width:100%;border-bottom:1px solid var(--line);
-  background:var(--surface);position:sticky;top:0;z-index:10}
-.ttl{font-weight:600;letter-spacing:-.01em}
-.ttl span{color:var(--dim);font-weight:400;margin-left:8px;font-size:12.5px}
-.seg{display:flex;gap:2px;background:#020617;border:1px solid var(--line);
-  border-radius:9px;padding:2px}
-.seg button{background:none;border:0;color:var(--dim);cursor:pointer;
-  font:500 12px/1 inherit;padding:7px 11px;border-radius:7px;white-space:nowrap}
-.seg button.on{background:var(--line);color:var(--text)}
-.seg button:hover:not(.on){color:var(--text)}
-.sp{margin-left:auto;display:flex;gap:8px;align-items:center}
-.btn{background:#020617;border:1px solid var(--line);color:var(--dim);
-  border-radius:9px;padding:8px 12px;font:500 12px/1 inherit;cursor:pointer}
-.btn:hover{color:var(--text);border-color:var(--line2)}
-.dims{font:400 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--dim)}
-main{flex:1;display:flex;align-items:flex-start;justify-content:center;
-  padding:26px 20px 40px;width:100%}
-/* The bezel is cosmetic. The iframe inside is the real viewport, at exactly
-   the device's CSS pixel size, so the media queries fire as they would. */
-.device{background:#0f172a;border:1px solid var(--line2);border-radius:44px;
-  padding:11px;box-shadow:0 30px 80px rgba(0,0,0,.6);transform-origin:top center}
-.screen{position:relative;border-radius:34px;overflow:hidden;background:#000}
-.notch{position:absolute;top:9px;left:50%;transform:translateX(-50%);
-  width:106px;height:29px;background:#000;border-radius:16px;z-index:5;
-  pointer-events:none}
-iframe{display:block;border:0;background:var(--bg)}
-</style></head><body>
-<header>
-  <div class="ttl">Phone preview<span id="note">dev instance · port 4501</span></div>
-  <div class="seg" id="devs"></div>
-  <div class="seg" id="zooms"></div>
-  <div class="sp">
-    <span class="dims" id="dims"></span>
-    <button class="btn" id="rl">Reload</button>
-    <button class="btn" id="open">Open full</button>
-  </div>
-</header>
-<main><div class="device" id="dev">
-  <div class="screen" id="scr"><div class="notch" id="notch"></div>
-    <iframe id="f" src="/"></iframe></div>
-</div></main>
-<script>
-const DEVICES = [
-  {id:'se',  name:'SE',        w:375, h:667, notch:false},
-  {id:'15',  name:'15/16',     w:393, h:852, notch:true},
-  {id:'max', name:'Pro Max',   w:430, h:932, notch:true},
-  {id:'mini',name:'13 mini',   w:375, h:812, notch:true},
-];
-const ZOOMS = [100, 90, 80, 70];
-let dev = localStorage.getItem('pf.dev') || '15';
-let zoom = +(localStorage.getItem('pf.zoom') || 100);
-
-function paint(){
-  const d = DEVICES.find(x=>x.id===dev) || DEVICES[1];
-  const f = document.getElementById('f');
-  f.style.width  = d.w + 'px';
-  f.style.height = d.h + 'px';
-  document.getElementById('scr').style.width  = d.w + 'px';
-  document.getElementById('scr').style.height = d.h + 'px';
-  document.getElementById('notch').style.display = d.notch ? 'block' : 'none';
-  document.getElementById('dev').style.transform = 'scale(' + (zoom/100) + ')';
-  document.getElementById('dims').textContent = d.w + ' x ' + d.h;
-  document.getElementById('devs').innerHTML = DEVICES.map(x =>
-    `<button data-d="${x.id}" class="${x.id===dev?'on':''}">${x.name}</button>`).join('');
-  document.getElementById('zooms').innerHTML = ZOOMS.map(z =>
-    `<button data-z="${z}" class="${z===zoom?'on':''}">${z}%</button>`).join('');
-  localStorage.setItem('pf.dev', dev);
-  localStorage.setItem('pf.zoom', zoom);
-}
-document.getElementById('devs').onclick = e => {
-  const b = e.target.closest('[data-d]'); if(!b) return; dev = b.dataset.d; paint(); };
-document.getElementById('zooms').onclick = e => {
-  const b = e.target.closest('[data-z]'); if(!b) return; zoom = +b.dataset.z; paint(); };
-document.getElementById('rl').onclick = () => {
-  const f = document.getElementById('f'); f.src = f.src; };
-document.getElementById('open').onclick = () => window.open('/', '_blank');
-// R reloads the frame, not the harness, so a design pass is one keystroke.
-addEventListener('keydown', e => {
-  if((e.key==='r'||e.key==='R') && !e.metaKey && !e.ctrlKey){
-    e.preventDefault(); const f=document.getElementById('f'); f.src=f.src; }
-});
-paint();
-</script></body></html>"""
 
 
 class Server(socketserver.ThreadingTCPServer):

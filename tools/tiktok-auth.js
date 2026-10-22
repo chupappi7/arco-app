@@ -48,7 +48,24 @@ const crypto = require('crypto');
 const readline = require('readline');
 const { spawn } = require('child_process');
 const { URL } = require('url');
-const { AUTHORIZE_URL, exchangeCode } = require('./lib/tiktok');
+const { AUTHORIZE_URL, exchangeCode, fetchCreatorInfo } = require('./lib/tiktok');
+
+// Which TikTok account each key is supposed to be. The consent screen
+// authorizes whoever is logged into the browser, not whoever you named on the
+// command line, so --account alone cannot keep them straight: approving while
+// signed in as the wrong account writes that account's token under this key,
+// and the next post goes to the wrong profile. Checked after the exchange.
+const EXPECTED_USERNAME = {
+  vn: 'arco.app',
+  us: 'emiliagonzalez389',
+  getarco: 'getarcoapp',
+  max: 'maxmilian.dev',
+  prodgod: 'productivity_god',
+  jackson: 'jackson21.dev',
+  // Not an ARCO account. LockViet has its own app and its own
+  // audience, so nothing built by this pipeline belongs on it.
+  viet: 'huynhlearnsviet',
+};
 
 // video.upload drafts to the creator's inbox; video.publish is what Direct
 // Post needs, and creator_info/query refuses without it. Granting both keeps
@@ -56,7 +73,13 @@ const { AUTHORIZE_URL, exchangeCode } = require('./lib/tiktok');
 // video.upload drafts to the inbox, video.publish is Direct Post,
 // video.list reads the account's own posts back (views, likes, and
 // therefore whether a draft was ever actually published).
-const DEFAULT_SCOPE = 'user.info.basic,user.info.stats,video.upload,video.publish,video.list';
+// The scopes the PUBLISHER app holds, which is whose client key this script
+// reads by default. It used to ask for user.info.stats and video.list too —
+// those live on the old sandbox app, and asking the publisher app for them
+// fails the whole authorization with invalid_scope before you see a consent
+// screen. For a stats token, run with the sandbox creds and --scope.
+const DEFAULT_SCOPE = 'user.info.basic,video.publish,video.upload';
+const STATS_SCOPE = 'user.info.basic,user.info.stats,video.list';
 const STATE_FILE = path.join(__dirname, '.auth-state.json');
 const ENV_FILE = path.join(__dirname, '..', '.env');
 
@@ -250,6 +273,34 @@ function writeRefreshTokenToEnv(token, account) {
 }
 
 /** Shared success reporting for both the interactive and split flows. */
+/**
+ * Refuse a token that belongs to someone else.
+ *
+ * Returns the username TikTok reports, or null if it could not be read (a
+ * stats-scoped token has no creator_info, which is not an error here).
+ */
+async function assertRightAccount(tokens, account) {
+  const want = EXPECTED_USERNAME[account || 'vn'];
+  if (!want) return null;
+  let got = null;
+  try {
+    const info = await fetchCreatorInfo({ accessToken: tokens.access_token });
+    got = info && info.creator_username;
+  } catch (err) {
+    console.warn(`  ! could not verify which account this is: ${err.message}`);
+    return null;
+  }
+  if (!got) return null;
+  if (got.toLowerCase() !== want.toLowerCase()) {
+    throw new Error(
+      `this authorization belongs to @${got}, not @${want}.\n` +
+        `  Nothing was written. Sign out of @${got} in the browser, sign in as\n` +
+        `  @${want}, and run --print-url again.`
+    );
+  }
+  return got;
+}
+
 function reportTokens(tokens, opts) {
   const granted = (tokens.scope || '').split(/[,\s]+/).filter(Boolean);
   console.log('\n  Success.');
@@ -292,7 +343,11 @@ async function main() {
       codeVerifier: saved.codeVerifier || undefined,
     });
     fs.unlinkSync(STATE_FILE);   // single-use
+    // Verify before writing: a token saved under the wrong key is worse than
+    // no token, because everything downstream then posts to the wrong profile.
+    const who = await assertRightAccount(tokens, opts.account);
     reportTokens(tokens, opts);
+    if (who) console.log(`  verified: @${who}`);
     return;
   }
 
@@ -360,7 +415,9 @@ async function main() {
     codeVerifier: pkce?.verifier,
   });
 
+  const who = await assertRightAccount(tokens, opts.account);
   reportTokens(tokens, opts);
+  if (who) console.log(`  verified: @${who}`);
 }
 
 main().catch((err) => {
