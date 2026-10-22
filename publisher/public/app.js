@@ -244,95 +244,87 @@ const at = (sec, o = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) =
 function overviewView() {
   const acc = S.me.accounts;
   if (!acc.length) return firstRun();
-  if (!S.ov) return pageHead(greeting(), 'Loading today…') + '<div class="panel empty">Loading…</div>';
-  const now = Math.floor(Date.now() / 1000), todayKey = dayKey(today());
+  if (!S.ov) return pageHead(greeting(), 'Loading…') + '<div class="panel empty">Loading…</div>';
+  const now = Math.floor(Date.now() / 1000), t0 = today(), todayKey = dayKey(t0);
   const live = S.posts.filter(p => p.status !== 'cancelled');
-  const todays = live.filter(p => dayOf(p.scheduled_at) === todayKey).sort((a, b) => a.scheduled_at - b.scheduled_at);
   const upcoming = live.filter(p => p.status === 'queued' && p.scheduled_at >= now).sort((a, b) => a.scheduled_at - b.scheduled_at);
   const next = upcoming[0];
-  const leftToday = todays.filter(p => p.status === 'queued' && p.scheduled_at >= now).length;
+  const leftToday = upcoming.filter(p => dayOf(p.scheduled_at) === todayKey).length;
   const sub = next
-    ? `${leftToday ? `<b>${leftToday} post${leftToday === 1 ? '' : 's'}</b> still to go out today. ` : ''}Next is <b>${dayOf(next.scheduled_at) === todayKey ? at(next.scheduled_at) : fmtFull(next.scheduled_at)}</b> on ${PLATFORM[next.platform] || 'TikTok'} ${next.platform === 'facebook' ? '' : '@'}${esc(next.username)}.`
-    : 'Nothing is scheduled yet.';
+    ? `${leftToday ? `${leftToday} post${leftToday === 1 ? '' : 's'} left today · ` : ''}next at <b>${at(next.scheduled_at)}</b>${dayOf(next.scheduled_at) === todayKey ? '' : ` ${fmt(next.scheduled_at, { weekday: 'short' })}`} on ${who(next)}`
+    : 'Nothing scheduled yet.';
 
-  const slot = p => {
-    const isNext = next && p.id === next.id;
-    const cls = isNext ? 'next' : p.status;
-    const label = isNext ? 'Next up' : { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
-    const img = thumbOf(p);
-    return `<div class="slot ${cls}"><time>${at(p.scheduled_at)}</time><div class="dot"><i></i></div>
-      <div class="rpost" data-open="${p.id}" role="button" tabindex="0">${img ? `<img class="thumb" src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}
-        <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
-        <span class="st ${cls}">${label}</span></div></div>`;
-  };
-  const before = todays.filter(p => p.scheduled_at < now), after = todays.filter(p => p.scheduled_at >= now);
-  const rail = todays.length
-    ? `<div class="rail">${before.map(slot).join('')}<div class="nowline"><time>${at(now)}</time><div class="bar"></div></div>${after.map(slot).join('')}</div>`
-    : `<div class="empty"><b>Nothing goes out today.</b>${next ? `The next post is ${fmtFull(next.scheduled_at)}.` : 'Create a post, or add it to the queue to fill your posting times.'}
-        <div><a class="btn" href="#compose">${ui('plus', 16)}Create post</a></div></div>`;
-
-  const failed = live.filter(p => p.status === 'failed' && p.scheduled_at > now - 7 * 86400);
-  const reconnect = acc.filter(a => a.needs_reconnect);
-  const drafts = draftGroups();
-  const handle = p => `${who(p)}`;
-
-  // The numbers we already have, each a way into the screen that explains it.
+  // Numbers we already have; each one opens the screen that explains it.
   const week = 7 * 86400;
-  const sched7 = upcoming.filter(p => p.scheduled_at < now + week).length;
-  const pub7 = live.filter(p => p.status === 'published' && p.scheduled_at >= now - week).length;
-  const platforms = new Set(acc.map(platformOf)).size;
+  const failed = live.filter(p => p.status === 'failed' && p.scheduled_at > now - week);
+  const reconnect = acc.filter(a => a.needs_reconnect);
   const kpis = [
-    ['#calendar', 'Scheduled', sched7, 'in the next 7 days', ''],
-    ['#calendar', 'Published', pub7, 'in the last 7 days', ''],
-    ['#calendar', 'Failed', failed.length, failed.length ? 'in the last 7 days' : 'nothing failed this week', failed.length ? 'bad' : ''],
-    ['#accounts', 'Accounts', acc.length, reconnect.length ? `${reconnect.length} need${reconnect.length === 1 ? 's' : ''} reconnecting` : `on ${platforms} platform${platforms === 1 ? '' : 's'}`, reconnect.length ? 'warn' : ''],
+    ['#calendar', 'Scheduled', upcoming.filter(p => p.scheduled_at < now + week).length, 'next 7 days', ''],
+    ['#calendar', 'Published', live.filter(p => p.status === 'published' && p.scheduled_at >= now - week).length, 'last 7 days', ''],
+    ['#calendar', 'Failed', failed.length, 'last 7 days', failed.length ? 'bad' : ''],
+    ['#accounts', 'Accounts', acc.length, reconnect.length ? `${reconnect.length} to reconnect` : 'all connected', reconnect.length ? 'warn' : ''],
   ];
 
+  // Schedule: seven day tabs from today; the list shows the chosen day.
+  const days = [...Array(7)].map((_, i) => addDays(t0, i));
+  const sel = days.find(d => dayKey(d) === S.ovDay) || days[0], selKey = dayKey(sel);
+  const onDay = d => live.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((a, b) => a.scheduled_at - b.scheduled_at);
+  const tab = (d, i) => { const n = onDay(d).length, k = dayKey(d);
+    return `<button class="dtab ${k === selKey ? 'on' : ''}" data-ovday="${k}"><span>${i === 0 ? 'Today' : i === 1 ? '<em class="lg">Tomorrow</em><em class="sm">Tmrw</em>' : dayLabel(d, { weekday: 'short' })}</span>
+      <b>${d.d}</b><i class="${n ? '' : 'z'}">${n || '–'}</i></button>`; };
+  const label = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting' };
+  const row = (p, later) => { const isNext = next && p.id === next.id, st = isNext ? 'next' : p.status;
+    return `<div class="srow2 ${st} ${later ? 'later' : ''}" data-open="${p.id}" role="button" tabindex="0">
+      <time>${later ? `<small>${fmt(p.scheduled_at, { weekday: 'short' })}</small>` : ''}${at(p.scheduled_at)}</time><i class="sdot"></i>
+      ${thumbOf(p) ? `<img src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
+      <div class="sx"><b>${icon(p.platform || 'tiktok', 13)}${who(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
+      <span class="st ${st}">${isNext ? 'Next up' : label[p.status] || p.status}</span></div>`; };
+  const list = onDay(sel);
+  const isToday = selKey === todayKey;
+  const before = isToday ? list.filter(p => p.scheduled_at < now) : [], after = isToday ? list.filter(p => p.scheduled_at >= now) : list;
+  const endSel = Math.floor(zonedToMs(...Object.values(addDays(sel, 1))) / 1000);
+  const later = upcoming.filter(p => p.scheduled_at >= endSel).slice(0, Math.max(0, 4 - list.length));
+  const schedule = `${list.length ? `${before.map(p => row(p)).join('')}${isToday ? `<div class="snow"><time>${at(now)}</time><i></i></div>` : ''}${after.map(p => row(p)).join('')}`
+      : `<div class="snone"><span>${isToday ? 'Nothing goes out today.' : `Nothing scheduled for ${dayLabel(sel, { weekday: 'long' })}.`}</span>
+        <button class="btn sec" data-newon="${selKey}">${ui('plus', 15)}Schedule a post</button></div>`}
+    ${later.length ? `<div class="slater">Coming up</div>${later.map(p => row(p, true)).join('')}` : ''}`;
+
+  // Needs attention: only what someone has to act on.
   const attn = [
-    ...failed.slice(0, 3).map(p => `<div class="it" data-open="${p.id}" role="button" tabindex="0"><span class="ic bad">${ui('x', 16)}</span><div><b>Failed on ${handle(p)}</b><span>${esc(p.fail_reason || 'Open it to see why')}</span></div><em>Review</em></div>`),
-    ...reconnect.slice(0, 3).map(a => `<a href="#accounts"><span class="ic warn">${ui('retry', 16)}</span><div><b>Reconnect ${who(a)}</b><span>${PLATFORM[platformOf(a)]} access expired or was removed</span></div><em>Reconnect</em></a>`),
+    ...failed.map(p => `<div class="arow2" data-open="${p.id}" role="button" tabindex="0"><span class="ic bad">${ui('x', 15)}</span>
+      <div><b>Failed on ${who(p)}</b><span title="${esc(p.fail_reason || '')}">${esc(p.fail_reason || 'Open it to see why')}</span></div><em>Review</em></div>`),
+    ...reconnect.map(a => `<a class="arow2" href="#accounts"><span class="ic warn">${ui('retry', 15)}</span>
+      <div><b>Reconnect ${who(a)}</b><span>${PLATFORM[platformOf(a)]} access expired or was removed</span></div><em>Fix</em></a>`),
   ];
+  const drafts = draftGroups();
+  const todo = [
+    ...drafts.slice(0, 4).map(g => `<div class="arow2" data-opendraft="${esc(g[0].group_id || g[0].id)}" role="button" tabindex="0"><span class="ic mute">${ui('draft', 15)}</span>
+      <div><b>Finish draft</b><span>${esc(g[0].caption || g[0].title || 'No caption yet')}</span></div><em>Open</em></div>`),
+    ...(!S.me.workspace.slots && can('admin') ? [`<a class="arow2" href="#settings"><span class="ic mute">${ui('cal', 15)}</span>
+      <div><b>Set your posting times</b><span>"Add to queue" then picks the next free time</span></div><em>Set</em></a>`] : []),
+  ];
+  const side = `<section class="panel ocard"><header><h2>To do</h2>${attn.length ? `<span class="count bad">${attn.length}</span>` : ''}</header>
+    <div class="oscroll">${attn.length || todo.length ? `${attn.join('')}${todo.join('')}`
+      : `<div class="allclear"><span class="ic ok">${ui('check', 18)}</span><b>All clear</b><span>No failed posts, no drafts, every account connected.</span></div>`}</div>
+    <div class="quick"><a class="btn" href="#compose">${ui('plus', 15)}New post</a>${can('admin') ? `<a class="btn sec" href="#accounts">${ui('users', 15)}Accounts</a>` : `<a class="btn sec" href="#calendar">${ui('cal', 15)}Calendar</a>`}</div></section>`;
 
-  // After today: the next few posts, so the week ahead is never a surprise.
-  const later = upcoming.filter(p => dayOf(p.scheduled_at) !== todayKey).slice(0, 4);
-  const laterRow = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
-      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${handle(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
-      <time>${fmt(p.scheduled_at, { weekday: 'short' })} ${at(p.scheduled_at)}</time></div>`;
+  // Recently published: four tiles, always four, so the row never looks half empty.
+  const pub = live.filter(p => p.status === 'published').sort((a, b) => b.scheduled_at - a.scheduled_at).slice(0, 4);
+  const tile = p => `<div class="ptile" data-open="${p.id}" role="button" tabindex="0">
+      <div class="pimg">${thumbOf(p) ? `<img src="${esc(thumbOf(p))}" alt="">` : ''}<span class="pbadge">${appIcon(p.platform || 'tiktok', 20)}</span></div>
+      <b>${who(p)}</b><span>${p.stats ? statLine(p.stats) : fmt(p.scheduled_at, { month: 'short', day: 'numeric' })}</span></div>`;
+  const ghost = `<a class="ptile ghost" href="#compose"><div class="pimg">${ui('plus', 22)}</div><b>Create post</b><span>Your next one goes here</span></a>`;
 
-  // This week, Monday to Sunday: how many posts each day, on which platforms.
-  const t0 = today(), wd = new Date(Date.UTC(t0.y, t0.m - 1, t0.d)).getUTCDay(), mon = addDays(t0, -((wd + 6) % 7));
-  const days = [...Array(7)].map((_, i) => addDays(mon, i));
-  const weekPosts = days.map(d => live.filter(p => dayOf(p.scheduled_at) === dayKey(d)));
-  const weekTotal = weekPosts.reduce((n, x) => n + x.length, 0);
-  const dayCell = (d, i) => {
-    const list = weekPosts[i], k = dayKey(d), isToday = k === todayKey, past = !isToday && list.length === 0 && i < (wd + 6) % 7;
-    const bad = list.some(p => p.status === 'failed');
-    return `<a class="wd ${isToday ? 'today' : ''} ${past ? 'past' : ''}" href="#calendar">
-      <span class="wl">${dayLabel(d, { weekday: 'short' })} <b>${d.d}</b></span>
-      <span class="wn ${list.length ? "" : "z"}">${list.length || "–"}</span>
-      <span class="wp">${ORDER.filter(pl => list.some(p => (p.platform || 'tiktok') === pl)).map(pl => icon(pl, 12)).join('')}${bad ? '<i class="wbad" title="A post failed"></i>' : ''}</span></a>`;
-  };
-
-  const published = live.filter(p => p.status === 'published').sort((a, b) => b.scheduled_at - a.scheduled_at).slice(0, 4);
-  const pubRow = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
-      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${handle(p)}</b><span>${fmt(p.scheduled_at, { dateStyle: 'medium' })}${p.stats ? statLine(p.stats) : ''}</span></div>
-      ${p.post_url ? `<a class="view" href="${esc(p.post_url)}" target="_blank" rel="noopener">View post</a>` : ''}</div>`;
-
-  return pageHead(greeting(), sub) + `
+  return `<div class="ohead"><div><h1>${greeting()}</h1><p>${sub}</p></div></div>
   <div class="kpis">${kpis.map(([href, l, n, note, tone]) => `<a href="${href}" class="kpi ${tone}"><span>${l}</span><b>${n}</b><small>${note}</small></a>`).join('')}</div>
-  <div class="ovw">
-    <section class="panel today"><header><h2>Today</h2><a href="#calendar">Open calendar</a></header>${rail}</section>
-    <div class="stack">
-      ${attn.length ? `<section class="panel"><header><h2>Needs attention</h2></header><div class="attn">${attn.join('')}</div></section>` : ''}
-      <section class="panel grow"><header><h2>Coming up</h2>${drafts.length ? `<a href="#drafts">${drafts.length} draft${drafts.length === 1 ? '' : 's'} waiting</a>` : ''}</header>
-        ${later.length ? `<div class="list">${later.map(laterRow).join('')}</div>`
-          : `<div class="empty"><b>Nothing after today.</b>Schedule a post, or add one to the queue.</div>`}</section>
-    </div>
-    <section class="panel wide"><header><h2>This week</h2><span class="note">${weekTotal} post${weekTotal === 1 ? '' : 's'}</span></header>
-      <div class="wkstrip">${days.map(dayCell).join('')}</div></section>
-    <section class="panel"><header><h2>Recently published</h2><a href="#calendar">See all</a></header>
-      ${published.length ? `<div class="list">${published.map(pubRow).join('')}</div>`
-        : '<div class="empty">Published posts appear here with a link to each one.</div>'}</section>
+  <div class="ogrid">
+    <section class="panel ocard sched"><header><h2>Schedule</h2><a href="#calendar">Open calendar</a></header>
+      <div class="dtabs">${days.map(tab).join('')}</div>
+      <div class="oscroll">${schedule}</div></section>
+    ${side}
+    <section class="panel ocard"><header><h2>Recently published</h2><a href="#calendar">See all</a></header>
+      <div class="ptiles">${pub.map(tile).join('')}${pub.length ? ghost.repeat(4 - pub.length) : ''}</div>
+      ${pub.length ? '' : '<div class="sempty"><span>Published posts show here with their numbers.</span></div>'}</section>
     ${perfCard()}
   </div>`;
 }
@@ -359,14 +351,15 @@ async function loadStats(days = S.statsDays || 7) {
 
 function perfCard() {
   const st = S.ovStats;
-  const head = `<header><h2>Performance</h2><a href="#analytics">Last 7 days</a></header>`;
-  if (!st) return `<section class="panel perf">${head}<div class="empty">Loading…</div></section>`;
-  const cells = [...['views', 'likes', 'comments', 'shares'].filter(k => st.totals[k] != null).slice(0, 3).map(k => [METRIC[k], num(st.totals[k]), '']),
+  const head = '<header><h2>Performance</h2><a href="#analytics">Last 7 days</a></header>';
+  if (!st) return `<section class="panel ocard perf">${head}<div class="sempty"><span>Loading…</span></div></section>`;
+  const keys = ['views', 'likes', 'comments', 'shares'].filter(k => st.totals[k] != null);
+  const cells = [...(keys.length ? keys : ['likes', 'comments', 'shares']).slice(0, 3).map(k => [METRIC[k], num(st.totals[k] ?? null), '']),
     ['New followers', st.followers.change == null ? '–' : signed(st.followers.change), st.followers.change > 0 ? 'up' : '']];
-  return `<section class="panel perf">${head}
-    ${st.tracked || st.followers.total != null ? `<div class="pgrid">${cells.map(([l, v, c]) => `<div><span>${l}</span><b class="${c}">${v}</b></div>`).join('')}</div>`
-      : '<div class="empty">Numbers appear a few hours after your first Instagram or Facebook post goes out.</div>'}
-    <p class="pnote">${st.facebook_limited ? 'Instagram posts, and followers on Facebook' : 'Instagram and Facebook'}${st.updated_at ? `, updated ${ago(st.updated_at)}` : ''}.${st.tiktok_pending ? ' TikTok numbers come once TikTok approves access.' : ''}</p></section>`;
+  const note = `${st.updated_at ? `Updated ${ago(st.updated_at)}` : 'Read every few hours'}${st.tiktok_pending ? ' · TikTok after approval' : ''}`;
+  return `<section class="panel ocard perf">${head}
+    <div class="pgrid">${cells.map(([l, v, c]) => `<div><span>${l}</span><b class="${c}">${v}</b></div>`).join('')}</div>
+    <p class="pnote" title="${esc(note)}">${note}</p></section>`;
 }
 
 function analyticsView() {
@@ -1740,6 +1733,10 @@ function bind() {
     if (h > 23) return;
     resetComposer(); S.when = 'later'; S.at = `${y}-${pad(m)}-${pad(d)}T${pad(h)}:00`; location.hash = '#compose';
   });
+  on('[data-ovday]', 'click', e => { S.ovDay = e.currentTarget.dataset.ovday; render(); });
+  on('[data-newon]', 'click', e => { const [y, m, d] = e.currentTarget.dataset.newon.split('-').map(Number);
+    const n = zoned(Date.now()), isToday = n.y === y && n.m === m && n.d === d, h = isToday ? Math.max(9, n.h + 1) : 9;
+    resetComposer(); if (h <= 23) { S.when = 'later'; S.at = `${y}-${pad(m)}-${pad(d)}T${pad(h)}:00`; } location.hash = '#compose'; });
   on('[data-today]', 'click', () => { S.week = 0; S.month = 0; loadWeek(); });
   on('[data-moreday]', 'click', e => { const [y, m, d] = e.currentTarget.dataset.moreday.split('-').map(Number);
     const t = today(), mon = x => { const wd = new Date(Date.UTC(x.y, x.m - 1, x.d)).getUTCDay(); return addDays(x, -((wd + 6) % 7)); };
