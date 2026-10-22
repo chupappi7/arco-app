@@ -13,6 +13,7 @@
   --bg:var(--canvas); --muted:var(--mute); --dim:var(--mute); --accent:var(--link); --ok:var(--success); --warn:var(--next-ink); --bad:var(--danger);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --pop:#232938;
   --graphite:#E8ECF2; --canvas:#11151D; --surface:#1A1F2A; --well:#202634; --line:#2B3241; --line-2:#232A38;
   --mute:#9AA4B5; --soft:#6B7487; --saffron-tint:#3A2E1A; --next-ink:#F4C27A;
   --danger:#F28B5B; --danger-tint:#3A1F16; --success:#4ADE80; --success-tint:#16301F; --link:#7AA7FF; --on-dark:#11151D;
@@ -570,3 +571,66 @@ code.key{display:block;width:100%;user-select:all;background:var(--well);border:
 .slotline .link{color:var(--graphite);font-weight:600;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
 .slotline .link:hover{text-decoration-color:var(--graphite)}
 .dflt{font-style:normal;font-size:11.5px;color:var(--mute);background:var(--canvas);border-radius:20px;padding:1px 7px;margin-left:4px}
+
+/* ---------- post to: dropdown ---------- */
+.dd{position:relative}
+.ddbtn{display:flex;align-items:center;gap:12px;width:100%;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 12px 8px 10px;text-align:left;min-height:52px;transition:border-color .15s}
+.ddbtn:hover,.dd.open .ddbtn{border-color:var(--graphite)}
+.ddbtn>svg{margin-left:auto;color:var(--mute);flex:none}
+.ddl{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ddl.mute{color:var(--mute);font-weight:500}
+.ddph{width:34px;height:34px;border-radius:50%;background:var(--canvas);display:grid;place-items:center;color:var(--mute);flex:none}
+.stack{display:flex;flex:none}
+.stack .avw+.avw,.stack .more{margin-left:-10px}
+.stack .av{width:32px;height:32px;border:2px solid var(--surface)}
+.stack .badge-pl{width:14px;height:14px;right:-2px;bottom:-2px}
+.stack .more{width:32px;height:32px;border-radius:50%;background:var(--canvas);border:2px solid var(--surface);display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--mute)}
+.ddpop{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:20;background:var(--pop,var(--surface));border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px rgba(17,21,29,.16);overflow:hidden}
+.ddpop .pq{margin:10px 10px 0;width:calc(100% - 20px)}
+.ddlist{max-height:340px;overflow:auto;padding:6px}
+.ddg+.ddg{border-top:1px solid var(--line-2);margin-top:4px;padding-top:4px}
+.ddgh{display:flex;align-items:center;gap:10px;padding:8px 8px 4px;font-size:12.5px;color:var(--mute);cursor:pointer}
+.ddgh b{color:var(--graphite);font-weight:650;flex:1}
+.ddi{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;cursor:pointer}
+.ddi:hover{background:var(--well)}
+.ddi.off{opacity:.5;cursor:not-allowed}
+.ddi .av{width:30px;height:30px}.ddi .badge-pl{width:14px;height:14px;right:-3px;bottom:-3px}
+.ddi .nm{min-width:0;flex:1}
+.ddi .nm b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ddi .nm span{display:block;font-size:12px;color:var(--mute)}
+.ddi input,.ddgh input{width:16px;height:16px;accent-color:var(--graphite);flex:none}
+.ddfoot{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-top:1px solid var(--line-2);background:var(--well)}
+.ddfoot a{font-size:13px;color:var(--mute)}
+
+/* ---------- calendar: 4 weeks and month ---------- */
+.calbar .navg{display:inline-flex;gap:4px}
+.calbar .ctitle{font:700 18px var(--display);min-width:150px}
+.calbar .seg{margin-left:auto}
+.monthhead span{font-weight:600;font-size:12px}
+.month .day{min-height:118px;padding:8px 6px;display:flex;flex-direction:column;gap:3px}
+.month .day h4{margin:0 0 4px 2px;font-size:12.5px;color:var(--graphite);font-weight:600}
+.month .day.past{background:var(--well)}
+.month .day.past h4{color:var(--soft)}
+.month .day.today{box-shadow:inset 0 0 0 1px var(--saffron)}
+.mp{display:flex;align-items:center;gap:5px;font-size:11.5px;border-radius:6px;padding:3px 5px 3px 3px;background:var(--well);border-left:2px solid var(--soft);cursor:pointer;min-width:0;white-space:nowrap}
+.mp:hover{background:var(--canvas)}
+.mp img,.mp .noimg{width:18px;height:22px;border-radius:3px;object-fit:cover;flex:none;background:var(--line-2)}
+.mp b{font-weight:650}
+.mp span{color:var(--mute);overflow:hidden;text-overflow:ellipsis;min-width:0}
+.mp.published{border-left-color:var(--success)}.mp.failed{border-left-color:var(--danger);background:var(--danger-tint)}
+.mp.cancelled{opacity:.5}
+.month .day.past .mp{background:var(--surface)}
+.more{border:0;background:none;color:var(--mute);font-size:11.5px;font-weight:600;text-align:left;padding:2px 4px}
+.more:hover{color:var(--graphite)}
+.week .day{min-height:300px}
+@media (max-width:1100px){.mp span,.mp img{display:none}}
+@media (max-width:860px){.calbar .seg{margin-left:0}.month .day{min-height:70px;padding:4px 3px}.mp{padding:2px 3px}.mp b{display:none}.month .day h4{font-size:11.5px}}
+
+@media (prefers-color-scheme:dark){.ddpop{box-shadow:0 24px 50px rgba(0,0,0,.55)}.ddfoot{background:rgba(255,255,255,.03)}}
+@media (max-width:860px){
+  .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px 10px;padding:0 16px}
+  .chips::-webkit-scrollbar{display:none}
+  .chips>*{flex:none}
+  .calbar>a.btn,.calbar>.note{display:none}
+  .calbar .ctitle{min-width:0;font-size:16px}
+}

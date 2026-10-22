@@ -45,8 +45,8 @@ const S = {
   voiceEdit: null,
   set: { music: false, disclose: false, brand: false, branded: false },
   when: 'now', at: '', busy: false, status: null,
-  week: 0, month: 0, calMode: 'week', fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
-  pq: '', capTab: 'all', prevTab: null,
+  week: 0, month: 0, calMode: 'weeks', fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
+  pq: '', pickOpen: false, capTab: 'all', prevTab: null,
   login: { step: 'email', email: '', code: '', busy: false, err: '' }, members: null, invited: null,
 };
 const ORDER = ['tiktok', 'instagram', 'facebook'];
@@ -559,29 +559,40 @@ function composeView() {
   </div>`;
 }
 
-// Accounts as avatars you tap on and off, grouped by brand. A long list
-// (agencies) gets a search box.
+// "Post to" is a dropdown: the closed button shows who is chosen; the list
+// opens grouped by brand with a search box, like Business Suite's switcher.
 function accountPicker() {
+  const chosen = S.targets.map(acct).filter(Boolean);
+  const stack = chosen.slice(0, 5).map(a => withBadge(avatar(a.avatar_url, a.username || a.display_name), platformOf(a))).join('');
+  const label = !chosen.length ? 'Choose accounts'
+    : chosen.length === 1 ? handle(chosen[0])
+    : chosen.length === 2 ? `${handle(chosen[0])}, ${handle(chosen[1])}` : `${handle(chosen[0])} and ${chosen.length - 1} more`;
+  return `<div class="dd ${S.pickOpen ? 'open' : ''}">
+    <button type="button" class="ddbtn" id="openpick" aria-haspopup="listbox" aria-expanded="${!!S.pickOpen}">
+      ${chosen.length ? `<span class="stack">${stack}${chosen.length > 5 ? `<span class="more">+${chosen.length - 5}</span>` : ''}</span>` : `<span class="ddph">${ui('users', 18)}</span>`}
+      <span class="ddl ${chosen.length ? '' : 'mute'}">${label}</span>${ui('chev', 16)}</button>
+    ${S.pickOpen ? pickList() : ''}</div>`;
+}
+
+function pickList() {
   const q = S.pq.trim().toLowerCase();
-  const many = S.me.accounts.length > 10;
   const hit = a => !q || [a.username, a.display_name, PLATFORM[platformOf(a)], brandName(a.brand_id)]
     .some(v => String(v || '').toLowerCase().includes(q));
   const groups = brandGroups(S.me.accounts.filter(hit)).filter(g => g.accounts.length);
-  const showNames = groups.length > 1 || S.me.brands.length;
-  return `${many ? `<input type="text" id="pq" class="pq" placeholder="Search accounts or brands" value="${esc(S.pq)}" autocomplete="off">` : ''}
-    ${groups.map(g => {
+  return `<div class="ddpop" role="listbox" aria-multiselectable="true">
+    ${S.me.accounts.length > 6 ? `<input type="text" id="pq" class="pq" placeholder="Search accounts or brands" value="${esc(S.pq)}" autocomplete="off">` : ''}
+    <div class="ddlist">${groups.map(g => {
       const usable = g.accounts.filter(a => !a.needs_reconnect);
       const on = usable.filter(a => S.targets.includes(a.id)).length;
       const state = !on ? 'none' : on === usable.length ? 'all' : 'some';
-      return `<div class="agroup">${showNames ? `<label class="ahead"><input type="checkbox" data-bg="${g.id}" data-state="${state}" ${state === 'all' ? 'checked' : ''} ${usable.length ? '' : 'disabled'}>
-          <b>${esc(g.name)}</b></label>` : ''}
-        <div class="atiles">${g.accounts.map(a => `<label class="atile ${S.targets.includes(a.id) ? 'on' : ''} ${a.needs_reconnect ? 'off' : ''}"
-            title="${esc(`${PLATFORM[platformOf(a)]} ${a.username || a.display_name}${a.needs_reconnect ? ' (reconnect needed)' : ''}`)}">
+      return `<div class="ddg"><label class="ddgh"><input type="checkbox" data-bg="${g.id}" data-state="${state}" ${state === 'all' ? 'checked' : ''} ${usable.length ? '' : 'disabled'}>
+          <b>${esc(g.name)}</b><span>${on ? `${on} of ` : ''}${g.accounts.length}</span></label>
+        ${g.accounts.map(a => `<label class="ddi ${a.needs_reconnect ? 'off' : ''}">
           <input type="checkbox" data-t="${a.id}" ${S.targets.includes(a.id) ? 'checked' : ''} ${a.needs_reconnect ? 'disabled' : ''}>
           ${withBadge(avatar(a.avatar_url, a.username || a.display_name), platformOf(a))}
-          <span>${handle(a)}</span>${S.targets.includes(a.id) ? `<i class="tick">${ui('check', 11)}</i>` : ''}</label>`).join('')}</div></div>`;
-    }).join('') || '<p class="note">No account matches.</p>'}
-    ${can('admin') ? '<a class="amanage" href="#accounts">Manage accounts</a>' : ''}`;
+          <span class="nm"><b>${handle(a)}</b><span>${PLATFORM[platformOf(a)]}${a.needs_reconnect ? ' · reconnect needed' : ''}</span></span></label>`).join('')}</div>`;
+    }).join('') || '<p class="note" style="padding:10px">No account matches.</p>'}</div>
+    <div class="ddfoot">${can('admin') ? '<a href="#accounts">Manage accounts</a>' : '<span></span>'}<button type="button" class="btn" id="closepick">Done</button></div></div>`;
 }
 
 function mediaView() {
@@ -773,6 +784,7 @@ function inputToMs(str) {
 const dayOf = sec => { const p = zoned(sec * 1000); return `${p.y}-${p.m}-${p.d}`; };
 const addDays = (day, n) => { const t = new Date(Date.UTC(day.y, day.m - 1, day.d + n)); return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() }; };
 const dayKey = day => `${day.y}-${day.m}-${day.d}`;
+const ymd = day => day.y * 10000 + day.m * 100 + day.d;
 const dayLabel = (day, opts) => new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', ...opts }).format(new Date(Date.UTC(day.y, day.m - 1, day.d)));
 const today = () => { const p = zoned(Date.now()); return { y: p.y, m: p.m, d: p.d }; };
 
@@ -1257,8 +1269,9 @@ function calRange() {
   }
   const wd = new Date(Date.UTC(t.y, t.m - 1, t.d)).getUTCDay();
   const start = addDays(t, -((wd + 6) % 7) + S.week * 7);
-  const end = addDays(start, 6);
-  return { start, n: 7, title: `${dayLabel(start, { day: 'numeric', month: 'short' })} – ${dayLabel(end, { day: 'numeric', month: 'short' })}` };
+  const n = S.calMode === 'weeks' ? 28 : 7;
+  const end = addDays(start, n - 1);
+  return { start, n, title: `${dayLabel(start, { day: 'numeric', month: 'short' })} – ${dayLabel(end, { day: 'numeric', month: 'short' })}` };
 }
 
 async function loadWeek() {
@@ -1275,8 +1288,10 @@ function postCard(p, compact) {
   const time = fmt(p.scheduled_at, { hour: '2-digit', minute: '2-digit' });
   const drag = p.status === 'queued' ? `draggable="true" data-drag="${p.id}"` : '';
   if (compact) {
-    return `<div class="pill-post ${p.status}" ${drag} data-open="${p.id}" title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.status}`)}">
-      ${icon(p.platform || 'tiktok', 11)}<span>${time}</span></div>`;
+    const img = p.images[p.cover_index] || p.images[0];
+    return `<div class="mp ${p.status}" ${drag} data-open="${p.id}" role="button" tabindex="0"
+        title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.status}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
+      ${img ? `<img src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}${icon(p.platform || 'tiktok', 11)}<b>${at(p.scheduled_at)}</b><span>${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</span></div>`;
   }
   // Week view: a small row per post. Everything you can do with it is one
   // click away in the drawer.
@@ -1291,7 +1306,7 @@ function postCard(p, compact) {
 }
 
 function calendarView() {
-  const r = calRange(), month = S.calMode === 'month';
+  const r = calRange(), month = S.calMode === 'month', grid = S.calMode !== 'week';
   const accts = S.me.accounts;
   const plats = ORDER.filter(pl => accts.some(a => platformOf(a) === pl));
   const posts = S.posts.filter(p => (S.fPlat === 'all' || (p.platform || 'tiktok') === S.fPlat)
@@ -1314,20 +1329,23 @@ function calendarView() {
       </select>` : ''}
     </div>
     <div class="calbar">
-      <button class="btn sec" data-wk="-1" ${offset <= 0 ? 'disabled' : ''} aria-label="Previous">‹</button>
-      <b>${r.title}</b>
-      <button class="btn sec" data-wk="1" aria-label="Next">›</button>
-      <span class="seg"><button class="${month ? '' : 'on'}" data-mode="week">Week</button><button class="${month ? 'on' : ''}" data-mode="month">Month</button></span>
-      <span class="note">${esc(tz().replace(/_/g, ' '))} · drag a scheduled post to move it</span>
+      <span class="navg"><button class="btn sec" data-wk="-1" aria-label="Previous">‹</button>
+      <button class="btn sec" data-wk="1" aria-label="Next">›</button></span>
+      <b class="ctitle">${r.title}</b>
+      ${offset ? '<button class="btn ghost" data-today>Today</button>' : ''}
+      <span class="seg">${[['week', 'Week'], ['weeks', '4 weeks'], ['month', 'Month']].map(([k, l]) =>
+        `<button class="${S.calMode === k ? 'on' : ''}" data-mode="${k}">${l}</button>`).join('')}</span>
+      <span class="note">${esc(tz().replace(/_/g, ' '))}</span>
       <a class="btn" href="#compose" style="margin-left:auto;text-decoration:none">New post</a>
     </div>
-    ${month ? `<div class="monthhead">${days.slice(0, 7).map(d => `<span>${dayLabel(d, { weekday: 'short' })}</span>`).join('')}</div>` : ''}
-    <div class="${month ? 'month' : 'week'}">${days.map(d => {
-      const ps = posts.filter(p => dayOf(p.scheduled_at) === dayKey(d));
-      const out = month && d.m !== r.month;
-      return `<div class="day ${dayKey(d) === now ? 'today' : ''} ${out ? 'out' : ''}" data-day="${d.y}-${d.m}-${d.d}">
-        <h4>${month ? d.d : `<span>${dayLabel(d, { weekday: 'short' })}</span><b>${d.d}</b>`}</h4>
-        ${ps.map(p => postCard(p, month)).join('') || ''}
+    ${grid ? `<div class="monthhead">${days.slice(0, 7).map(d => `<span>${dayLabel(d, { weekday: 'short' })}</span>`).join('')}</div>` : ''}
+    <div class="${grid ? 'month' : 'week'}">${days.map((d, i) => {
+      const ps = posts.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((a, b) => a.scheduled_at - b.scheduled_at);
+      const out = month && d.m !== r.month, past = ymd(d) < ymd(today());
+      const label = grid ? (d.d === 1 || i === 0 ? dayLabel(d, { month: 'short', day: 'numeric' }) : d.d) : `<span>${dayLabel(d, { weekday: 'short' })}</span><b>${d.d}</b>`;
+      return `<div class="day ${dayKey(d) === now ? 'today' : ''} ${out ? 'out' : ''} ${past ? 'past' : ''}" data-day="${d.y}-${d.m}-${d.d}">
+        <h4>${label}</h4>
+        ${ps.slice(0, grid ? 4 : 99).map(p => postCard(p, grid)).join('')}${grid && ps.length > 4 ? `<button class="more" data-moreday="${d.y}-${d.m}-${d.d}">+${ps.length - 4} more</button>` : ''}
       </div>`;
     }).join('')}</div>`;
 }
@@ -1553,7 +1571,11 @@ async function brandAction(fn) {
 
 // ---- events ------------------------------------------------------------
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.detail) { S.detail = null; render(); } });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (S.pickOpen) { S.pickOpen = false; render(); $('openpick')?.focus(); } else if (S.detail) { S.detail = null; render(); } });
+// The account dropdown closes when you click anywhere outside it.
+document.addEventListener('pointerdown', e => { if (S.pickOpen && !e.target.closest('.dd')) { S.pickOpen = false; render(); } });
 
 function bind() {
   const on = (sel, ev, fn) => document.querySelectorAll(sel).forEach(el => el.addEventListener(ev, fn));
@@ -1631,6 +1653,8 @@ function bind() {
   on('[data-uncustom]', 'click', e => { delete S.over[e.target.dataset.uncustom]; S.capTab = 'all'; render(); });
   on('#caption', 'change', render);
   on('[data-t]', 'change', e => toggleTarget(e.target.dataset.t, e.target.checked));
+  on('#openpick', 'click', () => { S.pickOpen = !S.pickOpen; render(); if (S.pickOpen) $('pq')?.focus(); });
+  on('#closepick', 'click', () => { S.pickOpen = false; render(); });
   on('[data-bg]', 'change', e => pickGroup(e.target.dataset.bg, e.target.checked));
   document.querySelectorAll('[data-state=some]').forEach(el => { el.indeterminate = true; });
   on('#pq', 'input', e => { S.pq = e.target.value; const at = e.target.selectionStart; render();
@@ -1670,7 +1694,7 @@ function bind() {
   on('[data-fp]', 'click', e => { S.fPlat = e.target.dataset.fp; S.fAcct = 'all'; render(); });
   on('#facct', 'change', e => { S.fAcct = e.target.value; render(); });
   on('[data-again]', 'click', e => { S.detail = null; edit(e.target.dataset.again, true); });
-  on('[data-wk]', 'click', e => { if (S.calMode === 'month') S.month += Number(e.target.dataset.wk); else S.week += Number(e.target.dataset.wk); loadWeek(); });
+  on('[data-wk]', 'click', e => { const d = Number(e.currentTarget.dataset.wk); if (S.calMode === 'month') S.month += d; else S.week += d * (S.calMode === 'weeks' ? 4 : 1); loadWeek(); });
   on('[data-open]', 'click', e => { if (e.target.closest('button,a')) return; S.detail = e.currentTarget.dataset.open; render(); });
   on('#closedetail', 'click', () => { S.detail = null; render(); });
   on('#overlay', 'click', e => { if (e.target.id === 'overlay') { S.detail = null; render(); } });
@@ -1678,7 +1702,11 @@ function bind() {
     try { await send(`/posts/${S.detail}`, 'PATCH', { caption: $('dcap').value }); S.flash = { kind: 'ok', text: 'Caption saved.' }; }
     catch (x) { S.flash = { kind: 'err', text: x.message }; }
     reloadView(); });
-  on('[data-mode]', 'click', e => { S.calMode = e.target.dataset.mode; loadWeek(); });
+  on('[data-today]', 'click', () => { S.week = 0; S.month = 0; loadWeek(); });
+  on('[data-moreday]', 'click', e => { const [y, m, d] = e.currentTarget.dataset.moreday.split('-').map(Number);
+    const t = today(), mon = x => { const wd = new Date(Date.UTC(x.y, x.m - 1, x.d)).getUTCDay(); return addDays(x, -((wd + 6) % 7)); };
+    S.calMode = 'week'; S.week = Math.round((Date.UTC(...Object.values(mon({ y, m, d })).map((v, k) => k === 1 ? v - 1 : v)) - Date.UTC(...Object.values(mon(t)).map((v, k) => k === 1 ? v - 1 : v))) / 6048e5); loadWeek(); });
+  on('[data-mode]', 'click', e => { S.calMode = e.target.dataset.mode; S.week = 0; S.month = 0; loadWeek(); });
   on('[data-drag]', 'dragstart', e => { e.dataTransfer.setData('text/plain', e.currentTarget.dataset.drag); e.dataTransfer.effectAllowed = 'move'; });
   on('[data-day]', 'dragover', e => { e.preventDefault(); e.currentTarget.classList.add('drop'); });
   on('[data-day]', 'dragleave', e => e.currentTarget.classList.remove('drop'));
