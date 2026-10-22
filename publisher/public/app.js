@@ -404,15 +404,17 @@ function analyticsView() {
 // Until the workspace has an account, the overview is a short path to the
 // first scheduled post.
 function firstRun() {
+  const admin = can('admin');
   const steps = [
-    [S.me.accounts.length > 0, 'Connect an account', 'TikTok, Instagram or a Facebook Page. You log in on their own screen.', '#accounts', 'Connect'],
-    [false, 'Create your first post', 'Add photos, write a caption, see how it looks on each platform.', '#compose', 'Create post'],
-    [!!S.me.workspace.slots, 'Set your posting times', 'Then "Add to queue" picks the next free time for you.', '#settings', 'Set times'],
+    [S.me.accounts.length > 0, 'Connect an account', 'You sign in on the platform\'s own screen. We never see your password.',
+      admin ? `<div class="frc">${ORDER.filter(connectHref).map(pl => `<a class="frbtn" href="${connectHref(pl)}">${appIcon(pl, 22)}${PLATFORM[pl]}</a>`).join('')}</div>`
+        : '<p class="note">Ask a workspace admin to connect an account or give you a brand.</p>'],
+    [false, 'Create your first post', 'Add photos, write a caption, and see how it looks on each platform before it goes out.', ''],
+    [!!S.me.workspace.slots, 'Set your posting times', 'Pick the days and times you like to post. "Add to queue" then fills them for you.', ''],
   ];
-  return pageHead('Welcome to ARCO Publisher', 'Three steps to your first scheduled post.') + `
-    <section class="panel"><div class="checklist">${steps.map(([done, t, d, href, cta], i) => `<div class="step ${done ? 'done' : ''}">
-      <span class="num">${done ? ui('check', 14) : i + 1}</span><div><b>${t}</b><span>${d}</span></div>
-      ${done ? '' : `<a class="btn ${i ? 'sec' : ''}" href="${href}">${cta}</a>`}</div>`).join('')}</div></section>`;
+  return `<div class="welcome"><h1>Welcome to ARCO Publisher</h1><p>Three steps to your first scheduled post.</p></div>
+    <section class="panel"><ol class="frsteps">${steps.map(([done, t, d, extra], i) => `<li class="${done ? 'done' : ''} ${i === 0 && !done ? 'cur' : ''}">
+      <span class="num">${done ? ui('check', 14) : i + 1}</span><div><b>${t}</b><span>${d}</span>${!done ? extra : ''}</div></li>`).join('')}</ol></section>`;
 }
 
 // ---- sign in: email, then the 6-digit code it receives ---------------------
@@ -1213,19 +1215,21 @@ function draftGroups() {
 
 function draftsView() {
   const groups = draftGroups();
-  return `<div class="drafts">${groups.map(g => {
-    const d = g[0], cover = d.images[d.cover_index] || d.images[0];
-    return `<div class="card draft"><div class="sec">
-      ${cover ? `<img src="${esc(cover)}" alt="">` : ''}
-      <div class="dtxt"><div class="marks">${g.map(x => icon(x.platform, 13)).join('')}
-        <span class="note">${g.map(x => `${x.platform === 'facebook' ? '' : '@'}${esc(x.username)}`).join(', ')}</span></div>
-        <p>${esc((d.caption || d.title || 'No caption yet').slice(0, 160))}</p>
-        <span class="note">${d.images.length} photo${d.images.length === 1 ? '' : 's'} · saved ${fmtFull(d.updated_at)}</span></div>
-      <div class="dacts"><button class="btn" data-opendraft="${esc(d.group_id || d.id)}">Open</button>
-        <button class="btn danger" data-deldraft="${esc(d.group_id || d.id)}">Delete</button></div>
-    </div></div>`;
-  }).join('') || `<div class="card"><div class="sec"><p class="note" style="margin:0">No drafts. Use "Save draft" in
-    <a href="#compose">New post</a> to keep a post for later.</p></div></div>`}</div>`;
+  if (!groups.length) return `<section class="panel empty"><b>No drafts.</b>Use "Save draft" while creating a post to keep it for later.
+    <div><a class="btn" href="#compose">${ui('plus', 16)}Create post</a></div></section>`;
+  return `<div class="dgrid">${groups.map(g => {
+    const d = g[0], cover = d.images[d.cover_index] || d.images[0], key = esc(d.group_id || d.id);
+    return `<article class="dcard">
+      <button class="dcover" data-opendraft="${key}" aria-label="Open draft">${cover ? `<img src="${esc(cover)}" alt="">` : '<span class="noimg"></span>'}
+        ${d.images.length > 1 ? `<span class="dn">${d.images.length}</span>` : ''}</button>
+      <div class="dbody">
+        <div class="dacc">${g.slice(0, 4).map(x => withBadge(avatar(acct(x.account_id)?.avatar_url, x.username), x.platform || 'tiktok')).join('')}
+          <span>${g.length === 1 ? `${g[0].platform === 'facebook' ? '' : '@'}${esc(g[0].username)}` : `${g.length} accounts`}</span></div>
+        <p>${esc((d.caption || d.title || 'No caption yet').slice(0, 140))}</p>
+        <small>Saved ${fmt(d.updated_at, { month: 'short', day: 'numeric' })}</small></div>
+      <div class="dfoot"><button class="btn" data-opendraft="${key}">Open</button>
+        <button class="btn ghost danger" data-deldraft="${key}">Delete</button></div></article>`;
+  }).join('')}</div>`;
 }
 
 function openDraft(key) {
@@ -1316,7 +1320,8 @@ function calendarView() {
     && (S.fBrand === 'all' || a.brand_id === S.fBrand));
   const days = [...Array(r.n)].map((_, i) => addDays(r.start, i));
   const now = dayKey(today()), offset = month ? S.month : S.week;
-  return `<div class="chips">
+  const empty = !posts.length;
+  const filters = accts.length ? `<div class="chips">
       ${S.me.brands.length ? `<select id="fbrand" style="width:auto;padding:5px 10px">
         <option value="all">All brands</option>
         ${S.me.brands.map(b => `<option value="${b.id}" ${S.fBrand === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
@@ -1327,7 +1332,8 @@ function calendarView() {
         <option value="all">All accounts</option>
         ${shown.map(a => `<option value="${a.id}" ${S.fAcct === a.id ? 'selected' : ''}>${PLATFORM[platformOf(a)]} · ${handle(a)}</option>`).join('')}
       </select>` : ''}
-    </div>
+    </div>` : '';
+  return `${filters}
     <div class="calbar">
       <span class="navg"><button class="btn sec" data-wk="-1" aria-label="Previous">‹</button>
       <button class="btn sec" data-wk="1" aria-label="Next">›</button></span>
@@ -1338,12 +1344,13 @@ function calendarView() {
       <span class="note">${esc(tz().replace(/_/g, ' '))}</span>
       <a class="btn" href="#compose" style="margin-left:auto;text-decoration:none">New post</a>
     </div>
+    ${empty ? `<div class="calempty">${ui('cal', 18)}<span>Nothing scheduled here yet. Click a day to create a post for it.</span></div>` : ''}
     ${grid ? `<div class="monthhead">${days.slice(0, 7).map(d => `<span>${dayLabel(d, { weekday: 'short' })}</span>`).join('')}</div>` : ''}
     <div class="${grid ? 'month' : 'week'}">${days.map((d, i) => {
       const ps = posts.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((a, b) => a.scheduled_at - b.scheduled_at);
       const out = month && d.m !== r.month, past = ymd(d) < ymd(today());
       const label = grid ? (d.d === 1 || i === 0 ? dayLabel(d, { month: 'short', day: 'numeric' }) : d.d) : `<span>${dayLabel(d, { weekday: 'short' })}</span><b>${d.d}</b>`;
-      return `<div class="day ${dayKey(d) === now ? 'today' : ''} ${out ? 'out' : ''} ${past ? 'past' : ''}" data-day="${d.y}-${d.m}-${d.d}">
+      return `<div class="day ${dayKey(d) === now ? 'today' : ''} ${out ? 'out' : ''} ${past ? 'past' : 'open'}" data-day="${d.y}-${d.m}-${d.d}" ${past ? '' : 'title="Create a post for this day"'}>
         <h4>${label}</h4>
         ${ps.slice(0, grid ? 4 : 99).map(p => postCard(p, grid)).join('')}${grid && ps.length > 4 ? `<button class="more" data-moreday="${d.y}-${d.m}-${d.d}">+${ps.length - 4} more</button>` : ''}
       </div>`;
@@ -1356,28 +1363,34 @@ function calendarView() {
 function detailView() {
   const p = S.posts.find(x => x.id === S.detail) || S.stats?.top?.find(x => x.id === S.detail);
   if (!p) return '';
-  const a = acct(p.account_id), editable = p.status === 'queued';
-  return `<div class="overlay" id="overlay"><div class="panel" role="dialog" aria-modal="true" aria-label="Post details">
-    <div class="phead">${withBadge(avatar(a?.avatar_url, p.username), p.platform || 'tiktok')}
-      <b>${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</b><span class="pill ${p.status}">${p.status}</span>
-      <button class="link" id="closedetail" style="margin-left:auto" aria-label="Close">Close ×</button></div>
-    <p class="note">${fmtFull(p.scheduled_at)} · ${esc(tz().replace(/_/g, ' '))}</p>
-    ${p.stats ? `<div class="dstats">${STAT_KEYS.filter(k => p.stats[k] != null).map(k => `<div><b>${num(p.stats[k])}</b><span>${METRIC[k]}</span></div>`).join('')}</div>`
-      : p.status === 'published' && p.platform !== 'tiktok' ? '<p class="note">Likes and comments appear here within a few hours.</p>' : ''}
-    <div class="thumbs">${p.images.map((u, n) => `<img src="${esc(u)}" alt="Slide ${n + 1}" class="${n === p.cover_index ? 'cv' : ''}">`).join('')
-      || `<span class="note">${['published', 'failed', 'cancelled'].includes(p.status)
-        ? 'The photos of this post were deleted (7 days after it finished).' : 'No photos.'}</span>`}</div>
-    ${p.title ? `<p><b>${esc(p.title)}</b></p>` : ''}
-    ${editable ? `<label class="f" for="dcap">Caption</label><textarea id="dcap">${esc(p.caption)}</textarea>
-      <button class="btn sec" id="savecap">Save caption</button>`
-      : `<p class="cap-full">${esc(p.caption) || '<span class="note">No caption</span>'}</p>`}
-    ${p.fail_reason ? `<div class="status ${p.status === 'failed' ? 'err' : ''}">${esc(p.fail_reason)}</div>` : ''}
-    <div class="foot" style="padding:12px 0 0">
-      ${editable ? `<button class="btn sec" data-edit="${p.id}">Open in editor</button><button class="btn danger" data-cancel="${p.id}">Cancel post</button>` : ''}
+  const a = acct(p.account_id), editable = p.status === 'queued', pl = p.platform || 'tiktok';
+  const label = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
+  const cover = p.images[p.cover_index] || p.images[0];
+  return `<div class="overlay" id="overlay"><aside class="drawer" role="dialog" aria-modal="true" aria-label="Post details">
+    <header class="dh">${withBadge(avatar(a?.avatar_url, p.username), pl)}
+      <div><b>${pl === 'facebook' ? '' : '@'}${esc(p.username)}</b><span>${PLATFORM[pl]}</span></div>
+      <button class="xbtn" id="closedetail" aria-label="Close">${ui('x', 18)}</button></header>
+    <div class="dscroll">
+      <div class="dwhen"><span class="st ${p.status === 'queued' ? 'queued' : p.status}">${label}</span>
+        <b>${fmt(p.scheduled_at, { weekday: 'long', month: 'short', day: 'numeric' })} · ${at(p.scheduled_at)}</b>
+        <small>${esc(tz().replace(/_/g, ' '))}</small></div>
+      ${p.fail_reason ? `<div class="dfail">${ui('x', 15)}<span>${esc(p.fail_reason)}</span></div>` : ''}
+      ${p.stats ? `<div class="dstats">${STAT_KEYS.filter(k => p.stats[k] != null).map(k => `<div><b>${num(p.stats[k])}</b><span>${METRIC[k]}</span></div>`).join('')}</div>` : ''}
+      ${cover ? `<div class="dmedia"><img class="big" src="${esc(cover)}" alt="Cover">
+        ${p.images.length > 1 ? `<div class="dthumbs">${p.images.map((u, n) => `<img src="${esc(u)}" alt="Photo ${n + 1}" class="${n === p.cover_index ? 'cv' : ''}">`).join('')}</div>` : ''}</div>`
+        : `<p class="note">${['published', 'failed', 'cancelled'].includes(p.status) ? 'The photos were deleted 7 days after the post finished.' : 'No photos.'}</p>`}
+      ${p.title ? `<p class="dtitle">${esc(p.title)}</p>` : ''}
+      <label class="f" for="dcap">Caption</label>
+      ${editable ? `<textarea id="dcap">${esc(p.caption)}</textarea>`
+        : `<p class="cap-full">${esc(p.caption) || '<span class="note">No caption</span>'}</p>`}
+    </div>
+    <footer class="df">
+      ${editable ? `<button class="btn" id="savecap">Save caption</button><button class="btn sec" data-edit="${p.id}">Open in editor</button>
+        <button class="btn ghost danger" data-cancel="${p.id}">Cancel post</button>` : ''}
       ${p.status === 'failed' ? `<button class="btn" data-retry="${p.id}">Retry</button><button class="btn sec" data-edit="${p.id}">Edit</button>` : ''}
       ${p.status === 'published' || p.status === 'cancelled' ? `<button class="btn sec" data-again="${p.id}">Post again</button>` : ''}
-      ${p.post_url ? `<a class="btn sec" href="${esc(p.post_url)}" target="_blank" rel="noopener" style="text-decoration:none">View live post</a>` : ''}
-    </div></div></div>`;
+      ${p.post_url ? `<a class="btn ${p.status === 'published' ? '' : 'sec'}" href="${esc(p.post_url)}" target="_blank" rel="noopener">View live post</a>` : ''}
+    </footer></aside></div>`;
 }
 
 // Dropping a post on another day keeps its time of day, in the workspace's zone.
@@ -1702,6 +1715,15 @@ function bind() {
     try { await send(`/posts/${S.detail}`, 'PATCH', { caption: $('dcap').value }); S.flash = { kind: 'ok', text: 'Caption saved.' }; }
     catch (x) { S.flash = { kind: 'err', text: x.message }; }
     reloadView(); });
+  on('.day.open', 'click', e => {
+    if (e.target.closest('[data-open],button,a')) return;
+    const [y, m, d] = e.currentTarget.dataset.day.split('-').map(Number);
+    // 9:00 that day, or the next whole hour if today is already past 9.
+    const n = zoned(Date.now()), isToday = n.y === y && n.m === m && n.d === d;
+    const h = isToday ? Math.max(9, n.h + 1) : 9;
+    if (h > 23) return;
+    resetComposer(); S.when = 'later'; S.at = `${y}-${pad(m)}-${pad(d)}T${pad(h)}:00`; location.hash = '#compose';
+  });
   on('[data-today]', 'click', () => { S.week = 0; S.month = 0; loadWeek(); });
   on('[data-moreday]', 'click', e => { const [y, m, d] = e.currentTarget.dataset.moreday.split('-').map(Number);
     const t = today(), mon = x => { const wd = new Date(Date.UTC(x.y, x.m - 1, x.d)).getUTCDay(); return addDays(x, -((wd + 6) % 7)); };
