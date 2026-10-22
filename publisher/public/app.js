@@ -208,8 +208,11 @@ function render() {
   $('tabbar').classList.toggle('flat', S.view === 'compose');
   const views = { analytics: analyticsView, overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
   const head = S.view === 'overview' ? '' : pageHead(...HEADS[S.view]());
+  const hadDetail = !!$('overlay'), opener = S.detail && !hadDetail ? document.activeElement?.closest?.('[data-open]')?.dataset.open : null;
   $('app').innerHTML = head + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '');
   bind();
+  if (S.detail && !hadDetail) { S.opener = opener; $('closedetail')?.focus(); }
+  if (!S.detail && hadDetail && S.opener) { document.querySelector(`[data-open="${S.opener}"]`)?.focus(); S.opener = null; }
 }
 
 // ---- overview ----------------------------------------------------------------
@@ -258,8 +261,8 @@ function overviewView() {
     const label = isNext ? 'Next up' : { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
     const img = thumbOf(p);
     return `<div class="slot ${cls}"><time>${at(p.scheduled_at)}</time><div class="dot"><i></i></div>
-      <div class="rpost" data-open="${p.id}">${img ? `<img class="thumb" src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}
-        <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
+      <div class="rpost" data-open="${p.id}" role="button" tabindex="0">${img ? `<img class="thumb" src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}
+        <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
         <span class="st ${cls}">${label}</span></div></div>`;
   };
   const before = todays.filter(p => p.scheduled_at < now), after = todays.filter(p => p.scheduled_at >= now);
@@ -271,7 +274,7 @@ function overviewView() {
   const failed = live.filter(p => p.status === 'failed' && p.scheduled_at > now - 7 * 86400);
   const reconnect = acc.filter(a => a.needs_reconnect);
   const drafts = draftGroups();
-  const handle = p => `${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}`;
+  const handle = p => `${who(p)}`;
 
   // The numbers we already have, each a way into the screen that explains it.
   const week = 7 * 86400;
@@ -287,12 +290,12 @@ function overviewView() {
 
   const attn = [
     ...failed.slice(0, 3).map(p => `<div class="it" data-open="${p.id}" role="button" tabindex="0"><span class="ic bad">${ui('x', 16)}</span><div><b>Failed on ${handle(p)}</b><span>${esc(p.fail_reason || 'Open it to see why')}</span></div><em>Review</em></div>`),
-    ...reconnect.slice(0, 3).map(a => `<a href="#accounts"><span class="ic warn">${ui('retry', 16)}</span><div><b>Reconnect ${a.platform === 'facebook' ? '' : '@'}${esc(a.username)}</b><span>${PLATFORM[platformOf(a)]} access expired or was removed</span></div><em>Reconnect</em></a>`),
+    ...reconnect.slice(0, 3).map(a => `<a href="#accounts"><span class="ic warn">${ui('retry', 16)}</span><div><b>Reconnect ${who(a)}</b><span>${PLATFORM[platformOf(a)]} access expired or was removed</span></div><em>Reconnect</em></a>`),
   ];
 
   // After today: the next few posts, so the week ahead is never a surprise.
   const later = upcoming.filter(p => dayOf(p.scheduled_at) !== todayKey).slice(0, 4);
-  const laterRow = p => `<div class="rpost" data-open="${p.id}">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
+  const laterRow = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
       <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${handle(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
       <time>${fmt(p.scheduled_at, { weekday: 'short' })} ${at(p.scheduled_at)}</time></div>`;
 
@@ -311,7 +314,7 @@ function overviewView() {
   };
 
   const published = live.filter(p => p.status === 'published').sort((a, b) => b.scheduled_at - a.scheduled_at).slice(0, 4);
-  const pubRow = p => `<div class="rpost" data-open="${p.id}">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
+  const pubRow = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
       <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${handle(p)}</b><span>${fmt(p.scheduled_at, { dateStyle: 'medium' })}${p.stats ? statLine(p.stats) : ''}</span></div>
       ${p.post_url ? `<a class="view" href="${esc(p.post_url)}" target="_blank" rel="noopener">View post</a>` : ''}</div>`;
 
@@ -376,10 +379,10 @@ function analyticsView() {
   const kpis = [['Posts published', num(st.published), st.tracked < st.published ? `${st.tracked} with numbers so far` : 'all with numbers', ''],
     ...shown.slice(0, 3).map(k => [METRIC[k], num(st.totals[k]), st.tracked ? `${num(Math.round(st.totals[k] / st.tracked))} per post` : '', '']),
     ['Followers', num(st.followers.total), st.followers.change == null ? 'change shows after a day' : `${signed(st.followers.change)} in ${days} days`, st.followers.change > 0 ? 'up' : '']];
-  const row = p => `<div class="rpost" data-open="${p.id}">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
-      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
+  const row = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
+      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
       ${statLine(p.stats)}</div>`;
-  const acc = a => `<div class="arow">${icon(a.platform, 14)}<b>${a.platform === 'facebook' ? '' : '@'}${esc(a.username)}</b>
+  const acc = a => `<div class="arow">${icon(a.platform, 14)}<b>${who(a)}</b>
       <span class="fv">${a.followers == null ? (a.platform === 'tiktok' ? '<em>Waiting on TikTok</em>' : '<em>Reading…</em>') : num(a.followers)}</span>
       <span class="fc ${a.change > 0 ? 'up' : a.change < 0 ? 'down' : ''}">${a.change == null ? '' : signed(a.change)}</span></div>`;
   const notes = [
@@ -567,8 +570,8 @@ function accountPicker() {
   const chosen = S.targets.map(acct).filter(Boolean);
   const stack = chosen.slice(0, 5).map(a => withBadge(avatar(a.avatar_url, a.username || a.display_name), platformOf(a))).join('');
   const label = !chosen.length ? 'Choose accounts'
-    : chosen.length === 1 ? handle(chosen[0])
-    : chosen.length === 2 ? `${handle(chosen[0])}, ${handle(chosen[1])}` : `${handle(chosen[0])} and ${chosen.length - 1} more`;
+    : chosen.length === 1 ? who(chosen[0])
+    : chosen.length === 2 ? `${who(chosen[0])}, ${who(chosen[1])}` : `${who(chosen[0])} and ${chosen.length - 1} more`;
   return `<div class="dd ${S.pickOpen ? 'open' : ''}">
     <button type="button" class="ddbtn" id="openpick" aria-haspopup="listbox" aria-expanded="${!!S.pickOpen}">
       ${chosen.length ? `<span class="stack">${stack}${chosen.length > 5 ? `<span class="more">+${chosen.length - 5}</span>` : ''}</span>` : `<span class="ddph">${ui('users', 18)}</span>`}
@@ -657,6 +660,13 @@ const avatar = (url, name) => url
   ? `<img class="av" src="${esc(url)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'av ini',textContent:'${esc((name || '?')[0].toUpperCase())}'}))">`
   : `<span class="av ini">${esc((name || '?')[0].toUpperCase())}</span>`;
 const handle = a => `${platformOf(a) === 'facebook' ? '' : '@'}${esc(a.username || a.display_name)}`;
+// A handle that says which platform it is when two accounts share a name
+// (the same brand on TikTok and Instagram is often both @brand).
+function who(x) {
+  const name = x.username || x.display_name || '', pl = x.platform || 'tiktok', low = name.toLowerCase();
+  const dup = (S.me?.accounts || []).filter(a => (a.username || a.display_name || '').toLowerCase() === low).length > 1;
+  return `${pl === 'facebook' ? '' : '@'}${esc(name)}${dup ? `<small class="plt">${PLATFORM[pl]}</small>` : ''}`;
+}
 
 
 const brandName = id => S.me.brands.find(b => b.id === id)?.name;
@@ -1295,7 +1305,7 @@ function postCard(p, compact) {
     const img = p.images[p.cover_index] || p.images[0];
     return `<div class="mp ${p.status}" ${drag} data-open="${p.id}" role="button" tabindex="0"
         title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.status}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
-      ${img ? `<img src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}${icon(p.platform || 'tiktok', 11)}<b>${at(p.scheduled_at)}</b><span>${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</span></div>`;
+      ${img ? `<img src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}${icon(p.platform || 'tiktok', 11)}<b>${at(p.scheduled_at)}</b><span>${who(p)}</span></div>`;
   }
   // Week view: a small row per post. Everything you can do with it is one
   // click away in the drawer.
@@ -1305,7 +1315,7 @@ function postCard(p, compact) {
       title="${esc(`${label}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
     ${img ? `<img src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}
     <div class="pt"><b>${icon(p.platform || 'tiktok', 12)}${at(p.scheduled_at)}</b>
-      <span>${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</span>
+      <span>${who(p)}</span>
       <em>${label}</em></div></div>`;
 }
 
@@ -1350,7 +1360,7 @@ function calendarView() {
       const ps = posts.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((a, b) => a.scheduled_at - b.scheduled_at);
       const out = month && d.m !== r.month, past = ymd(d) < ymd(today());
       const label = grid ? (d.d === 1 || i === 0 ? dayLabel(d, { month: 'short', day: 'numeric' }) : d.d) : `<span>${dayLabel(d, { weekday: 'short' })}</span><b>${d.d}</b>`;
-      return `<div class="day ${dayKey(d) === now ? 'today' : ''} ${out ? 'out' : ''} ${past ? 'past' : 'open'}" data-day="${d.y}-${d.m}-${d.d}" ${past ? '' : 'title="Create a post for this day"'}>
+      return `<div class="day ${dayKey(d) === now ? 'today' : ''} ${out ? 'out' : ''} ${past ? 'past' : 'open'}" data-day="${d.y}-${d.m}-${d.d}" ${past ? '' : `tabindex="0" role="button" aria-label="Create a post for ${dayLabel(d, { weekday: 'long', month: 'long', day: 'numeric' })}" title="Create a post for this day"`}>
         <h4>${label}</h4>
         ${ps.slice(0, grid ? 4 : 99).map(p => postCard(p, grid)).join('')}${grid && ps.length > 4 ? `<button class="more" data-moreday="${d.y}-${d.m}-${d.d}">+${ps.length - 4} more</button>` : ''}
       </div>`;
@@ -1585,6 +1595,12 @@ async function brandAction(fn) {
 // ---- events ------------------------------------------------------------
 
 document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[role=button][data-open], .day.open[role=button]')) { e.preventDefault(); e.target.click(); return; }
+  if (e.key === 'Tab' && $('overlay')) {
+    const f = [...$('overlay').querySelectorAll('button,a[href],textarea,input,select')].filter(x => !x.disabled);
+    if (f.length && e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (f.length && !e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+  }
   if (e.key !== 'Escape') return;
   if (S.pickOpen) { S.pickOpen = false; render(); $('openpick')?.focus(); } else if (S.detail) { S.detail = null; render(); } });
 // The account dropdown closes when you click anywhere outside it.
