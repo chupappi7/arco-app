@@ -1783,6 +1783,49 @@ def analytics(period='7', only=None, frm=None, to=None):
     organic = [f for f in flat if not f['promoted']]
     paid = [f for f in flat if f['promoted']]
     ripe = [f for f in organic if f['mature']]
+
+    # --- did this post beat what the account was already doing? ------------
+    #
+    # A raw view count cannot answer "are we improving". Accounts differ by
+    # more than 30x, and a post from July is not competing with one from
+    # today — so the only comparison that means anything is a post against
+    # the same account's recent form at the moment it went out.
+    #
+    # Measured on v48 both sides. Comparing a post's lifetime views against
+    # mature posts is the mistake this file already calls out elsewhere: it
+    # reads every young post as a collapse. A post with no v48 yet gets no
+    # delta at all rather than a flattering or damning guess.
+    BASELINE_N = 10              # posts of recent form, not all history
+    BASELINE_MIN = 3             # below this there is no form to speak of
+    hist = {}
+    for f in organic:
+        if f['mature'] and f['at']:
+            hist.setdefault(f['account'], []).append((f['at'], f['v48']))
+    for seq in hist.values():
+        seq.sort()
+
+    def baseline_for(key, at):
+        """Median v48 of the posts this account put out just before `at`."""
+        if not at:
+            return None
+        prior = [v for t, v in hist.get(key, []) if t < at]
+        if len(prior) < BASELINE_MIN:
+            return None
+        return median(prior[-BASELINE_N:]) or None
+
+    for r in rows:
+        per_ = stats.get(r['topic']) or {}
+        delta, base = {}, {}
+        for k in keys:
+            cell_ = per_.get(k) or {}
+            at_ = cell_.get('posted_at')
+            b = baseline_for(k, at_)
+            mine = v48(r['topic'], k, cell_, now_, daily)
+            base[k] = b
+            delta[k] = (None if mine is None or not b
+                        else round(100 * (mine - b) / b))
+        r['delta'] = delta
+        r['baseline'] = base
     per_account = {}
     for k in keys:
         vs = [f['views'] for f in organic if f['account'] == k]
@@ -2081,6 +2124,14 @@ def _published_cohort(rows, flat, lo, hi, keys):
                 # and a total hides the only thing worth seeing.
                 'cells': cells,
                 'urls': {k: r['urls'].get(k) for k in gat},
+                # Carried down from the topic row, restricted to the accounts
+                # in this outing. It is v48 against the median v48 of the ten
+                # posts that account put out before this one — the cohort
+                # numbers above are running totals and cannot answer "was
+                # this better than usual" on their own. On a reposted topic it
+                # describes the first mature run, the only one with a v48.
+                'delta': {k: (r.get('delta') or {}).get(k) for k in gat},
+                'baseline': {k: (r.get('baseline') or {}).get(k) for k in gat},
                 'per': per,
                 'at': gat,
                 'last_at': max(gat.values()), 'first_at': min(gat.values()),
@@ -6248,9 +6299,16 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 /* Per account, side by side. Summing them would hide the 30x spread, which
    is the only thing three accounts running one post can teach you. */
 .pcells{display:flex;gap:6px;flex:none}
-.pc{display:inline-flex;align-items:center;gap:5px;flex:0 0 78px;justify-content:flex-end;
-  padding:6px 9px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line);
+.pc{display:inline-flex;flex-direction:column;align-items:flex-end;gap:3px;flex:0 0 82px;
+  justify-content:center;
+  padding:5px 9px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line);
   font:500 12px/1 "Fira Code",monospace;color:var(--muted);text-decoration:none}
+.pc .pcn{display:flex;align-items:center;gap:5px}
+/* The delta reserves its line whether or not there is one, so cells in a row
+   keep a common baseline instead of jittering by a few pixels per column. */
+.pc .pcd{font-size:10px;line-height:1;color:var(--dim);min-height:10px}
+.pc .pcd.up{color:var(--ok)}
+.pc .pcd.down{color:var(--bad)}
 .pc i{width:6px;height:6px;border-radius:50%;flex:none}
 .pc.hot{color:var(--text);border-color:var(--accent);background:rgba(var(--accent-rgb),.12)}
 .pc.none{color:var(--line-2);justify-content:center}
@@ -10490,11 +10548,28 @@ function analyticsView(){
       // The columns to the right are sums; this is the one account.
       const p = (r.per || {})[a.key] || {};
       const rate = v ? (100 * (p.likes||0) / v).toFixed(1) : '0.0';
+      // How this post did against what the account was already doing, from
+      // the median of its previous ten mature posts. Both sides are v48, so
+      // a post still growing has no delta rather than a misleading one.
+      const d = (r.delta || {})[a.key];
+      const base = (r.baseline || {})[a.key];
+      let dHtml = '<span class="pcd"></span>', dTip = '';
+      if (d != null) {
+        // Past a couple of hundred percent the number stops being readable
+        // and a multiple says the same thing in three characters.
+        const txt = Math.abs(d) >= 200
+          ? ((100 + d) / 100).toFixed(1) + '×'
+          : (d > 0 ? '+' : '') + d + '%';
+        dHtml = `<span class="pcd ${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${txt}</span>`;
+        dTip = `\n${txt} vs this account's recent form (${fmt(base)} median at 48h)`;
+      }
       const tip = `${a.label}\n${fmt(v)} views · ${fmt(p.likes||0)} likes · `
-        + `${fmt(p.comments||0)} comments · ${fmt(p.shares||0)} shares\n${rate}% like rate`;
+        + `${fmt(p.comments||0)} comments · ${fmt(p.shares||0)} shares\n${rate}% like rate`
+        + dTip;
       return `<a class="pc ${hot?'hot':''}" ${u?`href="${u}" target="_blank" rel="noopener"`:''}
         title="${esc(tip)}" onclick="event.stopPropagation()">
-        <i style="background:${ACOL[a.key]}"></i>${fmt(v)}</a>`;
+        <span class="pcn"><i style="background:${ACOL[a.key]}"></i>${fmt(v)}</span>
+        ${dHtml}</a>`;
     };
 
     // Column headings. Without them the three view cells were three numbers
