@@ -1109,7 +1109,7 @@ def linear_ground(top, bot, size=(1080, 1920)):
 
 
 def phone_slide(bg, src, crop_top, number, title, body, out,
-                grad=(1.0, 0.98, 300, 1250), app='App Blocker & Focus: ARCO',
+                grad=(1.0, 0.98, 300, 1250), app='ARCO Focus',
                 style=None):
     """A screenshot in a handset on a plain ground, copy beside it.
 

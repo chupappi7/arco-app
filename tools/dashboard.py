@@ -1571,8 +1571,24 @@ def sync_all():
             # fine in the sidebar for days while its publisher token was dead.
             # Ask the publisher app directly, on the same slow beat.
             ci = creator_info(a['key'], max_age=0)
-            info['publish_ok'] = not ci.get('error')
-            info['publish_error'] = ci.get('error') or ''
+            err = ci.get('error') or ''
+            # A timeout or a dropped connection is this machine failing to
+            # reach TikTok, not the account failing to publish. Treating the
+            # two the same put a red "cannot publish · token expired" badge on
+            # arco.app for days while it posted every morning without missing
+            # one — the recorded reason was a 60 second timeout. On a
+            # transient error, keep whatever the last real answer was rather
+            # than condemning the account on a bad network moment.
+            transient = bool(re.search(
+                r'timed out|timeout|network|fetch failed|ECONN|getaddrinfo|'
+                r'socket hang up|EAI_AGAIN', err, re.I))
+            if err and transient:
+                prev = acct.get(a['key']) or {}
+                info['publish_ok'] = prev.get('publish_ok')
+                info['publish_error'] = ''
+            else:
+                info['publish_ok'] = not err
+                info['publish_error'] = err
             info['privacy_options'] = ci.get('privacy_level_options') or []
             hist = (acct.get(a['key']) or {}).get('history') or []
             # One row per calendar day, rewritten as the day goes on, so
@@ -6307,6 +6323,7 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 /* The delta reserves its line whether or not there is one, so cells in a row
    keep a common baseline instead of jittering by a few pixels per column. */
 .pc .pcd{font-size:10px;line-height:1;color:var(--dim);min-height:10px}
+.pc:not(:has(.pcd)){flex-direction:row;align-items:center;gap:5px;padding:6px 9px}
 .pc .pcd.up{color:var(--ok)}
 .pc .pcd.down{color:var(--bad)}
 .pc i{width:6px;height:6px;border-radius:50%;flex:none}
@@ -9316,9 +9333,17 @@ function acctWarn(key, st){
   if(st.paused) return `<div class="awarn pause">paused${
     st.pause_note ? ' · ' + esc(st.pause_note) : ''}
     <button onclick="event.preventDefault();event.stopPropagation();acctPause('${key}',false)">resume</button></div>`;
-  if(st.publish_ok === false) return `<div class="awarn bad">cannot publish${
-    st.publish_error ? ' · token expired' : ''}
-    <span class="fix">re-run tiktok-auth.js --account ${esc(key)}</span></div>`;
+  if(st.publish_ok === false){
+    // "token expired" used to be printed for every publish failure, so a
+    // network timeout told you to re-authorize an account whose token was
+    // fine. Only say it when the error actually says so, and otherwise show
+    // the reason, because the fix is different.
+    const why = st.publish_error || '';
+    const dead = /invalid_grant|token (is )?(invalid|expired)|re-authorize/i.test(why);
+    return `<div class="awarn bad">cannot publish${
+      dead ? ' · token expired' : why ? ' · ' + esc(why.slice(0, 60)) : ''}
+      ${dead ? `<span class="fix">re-run tiktok-auth.js --account ${esc(key)}</span>` : ''}</div>`;
+  }
   if(st.reach_dead) return `<div class="awarn bad">${st.reach_dead.posts} posts, no views
     <button onclick="event.preventDefault();event.stopPropagation();acctPause('${key}',true,'no reach')">pause</button></div>`;
   return '';
@@ -10540,7 +10565,10 @@ function analyticsView(){
       : postedAt(b)-postedAt(a));
     const shown = pubAll ? rowsAll : rowsAll.slice(0,20);
 
-    const cell = (r,a) => {
+    // Only rows that actually carry a delta pay for the extra line. Most
+    // of the list is posts younger than 48h, and reserving the line in
+    // every cell made the whole table taller to show nothing.
+    const cell = (r,a,anyD) => {
       const v = r.cells[a.key];
       if(v==null) return `<span class="pc none" title="not published to ${esc(a.label)}">–</span>`;
       const u = r.urls[a.key];
@@ -10553,7 +10581,7 @@ function analyticsView(){
       // a post still growing has no delta rather than a misleading one.
       const d = (r.delta || {})[a.key];
       const base = (r.baseline || {})[a.key];
-      let dHtml = '<span class="pcd"></span>', dTip = '';
+      let dHtml = anyD ? '<span class="pcd"></span>' : '', dTip = '';
       if (d != null) {
         // Past a couple of hundred percent the number stops being readable
         // and a multiple says the same thing in three characters.
@@ -10593,7 +10621,10 @@ function analyticsView(){
             esc(r.name || r.topic)}</b>
           <span>${dayPill(postedAt(r))}${r.pillar?' '+esc(r.pillar):''}${r.promoted?' · <i class="paid">$</i>':''}</span>
         </div>
-        <div class="pcells">${accs.map(a=>cell(r,a)).join('')}</div>
+        <div class="pcells">${(()=>{
+          const anyD = accs.some(a=>(r.delta||{})[a.key] != null);
+          return accs.map(a=>cell(r,a,anyD)).join('');
+        })()}</div>
         <div class="peng" title="likes · comments · shares, all accounts">
           <span>${fmt(r.likes)}</span><span>${fmt(r.comments)}</span><span>${fmt(r.shares)}</span>
         </div>

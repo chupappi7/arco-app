@@ -1672,5 +1672,50 @@
    "bg-h24.jpg",
    "bg-h29.jpg"
   ]
+ },
+ {
+  "topic": "three-hours-no-deleting",
+  "bgs": [
+   "bg-h20.jpg",
+   "bg-h24.jpg",
+   "bg-h29.jpg",
+   "bg-h31.jpg",
+   "bg-h36.jpg",
+   "bg-h45.jpg"
+  ]
+ },
+ {
+  "topic": "still-100-hours",
+  "bgs": [
+   "bg-h28.jpg",
+   "bg-h01.jpg",
+   "bg-h37.jpg",
+   "bg-h48.jpg",
+   "bg-h88.jpg",
+   "bg-n01.jpg",
+   "bg-n05.jpg"
+  ]
+ },
+ {
+  "topic": "not-one-is-willpower",
+  "bgs": [
+   "bg-h39.jpg",
+   "bg-h02.jpg",
+   "bg-h38.jpg",
+   "bg-h49.jpg",
+   "bg-n03.jpg",
+   "bg-n06.jpg"
+  ]
+ },
+ {
+  "topic": "boring-phone-widgets",
+  "bgs": [
+   "bg-h24.jpg",
+   "bg-h01.jpg",
+   "bg-h21.jpg",
+   "bg-h22.jpg",
+   "bg-h29.jpg",
+   "bg-h31.jpg"
+  ]
  }
 ]

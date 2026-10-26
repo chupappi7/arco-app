@@ -24,6 +24,30 @@ from compose import (hook_slide, phone_slide, cta_slide, linear_ground,
                      record_post_tools, record_post_bgs)
 
 SHOTS = '/Users/thinh/Desktop/appstore screens'
+
+# The current app, captured 4-7 Oct against 2.1.2, kept in the repo rather
+# than on a desktop so a post cannot quietly ship a build nobody runs any
+# more. Every screenshot above this line is from 21 September, and one post
+# reached back to an August capture and went out showing a plan screen dated
+# "Sat 22 Aug" -- which is how it came to be rejected. Prefer these.
+NOW = '/Users/thinh/SIXSIX/design/control-center/appstore/assets'
+# (file, crop_top). The 1320x2868 captures are 0.4602 wide-to-tall and the
+# handset's glass is 0.4600, so they already fill it: crop_top stays 0 or the
+# screenshot zooms and its top row slides under the drawn dynamic island --
+# which is what blacked out the "Today . ARCO" header at 165. The two older
+# 1206x2622 shots keep 150, which clears their status bar.
+#
+# Only scr-today, screen-shield and screen-insights are pages inside the app.
+# The rest are HOME screens carrying ARCO widgets, and copy that calls them
+# app screens is describing something the slide does not show.
+WIDGETS = (f'{NOW}/screen-widgets.png', 0)      # home: habit, timer, gym
+TODAY_NOW = (f'{NOW}/scr-today.png', 0)         # in-app Today, 7 Oct
+TIMELINE = (f'{NOW}/scr-timeline.png', 0)       # home: today's-timeline widget
+TASKS = (f'{NOW}/scr-tasks.png', 0)             # home: tasks widget
+HABITS = (f'{NOW}/scr-habits.png', 0)           # a second take of WIDGETS
+SHIELD_NOW = (f'{NOW}/screen-shield.png', 150)  # in-app shield
+INSIGHTS_NOW = (f'{NOW}/screen-insights.png', 150)   # in-app Insights
+
 SIM = 'Simulator Screenshot - iPhone 17 Pro - 2026-09-21 at'
 SHIELD = ('Screenshot 2026-09-21 at 2.37.56.png', 40)
 CONTROL = ('IMG_4283.PNG', 120)
@@ -39,12 +63,34 @@ VEIL_LUMA = 11       # the light a photo may add, so bright frames stay faint
 KICKER = 'here is why'
 CARD_OUTLINE = {'icon_outline': 3, 'badge_outline': 3}
 
+# Design variants of the step slide, 2026-10-17. The posted look is
+# 'control'; the other two came out of tools/screens_lab.py and are being
+# tried on live posts to see whether either beats it. A generator names one
+# and nothing else about it changes, so the comparison is design-only.
+DESIGNS = {
+    'control': {},
+    # The screenshot is the argument, so give it the frame: no photograph,
+    # copy in a full-width band, handset centred underneath and stacked so a
+    # three-line body pushes it down rather than through it.
+    'big-screen': {'phone_w': 660, 'phone_y': 450, 'phone_x': 210,
+                   'stack': 64, 'col_x': 72, 'col_w': 936, 'col_y': 140,
+                   'title_size': 74, 'body_size': 40, 'app_size': 30,
+                   'ground': 'flat'},
+    # Mirrors the posted layout. Costs nothing and breaks the sameness of a
+    # set where every slide puts the device on the same side.
+    'left-rail': {'side': 'left', 'col_x': 616, 'col_w': 400, 'col_y': 540,
+                  'title_size': 58, 'body_size': 34},
+}
+
 STYLE = {'side': 'right', 'col_x': 72, 'col_w': 392, 'col_y': 665,
          'title_face': 'Semi Condensed Heavy', 'body_face': 'Semi Condensed Medium',
          'app_face': 'Semi Condensed Bold',
          'title_size': 62, 'body_size': 35, 'app_size': 28, 'lead': 1.05,
          'ink': (248, 248, 250), 'sub': (176, 176, 184),
          'eyebrow': (248, 248, 250)}
+
+
+FLAT = linear_ground((20, 21, 25), (8, 8, 10))
 
 
 def veiled(bg):
@@ -97,13 +143,21 @@ def pick_bgs(topic, n, exclude=()):
 
 
 def build(topic, hook, bgs, slides, closer, pillar='screentime', kicker=None,
-          card_style=None, only=None, promo=None):
+          card_style=None, only=None, promo=None, design='control',
+          hook_accent=None):
     """bgs: hook, one per screen, then the closing card's. `pillar` is the
     hook's own tag; discipline posts use the same screens. `kicker` is the
     line under the hook, `card_style` extends the closing card's style,
     `promo` puts bold call-to-action lines on the card.
     `only` (slide numbers) re-renders just those slides and leaves the rest,
-    and the hook and background histories, untouched."""
+    and the hook and background histories, untouched. `design` names a key of
+    DESIGNS, `hook_accent` recolours the hook's second line."""
+    if design not in DESIGNS:
+        raise SystemExit('unknown design %r, have %s'
+                         % (design, ', '.join(DESIGNS)))
+    over = dict(DESIGNS[design])
+    flat_ground = over.pop('ground', None) == 'flat'
+    style = {**STYLE, **over}
     out = f'{c.REPO}/drafts/{topic}'
     os.makedirs(out, exist_ok=True)
     if len(bgs) != len(slides) + 2:
@@ -116,15 +170,20 @@ def build(topic, hook, bgs, slides, closer, pillar='screentime', kicker=None,
 
     want = (lambda n: only is None or n in only)
     if want(1):
-        hook_slide(bgs[0], hook, f'{out}/01.jpg', kicker=kicker)
+        hook_slide(bgs[0], hook, f'{out}/01.jpg', kicker=kicker,
+                   **({'accent': hook_accent} if hook_accent else {}))
     if only is None and not any(e.get('topic') == topic for e in hook_rules.history()):
         mark_hook_used(hook, topic)
 
     for i, (((src, crop), num, title, body), bg) in enumerate(zip(slides, bgs[1:-1]), 2):
         if not want(i):
             continue
-        phone_slide(veiled(bg), f'{SHOTS}/{src}', crop, num, title, body,
-                    f'{out}/{i:02d}.jpg', style=STYLE)
+        # A name from the current set is already an absolute path; only the
+        # older desktop captures need SHOTS joined on.
+        shot = src if os.path.isabs(src) else f'{SHOTS}/{src}'
+        phone_slide(FLAT.copy() if flat_ground else veiled(bg),
+                    shot, crop, num, title, body,
+                    f'{out}/{i:02d}.jpg', style=style)
 
     if want(len(slides) + 2):
         cta_slide(None, f'{out}/{len(slides) + 2:02d}.jpg', subtitle=closer,
@@ -138,3 +197,26 @@ def build(topic, hook, bgs, slides, closer, pillar='screentime', kicker=None,
     if not any(e.get('topic') == topic for e in c.tool_history()):
         record_post_tools(topic, ['ARCO'])
     record_post_bgs(topic, bgs)
+    record_design(topic, design)
+
+
+def record_design(topic, design):
+    """Write which design this post was built with into post_status.json.
+
+    The design was a keyword argument and nothing else: it changed the pixels
+    and left no trace, so two posts built to compare two designs were
+    indistinguishable from the other 400 by the time their numbers arrived.
+    Analytics reads this field; without it the comparison cannot be made at
+    all, only remembered.
+    """
+    path = f'{c.REPO}/tools/post_status.json'
+    try:
+        with open(path) as fh:
+            st = json.load(fh)
+    except Exception:
+        st = {}
+    st.setdefault(topic, {})['design'] = design
+    tmp = f'{path}.tmp{os.getpid()}'
+    with open(tmp, 'w') as fh:
+        json.dump(st, fh, indent=1, ensure_ascii=False)
+    os.replace(tmp, path)
