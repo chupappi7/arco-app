@@ -22,6 +22,14 @@ from compose import (hook_slide, phone_slide, cta_slide, preflight,
 from _veiled_screens import SHOTS, STYLE, KICKER, CARD_OUTLINE, veiled
 
 PROMO = ['Search “arco focus” on the App Store.']
+# Thinh, 2026-10-27: every post that shows screenshots gates a comment on the
+# card. The word is "ARCO" rather than "app" because the comment section is
+# read by people who have not seen the post -- a wall of the brand name is
+# recall and a search term, a wall of "app" is noise. The payoff is the setup
+# the slides just showed, which is the one thing commenting gets you that
+# searching the store does not, and it is answerable with one pasted reply.
+PROMO_COMMENT = ['Comment “ARCO” and I’ll send my setup.',
+                 'Search “arco focus” on the App Store.']
 # Thinh, 2026-10-07: the app is named by its current store name everywhere.
 PROMO_STORE_NAME = ['Search “App Blocker & Focus: ARCO”', 'on the App Store.']
 
@@ -103,7 +111,8 @@ def tool_slide(ground, icon, name, number, title, body, out):
     print('wrote', out)
 
 
-def build(topic, hook, theme, bgs, arco, tools, closer, only=None, promo=PROMO):
+def build(topic, hook, theme, bgs, arco, tools, closer, only=None,
+          promo=PROMO_COMMENT):
     """arco: (screen, title, body) for ARCO's slide. tools: [(name, title,
     [mechanism, consequence])] in roster order after ARCO. closer: the card's
     lines, drawn once from next_arco_angle(theme) and frozen in the generator.

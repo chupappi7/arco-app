@@ -30,7 +30,7 @@ import sys
 
 from _veiled_screens import (build, WIDGETS, SHIELD_NOW, TODAY_NOW,
                              TIMELINE, TASKS, INSIGHTS_NOW)
-from _tools_screens import PROMO
+from _tools_screens import PROMO_COMMENT
 
 POSTS = [
     dict(
@@ -113,7 +113,7 @@ def main(argv):
             continue
         build(topic=p['topic'], hook=p['hook'], kicker='here is why',
               bgs=p['bgs'], slides=p['slides'], closer=p['closer'],
-              pillar='screentime', promo=PROMO, only=only)
+              pillar='screentime', promo=PROMO_COMMENT, only=only)
         print('built', p['topic'])
 
 

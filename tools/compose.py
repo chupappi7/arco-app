@@ -1318,7 +1318,7 @@ def cta_slide(bg, out, subtitle='Planner and app blocker in one.',
         name_f, sub_f = font(58, 'Bold'), font(42, 'Semibold')
         store_f = font(36, 'Medium')
         subs = [subtitle] if isinstance(subtitle, str) else list(subtitle)
-        items = [(540, 940, 'App Blocker & Focus: ARCO', name_f, 'ma', (255, 255, 255))]
+        items = [(540, 940, 'ARCO Focus', name_f, 'ma', (255, 255, 255))]
         y = 1035
         for ln in subs:
             items.append((540, y, ln, sub_f, 'ma', (235, 235, 235)))
@@ -1384,7 +1384,7 @@ def cta_slide(bg, out, subtitle='Planner and app blocker in one.',
 
     INK, SUB = st['ink'], st['sub']
     ny = Y0 + 132 + ics
-    items = [(cx, ny, 'App Blocker & Focus: ARCO',
+    items = [(cx, ny, 'ARCO Focus',
               font(st['name_size'], 'Semi Condensed Bold'), anch, INK)]
     y = ny + st.get('name_gap', 108)
     subs = [subtitle] if isinstance(subtitle, str) else list(subtitle)

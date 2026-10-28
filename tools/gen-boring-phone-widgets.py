@@ -21,7 +21,7 @@ import sys
 
 from _veiled_screens import (build, pick_bgs, WIDGETS, SHIELD_NOW,
                              TODAY_NOW, INSIGHTS_NOW)
-from _tools_screens import PROMO
+from _tools_screens import PROMO_COMMENT
 
 TOPIC = 'boring-phone-widgets'
 
@@ -46,6 +46,6 @@ build(
     ],
     closer='Plan the day, block the rest.',
     pillar='screentime',
-    promo=PROMO,
+    promo=PROMO_COMMENT,
     only=[int(a) for a in sys.argv[1:]] or None,
 )
