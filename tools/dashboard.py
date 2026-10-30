@@ -1786,6 +1786,8 @@ def analytics(period='7', only=None, frm=None, to=None):
                 v48_ = v48(topic, k, cell, now_, daily)
                 flat.append({'account': k, 'views': v, 'promoted': topic in promoted,
                              'likes': cell.get('likes', 0),
+                             'eng': (cell.get('likes', 0) + cell.get('comments', 0)
+                                     + cell.get('shares', 0)),
                              'at': cell.get('posted_at'),
                              # None until the post is 48h old, which is what
                              # makes it excludable rather than merely small.
@@ -1879,6 +1881,11 @@ def analytics(period='7', only=None, frm=None, to=None):
     rated = [f for f in organic if f['views'] >= 50]
     rates = sorted(f['likes'] / f['views'] for f in rated)
     med_rate = rates[len(rates) // 2] if rates else 0
+    # Likes, comments and shares unweighted. A share is worth more than a like
+    # for reach, but any weighting here would be invented rather than measured,
+    # and the three move together closely enough to rank posts without it.
+    erates = sorted(f['eng'] / f['views'] for f in rated)
+    med_erate = erates[len(erates) // 2] if erates else 0
     buried = []
     for r in rows:
         if r['promoted'] or r['best'] >= PERFORMING_VIEWS:
@@ -1972,6 +1979,7 @@ def analytics(period='7', only=None, frm=None, to=None):
         'suggest': suggest,
         'buried': buried[:6],
         'like_rate': round(100 * med_rate, 1),
+        'eng_rate': round(100 * med_erate, 1),
         'suppressed': [{'topic': r['topic'], 'best': r['best'], 'worst': r['worst'],
                         'spread': r['spread']} for r in suppressed[:6]],
         'pillars': _pillar_table(rows),
@@ -2155,6 +2163,8 @@ def _published_cohort(rows, flat, lo, hi, keys):
                 'comments': tot['comments'], 'shares': tot['shares'],
                 'best': max(vs) if vs else 0,
                 'rate': round(100 * tot['likes'] / max(1, tot['views']), 1),
+                'erate': round(100 * (tot['likes'] + tot['comments']
+                                      + tot['shares']) / max(1, tot['views']), 1),
             })
     out.sort(key=lambda x: -x['last_at'])
 
@@ -6323,7 +6333,13 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 /* The delta reserves its line whether or not there is one, so cells in a row
    keep a common baseline instead of jittering by a few pixels per column. */
 .pc .pcd{font-size:10px;line-height:1;color:var(--dim);min-height:10px}
-.pc:not(:has(.pcd)){flex-direction:row;align-items:center;gap:5px;padding:6px 9px}
+/* The engagement rate sits under the view count because it is the half of the
+   cell that says whether the reach was worth having. Dim by default, green
+   once it clears the median, so a 500-view post that landed reads louder than
+   a 1,000-view post nobody touched. */
+.pc .pce{font-size:10px;line-height:1;color:var(--dim)}
+.pc .pce.good{color:var(--ok)}
+.pc:not(:has(.pcd)):not(:has(.pce)){flex-direction:row;align-items:center;gap:5px;padding:6px 9px}
 .pc .pcd.up{color:var(--ok)}
 .pc .pcd.down{color:var(--bad)}
 .pc i{width:6px;height:6px;border-radius:50%;flex:none}
@@ -10558,10 +10574,12 @@ function analyticsView(){
       ${ctile('Median per upload', t.median, `${t.hits} of ${t.uploads} over ${fmt(T)}`)}
     </div>`;
 
-    const sorts = [['new','Newest'],['views','Most views'],['rate','Best like rate']];
+    const sorts = [['new','Newest'],['views','Most views'],['rate','Best engagement']];
     const rowsAll = P.rows.slice().sort((a,b)=>
       pubSort==='views' ? b.views-a.views
-      : pubSort==='rate' ? b.rate-a.rate
+      // A rate off 2 views is one like, not a result. Same 50-view floor the
+      // buried-post finder uses; under it a post sorts by reach instead.
+      : pubSort==='rate' ? ((b.views>=50)-(a.views>=50)) || (b.erate-a.erate)
       : postedAt(b)-postedAt(a));
     const shown = pubAll ? rowsAll : rowsAll.slice(0,20);
 
@@ -10576,6 +10594,13 @@ function analyticsView(){
       // The columns to the right are sums; this is the one account.
       const p = (r.per || {})[a.key] || {};
       const rate = v ? (100 * (p.likes||0) / v).toFixed(1) : '0.0';
+      // Views say how far TikTok pushed it; this says what the people who saw
+      // it actually did. A post can win one and lose the other, and the rate
+      // is the half that was buried in a tooltip until now.
+      const eng = (p.likes||0) + (p.comments||0) + (p.shares||0);
+      const er = v ? (100 * eng / v) : 0;
+      const erHtml = `<span class="pce ${er >= AN.eng_rate ? 'good' : ''}"
+        >${er.toFixed(1)}%</span>`;
       // How this post did against what the account was already doing, from
       // the median of its previous ten mature posts. Both sides are v48, so
       // a post still growing has no delta rather than a misleading one.
@@ -10593,11 +10618,12 @@ function analyticsView(){
       }
       const tip = `${a.label}\n${fmt(v)} views · ${fmt(p.likes||0)} likes · `
         + `${fmt(p.comments||0)} comments · ${fmt(p.shares||0)} shares\n${rate}% like rate`
+        + `\n${er.toFixed(1)}% engagement (median ${AN.eng_rate}%)`
         + dTip;
       return `<a class="pc ${hot?'hot':''}" ${u?`href="${u}" target="_blank" rel="noopener"`:''}
         title="${esc(tip)}" onclick="event.stopPropagation()">
         <span class="pcn"><i style="background:${ACOL[a.key]}"></i>${fmt(v)}</span>
-        ${dHtml}</a>`;
+        ${erHtml}${dHtml}</a>`;
     };
 
     // Column headings. Without them the three view cells were three numbers
@@ -10609,7 +10635,7 @@ function analyticsView(){
         `<span class="pc"><i style="background:${ACOL[a.key]}"></i>${esc(a.short)}</span>`).join('')}</span>
       <span class="peng"><span title="likes">${I_LIKE}</span>
         <span title="comments">${I_COMM}</span><span title="shares">${I_SHARE}</span></span>
-      <span class="prate">rate</span>
+      <span class="prate" title="likes + comments + shares, over views">eng</span>
     </div>`;
 
     const body = shown.length ? `<div class="plist">${phead}${shown.map(r=>`
@@ -10628,7 +10654,9 @@ function analyticsView(){
         <div class="peng" title="likes · comments · shares, all accounts">
           <span>${fmt(r.likes)}</span><span>${fmt(r.comments)}</span><span>${fmt(r.shares)}</span>
         </div>
-        <div class="prate ${r.rate>=AN.like_rate?'good':''}">${r.rate}%</div>
+        <div class="prate ${r.erate>=AN.eng_rate?'good':''}" title="${
+          r.erate}% engagement (likes + comments + shares / views), median ${
+          AN.eng_rate}% — ${r.rate}% of views liked it">${r.erate}%</div>
       </div>`).join('')}</div>
       ${rowsAll.length>20&&!pubAll?`<button class="more" onclick="pubAll=true;render()">
         Show all ${rowsAll.length}</button>`:''}`
