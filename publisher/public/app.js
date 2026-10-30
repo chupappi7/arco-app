@@ -345,10 +345,39 @@ const statLine = st => `<span class="sline">${['views', 'likes', 'comments', 'sh
 const ago = sec => { const m = Math.round((Date.now() / 1000 - sec) / 60);
   return m < 60 ? `${Math.max(1, m)} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
 
-async function loadStats(days = S.statsDays || 7) {
-  S.statsDays = days;
-  try { S.stats = await api(`/stats?days=${days}`); } catch (e) { S.stats = { err: e.message }; }
+async function loadStats(days = S.statsDays || 30, plat = S.statsPlat || 'all') {
+  S.statsDays = days; S.statsPlat = plat;
+  try { S.stats = await api(`/stats?days=${days}&platform=${plat}`); } catch (e) { S.stats = { err: e.message }; }
   if (S.view === 'analytics') render();
+}
+
+// A small chart: one series, one axis, a hover tooltip per day. Bars for
+// counts per day, a line for a running total.
+function chart(series, key, { kind = 'bar', label, fmtv = num } = {}) {
+  const vals = series.map(d => d[key]);
+  const known = vals.filter(v => v != null);
+  if (!known.length || (kind === 'bar' && !known.some(v => v > 0))) return `<div class="cempty2">No ${label.toLowerCase()} in this period yet.</div>`;
+  const W = 600, Hh = 180, n = series.length;
+  let lo = kind === 'line' ? Math.min(...known) : 0, hi = Math.max(...known);
+  if (kind === 'line') { const pad = Math.max(1, (hi - lo) * 0.15); lo = Math.max(0, lo - pad); hi += pad; }
+  if (hi === lo) hi = lo + 1;
+  const y = v => Hh - ((v - lo) / (hi - lo)) * Hh, step = W / n;
+  const grid = [0, .5, 1].map(f => `<line x1="0" x2="${W}" y1="${Hh * f}" y2="${Hh * f}" class="g"/>`).join('');
+  let marks = '';
+  if (kind === 'bar') {
+    const bw = Math.max(1, step - 2);
+    marks = vals.map((v, i) => v ? `<rect class="b" x="${i * step + 1}" y="${y(v)}" width="${bw}" height="${Hh - y(v)}"/>` : '').join('');
+  } else {
+    let d = '', on = false;
+    vals.forEach((v, i) => { if (v == null) { on = false; return; } d += `${on ? 'L' : 'M'}${(i + .5) * step},${y(v)}`; on = true; });
+    marks = `<path class="l" d="${d}"/>`;
+  }
+  const hits = series.map((d, i) => `<rect class="hit" x="${i * step}" y="0" width="${step}" height="${Hh}"
+      data-tip="${esc(`${new Date(d.day + 'T12:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' })} · ${d[key] == null ? 'no data' : `${fmtv(d[key])} ${label.toLowerCase()}`}`)}" data-x="${((i + .5) / n * 100).toFixed(2)}"/>`).join('');
+  const ticks = [0, Math.floor((n - 1) / 2), n - 1].map(i => `<span style="left:${((i + .5) / n * 100).toFixed(2)}%">${new Date(series[i].day + 'T12:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' })}</span>`).join('');
+  return `<div class="chart"><div class="yax"><span>${fmtv(Math.round(hi))}</span><span>${fmtv(Math.round(lo))}</span></div>
+    <div class="plot"><svg viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" role="img" aria-label="${esc(label)} per day">${grid}${marks}${hits}</svg>
+      <i class="cx"></i><div class="ctip" role="status"></div><div class="xax">${ticks}</div></div></div>`;
 }
 
 function perfCard() {
@@ -365,37 +394,47 @@ function perfCard() {
 }
 
 function analyticsView() {
-  const st = S.stats, days = S.statsDays || 7;
-  const seg = `<div class="seg" role="group" aria-label="Period">${[7, 30].map(d =>
-    `<button data-days="${d}" class="${d === days ? 'on' : ''}" aria-pressed="${d === days}">Last ${d} days</button>`).join('')}</div>`;
-  if (!st) return `<div class="calbar">${seg}</div><div class="panel empty">Loading…</div>`;
-  if (st.err) return `<div class="calbar">${seg}</div><div class="panel empty"><b>Couldn't load the numbers.</b>${esc(st.err)}</div>`;
-  const shown = STAT_KEYS.filter(k => st.totals[k] != null);
-  const kpis = [['Posts published', num(st.published), st.tracked < st.published ? `${st.tracked} with numbers so far` : 'all with numbers', ''],
-    ...shown.slice(0, 3).map(k => [METRIC[k], num(st.totals[k]), st.tracked ? `${num(Math.round(st.totals[k] / st.tracked))} per post` : '', '']),
-    ['Followers', num(st.followers.total), st.followers.change == null ? 'change shows after a day' : `${signed(st.followers.change)} in ${days} days`, st.followers.change > 0 ? 'up' : '']];
+  const st = S.stats, days = S.statsDays || 30, plat = S.statsPlat || 'all';
+  const plats = st?.platforms || ORDER.filter(pl => S.me.accounts.some(a => platformOf(a) === pl));
+  const filters = `<div class="afilters">
+    <div class="pchips" role="group" aria-label="Platform">${[['all', 'All platforms'], ...plats.map(pl => [pl, PLATFORM[pl]])].map(([k, l]) =>
+      `<button class="pchip ${plat === k ? 'on' : ''}" data-aplat="${k}" aria-pressed="${plat === k}">${k === 'all' ? '' : appIcon(k, 18)}${l}</button>`).join('')}</div>
+    <div class="seg" role="group" aria-label="Period">${[7, 30, 90].map(d => `<button data-days="${d}" class="${d === days ? 'on' : ''}" aria-pressed="${d === days}">${d} days</button>`).join('')}</div></div>`;
+  if (!st) return `${filters}<div class="panel empty">Loading…</div>`;
+  if (st.err) return `${filters}<div class="panel empty"><b>Couldn't load the numbers.</b>${esc(st.err)}</div>`;
+
+  const T = st.totals, F = st.followers;
+  const kpis = [['Views', T.views], ['Likes', T.likes], ['Comments', T.comments], ['Shares', T.shares]]
+    .map(([l, v]) => [l, v == null ? '–' : num(v), v == null ? 'not shared yet' : st.tracked ? `${num(Math.round(v / st.tracked))} per post` : '', ''])
+    .concat([['Followers', F.total == null ? '–' : num(F.total), F.change == null ? 'change shows after a day' : `${signed(F.change)} in ${days} days`, F.change > 0 ? 'up' : F.change < 0 ? 'down' : '']]);
+
+  const prow = x => `<div class="bprow">${appIcon(x.platform, 26)}<div class="bpn"><b>${PLATFORM[x.platform]}</b><span>${x.posts} post${x.posts === 1 ? '' : 's'}</span></div>
+      <div class="bpv"><span>Views</span><b>${x.views == null ? '–' : num(x.views)}</b></div>
+      <div class="bpv"><span>Likes</span><b>${x.likes == null ? '–' : num(x.likes)}</b></div>
+      <div class="bpv"><span>Followers</span><b>${x.followers == null ? '–' : num(x.followers)}</b></div></div>`;
   const row = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
-      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
-      ${statLine(p.stats)}</div>`;
+      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>${statLine(p.stats)}</div>`;
   const acc = a => `<div class="arow">${icon(a.platform, 14)}<b>${who(a)}</b>
       <span class="fv">${a.limited && a.platform === 'tiktok' ? `<a class="rc" href="/api/auth/start?add=1">Reconnect</a>` : a.followers == null ? '<em>Reading…</em>' : num(a.followers)}</span>
-      <span class="fc ${a.change > 0 ? 'up' : a.change < 0 ? 'down' : ''}">${a.change == null ? '' : signed(a.change)}</span></div>`;
+      <span class="fc ${a.change > 0 ? 'up' : a.change < 0 ? 'down' : ''}">${a.change == null || a.change === 0 ? '' : signed(a.change)}</span></div>`;
   const notes = [
-    st.tiktok_reconnect && `TikTok accounts connected before stats were added need one reconnect to share their numbers.${can('admin') ? ' <a href="/api/auth/start?add=1">Reconnect TikTok</a>' : ''}`,
-    st.tiktok_pending && 'TikTok numbers appear within a few hours of connecting.',
-    st.facebook_limited && 'Facebook Page likes and comments need one more permission (pages_read_user_content). Followers already show.',
-    st.tracked && st.totals.views == null && 'Instagram views, reach and saves need the insights permission; until then you see likes and comments.',
+    st.tiktok_reconnect && `TikTok accounts connected before stats were added need one reconnect.${can('admin') ? ' <a href="/api/auth/start?add=1">Reconnect TikTok</a>' : ''}`,
+    st.facebook_limited && (plat === 'all' || plat === 'facebook') && 'Facebook post numbers need one more permission; followers already show.',
   ].filter(Boolean);
-  // Let the pagehead title stand; put the period switch under it.
-  return `<div class="calbar">${seg}${st.updated_at ? `<span class="note">Updated ${ago(st.updated_at)}</span>` : ''}</div>
-    <div class="kpis">${kpis.map(([l, v, n, c]) => `<div class="kpi"><span>${l}</span><b>${v}</b><small class="${c}">${n}</small></div>`).join('')}</div>
-    <div class="ovw">
-      <section class="panel"><header><h2>Top posts</h2><span class="note">by views and engagement</span></header>
-        ${st.top.length ? `<div class="list">${st.top.map(row).join('')}</div>`
-          : `<div class="empty"><b>No numbers yet for this period.</b>Likes and comments show a few hours after a post goes out on Instagram or Facebook.</div>`}</section>
-      <section class="panel"><header><h2>Followers</h2><span class="note">change in ${days} days</span></header>
-        <div class="alist">${st.accounts.map(acc).join('') || '<div class="empty">Connect an account to see followers.</div>'}</div></section>
+
+  return `${filters}
+    <div class="kpis five">${kpis.map(([l, v, n, c]) => `<div class="kpi"><span>${l}</span><b>${v}</b><small class="${c}">${n}</small></div>`).join('')}</div>
+    <div class="angrid">
+      <section class="panel ocard"><header><h2>Followers</h2><span class="note">total, ${days} days</span></header>${chart(st.series, 'followers', { kind: 'line', label: 'Followers' })}</section>
+      ${plat === 'all' ? `<section class="panel ocard"><header><h2>By platform</h2></header><div class="bplist">${st.by_platform.map(prow).join('') || '<div class="cempty2">No accounts yet.</div>'}</div></section>`
+        : `<section class="panel ocard"><header><h2>${appIcon(plat, 18)} ${PLATFORM[plat]} accounts</h2><span class="note">${st.accounts.length}</span></header>
+          <div class="oscroll"><div class="alist">${st.accounts.map(acc).join('') || '<div class="cempty2">No accounts on this platform.</div>'}</div></div></section>`}
+      <section class="panel ocard"><header><h2>Top posts</h2><span class="note">${st.published} published</span></header>
+        <div class="oscroll">${st.top.length ? `<div class="list">${st.top.map(row).join('')}</div>` : '<div class="cempty2">Numbers show a few hours after a post goes out.</div>'}</div></section>
+      <section class="panel ocard"><header><h2>Engagement</h2><span class="note">by publish day</span></header>${chart(st.series, 'engagement', { label: 'Interactions' })}</section>
     </div>
+    <section class="panel"><header><h2>Accounts</h2><span class="note">followers · change in ${days} days${st.updated_at ? ` · updated ${ago(st.updated_at)}` : ''}</span></header>
+      <div class="alist cols">${st.accounts.map(acc).join('') || '<div class="cempty2">Connect an account to see followers.</div>'}</div></section>
     ${notes.length ? `<div class="snotes">${notes.map(n => `<p>${n}</p>`).join('')}</div>` : ''}
     ${S.detail ? detailView() : ''}`;
 }
@@ -1736,6 +1775,10 @@ function bind() {
   on('#go', 'click', submit);
   on('#savedraft', 'click', saveDraft);
   on('[data-days]', 'click', e => loadStats(Number(e.currentTarget.dataset.days)));
+  on('[data-aplat]', 'click', e => loadStats(undefined, e.currentTarget.dataset.aplat));
+  on('.chart .hit', 'mouseenter', e => { const pl = e.target.closest('.plot'), tip = pl.querySelector('.ctip'), cx = pl.querySelector('.cx'), x = e.target.dataset.x;
+    tip.textContent = e.target.dataset.tip; tip.style.left = `${x}%`; tip.classList.add('on'); cx.style.left = `${x}%`; cx.classList.add('on'); });
+  on('.chart .plot', 'mouseleave', e => { e.currentTarget.querySelector('.ctip').classList.remove('on'); e.currentTarget.querySelector('.cx').classList.remove('on'); });
   on('[data-opendraft]', 'click', e => openDraft(e.target.dataset.opendraft));
   on('[data-deldraft]', 'click', async e => {
     const key = e.target.dataset.deldraft, g = draftGroups().find(x => (x[0].group_id || x[0].id) === key);

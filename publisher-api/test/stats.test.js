@@ -186,3 +186,27 @@ describe('TikTok numbers', () => {
     expect(st.tiktok_pending).toBe(false);
   });
 });
+
+describe('stats filters and series', () => {
+  beforeEach(() => resetDb(env));
+  const T3 = 1_800_000_000, day = t => new Date(t * 1000).toISOString().slice(0, 10);
+  it('filters by platform, breaks down per platform, and gives a day-by-day series', async () => {
+    await account('ig1', 'instagram'); await account('tt1', 'tiktok');
+    await post('a', 'ig1', T3 - 86400, { stats: { likes: 10, comments: 2, views: 500 }, statsAt: T3 });
+    await post('b', 'tt1', T3 - 3600, { stats: { views: 900, likes: 30, comments: 3, shares: 1 }, statsAt: T3 });
+    await env.DB.prepare('UPDATE accounts SET followers = 100 WHERE id = ?').bind('ig1').run();
+    await env.DB.prepare('UPDATE accounts SET followers = 50 WHERE id = ?').bind('tt1').run();
+    await env.DB.prepare(`INSERT INTO follower_history VALUES ('ig1', ?, 90), ('ig1', ?, 100), ('tt1', ?, 50)`)
+      .bind(day(T3 - 3 * 86400), day(T3), day(T3 - 86400)).run();
+    const all = await getStats(env, 'ws1', 7, T3);
+    expect(all.series.length).toBe(7);
+    expect(all.series.at(-1)).toMatchObject({ day: day(T3), followers: 150, views: 900, engagement: 34 });
+    expect(all.series.at(-4).followers).toBe(90);
+    expect(all.by_platform.map(x => [x.platform, x.posts, x.views, x.followers])).toEqual([['tiktok', 1, 900, 50], ['instagram', 1, 500, 100]]);
+    const tt = await getStats(env, 'ws1', 90, T3, 'tiktok');
+    expect(tt.totals).toEqual({ views: 900, likes: 30, comments: 3, shares: 1 });
+    expect(tt.accounts.map(a => a.id)).toEqual(['tt1']);
+    expect(tt.series.length).toBe(90);
+    await expect(getStats(env, 'ws1', 7, T3, 'myspace')).rejects.toThrow('platform');
+  });
+});

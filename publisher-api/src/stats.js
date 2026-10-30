@@ -173,37 +173,53 @@ export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TI
 
 const METRICS = ['views', 'reach', 'likes', 'comments', 'shares', 'saves'];
 
-// GET /v1/stats?days=7|30: totals for posts published in the period, the top
-// posts, and followers per account with the change over the period. Limited
-// to the caller's brands like everything else.
-export async function getStats(env, w, days, t = now()) {
-  if (![7, 30].includes(days)) throw new HttpError(400, 'days must be 7 or 30');
+// GET /v1/stats?days=7|30|90&platform=all|tiktok|instagram|facebook: totals for
+// posts published in the period, a day-by-day series for the charts, a
+// breakdown per platform, the top posts, and followers per account with the
+// change over the period. Limited to the caller's brands like everything else.
+export const PERIODS = [7, 30, 90];
+const PLATFORMS = ['tiktok', 'instagram', 'facebook'];
+export async function getStats(env, w, days, t = now(), platform = 'all') {
+  if (!PERIODS.includes(days)) throw new HttpError(400, 'days must be 7, 30 or 90');
+  if (platform !== 'all' && !PLATFORMS.includes(platform)) throw new HttpError(400, 'unknown platform');
   const from = t - days * DAY;
+  const pf = platform === 'all' ? { sql: '', binds: [] } : { sql: ' AND a.platform = ?', binds: [platform] };
   const sc = inScope(w, 'a.brand_id');
   const { results: rows } = await env.DB.prepare(`SELECT p.*, a.username, a.platform FROM posts p JOIN accounts a ON a.id = p.account_id
-      WHERE p.workspace_id = ? AND p.status = 'published' AND p.scheduled_at >= ? AND p.scheduled_at <= ?${sc.sql}
-      ORDER BY p.scheduled_at DESC`).bind(wsOf(w), from, t, ...sc.binds).all();
+      WHERE p.workspace_id = ? AND p.status = 'published' AND p.scheduled_at >= ? AND p.scheduled_at <= ?${sc.sql}${pf.sql}
+      ORDER BY p.scheduled_at DESC`).bind(wsOf(w), from, t, ...sc.binds, ...pf.binds).all();
+
+  // One entry per UTC day of the period, oldest first.
+  const dayKeys = [...Array(days)].map((_, i) => utcDay(t - (days - 1 - i) * DAY));
+  const perDay = new Map(dayKeys.map(d => [d, { day: d, posts: 0, views: 0, engagement: 0, followers: null }]));
 
   const totals = Object.fromEntries(METRICS.map(m => [m, 0]));
   const has = new Set();
+  const byPlatform = Object.fromEntries(PLATFORMS.map(pl => [pl, { platform: pl, posts: 0, views: null, likes: null, comments: null, shares: null, followers: null }]));
   let tracked = 0, updated = 0;
   const withStats = [];
   for (const r of rows) {
+    const pl = r.platform || 'tiktok', d = perDay.get(utcDay(r.scheduled_at));
+    byPlatform[pl].posts++;
+    if (d) d.posts++;
     if (!r.stats) continue;
     const s = JSON.parse(r.stats);
     tracked++;
     updated = Math.max(updated, r.stats_at || 0);
     for (const m of METRICS) if (s[m] !== undefined) { totals[m] += s[m]; has.add(m); }
+    for (const m of ['views', 'likes', 'comments', 'shares']) if (s[m] !== undefined) byPlatform[pl][m] = (byPlatform[pl][m] || 0) + s[m];
+    if (d) { d.views += s.views || 0; d.engagement += (s.likes || 0) + (s.comments || 0) + (s.shares || 0) + (s.saves || 0); }
     withStats.push({ r, s, score: (s.views || 0) + 10 * ((s.likes || 0) + (s.comments || 0) + (s.shares || 0) + (s.saves || 0)) });
   }
-  const top = withStats.sort((a, b) => b.score - a.score).slice(0, 5).map(x => postJson(env, x.r));
+  const top = withStats.sort((a, b) => b.score - a.score).slice(0, 6).map(x => postJson(env, x.r));
 
   const asc = inScope(w);
-  const { results: accs } = await env.DB.prepare(`SELECT id, username, platform, avatar_url, followers, stats_at, insights_denied_at FROM accounts
+  const { results: all } = await env.DB.prepare(`SELECT id, username, platform, avatar_url, followers, stats_at, insights_denied_at FROM accounts
       WHERE workspace_id = ?${asc.sql} ORDER BY platform, username`).bind(wsOf(w), ...asc.binds).all();
-  const startDay = utcDay(from), today = utcDay(t);
+  const startDay = dayKeys[0], today = dayKeys[days - 1];
   const accounts = [];
-  for (const a of accs) {
+  for (const a of all) {
+    if (platform !== 'all' && (a.platform || 'tiktok') !== platform) continue;
     let change = null;
     if (a.followers !== null) {
       const first = await env.DB.prepare(`SELECT day, followers FROM follower_history WHERE account_id = ? AND day >= ?
@@ -216,15 +232,33 @@ export async function getStats(env, w, days, t = now()) {
   }
   const known = accounts.filter(a => a.followers !== null);
   const changes = known.filter(a => a.change !== null);
+  for (const a of known) byPlatform[a.platform].followers = (byPlatform[a.platform].followers || 0) + a.followers;
 
+  // Followers per day: each account's last known count carried forward.
+  if (known.length) {
+    const marks = known.map(() => '?').join(',');
+    const { results: hist } = await env.DB.prepare(`SELECT account_id, day, followers FROM follower_history
+        WHERE account_id IN (${marks}) AND day <= ? ORDER BY day`).bind(...known.map(a => a.id), today).all();
+    const last = new Map();
+    let i = 0;
+    for (const d of dayKeys) {
+      while (i < hist.length && hist[i].day <= d) { last.set(hist[i].account_id, hist[i].followers); i++; }
+      if (last.size) perDay.get(d).followers = [...last.values()].reduce((n, v) => n + v, 0);
+    }
+  }
+
+  const flagsFrom = all.map(a => ({ platform: a.platform || 'tiktok', followers: a.followers, limited: !!a.insights_denied_at && a.insights_denied_at > t - INSIGHTS_RETRY }));
   return {
-    days, published: rows.length, tracked, updated_at: updated || null,
+    days, platform, published: rows.length, tracked, updated_at: updated || null,
     totals: Object.fromEntries(METRICS.filter(m => has.has(m)).map(m => [m, totals[m]])),
     followers: { total: known.length ? known.reduce((n, a) => n + a.followers, 0) : null,
       change: changes.length ? changes.reduce((n, a) => n + a.change, 0) : null },
+    series: [...perDay.values()],
+    by_platform: PLATFORMS.map(pl => byPlatform[pl]).filter(x => all.some(a => (a.platform || 'tiktok') === x.platform)),
+    platforms: PLATFORMS.filter(pl => all.some(a => (a.platform || 'tiktok') === pl)),
     accounts, top,
-    tiktok_pending: accounts.some(a => a.platform === 'tiktok' && a.followers === null && !a.limited),
-    tiktok_reconnect: accounts.some(a => a.platform === 'tiktok' && a.limited),
-    facebook_limited: accounts.some(a => a.platform === 'facebook' && a.limited),
+    tiktok_pending: flagsFrom.some(a => a.platform === 'tiktok' && a.followers === null && !a.limited),
+    tiktok_reconnect: flagsFrom.some(a => a.platform === 'tiktok' && a.limited),
+    facebook_limited: flagsFrom.some(a => a.platform === 'facebook' && a.limited),
   };
 }

@@ -64,10 +64,17 @@ http.createServer(async (q, r) => {
   if (p === '/api/v1/drafts') return j({ drafts: empty ? [] : posts.filter(x => x.status === 'draft') });
   if (p === '/api/v1/ai/usage') return j({ limit: 50, remaining: 47 });
   if (p === '/api/v1/members') return j({ members: [{ user_id: 'u1', email: 'thinh@arco.app', role: 'owner', brand_ids: null }, { user_id: 'u2', email: 'freelancer@studio.co', role: 'member', brand_ids: ['b2'] }], invites: [] });
-  if (p === '/api/v1/stats') { const d = Number(u.searchParams.get('days') || 7); const top = posts.filter(x => x.stats);
-    return j({ days: d, published: 3, tracked: 3, updated_at: now() - 5400, totals: { views: 17210, likes: 1090, comments: 67, shares: 26 }, followers: { total: 1842, change: 37 },
-      accounts: me.accounts.map(a => ({ id: a.id, username: a.username, platform: a.platform, avatar_url: '', followers: 300 + a.id.charCodeAt(1) * 7, change: 4, limited: a.id === 'a5' })),
-      top, tiktok_pending: false, tiktok_reconnect: true, facebook_limited: false }); }
+  if (p === '/api/v1/stats') { const d = Number(u.searchParams.get('days') || 30), plat = u.searchParams.get('platform') || 'all';
+    const accs = me.accounts.filter(a => plat === 'all' || a.platform === plat);
+    const top = posts.filter(x => x.stats && (plat === 'all' || x.platform === plat));
+    const series = [...Array(d)].map((_, i) => { const day = new Date((now() - (d - 1 - i) * 86400) * 1000).toISOString().slice(0, 10);
+      return { day, posts: i % 3 ? 0 : 1, views: i % 3 ? 0 : 800 + (i * 137) % 900, engagement: i % 3 ? 0 : 40 + (i * 53) % 120, followers: 1700 + Math.round(i * 140 / d) + (i % 5) }; });
+    return j({ days: d, platform: plat, published: top.length, tracked: top.length, updated_at: now() - 5400,
+      totals: plat === 'facebook' ? {} : { views: 17210, likes: 1090, comments: 67, shares: 26 }, followers: { total: 1842, change: 37 }, series,
+      by_platform: ['tiktok', 'instagram', 'facebook'].filter(pl => plat === 'all' || pl === plat).map((pl, i) => ({ platform: pl, posts: 3 - i, views: pl === 'facebook' ? null : 9000 - i * 3000, likes: pl === 'facebook' ? null : 700 - i * 200, comments: null, shares: null, followers: [412, 650, 780][i] })),
+      platforms: ['tiktok', 'instagram', 'facebook'],
+      accounts: accs.map(a => ({ id: a.id, username: a.username, platform: a.platform, avatar_url: '', followers: 300 + a.id.charCodeAt(1) * 7, change: a.id === 'a2' ? 12 : 0, limited: a.id === 'a5' })),
+      top, tiktok_pending: false, tiktok_reconnect: true, facebook_limited: true }); }
   if (p.endsWith('/creator-info')) return j({ creator_username: 'arco.app', creator_nickname: 'ARCO', creator_avatar_url: '', comment_disabled: false, privacy_level_options: ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'SELF_ONLY'] });
   if (p === '/api/v1/media' && q.method === 'POST') { const ch = []; q.on('data', d => ch.push(d)); return q.on('end', () => { const key = 'ws1/' + Math.random().toString(16).slice(2) + '.jpg'; media[key] = Buffer.concat(ch); j({ key, url: '/media/' + key }); }); }
   if (p === '/api/v1/media/copy') { const o = await body(q);
