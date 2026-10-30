@@ -2,6 +2,9 @@ const OAUTH_TOKEN_URL = 'https://open.tiktokapis.com/v2/oauth/token/';
 const CREATOR_INFO_URL = 'https://open.tiktokapis.com/v2/post/publish/creator_info/query/';
 const CONTENT_INIT_URL = 'https://open.tiktokapis.com/v2/post/publish/content/init/';
 const STATUS_URL = 'https://open.tiktokapis.com/v2/post/publish/status/fetch/';
+// Numbers: user.info.stats for the account, video.list for its posts.
+const USER_STATS_URL = 'https://open.tiktokapis.com/v2/user/info/?fields=follower_count,likes_count,video_count';
+const VIDEO_QUERY_URL = 'https://open.tiktokapis.com/v2/video/query/?fields=id,view_count,like_count,comment_count,share_count';
 
 const TRANSIENT_CODES = new Set(['internal_error', 'rate_limit_exceeded']);
 
@@ -53,9 +56,9 @@ export function tiktok({ clientKey, clientSecret, fetch }) {
     return body;
   }
 
-  async function v2(url, accessToken, payload, label) {
+  async function v2(url, accessToken, payload, label, method = 'POST') {
     const res = await send(url, {
-      method: 'POST',
+      method,
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json; charset=UTF-8' },
       body: payload === undefined ? undefined : JSON.stringify(payload),
     }, label);
@@ -80,6 +83,10 @@ export function tiktok({ clientKey, clientSecret, fetch }) {
     creatorInfo: accessToken => v2(CREATOR_INFO_URL, accessToken, undefined, 'creator info'),
     initPhoto: (accessToken, body) => v2(CONTENT_INIT_URL, accessToken, body, 'content init'),
     status: (accessToken, publishId) => v2(STATUS_URL, accessToken, { publish_id: publishId }, 'status fetch'),
+    userStats: accessToken => v2(USER_STATS_URL, accessToken, undefined, 'tiktok account stats', 'GET').then(d => d.user || {}),
+    // Up to 20 posts per call.
+    videoStats: (accessToken, ids) => v2(VIDEO_QUERY_URL, accessToken, { filters: { video_ids: ids.slice(0, 20) } }, 'tiktok stats')
+      .then(d => d.videos || []),
   };
 }
 

@@ -11,8 +11,9 @@ import crypto from 'node:crypto';
 export const AUTHORIZE_URL = 'https://www.tiktok.com/v2/auth/authorize/';
 export const OAUTH_TOKEN_URL = 'https://open.tiktokapis.com/v2/oauth/token/';
 
-// video.publish is what the audit is for; user.info.basic comes with Login Kit.
-export const SCOPE = 'user.info.basic,video.publish,video.upload';
+// video.publish is what the audit is for; user.info.basic comes with Login Kit;
+// user.info.stats and video.list give the account's and its posts' numbers.
+export const SCOPE = 'user.info.basic,user.info.stats,video.list,video.publish,video.upload';
 
 export const b64url = buf =>
   buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

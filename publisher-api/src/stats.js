@@ -3,8 +3,9 @@
 // every 3 hours for its first 3 days, then daily until it is 30 days old;
 // an account's followers every 6 hours, kept one row per day for trends.
 //
-// TikTok is not read: its numbers need the video.list and user.info.stats
-// scopes, which the app has not been approved for yet.
+// TikTok needs user.info.stats and video.list. Accounts connected before
+// those scopes were requested lack them until they reconnect; such an account
+// is left alone for a week at a time, the way Instagram insights are.
 
 import { now, HttpError } from './http.js';
 import { accessTokenFor } from './accounts.js';
@@ -22,7 +23,13 @@ export const STATS_PER_TICK = 6;
 const utcDay = t => new Date(t * 1000).toISOString().slice(0, 10);
 const count = v => (Number.isFinite(Number(v)) ? Number(v) : 0);
 // Graph says "no permission" as code 10, 200-299, or a 100 about permissions.
-const denied = err => /^(10|2\d\d)$/.test(String(err.code)) || /permission/i.test(err.message || '');
+const denied = err => /^(10|2\d\d)$/.test(String(err.code)) || err.code === 'scope_not_authorized'
+  || /permission|scope/i.test(err.message || '');
+const resting = (a, t) => a.insights_denied_at && a.insights_denied_at > t - INSIGHTS_RETRY;
+async function rest(env, account, t) {
+  await env.DB.prepare('UPDATE accounts SET insights_denied_at = ? WHERE id = ?').bind(t, account.id).run();
+  account.insights_denied_at = t;
+}
 
 async function markReconnect(env, accountId) {
   await env.DB.prepare('UPDATE accounts SET needs_reconnect = 1 WHERE id = ?').bind(accountId).run();
@@ -91,15 +98,20 @@ export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TI
 
   // Accounts first, but at most a third of the budget, so posts keep moving.
   const accountBudget = Math.max(1, Math.floor(budget / 3));
-  const { results: accs } = await env.DB.prepare(`SELECT id, platform, open_id FROM accounts
-      WHERE platform IN ('instagram', 'facebook') AND needs_reconnect = 0 AND (stats_at IS NULL OR stats_at < ?)
-      ORDER BY COALESCE(stats_at, 0) LIMIT ?`).bind(t - ACCOUNT_EVERY, accountBudget).all();
+  const { results: accs } = await env.DB.prepare(`SELECT id, platform, open_id, insights_denied_at FROM accounts
+      WHERE needs_reconnect = 0 AND (stats_at IS NULL OR stats_at < ?)
+        AND (platform != 'tiktok' OR insights_denied_at IS NULL OR insights_denied_at < ?)
+      ORDER BY COALESCE(stats_at, 0) LIMIT ?`).bind(t - ACCOUNT_EVERY, t - INSIGHTS_RETRY, accountBudget).all();
   for (const a of accs) {
     budget--;
     try {
       const { token } = await load(a.id);
-      const r = a.platform === 'instagram' ? await mt.igAccountStats(token) : await mt.fbPageStats(token, a.open_id.slice(3));
-      const followers = count(r.followers_count ?? r.fan_count);
+      let r;
+      if (a.platform === 'tiktok') {
+        try { r = await tk.userStats(token); }
+        catch (err) { if (!denied(err)) throw err; await rest(env, a, t); continue; }
+      } else r = a.platform === 'instagram' ? await mt.igAccountStats(token) : await mt.fbPageStats(token, a.open_id.slice(3));
+      const followers = count(r.follower_count ?? r.followers_count ?? r.fan_count);
       await env.DB.batch([
         env.DB.prepare('UPDATE accounts SET followers = ?, stats_at = ? WHERE id = ?').bind(followers, t, a.id),
         env.DB.prepare(`INSERT INTO follower_history (account_id, day, followers) VALUES (?, ?, ?)
@@ -114,18 +126,39 @@ export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TI
   }
 
   if (budget <= 0) return done;
-  const { results: posts } = await env.DB.prepare(`SELECT p.id, p.account_id, p.public_post_id, p.scheduled_at
+  const { results: posts } = await env.DB.prepare(`SELECT p.id, p.account_id, p.public_post_id, p.scheduled_at, a.platform
       FROM posts p JOIN accounts a ON a.id = p.account_id
-      WHERE p.status = 'published' AND a.platform IN ('instagram', 'facebook') AND a.needs_reconnect = 0
+      WHERE p.status = 'published' AND a.needs_reconnect = 0
+        AND (a.platform != 'tiktok' OR a.insights_denied_at IS NULL OR a.insights_denied_at < ?)
         AND p.public_post_id IS NOT NULL AND p.scheduled_at > ?
         AND (p.stats_at IS NULL OR (p.scheduled_at > ? AND p.stats_at < ?) OR p.stats_at < ?)
       ORDER BY COALESCE(p.stats_at, 0), p.scheduled_at DESC LIMIT ?`)
-    .bind(t - FOLLOW_FOR, t - YOUNG, t - YOUNG_EVERY, t - DAY, budget).all();
-  for (const p of posts) {
+    .bind(t - INSIGHTS_RETRY, t - FOLLOW_FOR, t - YOUNG, t - YOUNG_EVERY, t - DAY, budget).all();
+  const save = (id, s) => env.DB.prepare('UPDATE posts SET stats = COALESCE(?, stats), stats_at = ? WHERE id = ?').bind(s ? JSON.stringify(s) : null, t, id).run();
+  const ttByAccount = new Map();
+  for (const p of posts.filter(x => x.platform === 'tiktok')) ttByAccount.set(p.account_id, [...(ttByAccount.get(p.account_id) || []), p]);
+  for (const [accountId, list] of ttByAccount) {
+    try {
+      const { account, token } = await load(accountId);
+      let videos;
+      try { videos = await tk.videoStats(token, list.map(p => p.public_post_id)); }
+      catch (err) { if (!denied(err)) throw err; await rest(env, account, t); continue; }
+      const byId = new Map(videos.map(v => [String(v.id), v]));
+      for (const p of list) {
+        const v = byId.get(String(p.public_post_id));
+        await save(p.id, v ? { views: count(v.view_count), likes: count(v.like_count), comments: count(v.comment_count), shares: count(v.share_count) } : null);
+        if (v) done.posts++;
+      }
+    } catch (err) {
+      if (err.code === 'needs_reconnect') await markReconnect(env, accountId);
+      else { console.error('stats tiktok', accountId, err.message); for (const p of list) await save(p.id, null); }
+    }
+  }
+  for (const p of posts.filter(x => x.platform !== 'tiktok')) {
     try {
       const { account, token } = await load(p.account_id);
       const s = account.platform === 'instagram' ? await readInstagram(env, mt, token, p, account, t) : await readFacebook(env, mt, token, p, account, t);
-      await env.DB.prepare('UPDATE posts SET stats = ?, stats_at = ? WHERE id = ?').bind(s ? JSON.stringify(s) : null, t, p.id).run();
+      await save(p.id, s);
       if (s) done.posts++;
     } catch (err) {
       if (err.code === 'needs_reconnect') await markReconnect(env, p.account_id);
@@ -190,7 +223,8 @@ export async function getStats(env, w, days, t = now()) {
     followers: { total: known.length ? known.reduce((n, a) => n + a.followers, 0) : null,
       change: changes.length ? changes.reduce((n, a) => n + a.change, 0) : null },
     accounts, top,
-    tiktok_pending: accounts.some(a => a.platform === 'tiktok'),
+    tiktok_pending: accounts.some(a => a.platform === 'tiktok' && a.followers === null && !a.limited),
+    tiktok_reconnect: accounts.some(a => a.platform === 'tiktok' && a.limited),
     facebook_limited: accounts.some(a => a.platform === 'facebook' && a.limited),
   };
 }

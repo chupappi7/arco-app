@@ -82,7 +82,7 @@ export async function oauthIntake(env, tk, { code, code_verifier, redirect_uri, 
   const profile = [info.creator_username || '', info.creator_nickname || '', info.creator_avatar_url || ''];
   let accountId = existing?.id;
   if (existing) {
-    await env.DB.prepare(`UPDATE accounts SET refresh_token_enc = ?, access_token_enc = NULL, access_expires_at = NULL,
+    await env.DB.prepare(`UPDATE accounts SET insights_denied_at = NULL, refresh_token_enc = ?, access_token_enc = NULL, access_expires_at = NULL,
         needs_reconnect = 0, username = ?,
         display_name = ?, avatar_url = ?, token_updated_at = ? WHERE id = ?`)
       .bind(enc, ...profile, t, accountId).run();
@@ -141,7 +141,7 @@ export async function metaIntake(env, mt, { code, redirect_uri, session_id }) {
     const id = old?.id || 'acc_' + randomToken('', 8);
     ids.push(id);
     statements.push(old
-      ? env.DB.prepare(`UPDATE accounts SET refresh_token_enc = ?, access_token_enc = ?, access_expires_at = NULL,
+      ? env.DB.prepare(`UPDATE accounts SET insights_denied_at = NULL, refresh_token_enc = ?, access_token_enc = ?, access_expires_at = NULL,
           needs_reconnect = 0, username = ?, display_name = ?, avatar_url = ?, meta_user_id = ?, token_updated_at = ?
           WHERE id = ?`).bind(enc, enc, f.name, f.name, f.avatar, String(user.id), t, id)
       : env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, platform, meta_user_id, username, display_name,
@@ -176,7 +176,7 @@ export async function igIntake(env, mt, { code, redirect_uri, session_id }) {
   const old = byOpenId.get(openId);
   const id = old?.id || 'acc_' + randomToken('', 8);
   if (old) {
-    await env.DB.prepare(`UPDATE accounts SET refresh_token_enc = ?, access_token_enc = ?, access_expires_at = ?,
+    await env.DB.prepare(`UPDATE accounts SET insights_denied_at = NULL, refresh_token_enc = ?, access_token_enc = ?, access_expires_at = ?,
         needs_reconnect = 0, username = ?, display_name = ?, avatar_url = ?, token_updated_at = ? WHERE id = ?`)
       .bind(enc, enc, expires, ...profile, t, id).run();
   } else {

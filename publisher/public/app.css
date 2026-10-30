@@ -806,3 +806,5 @@ code.key{display:block;width:100%;user-select:all;background:var(--well);border:
 @media (max-width:860px){.quick{display:none}}
 .dtab .sm{display:none}.dtab em{font-style:normal}
 @media (max-width:600px){.dtab .lg{display:none}.dtab .sm{display:inline}}
+.arow .fv a.rc{font-size:12.5px;font-weight:600;color:var(--graphite)}
+.snotes a{color:var(--graphite);font-weight:600}

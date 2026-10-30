@@ -300,6 +300,8 @@ function overviewView() {
   const todo = [
     ...drafts.slice(0, 4).map(g => `<div class="arow2" data-opendraft="${esc(g[0].group_id || g[0].id)}" role="button" tabindex="0"><span class="ic mute">${ui('draft', 15)}</span>
       <div><b>Finish draft</b><span>${esc(g[0].caption || g[0].title || 'No caption yet')}</span></div><em>Open</em></div>`),
+    ...(S.ovStats?.tiktok_reconnect && can('admin') ? [`<a class="arow2" href="/api/auth/start?add=1"><span class="ic mute">${appIcon('tiktok', 18)}</span>
+      <div><b>Reconnect TikTok for stats</b><span>One reconnect lets TikTok share views, likes and followers</span></div><em>Reconnect</em></a>`] : []),
     ...(!S.me.workspace.slots && can('admin') ? [`<a class="arow2" href="#settings"><span class="ic mute">${ui('cal', 15)}</span>
       <div><b>Set your posting times</b><span>"Add to queue" then picks the next free time</span></div><em>Set</em></a>`] : []),
   ];
@@ -356,7 +358,7 @@ function perfCard() {
   const keys = ['views', 'likes', 'comments', 'shares'].filter(k => st.totals[k] != null);
   const cells = [...(keys.length ? keys : ['likes', 'comments', 'shares']).slice(0, 3).map(k => [METRIC[k], num(st.totals[k] ?? null), '']),
     ['New followers', st.followers.change == null ? '–' : signed(st.followers.change), st.followers.change > 0 ? 'up' : '']];
-  const note = `${st.updated_at ? `Updated ${ago(st.updated_at)}` : 'Read every few hours'}${st.tiktok_pending ? ' · TikTok after approval' : ''}`;
+  const note = `${st.updated_at ? `Updated ${ago(st.updated_at)}` : 'Read every few hours'}${st.tiktok_reconnect ? ' · reconnect TikTok for its numbers' : ''}`;
   return `<section class="panel ocard perf">${head}
     <div class="pgrid">${cells.map(([l, v, c]) => `<div><span>${l}</span><b class="${c}">${v}</b></div>`).join('')}</div>
     <p class="pnote" title="${esc(note)}">${note}</p></section>`;
@@ -376,10 +378,11 @@ function analyticsView() {
       <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
       ${statLine(p.stats)}</div>`;
   const acc = a => `<div class="arow">${icon(a.platform, 14)}<b>${who(a)}</b>
-      <span class="fv">${a.followers == null ? (a.platform === 'tiktok' ? '<em>Waiting on TikTok</em>' : '<em>Reading…</em>') : num(a.followers)}</span>
+      <span class="fv">${a.limited && a.platform === 'tiktok' ? `<a class="rc" href="/api/auth/start?add=1">Reconnect</a>` : a.followers == null ? '<em>Reading…</em>' : num(a.followers)}</span>
       <span class="fc ${a.change > 0 ? 'up' : a.change < 0 ? 'down' : ''}">${a.change == null ? '' : signed(a.change)}</span></div>`;
   const notes = [
-    st.tiktok_pending && 'TikTok views and likes come once TikTok approves the stats permissions for ARCO Publisher.',
+    st.tiktok_reconnect && `TikTok accounts connected before stats were added need one reconnect to share their numbers.${can('admin') ? ' <a href="/api/auth/start?add=1">Reconnect TikTok</a>' : ''}`,
+    st.tiktok_pending && 'TikTok numbers appear within a few hours of connecting.',
     st.facebook_limited && 'Facebook Page likes and comments need one more permission (pages_read_user_content). Followers already show.',
     st.tracked && st.totals.views == null && 'Instagram views, reach and saves need the insights permission; until then you see likes and comments.',
   ].filter(Boolean);

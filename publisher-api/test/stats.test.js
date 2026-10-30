@@ -4,6 +4,7 @@ import { resetDb, fakeTk } from './helpers.js';
 import { encrypt } from '../src/crypto.js';
 import { refreshStats, getStats } from '../src/stats.js';
 import { MetaError } from '../src/meta.js';
+import { TikTokError } from '../src/tiktok.js';
 
 const T = 1_800_000_000;
 const env = baseEnv;
@@ -38,7 +39,7 @@ function fakeMeta(over = {}) {
 describe('refreshStats', () => {
   beforeEach(() => resetDb(env));
 
-  it('reads Instagram and Facebook posts and accounts, never TikTok', async () => {
+  it('reads Instagram and Facebook posts and accounts, and leaves TikTok to its own client', async () => {
     await account('ig1', 'instagram'); await account('fb1', 'facebook'); await account('tt1', 'tiktok');
     await post('p1', 'ig1', T - 3600); await post('p2', 'fb1', T - 7200); await post('p3', 'tt1', T - 3600);
     const mt = fakeMeta();
@@ -144,5 +145,44 @@ describe('Facebook without pages_read_user_content', () => {
     const s = await getStats(env, 'ws1', 7, T);
     expect(s.facebook_limited).toBe(true);
     expect(s.tracked).toBe(0);
+  });
+});
+
+describe('TikTok numbers', () => {
+  beforeEach(() => resetDb(env));
+  const T2 = 1_800_000_000;
+
+  it('reads followers and every due post of an account in one call', async () => {
+    await account('tt1', 'tiktok');
+    await post('a', 'tt1', T2 - 3600, { remote: '7500000000000000001' });
+    await post('b', 'tt1', T2 - 7200, { remote: '7500000000000000002' });
+    const calls = [];
+    const tk = fakeTk({
+      userStats: async () => { calls.push('user'); return { follower_count: 4200, likes_count: 9, video_count: 3 }; },
+      videoStats: async (tok, ids) => { calls.push(['videos', ids]);
+        return ids.map((id, i) => ({ id, view_count: 1000 * (i + 1), like_count: 50, comment_count: 4, share_count: 2 })); },
+    });
+    const done = await refreshStats(env, fakeMeta(), tk, T2, 6);
+    expect(done).toEqual({ posts: 2, accounts: 1 });
+    expect(calls.filter(c => Array.isArray(c)).length).toBe(1);
+    const a = await env.DB.prepare('SELECT stats FROM posts WHERE id = ?').bind('a').first();
+    expect(JSON.parse(a.stats)).toEqual({ views: 1000, likes: 50, comments: 4, shares: 2 });
+    expect((await env.DB.prepare('SELECT followers FROM accounts WHERE id = ?').bind('tt1').first()).followers).toBe(4200);
+    const st = await getStats(env, 'ws1', 7, T2);
+    expect(st.totals.views).toBe(3000);
+    expect(st.tiktok_pending).toBe(false);
+  });
+
+  it('an account connected before the stats scopes is left alone and asked to reconnect', async () => {
+    await account('tt1', 'tiktok'); await post('a', 'tt1', T2 - 3600, { remote: '75' });
+    let n = 0;
+    const no = async () => { n++; throw new TikTokError('tiktok stats: scope not authorized', { code: 'scope_not_authorized' }); };
+    const tk = fakeTk({ userStats: no, videoStats: no });
+    await refreshStats(env, fakeMeta(), tk, T2, 6);
+    await refreshStats(env, fakeMeta(), tk, T2 + 600, 6);
+    expect(n).toBe(1);
+    const st = await getStats(env, 'ws1', 7, T2);
+    expect(st.tiktok_reconnect).toBe(true);
+    expect(st.tiktok_pending).toBe(false);
   });
 });
