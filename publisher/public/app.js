@@ -209,7 +209,7 @@ function render() {
   const views = { analytics: analyticsView, overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
   const head = S.view === 'overview' ? '' : pageHead(...HEADS[S.view]());
   const hadDetail = !!$('overlay'), opener = S.detail && !hadDetail ? document.activeElement?.closest?.('[data-open]')?.dataset.open : null;
-  $('app').innerHTML = head + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '');
+  $('app').innerHTML = head + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '') + resultView();
   bind();
   if (S.detail && !hadDetail) { S.opener = opener; $('closedetail')?.focus(); }
   if (!S.detail && hadDetail && S.opener) { document.querySelector(`[data-open="${S.opener}"]`)?.focus(); S.opener = null; }
@@ -498,7 +498,7 @@ function composeView() {
     : S.replaces ? ['Editing a scheduled post. The original stays scheduled until you save this one.', 'Stop editing'] : null;
   const when = [['now', 'Post now'], ['queue', 'Add to queue'], ['later', 'Schedule']];
   return `${banner ? `<div class="cbanner">${banner[0]}<button class="btn sec" id="stopedit">${banner[1]}</button></div>` : ''}
-  <div class="composer">
+  <div class="composer ${S.busy ? 'busy' : ''}" ${S.busy ? 'aria-busy="true"' : ''}>
     <div class="cmain">
       <section class="panel"><header><h2>Post to</h2>${S.targets.length ? `<span class="note">${S.targets.length} selected</span>` : ''}</header>
         <div class="csec">${accountPicker()}</div></section>
@@ -941,37 +941,63 @@ async function submit() {
   S.busy = false;
   if (!made.length) { S.status = { kind: 'err', text: errors.join(' · ') }; return render(); }
   if (S.fromDraft && !errors.length) await dropDrafts(S.fromDraft);
+  const cover = S.images[S.cover]?.url || S.images[0]?.url || '';
+  const scheduled = made[0].scheduled_at > Date.now() / 1000 + 60;
   resetComposer();
-  const tail = errors.length ? ` Not sent: ${errors.join(' · ')}` : '';
-  if (made[0].scheduled_at > Date.now() / 1000 + 60) {
-    const first = Math.min(...made.map(p => p.scheduled_at));
-    S.flash = { kind: errors.length ? 'err' : 'ok', text: `${made.length > 1 ? `${made.length} posts scheduled, the first for` : 'Scheduled for'} ${fmtFull(first)}.${tail}` };
-    S.keepFlash = true;
-    location.hash = '#calendar';
-  } else {
-    S.status = { kind: errors.length ? 'err' : '', text: `Posting… This page updates when it is done.${tail}` };
-    render(); watch(made.map(p => p.id), tail);
-  }
+  S.status = null;
+  S.result = { scheduled, cover, posts: made, errors, open: true };
+  render();
+  if (!scheduled) watch(made.map(p => p.id));
+  refreshCounts();
 }
 
-async function watch(ids, tail = '') {
-  const done = new Map();
-  for (let n = 0; n < 100 && done.size < ids.length; n++) {
+async function watch(ids) {
+  const R = S.result;
+  for (let n = 0; n < 100; n++) {
     await new Promise(r => setTimeout(r, 3000));
     const t = Math.floor(Date.now() / 1000);
     let posts;
     try { posts = (await api(`/posts?from=${t - 3600}&to=${t + 60}`)).posts; }
     catch { continue; }   // one failed check is not a result; keep watching
-    for (const p of posts) if (ids.includes(p.id) && (p.status === 'published' || p.status === 'failed')) done.set(p.id, p);
+    for (const p of posts) { const i = R.posts.findIndex(x => x.id === p.id); if (i >= 0) R.posts[i] = p; }
+    if (S.result === R && R.open) render();
+    if (R.posts.every(p => p.status === 'published' || p.status === 'failed')) break;
   }
-  const all = [...done.values()];
-  const failed = all.filter(p => p.status === 'failed');
-  const label = p => `${PLATFORM[p.platform] || 'TikTok'} ${p.platform === 'facebook' ? '' : '@'}${p.username}`;
-  if (done.size < ids.length) S.status = { kind: '', text: `Still processing. Check the Calendar for the result.${tail}` };
-  else if (failed.length) S.status = { kind: 'err', text: failed.map(p => `${label(p)}: ${p.fail_reason || 'rejected'}`).join(' · ') +
-    (all.length > failed.length ? ` · Published to ${all.filter(p => p.status === 'published').map(label).join(', ')}.` : '') };
-  else S.status = { kind: 'ok', text: `Published to ${all.map(label).join(', ')}. It may take a few minutes to appear on the profile.${tail}` };
-  render();
+  if (S.result === R && R.open) return;
+  // The sheet was closed: say how it went in a toast.
+  const failed = R.posts.filter(p => p.status === 'failed'), ok = R.posts.filter(p => p.status === 'published');
+  if (failed.length) toast(`${failed.length} post${failed.length === 1 ? '' : 's'} failed: ${failed.map(p => `${PLATFORM[p.platform]} @${p.username}`).join(', ')}. Open the calendar to retry.`, 'err');
+  else if (ok.length === R.posts.length) toast(`Published to ${ok.length === 1 ? `${PLATFORM[ok[0].platform]} @${ok[0].username}` : `${ok.length} accounts`}.`);
+}
+
+// After Post now or Schedule: what happened, per account, and where to go next.
+function resultView() {
+  const R = S.result;
+  if (!R?.open) return '';
+  const done = R.posts.filter(p => p.status === 'published').length, failed = R.posts.filter(p => p.status === 'failed').length;
+  const pending = R.posts.length - done - failed;
+  const first = Math.min(...R.posts.map(p => p.scheduled_at));
+  const title = R.scheduled ? `Scheduled for ${fmt(first, { weekday: 'short', month: 'short', day: 'numeric' })} · ${at(first)}`
+    : pending ? `Posting to ${R.posts.length} account${R.posts.length === 1 ? '' : 's'}…`
+    : failed ? `${done} published, ${failed} failed` : `Published to ${done} account${done === 1 ? '' : 's'}`;
+  const state = R.scheduled ? 'ok' : pending ? 'busy' : failed ? 'bad' : 'ok';
+  const row = p => {
+    const a = acct(p.account_id);
+    const right = R.scheduled ? `<span class="rs">${at(p.scheduled_at)}${dayOf(p.scheduled_at) !== dayOf(first) ? ` ${fmt(p.scheduled_at, { weekday: 'short' })}` : ''}</span>`
+      : p.status === 'published' ? `<span class="rs ok">${ui('check', 14)}Published</span>${p.post_url ? `<a class="btn sec sm" href="${esc(p.post_url)}" target="_blank" rel="noopener">View</a>` : ''}`
+      : p.status === 'failed' ? `<span class="rs bad">Failed</span><button class="btn sec sm" data-retry="${p.id}">Retry</button>`
+      : '<span class="rs"><i class="spin"></i>Posting…</span>';
+    return `<div class="rrow">${withBadge(avatar(a?.avatar_url, p.username), p.platform || 'tiktok')}
+      <div class="rn"><b>${who(p)}</b>${p.status === 'failed' ? `<span title="${esc(p.fail_reason || '')}">${esc(p.fail_reason || 'Rejected')}</span>` : `<span>${PLATFORM[p.platform || 'tiktok']}</span>`}</div>${right}</div>`;
+  };
+  return `<div class="rsheet-bg" id="rsheetbg"><div class="rsheet" role="dialog" aria-modal="true" aria-labelledby="rtitle">
+    <div class="rtop">${R.cover ? `<img src="${esc(R.cover)}" alt="">` : ''}<span class="rbadge ${state}">${state === 'busy' ? '<i class="spin"></i>' : ui(state === 'bad' ? 'x' : 'check', 18)}</span></div>
+    <h2 id="rtitle">${title}</h2>
+    <p class="rsub">${R.scheduled ? 'It goes out automatically, even with your laptop closed.' : pending ? 'You can close this. It keeps going, and you get a message when it is done.' : failed ? 'Retry the failed ones, or fix them from the calendar.' : 'It may take a minute to show on each profile.'}</p>
+    <div class="rlist">${R.posts.map(row).join('')}${R.errors.map(e => `<div class="rrow"><span class="ic bad">${ui('x', 14)}</span><div class="rn"><b>Not sent</b><span title="${esc(e)}">${esc(e)}</span></div></div>`).join('')}</div>
+    <div class="racts"><button class="btn sec" data-res="${R.scheduled ? 'calendar' : 'overview'}">${R.scheduled ? 'See in calendar' : 'Go to overview'}</button>
+      <button class="btn" data-res="another">Create another</button></div>
+    <button class="xbtn rclose" data-res="close" aria-label="Close">${ui('x', 18)}</button></div></div>`;
 }
 
 // Targets stay selected for the next post; privacy is chosen again each time.
@@ -1598,7 +1624,7 @@ document.addEventListener('keydown', e => {
     else if (f.length && !e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
   }
   if (e.key !== 'Escape') return;
-  if (S.pickOpen) { S.pickOpen = false; render(); $('openpick')?.focus(); } else if (S.detail) { S.detail = null; render(); } });
+  if (S.result?.open) { S.result.open = false; render(); } else if (S.pickOpen) { S.pickOpen = false; render(); $('openpick')?.focus(); } else if (S.detail) { S.detail = null; render(); } });
 // The account dropdown closes when you click anywhere outside it.
 document.addEventListener('pointerdown', e => { if (S.pickOpen && !e.target.closest('.dd')) { S.pickOpen = false; render(); } });
 
@@ -1740,6 +1766,10 @@ function bind() {
   on('[data-newon]', 'click', e => { const [y, m, d] = e.currentTarget.dataset.newon.split('-').map(Number);
     const n = zoned(Date.now()), isToday = n.y === y && n.m === m && n.d === d, h = isToday ? Math.max(9, n.h + 1) : 9;
     resetComposer(); if (h <= 23) { S.when = 'later'; S.at = `${y}-${pad(m)}-${pad(d)}T${pad(h)}:00`; } location.hash = '#compose'; });
+  on('[data-res]', 'click', e => { const k = e.currentTarget.dataset.res; if (!S.result) return; S.result.open = false;
+    if (k === 'overview') location.hash = '#overview'; else if (k === 'calendar') location.hash = '#calendar';
+    else { render(); if (k === 'another') $('openpick')?.focus(); } });
+  on('#rsheetbg', 'click', e => { if (e.target.id === 'rsheetbg') { S.result.open = false; render(); } });
   on('[data-today]', 'click', () => { S.week = 0; S.month = 0; loadWeek(); });
   on('[data-moreday]', 'click', e => { const [y, m, d] = e.currentTarget.dataset.moreday.split('-').map(Number);
     const t = today(), mon = x => { const wd = new Date(Date.UTC(x.y, x.m - 1, x.d)).getUTCDay(); return addDays(x, -((wd + 6) % 7)); };
@@ -1751,7 +1781,11 @@ function bind() {
   on('[data-day]', 'drop', e => { e.preventDefault(); e.currentTarget.classList.remove('drop');
     const id = e.dataTransfer.getData('text/plain'); if (id) movePost(id, e.currentTarget.dataset.day); });
   on('[data-cancel]', 'click', async e => { try { await api(`/posts/${e.target.dataset.cancel}`, { method: 'DELETE' }); S.detail = null; S.flash = { kind: 'ok', text: 'Post cancelled.' }; } catch (x) { S.flash = { kind: 'err', text: x.message }; } reloadView(); refreshCounts(); });
-  on('[data-retry]', 'click', async e => { try { await api(`/posts/${e.target.dataset.retry}/retry`, { method: 'POST' }); S.detail = null; S.flash = { kind: 'ok', text: 'Retrying. It goes out within a minute.' }; } catch (x) { S.flash = { kind: 'err', text: x.message }; } reloadView(); refreshCounts(); });
+  on('[data-retry]', 'click', async e => { const id = e.currentTarget.dataset.retry;
+    try { await api(`/posts/${id}/retry`, { method: 'POST' });
+      const R = S.result; const p = R?.open && R.posts.find(x => x.id === id);
+      if (p) { p.status = 'queued'; render(); watch([id]); return; }
+      S.detail = null; S.flash = { kind: 'ok', text: 'Retrying. It goes out within a minute.' }; } catch (x) { S.flash = { kind: 'err', text: x.message }; } reloadView(); refreshCounts(); });
   on('[data-edit]', 'click', e => { S.detail = null; edit(e.target.dataset.edit); });
   on('[data-disc]', 'click', async e => {
     if (!confirm('Disconnect this account? Its scheduled posts will be cancelled.')) return;
