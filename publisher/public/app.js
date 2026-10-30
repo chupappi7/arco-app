@@ -184,6 +184,40 @@ const HEADS = {
 };
 const pageHead = (title, sub, action = '') => `<div class="pagehead"><div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${action}</div>`;
 
+// The app's own confirm and prompt: says what will happen and what will
+// not, names the thing, and puts the risky action in red. Resolves to true
+// (or the typed value), or false when cancelled. `type` asks the person to type
+// a word first for things that cannot be undone.
+function ask({ title, body = '', ok = 'Confirm', danger = false, icon = '', list = [], input = null, type = null }) {
+  return new Promise(resolve => {
+    const box = $('dialogs'), back = document.activeElement;
+    box.innerHTML = `<div class="dlg-bg"><div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="dlgt" aria-describedby="dlgb">
+      ${icon ? `<div class="dlg-ic ${danger ? 'bad' : ''}">${icon}</div>` : ''}
+      <h2 id="dlgt">${title}</h2>${body ? `<p id="dlgb">${body}</p>` : ''}
+      ${list.length ? `<ul class="dlg-list">${list.map(([good, t]) => `<li class="${good ? 'ok' : 'no'}">${ui(good ? 'check' : 'x', 14)}<span>${t}</span></li>`).join('')}</ul>` : ''}
+      ${input ? `<input type="text" id="dlgin" value="${esc(input.value || '')}" placeholder="${esc(input.placeholder || '')}" aria-label="${esc(input.label || title)}" maxlength="60">` : ''}
+      ${type ? `<label class="dlg-type" for="dlgin">Type <b>${esc(type)}</b> to confirm</label><input type="text" id="dlgin" autocomplete="off" spellcheck="false">` : ''}
+      <div class="dlg-acts"><button class="btn sec" data-dlg="no">Cancel</button><button class="btn ${danger ? 'red' : ''}" data-dlg="yes" ${type ? 'disabled' : ''}>${ok}</button></div></div></div>`;
+    const inp = $('dlgin'), yes = box.querySelector('[data-dlg=yes]');
+    const done = v => { box.innerHTML = ''; document.removeEventListener('keydown', key, true); back?.focus?.(); resolve(v); };
+    const go = () => { if (yes.disabled) return; done(input ? inp.value.trim() || false : true); };
+    const key = e => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+      else if (e.key === 'Enter' && (input || type) && document.activeElement === inp) { e.preventDefault(); go(); }
+      else if (e.key === 'Tab') { const f = [...box.querySelectorAll('input,button:not(:disabled)')];
+        if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f.at(-1).focus(); }
+        else if (!e.shiftKey && document.activeElement === f.at(-1)) { e.preventDefault(); f[0].focus(); } }
+    };
+    document.addEventListener('keydown', key, true);
+    if (type) inp.addEventListener('input', () => { yes.disabled = inp.value.trim() !== type; });
+    box.querySelector('[data-dlg=no]').onclick = () => done(false);
+    yes.onclick = go;
+    box.querySelector('.dlg-bg').onclick = e => { if (e.target.classList.contains('dlg-bg')) done(false); };
+    (inp || (danger ? box.querySelector('[data-dlg=no]') : yes)).focus();
+    if (input) inp.select();
+  });
+}
+
 function toast(text, kind = '') {
   const el = document.createElement('div');
   el.className = `toast ${kind === 'err' ? 'err' : ''}`;
@@ -1690,16 +1724,22 @@ function bind() {
   on('[data-savescope]', 'click', e => { const id = e.target.dataset.savescope;
     peopleAction(() => send(`/members/${id}`, 'PATCH', { role: 'member', brand_ids: scopeFrom('sc-' + id) }), 'Access updated.'); });
   on('[data-remove]', 'click', async e => { const id = e.target.dataset.remove, leave = e.target.dataset.leave;
-    if (!confirm(leave ? 'Leave this workspace? You lose access to its accounts and posts.' : 'Remove this person from the workspace?')) return;
+    const email = S.members?.members.find(m => m.user_id === id)?.email || 'this person';
+    if (!await ask(leave ? { title: `Leave ${esc(S.me.workspace.name)}?`, ok: 'Leave workspace', danger: true, icon: ui('users', 22),
+        list: [[false, 'You lose access to its accounts, posts and drafts'], [true, 'Everything stays for the rest of the team'], [true, 'An admin can invite you back']] }
+      : { title: `Remove ${esc(email)}?`, ok: 'Remove', danger: true, icon: ui('users', 22),
+        list: [[false, 'They lose access to this workspace right away'], [true, 'Posts they scheduled still go out'], [true, 'You can invite them again later']] })) return;
     if (leave) { try { await send(`/members/${id}`, 'DELETE'); await loadMe(); S.members = null; route(); } catch (x) { S.flash = { kind: 'err', text: x.message }; render(); } }
     else peopleAction(() => send(`/members/${id}`, 'DELETE'), 'Removed.'); });
   on('[data-transfer]', 'click', async e => {
     const { transfer, email } = e.target.dataset;
-    if (prompt(`Make ${email} the owner? You become an admin and cannot undo this yourself. Type their email to confirm.`) !== email) return;
+    if (!await ask({ title: `Make ${esc(email)} the owner?`, ok: 'Transfer ownership', danger: true, icon: ui('users', 22), type: email,
+      list: [[false, 'You become an admin and cannot undo this yourself'], [true, 'Only the new owner can give it back']] })) return;
     try { await send('/workspace/transfer', 'POST', { user_id: transfer }); await loadMe(); S.members = null;
       S.flash = { kind: 'ok', text: `${email} now owns this workspace. You are an admin.` }; route(); }
     catch (x) { S.flash = { kind: 'err', text: x.message }; render(); } });
-  on('#logoutall', 'click', async () => { if (!confirm('Sign out on every device?')) return;
+  on('#logoutall', 'click', async () => { if (!await ask({ title: 'Sign out everywhere?', ok: 'Sign out everywhere', icon: ui('x', 22),
+      body: 'Every browser and device signed in to your account is signed out, including this one. Sign in again with a code by email.' })) return;
     await send('/logout-all', 'POST'); location.href = '/api/auth/logout'; });
   on('[data-cover]', 'click', e => { S.cover = Number(e.target.dataset.cover); render(); });
   on('[data-rm]', 'click', e => { const n = Number(e.target.dataset.rm); S.images.splice(n, 1); S.cover = Math.min(S.cover, Math.max(0, S.images.length - 1)); render(); });
@@ -1753,10 +1793,13 @@ function bind() {
   on('#newbrand', 'submit', e => { e.preventDefault(); const name = $('brandname').value;
     brandAction(() => send('/brands', 'POST', { name })); });
   on('[data-move]', 'change', e => brandAction(() => send(`/accounts/${e.target.dataset.move}`, 'PATCH', { brand_id: e.target.value || null })));
-  on('[data-rename]', 'click', e => { const id = e.target.dataset.rename;
-    const name = prompt('Rename brand', brandName(id) || ''); if (name) brandAction(() => send(`/brands/${id}`, 'PATCH', { name })); });
-  on('[data-delbrand]', 'click', e => { const id = e.target.dataset.delbrand;
-    if (confirm(`Delete the brand "${brandName(id)}"? Its accounts stay connected, just ungrouped.`)) brandAction(() => send(`/brands/${id}`, 'DELETE')); });
+  on('[data-rename]', 'click', async e => { const id = e.currentTarget.dataset.rename;
+    const name = await ask({ title: 'Rename brand', ok: 'Save', input: { value: brandName(id) || '', label: 'Brand name' } });
+    if (name && name !== brandName(id)) brandAction(() => send(`/brands/${id}`, 'PATCH', { name })); });
+  on('[data-delbrand]', 'click', async e => { const id = e.currentTarget.dataset.delbrand;
+    if (await ask({ title: `Delete the brand ${esc(brandName(id))}?`, ok: 'Delete brand', danger: true, icon: ui('users', 22),
+      list: [[true, 'Its accounts stay connected, just not grouped'], [true, 'Scheduled posts still go out'], [false, 'Its posting times and brand voice are removed']] }))
+      brandAction(() => send(`/brands/${id}`, 'DELETE')); });
   on('[data-pv]', 'change', e => { S.tt[e.target.dataset.pv].privacy = e.target.value; render(); });
   on('[data-cm]', 'change', e => { S.tt[e.target.dataset.cm].comment = e.target.checked; render(); });
   on('#bulkpriv', 'change', e => e.target.value && bulkPrivacy(e.target.value));
@@ -1782,7 +1825,8 @@ function bind() {
   on('[data-opendraft]', 'click', e => openDraft(e.target.dataset.opendraft));
   on('[data-deldraft]', 'click', async e => {
     const key = e.target.dataset.deldraft, g = draftGroups().find(x => (x[0].group_id || x[0].id) === key);
-    if (!g || !confirm('Delete this draft?')) return;
+    if (!g || !await ask({ title: 'Delete this draft?', ok: 'Delete draft', danger: true, icon: ui('draft', 22),
+      body: esc((g[0].caption || g[0].title || 'No caption yet').slice(0, 90)), list: [[false, 'Its caption and photos are removed for good']] })) return;
     await dropDrafts(g.map(x => x.id)); loadDrafts(); });
   on('#stopedit', 'click', () => { resetComposer(); location.hash = '#calendar'; });
   on('[data-fp]', 'click', e => { S.fPlat = e.target.dataset.fp; S.fAcct = 'all'; render(); });
@@ -1831,15 +1875,23 @@ function bind() {
       S.detail = null; S.flash = { kind: 'ok', text: 'Retrying. It goes out within a minute.' }; } catch (x) { S.flash = { kind: 'err', text: x.message }; } reloadView(); refreshCounts(); });
   on('[data-edit]', 'click', e => { S.detail = null; edit(e.target.dataset.edit); });
   on('[data-disc]', 'click', async e => {
-    if (!confirm('Disconnect this account? Its scheduled posts will be cancelled.')) return;
-    const id = e.target.dataset.disc;
+    const id = e.currentTarget.dataset.disc, a = acct(id), pl = platformOf(a), t = Math.floor(Date.now() / 1000);
+    let n = null;
+    try { n = (await api(`/posts?from=${t}&to=${t + 62 * 86400}`)).posts.filter(p => p.account_id === id && p.status === 'queued').length; } catch {}
+    const ok = await ask({ title: `Disconnect ${handle(a)}?`, ok: 'Disconnect', danger: true,
+      icon: withBadge(avatar(a.avatar_url, a.username || a.display_name), pl),
+      body: `ARCO Publisher stops posting to this ${PLATFORM[pl]} account.`,
+      list: [[false, n ? `${n} scheduled post${n === 1 ? ' is' : 's are'} cancelled` : 'Any scheduled posts are cancelled'],
+        [true, `Posts already published stay on ${PLATFORM[pl]}`], [true, 'You can connect it again any time']] });
+    if (!ok) return;
     await api(`/accounts/${id}`, { method: 'DELETE' }); S.me = await api('/me');
     S.targets = S.targets.filter(x => x !== id); saveTargets(); render();
   });
   on('[data-settab]', 'click', e => { S.setTab = e.currentTarget.dataset.settab; render(); });
   on('#apikey', 'click', async () => { S.apiKey = (await api('/api-key', { method: 'POST' })).api_key; S.me.api_key_set = true; render(); });
   on('#delws', 'click', async () => {
-    if (prompt(`Type the workspace name to delete it: ${S.me.workspace.name}`) !== S.me.workspace.name) return;
+    if (!await ask({ title: `Delete ${esc(S.me.workspace.name)}?`, ok: 'Delete workspace', danger: true, icon: ui('x', 22), type: S.me.workspace.name,
+      list: [[false, 'All its accounts, brands, posts, photos and members are removed now'], [false, 'Scheduled posts never go out'], [false, 'This cannot be undone']] })) return;
     await api('/me', { method: 'DELETE' }); location.href = '/api/auth/logout';
   });
 }
