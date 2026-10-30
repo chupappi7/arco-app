@@ -37,7 +37,7 @@ os.makedirs(OUT, exist_ok=True)
 
 HOOK = ['i barely type anymore', 'these 5 tools do it for me']
 TOOLS = ['Superwhisper', 'ARCO', 'Granola', 'Claude', 'CleanShot X']
-TITLES = ['1. Superwhisper', '2. ARCO: Day Planner & Focus', '3. Granola',
+TITLES = ['1. Superwhisper', '2. ARCO Focus', '3. Granola',
           '4. Claude', '5. CleanShot X']
 ICONS = ['icon-superwhisper.jpg', 'icon-arco.png', 'icon-granola.png',
          'icon-claude.jpg', 'icon-cleanshot.png']

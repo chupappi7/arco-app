@@ -61,7 +61,7 @@ BGS = [
 TOOLS = ['Claude', 'ARCO', 'Supabase', 'Vercel', 'RevenueCat']
 ICONS = ['icon-claude.jpg', 'icon-arco.png', 'icon-supabase.png',
          'icon-vercel.png', 'icon-revenuecat.png']
-TITLES = ['1. Claude', '2. ARCO: Day Planner & Focus', '3. Supabase',
+TITLES = ['1. Claude', '2. ARCO Focus', '3. Supabase',
           '4. Vercel', '5. RevenueCat']
 BODY = [
     ['Claude Code runs in my terminal.', 'It reads the whole project and',

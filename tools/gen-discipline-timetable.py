@@ -43,7 +43,7 @@ BGS = ['bg-h80.jpg', 'bg-h29.jpg', 'bg-h24.jpg', 'bg-h22.jpg',
        'bg-h21.jpg', 'bg-h20.jpg']
 
 RULES = [
- ('ARCO', [
+ ('ARCO Focus', [
     'The block runs on a timetable, not',
     'on willpower.',
     '',

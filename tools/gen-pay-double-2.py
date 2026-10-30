@@ -36,7 +36,7 @@ os.makedirs(OUT, exist_ok=True)
 
 HOOK = ['5 tools', 'i would pay double for']
 TOOLS = ['Gemini', 'ARCO', 'Loom', 'Airtable', 'Framer']
-TITLES = ['1. Gemini', '2. ARCO', '3. Loom', '4. Airtable', '5. Framer']
+TITLES = ['1. Gemini', '2. ARCO Focus', '3. Loom', '4. Airtable', '5. Framer']
 ICONS = ['icon-gemini.png', 'icon-arco.png', 'icon-loom.png',
          'icon-airtable.png', 'icon-framer.png']
 BGS = ['bg-h61.jpg',     # hook       desk-led-neon
