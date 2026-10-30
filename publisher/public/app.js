@@ -419,7 +419,7 @@ function analyticsView() {
       <span class="fc ${a.change > 0 ? 'up' : a.change < 0 ? 'down' : ''}">${a.change == null || a.change === 0 ? '' : signed(a.change)}</span></div>`;
   const notes = [
     st.tiktok_reconnect && `TikTok accounts connected before stats were added need one reconnect.${can('admin') ? ' <a href="/api/auth/start?add=1">Reconnect TikTok</a>' : ''}`,
-    st.facebook_limited && (plat === 'all' || plat === 'facebook') && 'Facebook post numbers need one more permission; followers already show.',
+    st.facebook_limited && (plat === 'all' || plat === 'facebook') && `Facebook Pages connected before post numbers were added need one reconnect.${can('admin') ? ' <a href="/api/auth/meta/start?add=1">Reconnect Facebook</a>' : ''}`,
   ].filter(Boolean);
 
   return `${filters}
