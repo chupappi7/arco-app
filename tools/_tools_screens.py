@@ -30,8 +30,8 @@ PROMO = ['Search “arco focus” on the App Store.']
 # searching the store does not, and it is answerable with one pasted reply.
 PROMO_COMMENT = ['Comment “ARCO” and I’ll send my setup.',
                  'Search “arco focus” on the App Store.']
-# Thinh, 2026-10-07: the app is named by its current store name everywhere.
-PROMO_STORE_NAME = ['Search “App Blocker & Focus: ARCO”', 'on the App Store.']
+# Thinh, 2026-10-30: the app is "ARCO Focus" on every slide, nothing else.
+PROMO_STORE_NAME = ['Search “arco focus”', 'on the App Store.']
 
 TOOL = {'x': 72, 'w': 936, 'icon': 220, 'icon_y': 560, 'title_size': 76,
         'body_size': 44, 'app_size': 34}

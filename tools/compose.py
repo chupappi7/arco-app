@@ -987,8 +987,30 @@ def assert_roster_allowed(out):
     return True
 
 
+APP_NAME = 'ARCO Focus'
+
+
+def assert_app_name(icon, title):
+    """Our own slide has to carry the current store name and nothing else.
+
+    Every other name the app has shipped under -- plain ARCO, the two long
+    store names -- is wrong on a slide now, and a generator written before a
+    rename still passes the old one in its title. Catch it at render time:
+    the post is only fixable while the generator is in front of you.
+    """
+    if 'arco' not in icon.lower():
+        return
+    name = title.split('.', 1)[1].strip() if '.' in title else title.strip()
+    if name != APP_NAME:
+        raise SystemExit(
+            f'the app slide says "{name}". It has to say "{APP_NAME}" -- '
+            'fix the title in the generator.')
+    return True
+
+
 def app_slide(bg, icon, title, body_lines, out, grad=(0.85, 0.68, 300, 1250)):
     assert_roster_allowed(out)
+    assert_app_name(icon, title)
     assert_teaches(title, body_lines)
     im = base_photo(bg, grad)
     im = frame_for_band(im, 600, 1300)
