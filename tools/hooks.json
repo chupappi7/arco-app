@@ -230,7 +230,7 @@
   {
    "topic": "lock-in-anyway",
    "title": "this is how you lock in when you don't feel like it",
-   "caption": "arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. ask claude for a quiz on what you just read and it builds a working one, so you click through questions instead of rereading the page. raycast floating notes keeps a note above every window on one hotkey, so the next step stays on screen while you work somewhere else. cleanshot x captures park in a corner overlay instead of piling on the desktop, so you drag the diagram into your notes without saving a file. any canva design opens out into an infinite whiteboard, so the whole topic gets mapped before you write a word. #discipline #focus #productivity #studytok #creatorsearchinsights",
+   "caption": "this is how you lock in when you do not feel like it. arco focus runs the block on a timetable, not on willpower, so there is no decision left to make when the hour starts. set the block to five minutes when you cannot face an hour, because starting was the only part that needed motivation. leave the file open and the tab ready from the night before, so there is nothing to set up on the morning you feel like nothing. keep the hour and change what counts as finishing it, so you end the day having done the block. decide the first pass is allowed to be rough, because most days the work does not need you to feel like doing it. #discipline #focus #deepwork #habits",
    "_note": "discipline pillar; registered by hand after an interrupted build left it unregistered"
   },
   {
@@ -869,7 +869,7 @@
   {
    "topic": "schedule-not-personality",
    "title": "discipline is a schedule, not a personality",
-   "caption": "four reasons discipline is a schedule, and the screen that runs each one. the day starts at a set time, because putting wake up on the plan sets a real alarm that moves when the block moves. every task gets a slot, because the plan your day card keeps counting tasks with no time until nothing is waiting. the bar is your own best day, because insights put your average day next to your best one. and quitting early costs you, because ending blocked hours early is a 30 second wait that resets if you leave. all of it is arco. ARCO is free on the App Store. #discipline #productivity #lockin #selfimprovement #creatorsearchinsights",
+   "caption": "discipline is a schedule, not a personality. arco focus closes the apps on a schedule i set once, so 9am arrives and the feeds simply do not open. write the week's blocked hours once, at a time you are not in them, so monday morning has no decision in it. pick the exact list of apps instead of a vague intention to use less, because a rule you can check is a rule and a mood is not. keep the window identical rather than tuning it each morning, since a schedule you negotiate with is back to being a personality. share the week with one person who will ask about it, so the rule stops depending on who you are at 9pm. #discipline #focus #productivity #habits",
    "slides": [
     "01.jpg",
     "02.jpg",
@@ -1461,8 +1461,8 @@
   },
   {
    "topic": "ten-x-13",
-   "title": "5 tools that each removed a step i did by hand",
-   "caption": "how i 10x'd my productivity, here is why. arco focus starts the block and locks every app on the list from one button, so there are no settings and nothing to decide. cursor edits across every file a change touches from one instruction, so the find-and-replace pass stops existing. superwhisper types what you say into whatever window is in front of you, so the blank page stage of a draft is gone. an airtable base gives you the table, the form and the views with no schema, so you skip building a crud screen nobody will see. photoroom cuts the background on the phone as you shoot, so the trip to a desktop editor disappears. #productivity #aitools #apps #techtok #creatorsearchinsights",
+   "title": "how i 10x'd my productivity",
+   "caption": "arco focus starts the block with one button and locks every app on the list, no settings and no deciding. cursor tab predicts your next edit across the file instead of the next word, so the step it removes is explaining what you were about to do. a make scenario shows data moving through every step while it runs, so reading a log to find the break stops being part of the job. descript edits the video by deleting words from the transcript, so scrubbing a timeline for the cut stops existing. framer publishes the live site from the same canvas you designed on, so the handoff from design to build is simply gone. #productivity #tools #apps #focus",
    "variants": {
     "vn": {
      "title": "how i 10x'd my productivity",
@@ -1580,6 +1580,31 @@
    "topic": "home-screen-five",
    "title": "the 5 apps on my home screen, everything else is in a folder",
    "caption": "a home screen slot is paid for in taps per day. arco focus puts the block on the lock screen with the time left running, so picking the phone up tells me to get back to work. chatgpt voice mode answers while the screen is still in your hand, so you ask the question in the three seconds you have. obsidian keeps every note as a plain file on the phone itself with no sign in, so the thought gets written before the signal returns. endel starts the soundscape in one tap with nothing to set up, so the session begins before you could talk yourself out of it. capcut cuts, captions and exports the whole clip on the phone that filmed it, so the video gets posted from the street. #productivity #apps #tools #focus"
+  },
+  {
+   "topic": "4x-productivity-15",
+   "title": "the tools i used to 4x my productivity",
+   "caption": "arco focus holds every task and plans the day in 30 seconds, with focus mode putting every distraction away. claude projects keep your files and instructions attached to every chat inside them, so you stop losing ten minutes re-explaining the project. raycast clipboard history searches everything you copied weeks back, so the link you lost on tuesday costs two keystrokes. linear cycles carry unfinished issues into the next one on their own, so nobody spends friday working out what got done. cleanshot x pins a screenshot above every other window, so you copy from it without the switching that eats an afternoon. #productivity #tools #apps #focus"
+  },
+  {
+   "topic": "work-by-noon-14",
+   "title": "the tools i use to do a full day of work by noon",
+   "caption": "arco focus plans the whole day before i start it, so nothing waits on a decision and i get more done by noon than i used to by six. gemini scheduled actions run a prompt at a time you set and send the result, so your inbox summary is written by 7am. a notion database template opens the page with its fields already filled, so the morning admin is three clicks before coffee. zapier moves a record between two apps the moment it changes, so the 9am handover already happened while you slept. sentry cron monitors alert you when a scheduled job did not run, so a broken backup is an 8am alert and not a lunchtime discovery. #productivity #tools #apps #automation"
+  },
+  {
+   "topic": "twelve-apps-8",
+   "title": "i pay for 12 apps, these 5 do all the work",
+   "caption": "arco focus gives every task a time and the block that protects it in the same app, so i stopped running a planner and a blocker that knew nothing about each other. perplexity aims a search at papers or one site alone and cites what it used, which is the research tool and the citation manager on one bill. canva resizes one design into every format in a click, taking over the thumbnail tool and the deck tool at once. supabase gives you database, auth and file storage behind one project, so three subscriptions sit on one free tier. vercel builds, hosts and previews every branch, so the host, the ci runner and the staging server stopped being three bills. #productivity #tools #apps #saas"
+  },
+  {
+   "topic": "rest-of-my-life-4",
+   "title": "5 apps i will use for the rest of my life",
+   "caption": "arco focus puts every task on one page with a time next to it, so i stopped keeping half the list in my head and losing the other half. codex works a task in its own sandbox and opens a pull request, so you review a diff, a skill that outlives whichever model wrote it. obsidian stores every note as a plain markdown file in a folder you own, so the company going away costs you nothing. github keeps the full history of a project permanently, so work from ten years ago still opens. figma auto layout resizes a frame to fit whatever ends up inside it, so the file still works after the brand and the team have changed. #productivity #tools #apps #software"
+  },
+  {
+   "topic": "best-for-last-10",
+   "title": "5 tools to stay productive, i saved the best for last",
+   "caption": "arco focus blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. antigravity drives your editor and a browser in the same agent run, so the work continues through the stretch where you would go looking elsewhere. clickup shows one list filtered to only what is due today, holding you through the hour when everything starts looking urgent. loom viewers comment at a timestamp rather than under the video, carrying the feedback round without a meeting cutting the day. posthog puts feature flags and session replay in the same tool, keeping you on the build through the week you would have spent guessing. #productivity #tools #apps #focus"
   }
  ]
 }

@@ -143,17 +143,6 @@
   ]
  },
  {
-  "topic": "lock-in-anyway",
-  "bgs": [
-   "bg-h36.jpg",
-   "bg-h49.jpg",
-   "bg-n03.jpg",
-   "bg-n06.jpg",
-   "bg-h20.jpg",
-   "bg-h39.jpg"
-  ]
- },
- {
   "topic": "business-at-19",
   "bgs": [
    "bg-h12.jpg",
@@ -1130,17 +1119,6 @@
   ]
  },
  {
-  "topic": "schedule-not-personality",
-  "bgs": [
-   "bg-h42.jpg",
-   "bg-h37.jpg",
-   "bg-h49.jpg",
-   "bg-n04.jpg",
-   "bg-n06.jpg",
-   "bg-h38.jpg"
-  ]
- },
- {
   "topic": "lock-in-screens",
   "bgs": [
    "bg-h73.jpg",
@@ -1643,11 +1621,11 @@
  {
   "topic": "ten-x-13",
   "bgs": [
-   "bg-h17.jpg",
-   "bg-h05.jpg",
-   "bg-h37.jpg",
-   "bg-h49.jpg",
-   "bg-n03.jpg",
+   "bg-h61.jpg",
+   "bg-h31.jpg",
+   "bg-h29.jpg",
+   "bg-h24.jpg",
+   "bg-h52.jpg",
    "bg-n05.jpg"
   ]
  },
@@ -1782,6 +1760,83 @@
    "bg-h49.jpg",
    "bg-h39.jpg",
    "bg-n04.jpg"
+  ]
+ },
+ {
+  "topic": "4x-productivity-15",
+  "bgs": [
+   "bg-h55.jpg",
+   "bg-h52.jpg",
+   "bg-n05.jpg",
+   "bg-h48.jpg",
+   "bg-h38.jpg",
+   "bg-h50.jpg"
+  ]
+ },
+ {
+  "topic": "work-by-noon-14",
+  "bgs": [
+   "bg-h56.jpg",
+   "bg-h51.jpg",
+   "bg-n06.jpg",
+   "bg-h49.jpg",
+   "bg-h39.jpg",
+   "bg-h46.jpg"
+  ]
+ },
+ {
+  "topic": "twelve-apps-8",
+  "bgs": [
+   "bg-h58.jpg",
+   "bg-n04.jpg",
+   "bg-h45.jpg",
+   "bg-h37.jpg",
+   "bg-h34.jpg",
+   "bg-h36.jpg"
+  ]
+ },
+ {
+  "topic": "rest-of-my-life-4",
+  "bgs": [
+   "bg-h60.jpg",
+   "bg-h32.jpg",
+   "bg-h88.jpg",
+   "bg-h21.jpg",
+   "bg-h35.jpg",
+   "bg-h22.jpg"
+  ]
+ },
+ {
+  "topic": "best-for-last-10",
+  "bgs": [
+   "bg-h62.jpg",
+   "bg-h51.jpg",
+   "bg-n06.jpg",
+   "bg-h48.jpg",
+   "bg-h38.jpg",
+   "bg-n04.jpg"
+  ]
+ },
+ {
+  "topic": "schedule-not-personality",
+  "bgs": [
+   "bg-h64.jpg",
+   "bg-h49.jpg",
+   "bg-h39.jpg",
+   "bg-h50.jpg",
+   "bg-h45.jpg",
+   "bg-h37.jpg"
+  ]
+ },
+ {
+  "topic": "lock-in-anyway",
+  "bgs": [
+   "bg-h65.jpg",
+   "bg-h46.jpg",
+   "bg-h32.jpg",
+   "bg-h36.jpg",
+   "bg-h34.jpg",
+   "bg-h88.jpg"
   ]
  }
 ]

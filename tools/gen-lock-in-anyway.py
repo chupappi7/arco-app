@@ -1,72 +1,57 @@
 #!/usr/bin/env python3
-"""lock-in-anyway: learn pillar. Studying on the days motivation does not turn
-up, by making the first move a click instead of a decision.
+"""lock-in-anyway: this is how you lock in / when you don't feel like it.
 
-Backgrounds picked with the gen-daily-batch guards (hook-only vibes skipped,
-copy band under BAND_MAX_LUMA, no adjacent vibe repeat, one person at most)
-and frozen here so the post rebuilds identically.
+  hook    from hook_rules.eligible(pillar=...), word for word.
+  lens    what it does when the motivation is simply absent.
+          Every point after ARCO answers it; that is not enforced by
+          any guard, only printed, so it is checked here by hand.
+  ARCO    angle s2 [screentime,discipline], drawn once and frozen
+          below so a rebuild cannot rotate it.
+  photos  allocated across the whole batch: copy band under 65 rather
+          than the guard's 80, no frame twice in one post, nothing
+          shared with the post before.
 """
-import json, os, sys
-sys.path.insert(0, '/Users/thinh/SIXSIX/arco-app/tools')
-import compose as c
-from compose import (app_slide, hook_slide, preflight, next_arco_angle,
-                     mark_hook_used, record_post_tools, record_post_bgs)
+from _screentime_common import build
 
-TOPIC = 'lock-in-anyway'
-OUT = f'/Users/thinh/SIXSIX/arco-app/drafts/{TOPIC}'
-os.makedirs(OUT, exist_ok=True)
-
-HOOK = ['this is how you lock in', "when you don't feel like it"]
-TOOLS = ['ARCO', 'Claude', 'Raycast', 'CleanShot X', 'Canva']
-BGS = ['bg-h36.jpg', 'bg-h49.jpg', 'bg-n03.jpg', 'bg-n06.jpg',
-       'bg-h20.jpg', 'bg-h39.jpg']
-
-BODY = {
- 'Claude': [
-    'Ask for a quiz on what you just',
-    'read and it builds a working one.',
-    '',
-    'You click through questions in the',
-    'chat instead of rereading a page.',
- ],
- 'Raycast': [
-    'Floating Notes keeps a note above',
-    'every window on one hotkey.',
-    '',
-    'The next step stays on screen',
-    'while you work somewhere else.',
- ],
- 'CleanShot X': [
-    'Captures park in a corner overlay',
-    'instead of piling on the desktop.',
-    '',
-    'You drag the diagram into your',
-    'notes without saving a file.',
- ],
- 'Canva': [
-    'Any design opens out into an',
-    'infinite whiteboard.',
-    '',
-    'The whole topic gets mapped in one',
-    'place before you write a word.',
- ],
-}
-
-preflight(TOPIC, TOOLS, BGS)
-
-log = json.load(open(f'{c.SP}/hook_usage.json'))
-if BGS[0] not in log:
-    c.pick_hook_bg(prefer=BGS[0])
-
-hook_slide(BGS[0], HOOK, f'{OUT}/01.jpg')
-mark_hook_used(HOOK)
-
-icons = json.load(open(c.TOOL_POOL))['icons']
-for i, tool in enumerate(TOOLS):
-    n, bg = i + 1, BGS[i + 1]
-    body = next_arco_angle() if tool == 'ARCO' else BODY[tool]
-    app_slide(bg, icons[tool], f'{n}. {tool}', body, f'{OUT}/{n+1:02d}.jpg')
-
-record_post_tools(TOPIC, TOOLS)
-record_post_bgs(TOPIC, BGS)
-print('\nbackgrounds:', ', '.join(BGS))
+build(
+    topic='lock-in-anyway',
+    hook=['this is how you lock in', "when you don't feel like it"],
+    bgs=['bg-h65.jpg',   # hook         desk-led-neon      luma 38
+         'bg-h46.jpg',   # ARCO         desk-city-day      luma 62
+         'bg-h32.jpg',   # 2            window-silhouette  luma 36 (the one person)
+         'bg-h36.jpg',   # 3            supercars-dusk     luma 24
+         'bg-h34.jpg',   # 4            desk-empty-day     luma 61
+         'bg-h88.jpg'],  # 5            supercars-dusk     luma 29
+    arco_lines=['The block runs on a timetable, not', 'on willpower.', '',
+                'There is no decision left to make', 'when the hour starts.',
+                '', 'My holy grail.'],
+    rules=[
+        ('Start at five minutes', [
+            'Set the block to five minutes when',
+            'you cannot face a full hour.',
+            '',
+            'Starting was the only part that',
+            'needed motivation.',
+        ]),
+        ('The desk is already set', [
+            'Leave the file open and the tab',
+            'ready from the night before.',
+            '',
+            'There is nothing to set up on the',
+            'morning you feel like nothing.',
+        ]),
+        ('Lower the bar, not the block', [
+            'Keep the hour, change what counts',
+            'as finishing it.',
+            '',
+            'You end the day having done the',
+            'block, so tomorrow is not a restart.',
+        ]),
+        ('Do it badly on purpose', [
+            'Decide the first pass is allowed',
+            'to be rough before you start.',
+            '',
+            'Most days the work does not need',
+            'you to feel like doing it.',
+        ]),
+    ])

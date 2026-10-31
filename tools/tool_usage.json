@@ -1807,5 +1807,35 @@
    "Endel",
    "CapCut"
   ]
+ },
+ {
+  "topic": "twelve-apps-8",
+  "tools": [
+   "ARCO",
+   "Perplexity",
+   "Canva",
+   "Supabase",
+   "Vercel"
+  ]
+ },
+ {
+  "topic": "rest-of-my-life-4",
+  "tools": [
+   "ARCO",
+   "Codex",
+   "Obsidian",
+   "GitHub",
+   "Figma"
+  ]
+ },
+ {
+  "topic": "best-for-last-10",
+  "tools": [
+   "ARCO",
+   "Antigravity",
+   "ClickUp",
+   "Loom",
+   "PostHog"
+  ]
  }
 ]
