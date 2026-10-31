@@ -447,7 +447,7 @@ function analyticsView() {
   const T = st.totals, F = st.followers;
   const P = st.previous?.totals || {};
   const delta = (v, pv) => { if (v == null) return ['not shared yet', '']; if (!pv) return [st.tracked ? `${num(Math.round(v / st.tracked))} per post` : `no posts in the previous ${days} days`, ''];
-    const pct = Math.round((v - pv) / pv * 100); return [`${pct > 0 ? '↑' : pct < 0 ? '↓' : '='} ${Math.abs(pct)}% vs previous ${days} days`, pct > 0 ? 'up' : pct < 0 ? 'down' : '']; };
+    const pct = Math.round((v - pv) / pv * 100); return [`${pct > 0 ? '↑' : pct < 0 ? '↓' : '='} ${Math.abs(pct)}%<span class="vs"> vs previous ${days} days</span>`, pct > 0 ? 'up' : pct < 0 ? 'down' : '']; };
   const kpis = [['Views', T.views], ['Likes', T.likes], ['Comments', T.comments], ['Shares', T.shares]]
     .map(([l, v]) => [l, v == null ? '–' : num(v), ...delta(v, P[l.toLowerCase()])])
     .concat([['Followers', F.total == null ? '–' : num(F.total), F.change == null ? 'change shows after a day' : `${signed(F.change)} in ${days} days`, F.change > 0 ? 'up' : F.change < 0 ? 'down' : '']]);

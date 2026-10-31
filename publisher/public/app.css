@@ -961,3 +961,4 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .list.drafts{display:block}
 @media (max-width:860px){.stack.bar{display:none}}
 @media (max-width:860px){.app{grid-template-rows:auto 1fr;align-content:start}}
+@media (max-width:600px){.kpi small .vs{display:none}}
