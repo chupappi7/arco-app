@@ -6,12 +6,12 @@ cd "$(dirname "$0")/.."
 set -a; source ~/.config/arco/instagram.env; source ~/.config/arco/publisher.env; set +a
 
 missing=0
-for v in META_APP_ID META_APP_SECRET IG_APP_ID IG_APP_SECRET RESEND_API_KEY MAIL_FROM; do
+for v in META_APP_ID META_APP_SECRET IG_APP_ID IG_APP_SECRET RESEND_API_KEY MAIL_FROM ANTHROPIC_API_KEY; do
   if [ -z "${!v:-}" ]; then echo "EMPTY: $v"; missing=1; fi
 done
 [ "$missing" = 0 ] || { echo "Fill ~/.config/arco/publisher.env first."; exit 1; }
 
-for v in META_APP_ID META_APP_SECRET IG_APP_ID IG_APP_SECRET RESEND_API_KEY MAIL_FROM; do
+for v in META_APP_ID META_APP_SECRET IG_APP_ID IG_APP_SECRET RESEND_API_KEY MAIL_FROM ANTHROPIC_API_KEY; do
   printf '%s' "${!v}" | npx wrangler secret put "$v" >/dev/null 2>&1 && echo "worker: $v loaded" || { echo "worker: $v FAILED"; exit 1; }
 done
 
