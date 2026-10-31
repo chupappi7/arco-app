@@ -213,6 +213,13 @@ export async function getStats(env, w, days, t = now(), platform = 'all') {
   }
   const top = withStats.sort((a, b) => b.score - a.score).slice(0, 6).map(x => postJson(env, x.r));
 
+  // The period before this one, for "up 12% on the previous 30 days".
+  const { results: prevRows } = await env.DB.prepare(`SELECT p.stats FROM posts p JOIN accounts a ON a.id = p.account_id
+      WHERE p.workspace_id = ? AND p.status = 'published' AND p.scheduled_at >= ? AND p.scheduled_at < ? AND p.stats IS NOT NULL${sc.sql}${pf.sql}`)
+    .bind(wsOf(w), from - days * DAY, from, ...sc.binds, ...pf.binds).all();
+  const prev = Object.fromEntries(METRICS.map(m => [m, 0]));
+  for (const r of prevRows) { const ps = JSON.parse(r.stats); for (const m of METRICS) if (ps[m] !== undefined) prev[m] += ps[m]; }
+
   const asc = inScope(w);
   const { results: all } = await env.DB.prepare(`SELECT id, username, platform, avatar_url, followers, stats_at, insights_denied_at FROM accounts
       WHERE workspace_id = ?${asc.sql} ORDER BY platform, username`).bind(wsOf(w), ...asc.binds).all();
@@ -251,6 +258,7 @@ export async function getStats(env, w, days, t = now(), platform = 'all') {
   return {
     days, platform, published: rows.length, tracked, updated_at: updated || null,
     totals: Object.fromEntries(METRICS.filter(m => has.has(m)).map(m => [m, totals[m]])),
+    previous: { published: prevRows.length, totals: Object.fromEntries(METRICS.filter(m => has.has(m)).map(m => [m, prev[m]])) },
     followers: { total: known.length ? known.reduce((n, a) => n + a.followers, 0) : null,
       change: changes.length ? changes.reduce((n, a) => n + a.change, 0) : null },
     series: [...perDay.values()],

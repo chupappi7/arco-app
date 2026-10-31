@@ -198,7 +198,9 @@ describe('stats filters and series', () => {
     await env.DB.prepare('UPDATE accounts SET followers = 50 WHERE id = ?').bind('tt1').run();
     await env.DB.prepare(`INSERT INTO follower_history VALUES ('ig1', ?, 90), ('ig1', ?, 100), ('tt1', ?, 50)`)
       .bind(day(T3 - 3 * 86400), day(T3), day(T3 - 86400)).run();
+    await post('old', 'ig1', T3 - 10 * 86400, { stats: { likes: 4, views: 100 }, statsAt: T3 });
     const all = await getStats(env, 'ws1', 7, T3);
+    expect(all.previous).toEqual({ published: 1, totals: { views: 100, likes: 4, comments: 0, shares: 0 } });
     expect(all.series.length).toBe(7);
     expect(all.series.at(-1)).toMatchObject({ day: day(T3), followers: 150, views: 900, engagement: 34 });
     expect(all.series.at(-4).followers).toBe(90);

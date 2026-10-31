@@ -118,6 +118,7 @@ function route() {
   if (signedIn && S.view === 'calendar') loadWeek();
   if (signedIn && S.view === 'drafts') loadDrafts();
   if (signedIn && S.view === 'analytics') loadStats();
+  S.anim = S.lastView !== S.view; S.lastView = S.view;
   render();
   window.scrollTo(0, 0);
 }
@@ -176,12 +177,16 @@ function tabbar() {
 
 const HEADS = {
   compose: () => ['Create post', S.targets.length ? `Goes to ${S.targets.length} account${S.targets.length === 1 ? '' : 's'}.` : 'Choose accounts, add photos, write the caption.'],
-  calendar: () => ['Calendar', `Everything scheduled and published, in ${tz().replace(/_/g, ' ')} time.`],
+  calendar: () => ['Calendar', `Everything scheduled and published, in ${tz().replace(/_/g, ' ')} time.`, `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
   analytics: () => ['Analytics', 'How your posts do, from the numbers each platform shares.'],
-  drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.'],
+  drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.', `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
   accounts: () => ['Accounts', 'Connect accounts and group them into brands.'],
   settings: () => ['Settings', 'Workspace, people and your account.'],
 };
+// Grey shapes in the layout of what is coming, instead of the word Loading.
+const sk = (w = '100%', h = 14, cls = '') => `<span class="sk ${cls}" style="width:${w};height:${h}px"></span>`;
+const skRows = n => [...Array(n)].map(() => `<div class="skrow">${sk('40px', 40, 'sq')}<div>${sk('55%', 13)}${sk('80%', 11)}</div></div>`).join('');
+const skKpis = n => `<div class="kpis ${n === 5 ? 'five' : ''}">${[...Array(n)].map(() => `<div class="kpi">${sk('50%', 12)}${sk('40%', 30)}${sk('60%', 11)}</div>`).join('')}</div>`;
 const pageHead = (title, sub, action = '') => `<div class="pagehead"><div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${action}</div>`;
 
 // The app's own confirm and prompt: says what will happen and what will
@@ -243,6 +248,7 @@ function render() {
   const views = { analytics: analyticsView, overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
   const head = S.view === 'overview' ? '' : pageHead(...HEADS[S.view]());
   const hadDetail = !!$('overlay'), opener = S.detail && !hadDetail ? document.activeElement?.closest?.('[data-open]')?.dataset.open : null;
+  if (S.anim) { $('app').classList.remove('in'); void $('app').offsetWidth; $('app').classList.add('in'); S.anim = false; }
   $('app').innerHTML = head + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '') + resultView();
   bind();
   if (S.detail && !hadDetail) { S.opener = opener; $('closedetail')?.focus(); }
@@ -278,7 +284,7 @@ const at = (sec, o = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) =
 function overviewView() {
   const acc = S.me.accounts;
   if (!acc.length) return firstRun();
-  if (!S.ov) return pageHead(greeting(), 'Loading…') + '<div class="panel empty">Loading…</div>';
+  if (!S.ov) return `<div class="ohead"><h1>${greeting()}</h1><p>${sk('42%', 14)}</p></div>${skKpis(4)}<div class="ogrid"><section class="panel ocard sched"><header><h2>Schedule</h2></header><div class="dtabs">${[...Array(7)].map(() => sk('100%', 62)).join('')}</div><div class="oscroll">${skRows(4)}</div></section><section class="panel ocard"><header><h2>To do</h2></header><div class="oscroll">${skRows(3)}</div></section></div>`;
   const now = Math.floor(Date.now() / 1000), t0 = today(), todayKey = dayKey(t0);
   const live = S.posts.filter(p => p.status !== 'cancelled');
   const upcoming = live.filter(p => p.status === 'queued' && p.scheduled_at >= now).sort((a, b) => a.scheduled_at - b.scheduled_at);
@@ -417,7 +423,7 @@ function chart(series, key, { kind = 'bar', label, fmtv = num } = {}) {
 function perfCard() {
   const st = S.ovStats;
   const head = '<header><h2>Performance</h2><a href="#analytics">Last 7 days</a></header>';
-  if (!st) return `<section class="panel ocard perf">${head}<div class="sempty"><span>Loading…</span></div></section>`;
+  if (!st) return `<section class="panel ocard perf">${head}<div class="pgrid">${[...Array(4)].map(() => `<div>${sk('50%', 12)}${sk('40%', 24)}</div>`).join('')}</div></section>`;
   const keys = ['views', 'likes', 'comments', 'shares'].filter(k => st.totals[k] != null);
   const cells = [...(keys.length ? keys : ['likes', 'comments', 'shares']).slice(0, 3).map(k => [METRIC[k], num(st.totals[k] ?? null), '']),
     ['New followers', st.followers.change == null ? '–' : signed(st.followers.change), st.followers.change > 0 ? 'up' : '']];
@@ -434,12 +440,15 @@ function analyticsView() {
     <div class="pchips" role="group" aria-label="Platform">${[['all', 'All platforms'], ...plats.map(pl => [pl, PLATFORM[pl]])].map(([k, l]) =>
       `<button class="pchip ${plat === k ? 'on' : ''}" data-aplat="${k}" aria-pressed="${plat === k}">${k === 'all' ? '' : appIcon(k, 18)}${l}</button>`).join('')}</div>
     <div class="seg" role="group" aria-label="Period">${[7, 30, 90].map(d => `<button data-days="${d}" class="${d === days ? 'on' : ''}" aria-pressed="${d === days}">${d} days</button>`).join('')}</div></div>`;
-  if (!st) return `${filters}<div class="panel empty">Loading…</div>`;
+  if (!st) return `${filters}${skKpis(5)}<div class="angrid"><section class="panel ocard"><header><h2>Followers</h2></header><div class="chart">${sk('100%', 180)}</div></section><section class="panel ocard"><header><h2>By platform</h2></header><div class="oscroll">${skRows(3)}</div></section></div>`;
   if (st.err) return `${filters}<div class="panel empty"><b>Couldn't load the numbers.</b>${esc(st.err)}</div>`;
 
   const T = st.totals, F = st.followers;
+  const P = st.previous?.totals || {};
+  const delta = (v, pv) => { if (v == null) return ['not shared yet', '']; if (!pv) return [st.tracked ? `${num(Math.round(v / st.tracked))} per post` : `no posts in the previous ${days} days`, ''];
+    const pct = Math.round((v - pv) / pv * 100); return [`${pct > 0 ? '↑' : pct < 0 ? '↓' : '='} ${Math.abs(pct)}% vs previous ${days} days`, pct > 0 ? 'up' : pct < 0 ? 'down' : '']; };
   const kpis = [['Views', T.views], ['Likes', T.likes], ['Comments', T.comments], ['Shares', T.shares]]
-    .map(([l, v]) => [l, v == null ? '–' : num(v), v == null ? 'not shared yet' : st.tracked ? `${num(Math.round(v / st.tracked))} per post` : '', ''])
+    .map(([l, v]) => [l, v == null ? '–' : num(v), ...delta(v, P[l.toLowerCase()])])
     .concat([['Followers', F.total == null ? '–' : num(F.total), F.change == null ? 'change shows after a day' : `${signed(F.change)} in ${days} days`, F.change > 0 ? 'up' : F.change < 0 ? 'down' : '']]);
 
   const prow = x => `<div class="bprow">${appIcon(x.platform, 26)}<div class="bpn"><b>${PLATFORM[x.platform]}</b><span>${x.posts} post${x.posts === 1 ? '' : 's'}</span></div>
@@ -579,12 +588,12 @@ function composeView() {
       <section class="panel"><header><h2>Photos</h2>${S.images.length ? `<span class="note">${S.images.length} of ${toInstagram() ? IG_MAX : 35}</span>` : ''}</header>
         <div class="csec">${mediaView()}</div></section>
 
-      <section class="panel"><header><h2>Caption</h2>${S.me.ai_enabled && !S.ai.open ? '' : ''}</header>
+      <section class="panel"><header><h2>Caption</h2>${S.me.ai_enabled && !S.ai.open ? aiPanel() : ''}</header>
         <div class="csec">
           ${tts.length ? `<label class="f" for="title">TikTok title</label>
             <input type="text" id="title" maxlength="200" value="${esc(S.title)}" placeholder="A short title for the photo post">
             <div class="count ${len(S.title) > 90 ? 'bad' : ''}">${len(S.title)} / 90</div>` : ''}
-          ${S.me.ai_enabled ? aiPanel() : ''}
+          ${S.me.ai_enabled && S.ai.open ? aiPanel() : ''}
           ${captionTabs(pls)}
           <div class="limits" id="caplimits">${limitsLine()}</div>
           ${S.me.ai_enabled && S.caption.trim() ? `<div class="rewrites"><span class="note">Rewrite</span>${Object.entries(REWRITE_LABEL)
@@ -614,7 +623,8 @@ function composeView() {
         </div></section>` : ''}
     </div>
 
-    <aside class="cside"><section class="panel"><header><h2>Preview</h2></header>
+    <aside class="cside"><section class="panel"><header><h2>Preview</h2>${S.targets.length ? `<span class="note">${S.targets.length} account${S.targets.length === 1 ? '' : 's'}</span>` : ''}</header>
+      ${S.targets.length ? `<div class="goes">${S.targets.map(acct).filter(Boolean).map(a => `<span class="goesto" title="${esc(PLATFORM[platformOf(a)])}">${withBadge(avatar(a.avatar_url, a.username || a.display_name), platformOf(a))}<span>${handle(a)}</span></span>`).join('')}</div>` : ''}
       ${pls.length > 1 ? `<div class="ptabs">${pls.map(pl => `<button data-prev="${pl}" class="${previewPl(pls) === pl ? 'on' : ''}">${icon(pl, 13)}${PLATFORM[pl]}</button>`).join('')}</div>` : ''}
       <div id="preview">${previewView()}</div></section></aside>
   </div>
@@ -628,6 +638,7 @@ function composeView() {
     <span class="grow"></span>
     ${need ? `<span class="need">${esc(need)}</span>` : S.status ? `<span class="need ${S.status.kind}">${esc(S.status.text)}</span>` : ''}
     <button class="btn sec" id="savedraft" ${draftBlocker() || S.busy ? 'disabled' : ''} title="${esc(draftBlocker())}">Save draft</button>
+    ${S.targets.length ? `<span class="stack bar" aria-hidden="true">${S.targets.slice(0, 4).map(acct).filter(Boolean).map(a => withBadge(avatar(a.avatar_url, a.username || a.display_name), platformOf(a))).join('')}${S.targets.length > 4 ? `<span class="more">+${S.targets.length - 4}</span>` : ''}</span>` : ''}
     <button class="btn" id="go" ${need || S.busy ? 'disabled' : ''} title="${esc(need || '')}">
       ${S.busy ? 'Working…' : `${S.when === 'later' ? 'Schedule' : S.when === 'queue' ? 'Add to queue' : 'Post now'}${S.targets.length > 1 ? ` · ${S.targets.length}` : ''}`}</button>
   </div>`;
@@ -1322,19 +1333,16 @@ function draftsView() {
   const groups = draftGroups();
   if (!groups.length) return `<section class="panel empty"><b>No drafts.</b>Use "Save draft" while creating a post to keep it for later.
     <div><a class="btn" href="#compose">${ui('plus', 16)}Create post</a></div></section>`;
-  return `<div class="dgrid">${groups.map(g => {
+  return `<div class="panel"><div class="list drafts">${groups.map(g => {
     const d = g[0], cover = d.images[d.cover_index] || d.images[0], key = esc(d.group_id || d.id);
-    return `<article class="dcard">
-      <button class="dcover" data-opendraft="${key}" aria-label="Open draft">${cover ? `<img src="${esc(cover)}" alt="">` : '<span class="noimg"></span>'}
-        ${d.images.length > 1 ? `<span class="dn">${d.images.length}</span>` : ''}</button>
-      <div class="dbody">
-        <div class="dacc">${g.slice(0, 4).map(x => withBadge(avatar(acct(x.account_id)?.avatar_url, x.username), x.platform || 'tiktok')).join('')}
-          <span>${g.length === 1 ? `${g[0].platform === 'facebook' ? '' : '@'}${esc(g[0].username)}` : `${g.length} accounts`}</span></div>
-        <p>${esc((d.caption || d.title || 'No caption yet').slice(0, 140))}</p>
-        <small>Saved ${fmt(d.updated_at, { month: 'short', day: 'numeric' })}</small></div>
-      <div class="dfoot"><button class="btn" data-opendraft="${key}">Open</button>
-        <button class="btn ghost danger" data-deldraft="${key}">Delete</button></div></article>`;
-  }).join('')}</div>`;
+    return `<div class="drow" data-opendraft="${key}" role="button" tabindex="0">
+      ${cover ? `<img class="thumb" src="${esc(cover)}" alt="">` : '<span class="noimg"></span>'}
+      <div class="wh"><b>${esc(d.caption || d.title || 'No caption yet')}</b>
+        <span>${g.length === 1 ? who(g[0]) : `${g.length} accounts`} · ${d.images.length} photo${d.images.length === 1 ? '' : 's'} · saved ${fmt(d.updated_at, { month: 'short', day: 'numeric' })}</span></div>
+      <span class="dacc">${g.slice(0, 4).map(x => withBadge(avatar(acct(x.account_id)?.avatar_url, x.username), x.platform || 'tiktok')).join('')}</span>
+      <button class="btn sec sm" data-opendraft="${key}">Open</button>
+      <button class="btn ghost danger sm" data-deldraft="${key}" aria-label="Delete draft">${ui('x', 14)}</button></div>`;
+  }).join('')}</div></div>`;
 }
 
 function openDraft(key) {
@@ -1400,7 +1408,7 @@ function postCard(p, compact) {
     const img = p.images[p.cover_index] || p.images[0];
     return `<div class="mp ${p.status}" ${drag} data-open="${p.id}" role="button" tabindex="0"
         title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.status}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
-      ${img ? `<img src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}${icon(p.platform || 'tiktok', 11)}<b>${at(p.scheduled_at)}</b><span>${who(p)}</span></div>`;
+      ${img ? `<img src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}<div><b>${icon(p.platform || 'tiktok', 11)}${at(p.scheduled_at)}</b><span>${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</span></div></div>`;
   }
   // Week view: a small row per post. Everything you can do with it is one
   // click away in the drawer.
@@ -1447,7 +1455,6 @@ function calendarView() {
       <span class="seg">${[['week', 'Week'], ['weeks', '4 weeks'], ['month', 'Month']].map(([k, l]) =>
         `<button class="${S.calMode === k ? 'on' : ''}" data-mode="${k}">${l}</button>`).join('')}</span>
       <span class="note">${esc(tz().replace(/_/g, ' '))}</span>
-      <a class="btn" href="#compose" style="margin-left:auto;text-decoration:none">New post</a>
     </div>
     ${empty ? `<div class="calempty">${ui('cal', 18)}<span>Nothing scheduled here yet. Click a day to create a post for it.</span></div>` : ''}
     ${grid ? `<div class="monthhead">${days.slice(0, 7).map(d => `<span>${dayLabel(d, { weekday: 'short' })}</span>`).join('')}</div>` : ''}
@@ -1627,7 +1634,7 @@ function settingsView() {
     ${owner ? srow('Delete workspace', 'Removes its accounts, brands, posts, images and members now. This cannot be undone.', '<button class="btn danger" id="delws">Delete workspace</button>') : ''}
   </section>`;
   if (tab === 'people') body = `<section class="panel">
-    ${!m ? '<div class="empty">Loading…</div>' : `<div class="plist">
+    ${!m ? `<div class="plist">${skRows(2)}</div>` : `<div class="plist">
       ${m.members.map(x => `<div class="prow2"><span class="av-me">${esc(x.email[0].toUpperCase())}</span>
         <div class="pn"><b>${esc(x.email)}${x.user_id === S.me.user?.id ? ' <em>You</em>' : ''}</b>
           <span>${x.role === 'owner' ? 'Owner' : x.role === 'admin' ? 'Admin' : x.brand_ids
@@ -1690,6 +1697,8 @@ async function brandAction(fn) {
 // ---- events ------------------------------------------------------------
 
 document.addEventListener('keydown', e => {
+  // C opens Create from anywhere, unless you are typing.
+  if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.target.closest('input,textarea,select,[contenteditable]') && S.me && !S.me.needs_email && !$('overlay') && !$('dialogs').firstChild) { location.hash = '#compose'; return; }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[role=button][data-open], .day.open[role=button]')) { e.preventDefault(); e.target.click(); return; }
   if (e.key === 'Tab' && $('overlay')) {
     const f = [...$('overlay').querySelectorAll('button,a[href],textarea,input,select')].filter(x => !x.disabled);
@@ -1822,9 +1831,9 @@ function bind() {
   on('.chart .hit', 'mouseenter', e => { const pl = e.target.closest('.plot'), tip = pl.querySelector('.ctip'), cx = pl.querySelector('.cx'), x = e.target.dataset.x;
     tip.textContent = e.target.dataset.tip; tip.style.left = `${x}%`; tip.classList.add('on'); cx.style.left = `${x}%`; cx.classList.add('on'); });
   on('.chart .plot', 'mouseleave', e => { e.currentTarget.querySelector('.ctip').classList.remove('on'); e.currentTarget.querySelector('.cx').classList.remove('on'); });
-  on('[data-opendraft]', 'click', e => openDraft(e.target.dataset.opendraft));
+  on('[data-opendraft]', 'click', e => { if (e.target.closest('[data-deldraft]')) return; openDraft(e.currentTarget.dataset.opendraft); });
   on('[data-deldraft]', 'click', async e => {
-    const key = e.target.dataset.deldraft, g = draftGroups().find(x => (x[0].group_id || x[0].id) === key);
+    e.stopPropagation(); const key = e.currentTarget.dataset.deldraft, g = draftGroups().find(x => (x[0].group_id || x[0].id) === key);
     if (!g || !await ask({ title: 'Delete this draft?', ok: 'Delete draft', danger: true, icon: ui('draft', 22),
       body: esc((g[0].caption || g[0].title || 'No caption yet').slice(0, 90)), list: [[false, 'Its caption and photos are removed for good']] })) return;
     await dropDrafts(g.map(x => x.id)); loadDrafts(); });

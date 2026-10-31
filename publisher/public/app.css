@@ -898,3 +898,65 @@ code.key{display:block;width:100%;user-select:all;background:var(--well);border:
 .dlg-type+input{margin-top:6px}
 .dlg-acts{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}
 .btn.red{background:var(--danger);border-color:var(--danger);color:#fff}
+
+/* ---------- motion: one entrance per page, feedback on touch, nothing else moves on its own ---------- */
+#app.in{animation:pagein .22s cubic-bezier(.2,.8,.2,1)}
+@keyframes pagein{from{opacity:0;transform:translateY(6px)}}
+.btn,.nav a,.pchip,.dtab,.atile,.ccard,.kpi,.ptile .pimg,.dcard,.wd,.srow2,.rpost,.arow2,.mp,.pc,.drow,.acard{transition:background-color .15s,border-color .15s,color .15s,box-shadow .18s,transform .12s}
+.btn:not(:disabled):active,.pchip:active,.dtab:active{transform:scale(.97)}
+.btn:not(:disabled):not(.ghost):not(.sec):hover{box-shadow:0 4px 12px rgba(17,21,29,.18)}
+a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
+.toast{animation:toastin .2s cubic-bezier(.2,.8,.2,1)}
+@keyframes toastin{from{opacity:0;transform:translateY(8px)}}
+.sk{display:block;border-radius:6px;background:linear-gradient(90deg,var(--well) 25%,var(--line-2) 40%,var(--well) 55%);background-size:400% 100%;animation:shimmer 1.3s ease-in-out infinite;margin:4px 0}
+.sk.sq{border-radius:8px;flex:none;margin:0}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:0 0}}
+.skrow{display:flex;gap:12px;align-items:center;padding:10px 8px}
+.skrow>div{flex:1}
+.kpi .sk{margin:3px 0}
+.dtabs .sk{border-radius:10px;margin:0}
+.chart .sk{grid-column:1/-1;height:100%!important;border-radius:10px}
+@media (prefers-reduced-motion:reduce){.sk{animation:none;background:var(--well)}}
+
+/* ---------- create: who gets this ---------- */
+.goes{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 12px}
+.goesto{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;background:var(--well);border-radius:999px;padding:3px 10px 3px 3px;max-width:100%}
+.goesto .av{width:22px;height:22px}.goesto .badge-pl{width:12px;height:12px;right:-3px;bottom:-3px}
+.goesto>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stack.bar .av{width:28px;height:28px}
+.stack.bar .more{width:28px;height:28px;font-size:10px}
+.panel>header .aibtn{padding:6px 12px;font-size:13px}
+
+/* ---------- drafts as rows ---------- */
+.list.drafts{padding:4px 10px 6px}
+.drow{display:flex;align-items:center;gap:12px;padding:10px 8px;border-radius:10px;cursor:pointer;min-width:0}
+.drow:hover{background:var(--well)}
+.drow+.drow{border-top:1px solid var(--line-2);border-radius:0 0 10px 10px}
+.drow .thumb,.drow .noimg{width:44px;height:54px;border-radius:7px;object-fit:cover;flex:none;background:var(--well)}
+.drow .wh{flex:1;min-width:0}
+.drow .wh b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drow .wh span{display:block;color:var(--mute);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drow .dacc{display:flex;flex:none}
+.drow .dacc .avw+.avw{margin-left:-8px}.drow .dacc .av{width:26px;height:26px;border:2px solid var(--surface)}.drow .dacc .badge-pl{width:12px;height:12px}
+.btn.ghost.sm{padding:5px 7px}
+@media (max-width:600px){.drow .dacc{display:none}}
+
+/* ---------- calendar grid posts: two lines ---------- */
+.mp{display:grid;grid-template-columns:22px minmax(0,1fr);gap:6px;align-items:center;padding:4px 5px 4px 4px;white-space:normal}
+.mp img,.mp .noimg{width:22px;height:28px}
+.mp>div{min-width:0;line-height:1.25}
+.mp b{display:flex;align-items:center;gap:4px;font-size:11.5px}
+.mp span{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.month .day{min-height:132px}
+@media (max-width:1100px){.mp span{display:block}.mp img{display:block}}
+@media (max-width:860px){.mp{grid-template-columns:1fr;padding:3px 4px}.mp img,.mp .noimg,.mp span{display:none}.mp b{font-size:10.5px}}
+
+/* ---------- analytics: rows share a height, no gaps ---------- */
+.angrid>.ocard{height:auto;min-height:0}
+.angrid .chart{height:200px;flex:none}
+.angrid .oscroll{max-height:none;flex:1}
+.bplist{padding-bottom:4px}
+.kpi small.down{color:var(--danger);font-weight:600}
+.kpi small.up{color:var(--success);font-weight:600}
+.list.drafts{display:block}
+@media (max-width:860px){.stack.bar{display:none}}

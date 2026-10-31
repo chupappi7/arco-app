@@ -70,7 +70,7 @@ http.createServer(async (q, r) => {
     const series = [...Array(d)].map((_, i) => { const day = new Date((now() - (d - 1 - i) * 86400) * 1000).toISOString().slice(0, 10);
       return { day, posts: i % 3 ? 0 : 1, views: i % 3 ? 0 : 800 + (i * 137) % 900, engagement: i % 3 ? 0 : 40 + (i * 53) % 120, followers: 1700 + Math.round(i * 140 / d) + (i % 5) }; });
     return j({ days: d, platform: plat, published: top.length, tracked: top.length, updated_at: now() - 5400,
-      totals: plat === 'facebook' ? {} : { views: 17210, likes: 1090, comments: 67, shares: 26 }, followers: { total: 1842, change: 37 }, series,
+      totals: plat === 'facebook' ? {} : { views: 17210, likes: 1090, comments: 67, shares: 26 }, previous: { published: 2, totals: { views: 12400, likes: 1210, comments: 50, shares: 26 } }, followers: { total: 1842, change: 37 }, series,
       by_platform: ['tiktok', 'instagram', 'facebook'].filter(pl => plat === 'all' || pl === plat).map((pl, i) => ({ platform: pl, posts: 3 - i, views: pl === 'facebook' ? null : 9000 - i * 3000, likes: pl === 'facebook' ? null : 700 - i * 200, comments: null, shares: null, followers: [412, 650, 780][i] })),
       platforms: ['tiktok', 'instagram', 'facebook'],
       accounts: accs.map(a => ({ id: a.id, username: a.username, platform: a.platform, avatar_url: '', followers: 300 + a.id.charCodeAt(1) * 7, change: a.id === 'a2' ? 12 : 0, limited: a.id === 'a5' })),
