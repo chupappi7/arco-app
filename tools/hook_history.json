@@ -21,13 +21,6 @@
   ]
  },
  {
-  "topic": "schedule-rules",
-  "hook": [
-   "discipline",
-   "is a schedule, not a personality"
-  ]
- },
- {
   "topic": "ten-x",
   "hook": [
    "how i 10x'd",
@@ -921,6 +914,76 @@
   "hook": [
    "5 apps i will use",
    "for the rest of my life"
+  ]
+ },
+ {
+  "topic": "boring-phone-widgets",
+  "hook": [
+   "my phone is boring now",
+   "and it changed everything"
+  ]
+ },
+ {
+  "topic": "three-hours-no-deleting",
+  "hook": [
+   "i cut 3 hours of screen time",
+   "without deleting a single app"
+  ]
+ },
+ {
+  "topic": "still-100-hours",
+  "hook": [
+   "5 reasons your screen time",
+   "is still 100+ hours"
+  ]
+ },
+ {
+  "topic": "not-one-is-willpower",
+  "hook": [
+   "4 things that cut my screen time",
+   "not one of them is willpower"
+  ]
+ },
+ {
+  "topic": "report-not-problem",
+  "hook": [
+   "your screen time report",
+   "is not the problem"
+  ]
+ },
+ {
+  "topic": "already-deleted",
+  "hook": [
+   "you already tried deleting the app",
+   "try these 5 instead"
+  ]
+ },
+ {
+  "topic": "sixty-one-days",
+  "hook": [
+   "4 hours a day on your phone",
+   "is 61 days a year"
+  ]
+ },
+ {
+  "topic": "second-hour",
+  "hook": [
+   "the hard part is not starting",
+   "it is the second hour"
+  ]
+ },
+ {
+  "topic": "nobody-talks",
+  "hook": [
+   "nobody talks about these 5 apps",
+   "and they run my whole day"
+  ]
+ },
+ {
+  "topic": "home-screen-five",
+  "hook": [
+   "the 5 apps on my home screen",
+   "everything else is in a folder"
   ]
  }
 ]

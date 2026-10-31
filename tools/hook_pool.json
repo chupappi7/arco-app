@@ -193,6 +193,66 @@
    "pillar": "screentime",
    "theme": "discipline",
    "lens": "the mechanism that works without willpower"
+  },
+  {
+   "lines": [
+    "your screen time report",
+    "is not the problem"
+   ],
+   "used": true,
+   "pillar": "screentime",
+   "theme": "screentime",
+   "lens": "what it changes that looking at the number never did"
+  },
+  {
+   "lines": [
+    "you already tried deleting the app",
+    "try these 5 instead"
+   ],
+   "used": true,
+   "pillar": "screentime",
+   "theme": "discipline",
+   "lens": "what it does that deleting the app did not"
+  },
+  {
+   "lines": [
+    "4 hours a day on your phone",
+    "is 61 days a year"
+   ],
+   "used": true,
+   "pillar": "screentime",
+   "theme": "insights",
+   "lens": "the stretch of life it gives back"
+  },
+  {
+   "lines": [
+    "the hard part is not starting",
+    "it is the second hour"
+   ],
+   "used": true,
+   "pillar": "discipline",
+   "theme": "discipline",
+   "lens": "what it does when the first hour's momentum is gone"
+  },
+  {
+   "lines": [
+    "nobody talks about these 5 apps",
+    "and they run my whole day"
+   ],
+   "used": true,
+   "pillar": "tools",
+   "theme": "planning",
+   "lens": "the part of the day it quietly runs"
+  },
+  {
+   "lines": [
+    "the 5 apps on my home screen",
+    "everything else is in a folder"
+   ],
+   "used": true,
+   "pillar": "tools",
+   "theme": "focus",
+   "lens": "why it earns a place on the home screen"
   }
  ]
 }

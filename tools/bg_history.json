@@ -1717,5 +1717,71 @@
    "bg-h29.jpg",
    "bg-h31.jpg"
   ]
+ },
+ {
+  "topic": "report-not-problem",
+  "bgs": [
+   "bg-h54.jpg",
+   "bg-h52.jpg",
+   "bg-n05.jpg",
+   "bg-h51.jpg",
+   "bg-n06.jpg",
+   "bg-h48.jpg"
+  ]
+ },
+ {
+  "topic": "already-deleted",
+  "bgs": [
+   "bg-h57.jpg",
+   "bg-h49.jpg",
+   "bg-h39.jpg",
+   "bg-h50.jpg",
+   "bg-h38.jpg",
+   "bg-h46.jpg"
+  ]
+ },
+ {
+  "topic": "sixty-one-days",
+  "bgs": [
+   "bg-h79.jpg",
+   "bg-n04.jpg",
+   "bg-h45.jpg",
+   "bg-h37.jpg",
+   "bg-h34.jpg",
+   "bg-h36.jpg"
+  ]
+ },
+ {
+  "topic": "second-hour",
+  "bgs": [
+   "bg-n07.jpg",
+   "bg-h32.jpg",
+   "bg-h88.jpg",
+   "bg-h21.jpg",
+   "bg-h35.jpg",
+   "bg-h22.jpg"
+  ]
+ },
+ {
+  "topic": "nobody-talks",
+  "bgs": [
+   "bg-n08.jpg",
+   "bg-h31.jpg",
+   "bg-h29.jpg",
+   "bg-h24.jpg",
+   "bg-h52.jpg",
+   "bg-n05.jpg"
+  ]
+ },
+ {
+  "topic": "home-screen-five",
+  "bgs": [
+   "bg-n09.jpg",
+   "bg-h51.jpg",
+   "bg-n06.jpg",
+   "bg-h49.jpg",
+   "bg-h39.jpg",
+   "bg-n04.jpg"
+  ]
  }
 ]

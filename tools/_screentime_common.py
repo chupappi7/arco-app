@@ -20,7 +20,11 @@ from compose import (rule_slide, hook_slide, preflight, mark_hook_used,
 def build(topic, hook, bgs, arco_lines, rules):
     out = f'{c.REPO}/drafts/{topic}'
     os.makedirs(out, exist_ok=True)
-    preflight(topic, ['ARCO'], bgs, pillar='screentime', hook=hook)
+    # rule_slide serves both method-led pillars, and assert_hook_pillar takes
+    # the pillar from the hook, so hardcoding screentime here rejected a
+    # discipline hook that wants exactly this shape.
+    pillar = hook_rules.pillar_of(hook) or 'screentime'
+    preflight(topic, ['ARCO'], bgs, pillar=pillar, hook=hook)
     for b in bgs[1:]:
         luma = c.copy_band_luma(b)
         if luma > c.BAND_MAX_LUMA:
