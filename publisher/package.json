@@ -3,5 +3,8 @@
   "private": true,
   "version": "1.0.0",
   "description": "Public posting surface for the ARCO TikTok integration.",
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "deploy": "node dev/stamp.cjs && vercel deploy --prod --yes"
+  }
 }
