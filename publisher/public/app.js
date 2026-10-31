@@ -325,7 +325,11 @@ function overviewView() {
   const before = isToday ? list.filter(p => p.scheduled_at < now) : [], after = isToday ? list.filter(p => p.scheduled_at >= now) : list;
   const endSel = Math.floor(zonedToMs(...Object.values(addDays(sel, 1))) / 1000);
   const later = upcoming.filter(p => p.scheduled_at >= endSel).slice(0, Math.max(0, 4 - list.length));
-  const schedule = `${list.length ? `${before.map(p => row(p)).join('')}${isToday ? `<div class="snow"><time>${at(now)}</time><i></i></div>` : ''}${after.map(p => row(p)).join('')}`
+  const weekEmpty = !upcoming.length && days.every(d => !onDay(d).length);
+  const schedule = weekEmpty ? `<div class="splan"><span class="splan-ic">${ui('cal', 22)}</span><b>Nothing scheduled this week</b>
+      <span>Pick a day above to plan one, or set posting times and let "Add to queue" fill them for you.</span>
+      <div><button class="btn" data-newon="${selKey}">${ui('plus', 15)}Schedule a post</button>${!S.me.workspace.slots && can('admin') ? '<a class="btn sec" href="#settings">Set posting times</a>' : '<a class="btn sec" href="#calendar">Open calendar</a>'}</div></div>`
+    : `${list.length ? `${before.map(p => row(p)).join('')}${isToday ? `<div class="snow"><time>${at(now)}</time><i></i></div>` : ''}${after.map(p => row(p)).join('')}`
       : `<div class="snone"><span>${isToday ? 'Nothing goes out today.' : `Nothing scheduled for ${dayLabel(sel, { weekday: 'long' })}.`}</span>
         <button class="btn sec" data-newon="${selKey}">${ui('plus', 15)}Schedule a post</button></div>`}
     ${later.length ? `<div class="slater">Coming up</div>${later.map(p => row(p, true)).join('')}` : ''}`;
@@ -360,16 +364,17 @@ function overviewView() {
 
   return `<div class="ohead"><div><h1>${greeting()}</h1><p>${sub}</p></div></div>
   <div class="kpis">${kpis.map(([href, l, n, note, tone]) => `<a href="${href}" class="kpi ${tone}"><span>${l}</span><b>${n}</b><small>${note}</small></a>`).join('')}</div>
-  <div class="ogrid">
+  <div class="ogrid"><div class="ocol">
     <section class="panel ocard sched"><header><h2>Schedule</h2><a href="#calendar">Open calendar</a></header>
       <div class="dtabs">${days.map(tab).join('')}</div>
       <div class="oscroll">${schedule}</div></section>
-    ${side}
     <section class="panel ocard"><header><h2>Recently published</h2><a href="#calendar">See all</a></header>
-      <div class="ptiles">${pub.map(tile).join('')}${pub.length ? ghost.repeat(4 - pub.length) : ''}</div>
-      ${pub.length ? '' : '<div class="sempty"><span>Published posts show here with their numbers.</span></div>'}</section>
+      ${pub.length ? `<div class="ptiles">${pub.map(tile).join('')}${pub.length < 4 ? ghost : ''}</div>`
+        : `<div class="snone"><span>Published posts show here with their numbers.</span><a class="btn sec" href="#compose">${ui('plus', 15)}Create post</a></div>`}</section>
+  </div><div class="ocol side">
+    ${side}
     ${perfCard()}
-  </div>`;
+  </div></div>`;
 }
 
 // ---- stats ---------------------------------------------------------------
@@ -745,6 +750,7 @@ const handle = a => `${platformOf(a) === 'facebook' ? '' : '@'}${esc(a.username 
 // (the same brand on TikTok and Instagram is often both @brand).
 function who(x) {
   const name = x.username || x.display_name || '', pl = x.platform || 'tiktok', low = name.toLowerCase();
+  if (!name) return `<span class="gone">${PLATFORM[pl]} account removed</span>`;
   const dup = (S.me?.accounts || []).filter(a => (a.username || a.display_name || '').toLowerCase() === low).length > 1;
   return `${pl === 'facebook' ? '' : '@'}${esc(name)}${dup ? `<small class="plt">${PLATFORM[pl]}</small>` : ''}`;
 }

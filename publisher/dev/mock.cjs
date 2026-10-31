@@ -46,7 +46,7 @@ const media = {};
 const body = q => new Promise(r => { let b = ''; q.on('data', d => b += d); q.on('end', () => { try { r(JSON.parse(b || '{}')); } catch { r({}); } }); });
 http.createServer(async (q, r) => {
   const u = new URL(q.url, 'http://x'), p = u.pathname, j = (o, s = 200) => { r.statusCode = s; r.setHeader('Content-Type', 'application/json'); r.end(JSON.stringify(o)); };
-  const cookie = q.headers.cookie || '', empty = cookie.includes('empty=1');
+  const cookie = q.headers.cookie || '', empty = cookie.includes('empty=1'), quiet = cookie.includes('quiet=1');
   if (p.startsWith('/api/v1/') && cookie.includes('out=1')) return j({ error: 'Sign in first' }, 401);
   // New posts "publish" a few seconds after they are due.
   for (const x of posts) if (x.created && x.status === 'queued' && x.scheduled_at <= now() && Date.now() - x.created > 5000) {
@@ -54,7 +54,7 @@ http.createServer(async (q, r) => {
     else { x.status = 'published'; x.post_url = 'https://example.com/p'; } }
   if (p === '/api/v1/me') return j(empty ? { ...me, accounts: [], brands: [], workspace: { ...me.workspace, slots: null } } : me);
   if (p.startsWith('/fake/')) { r.setHeader('Content-Type', 'image/svg+xml'); return r.end(svg(p)); }
-  if (p === '/api/v1/posts' && q.method === 'GET') return j({ posts: empty ? [] : posts.filter(x => x.status !== 'draft') });
+  if (p === '/api/v1/posts' && q.method === 'GET') return j({ posts: empty ? [] : quiet ? posts.filter(x => x.status === 'published' || x.status === 'failed').slice(0, 3).map((x, i) => i === 1 ? { ...x, username: '' } : x) : posts.filter(x => x.status !== 'draft') });
   if (p === '/api/v1/posts' && q.method === 'POST') { const o = await body(q), id = 'n' + Math.random().toString(16).slice(2, 8);
     const x = { ...mk(id, o.account_id, 'queued', 0, o.caption || ''), scheduled_at: o.scheduled_at || now(), images: (o.image_keys || []).map(k => '/media/' + k),
       created: Date.now(), fail: acc(o.account_id).platform === 'instagram' };
