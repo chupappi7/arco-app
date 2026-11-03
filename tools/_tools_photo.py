@@ -20,8 +20,10 @@ sys.path.insert(0, '/Users/thinh/SIXSIX/arco-app/tools')
 from PIL import Image, ImageDraw
 import compose as c
 import hook_rules
-from compose import (app_slide, hook_slide, mark_hook_used, preflight,
-                     record_post_bgs, record_post_tools)
+from compose import (app_slide, hook_slide, mark_hook_used, phone_slide,
+                     preflight, record_post_bgs, record_post_tools)
+
+SHOTS = '/Users/thinh/Desktop/appstore screens'
 
 KICKER = 'here is why'
 # The store name is 'App Blocker & Focus: ARCO', and for a while the slide
@@ -90,10 +92,12 @@ def assert_fits(name, lines):
         raise SystemExit(f'{name}: copy runs to y={y}')
 
 
-def build(topic, hook, theme, bgs, arco, tools, only=None):
+def build(topic, hook, theme, bgs, arco, tools, only=None, cta=None):
     """arco: ARCO's body lines, drawn once with next_arco_angle(theme) and
     frozen in the generator. tools: [(name, [mechanism, consequence])] after
-    ARCO. bgs: hook then one per roster slide."""
+    ARCO. bgs: hook then one per roster slide. `cta` adds a closing slide:
+    (screen, crop_top, title, body) -- a real app screen with the ask beside
+    it."""
     out = f'{c.REPO}/drafts/{topic}'
     os.makedirs(out, exist_ok=True)
     roster = ['ARCO'] + [t[0] for t in tools]
@@ -153,6 +157,23 @@ def build(topic, hook, theme, bgs, arco, tools, only=None):
             app_slide(bgs[i + 1], icons[name], title, lines, f'{out}/{n:02d}.jpg')
             print(f'  {bgs[i+1]}  {c.VIBES.get(bgs[i+1]):18s} band luma '
                   f'{c.copy_band_luma(bgs[i+1]):.1f}')
+
+    # Thinh, 2026-11-02: "i think all should have screens at least, text by
+    # itself is boring", and "make some ctas with comment setup or app to get
+    # the app or for promo code". A tools post is five icons and no app
+    # screen anywhere, and it ended on the fifth peer with nothing to do
+    # next. This adds one slide that fixes both: a real ARCO screen with the
+    # ask beside it. It stays opt-in, so the posts already out rebuild
+    # unchanged, and the roster slides keep reading as a recommendation
+    # because the ask is not on any of them.
+    if cta and want(len(roster) + 2):
+        from _veiled_screens import WIDE, veiled
+        (src, crop), ct, cb = cta
+        shot = src if os.path.isabs(src) else f'{SHOTS}/{src}'
+        # The hook's frame comes back under the veil: the post closes where
+        # it opened, and no seventh background has to be allocated.
+        phone_slide(veiled(bgs[0]), shot, crop, '', ct, cb,
+                    f'{out}/{len(roster) + 2:02d}.jpg', style=WIDE)
 
     if not any(e.get('topic') == topic for e in c.tool_history()):
         record_post_tools(topic, roster)

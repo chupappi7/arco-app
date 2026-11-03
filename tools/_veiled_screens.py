@@ -61,6 +61,22 @@ VEIL = 0.22          # ceiling on how much of the photograph shows through
 VEIL_LUMA = 11       # the light a photo may add, so bright frames stay faint
 
 KICKER = 'here is why'
+
+# Thinh, 2026-11-02: "make some ctas with comment setup or app to get the app
+# or for promo code". The screens posts close on the icon card, and until now
+# the card only described the app. These are the three closers a post can
+# pick, kept here so the choice is a named constant and analytics can tell
+# which card a post shipped with.
+#
+# CTA_COMMENT gates the setup the slides just showed: it is the one thing a
+# comment gets you that searching the store does not, and the comment wall
+# fills with the brand name rather than with "app". CTA_STORE is the plain
+# search term for a post that has already asked for enough. A promo code
+# needs an offer code minted in App Store Connect first, so there is no
+# constant for one here yet.
+CTA_COMMENT = ['Comment \u201cARCO\u201d and I\u2019ll send my setup.',
+               'Search \u201carco focus\u201d on the App Store.']
+CTA_STORE = ['Search \u201carco focus\u201d', 'on the App Store.']
 CARD_OUTLINE = {'icon_outline': 3, 'badge_outline': 3}
 
 # Design variants of the step slide, 2026-10-17. The posted look is
@@ -80,6 +96,18 @@ DESIGNS = {
     # set where every slide puts the device on the same side.
     'left-rail': {'side': 'left', 'col_x': 616, 'col_w': 400, 'col_y': 540,
                   'title_size': 58, 'body_size': 34},
+    # Thinh, 2026-11-02: "make it more clean there are too many two row
+    # sentences". Beside the handset the column is 392px, which is about 25
+    # characters -- every sentence straddled a row however short it was
+    # written. Here the copy is a full-width band above the device, 936px or
+    # roughly 58 characters, and `sentence_lines` gives each sentence a row
+    # of its own. The handset is 500 rather than big-screen's 660 so its
+    # bottom lands at 1564, clear of the floor TikTok's caption sits on;
+    # big-screen puts it at 1885, under the caption.
+    'wide-band': {'phone_w': 500, 'phone_x': 290, 'phone_y': 450, 'stack': 72,
+                  'col_x': 72, 'col_w': 936, 'col_y': 140,
+                  'title_size': 74, 'body_size': 40, 'app_size': 30,
+                  'sentence_lines': True, 'ground': 'flat'},
 }
 
 STYLE = {'side': 'right', 'col_x': 72, 'col_w': 392, 'col_y': 665,
@@ -91,6 +119,12 @@ STYLE = {'side': 'right', 'col_x': 72, 'col_w': 392, 'col_y': 665,
 
 
 FLAT = linear_ground((20, 21, 25), (8, 8, 10))
+
+# The wide band on a photograph rather than the flat ground: what the closing
+# slide of a photo listicle uses, so it keeps the look of the six slides
+# before it and still gets a column wide enough to hold a whole sentence.
+WIDE = {k: v for k, v in {**STYLE, **DESIGNS['wide-band']}.items()
+        if k != 'ground'}
 
 
 def veiled(bg):

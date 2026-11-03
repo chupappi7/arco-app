@@ -1041,7 +1041,7 @@ def app_slide(bg, icon, title, body_lines, out, grad=(0.85, 0.68, 300, 1250)):
     print('wrote', out)
 
 def rule_slide(bg, number, title, body_lines, out, grad=(0.85, 0.68, 300, 1250),
-               badge=True, title_fill=WHITE):
+               badge=True, title_fill=WHITE, title_size=None):
     """A tool slide with a numbered badge where the app icon would be.
 
     Method-led pillars (discipline, screentime) have no app to show, and
@@ -1073,7 +1073,10 @@ def rule_slide(bg, number, title, body_lines, out, grad=(0.85, 0.68, 300, 1250),
         im.paste(b, (88, 610), b)
 
     assert_teaches(title, body_lines)
-    tf = fit_font(title, 'Black', 84)
+    # fit_font shrinks per title, so a long step rendered visibly smaller than
+    # "1. ARCO Focus" right above it and the post had no consistent headline
+    # size. A caller that knows all the titles can size them once and pass it.
+    tf = font(title_size, 'Black') if title_size else fit_font(title, 'Black', 84)
     items = [(85, 865, title, tf, 'la', title_fill)]
     body_f = font(50, 'Semibold')
     y = 995
@@ -1180,7 +1183,17 @@ def phone_slide(bg, src, crop_top, number, title, body, out,
         if len(tlines) <= 3:
             break
     bf = font(st['body_size'], st['body_face'])
-    blines = wrap_px(body, bf, COL)
+    # Thinh, 2026-11-02: "there are too many two row sentences". Greedy
+    # wrapping breaks wherever the row runs out, so a two-sentence body
+    # almost always ends a row halfway through a sentence and starts the
+    # next one mid-row. `sentence_lines` wraps each sentence on its own, so
+    # a sentence short enough to fit a row gets a row. Opt-in, so the posts
+    # already out rebuild pixel-identical.
+    if st.get('sentence_lines'):
+        blines = [l for part in re.findall(r'[^.]+\.\s*|[^.]+$', body)
+                  if part.strip() for l in wrap_px(part.strip(), bf, COL)]
+    else:
+        blines = wrap_px(body, bf, COL)
     col_h = ((60 if app else 0)
              + len(tlines) * round(tf.size * st['lead']) + 26
              + len(blines) * round(bf.size * 1.32))
