@@ -8,45 +8,44 @@
           no step here is "check your usage" -- that is the problem restated.
   ARCO    angle a2 (Blocked Hours, set once, number halves): the one angle in
           the screentime set that answers a report with an action rather than
-          better reporting. a6/i1 are Insights angles and would have agreed
-          with the thing the hook calls useless.
-  rules   none repeat boring-phone-2 (Raise to Wake, Hide app, one page,
-          badges), the only other post in this look.
+          better reporting.
+
+Rebuilt 2026-11-02 on Thinh's note -- "i think all should have screens at
+least, text by itself is boring". The first build was ARCO on one screen and
+four stock iOS steps as text over photographs; it went out at a 0.8% like
+rate against 2.0% for all posts. Every step is now a real ARCO screen in the
+under-an-hour look, and the post closes on the card with the comment CTA.
+The text-steps version is in git history.
 """
-from _screentime_common import build
+from _veiled_screens import (build, CONTROL, SHIELD_NOW, TODAY_NOW, TIMELINE,
+                             CTA_COMMENT, KICKER, CARD_OUTLINE)
 
 build(
     topic='report-not-problem',
     hook=['your screen time report', 'is not the problem'],
     bgs=['bg-h54.jpg',   # hook         desk-led-warm      luma 38
-         'bg-h52.jpg',   # ARCO         desk-city-day      luma 64
+         'bg-h52.jpg',   # 1            desk-city-day      luma 64
          'bg-n05.jpg',   # 2            desk-empty-day     luma 51
          'bg-h51.jpg',   # 3            desk-city-day      luma 60
          'bg-n06.jpg',   # 4            desk-empty-day     luma 55
-         'bg-h48.jpg'],  # 5            desk-city-day      luma 65
-    arco_lines=['Blocked Hours shuts my apps from',
-                'six to eight, every evening.', '',
-                'I set it once and my screen time is', 'down by half.', '',
-                'I never argue with it.'],
-    rules=[
-        ('Downtime picks the hours', [
-            'Set Downtime in Screen Time and',
-            'name the hours apps stay shut.', '',
-            'The report says where the evening',
-            'went. Downtime spends it for you.']),
-        ('App Limits cap the category', [
-            'One limit covers Social, instead',
-            'of one app at a time.', '',
-            'The number stops being a surprise',
-            'you read about on Sunday.']),
-        ('Alerts arrive on your clock', [
-            'Scheduled Summary holds alerts and',
-            'delivers them at times you pick.', '',
-            'You open the phone because you',
-            'decided to, not because it buzzed.']),
-        ('The charger moves out', [
-            'Leave the charger in the kitchen',
-            'and let the phone sleep there.', '',
-            'The first hour of the day happens',
-            'before you have read anything.']),
-    ])
+         'bg-h48.jpg'],  # card         desk-city-day      luma 65
+    kicker=KICKER,
+    slides=[
+        (SHIELD_NOW, '1', 'The app opens into a wall.',
+         'Blocked Hours shut the feeds on a schedule you set once. '
+         'The report only tells you afterwards.'),
+        (CONTROL, '2', 'Blocking starts now.',
+         'A session locks the feeds until the timer runs out. '
+         'Nothing waits for Sunday.'),
+        (TODAY_NOW, '3', 'Every hour gets a job.',
+         'The day goes on the timeline as blocks. '
+         'No empty hour is left for the feed.'),
+        (TIMELINE, '4', 'A glance stays a glance.',
+         'The widget shows the running block on the home screen. '
+         'You never unlock to check.'),
+    ],
+    closer=['The report counts the hours.',
+            'This one spends them.'],
+    promo=CTA_COMMENT,
+    card_style=CARD_OUTLINE,
+    design='wide-band')

@@ -14,6 +14,7 @@
           about a single feature.
 """
 from _tools_photo import main
+from _veiled_screens import TIMELINE
 
 main(
     topic='nobody-talks',
@@ -41,4 +42,8 @@ main(
         ('n8n',
          ['n8n runs your automations on your own machine rather than a metered cloud account.',
           'The admin that used to take an evening a week now runs while you are asleep.']),
-    ])
+    ],
+    cta=(TIMELINE,
+         'Comment \u201cARCO\u201d.',
+         'I will send the blocks and the schedule I use. '
+         'Or search \u201carco focus\u201d on the App Store.'))

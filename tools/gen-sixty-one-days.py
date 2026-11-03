@@ -6,46 +6,45 @@
           which is 60.8 days -- the hook rounds, the slides do not contradict
           it.
   lens    the stretch of life it gives back. One step does the arithmetic,
-          two say where in the day the hours actually sit, and the last one
-          answers the question the arithmetic creates.
-  ARCO    angle a6. It is the Insights angle that names four hours on one app,
-          the hook's own number, so the slide lands on the hook instead of
-          near it.
+          two say where in the day the hours sit, and the last one answers
+          the question the arithmetic creates.
+  ARCO    angle a6, the Insights angle that names four hours on one app --
+          the hook's own number -- so the opening screen lands on the hook.
+
+Rebuilt 2026-11-02 on Thinh's note -- "i think all should have screens at
+least, text by itself is boring". The first build carried one screen and
+four text steps over photographs. Every step is a real ARCO screen now, and
+the post closes on the card with the store CTA.
 """
-from _screentime_common import build
+from _veiled_screens import (build, INSIGHTS_NOW, SHIELD_NOW, GOOD_HABITS,
+                             PLAN_DAY, CTA_STORE, KICKER, CARD_OUTLINE)
 
 build(
     topic='sixty-one-days',
     hook=['4 hours a day on your phone', 'is 61 days a year'],
     bgs=['bg-h79.jpg',   # hook         desk-led-neon      luma 41
-         'bg-n04.jpg',   # ARCO         villa-day          luma 54
+         'bg-n04.jpg',   # 1            villa-day          luma 54
          'bg-h45.jpg',   # 2            window-silhouette  luma 50 (the one person)
          'bg-h37.jpg',   # 3            supercars-dusk     luma 23
          'bg-h34.jpg',   # 4            desk-empty-day     luma 61
-         'bg-h36.jpg'],  # 5            supercars-dusk     luma 24
-    arco_lines=['Insights shows the week by app and', 'by day, in hours.',
-                '', 'Seeing four hours on one app is what',
-                'made me finally cut it.', '',
-                'The number did the convincing.'],
-    rules=[
-        ('One hour back is 15 days', [
-            'Cut a single hour a day and the',
-            'year hands you two weeks.', '',
-            'You do not have to win all four',
-            'to get a holiday back.']),
-        ('Most of it is after nine', [
-            'Read Insights by hour instead of',
-            'by app, for one week.', '',
-            'The four hours are rarely spread',
-            'out. They sit in the evening.']),
-        ('Pickups cost more than minutes', [
-            'Every pickup restarts whatever you',
-            'were in the middle of.', '',
-            'Fifty a day is why four hours',
-            'feels like the entire evening.']),
-        ('Name what the days are for', [
-            'Decide what the 61 days buy before',
-            'you go and take them back.', '',
-            'Hours with nowhere to go come',
-            'straight back to the phone.']),
-    ])
+         'bg-h36.jpg'],  # card         supercars-dusk     luma 24
+    kicker=KICKER,
+    slides=[
+        (INSIGHTS_NOW, '1', 'The week, by app.',
+         'Insights counts the hours per app and per day. '
+         'Twenty four on one app is where the days hide.'),
+        (SHIELD_NOW, '2', 'One hour back is 15 days.',
+         'Blocked Hours shut the evening window. '
+         'You do not have to win all four.'),
+        (PLAN_DAY, '3', 'Give the hours a job.',
+         'Plan the day and the time you cut lands on a block. '
+         'Empty hours go back to the phone.'),
+        (GOOD_HABITS, '4', 'The days show up as work.',
+         'Focus time is counted by the week. '
+         'The hour you took back is one you can point at.'),
+    ],
+    closer=['Four hours a day is 61 days a year.',
+            'Take one of them back this week.'],
+    promo=CTA_STORE,
+    card_style=CARD_OUTLINE,
+    design='wide-band')

@@ -1554,7 +1554,7 @@
   {
    "topic": "report-not-problem",
    "title": "your screen time report is not the problem",
-   "caption": "the weekly report is a receipt, not a fix. arco focus blocked hours shuts my apps from six to eight every evening, set once, and my screen time is down by half. downtime in screen time names the hours apps stay shut, so the evening gets spent instead of explained. one app limit covers social instead of one app at a time. scheduled summary holds your alerts and hands them over when you pick, so you open the phone because you decided to. leave the charger in the kitchen and the first hour of the day happens before you have read anything. #screentime #focus #productivity #iphone"
+   "caption": "the weekly report is a receipt, not a fix. arco focus blocked hours shut the feeds on a schedule you set once, so the app opens into a wall instead of a feed. start a session and everything stays locked until it ends, which is blocking now rather than on sunday. the day goes on the timeline as blocks, so there is no open hour left for the feed to fill. the widget shows what is running without unlocking, so a glance stays a glance. comment arco and i will send my setup. #screentime #focus #productivity #iphone"
   },
   {
    "topic": "already-deleted",
@@ -1564,17 +1564,17 @@
   {
    "topic": "sixty-one-days",
    "title": "4 hours a day on your phone is 61 days a year",
-   "caption": "four hours a day is 61 days a year. arco focus insights shows the week by app and by day, and seeing four hours on one app is what made me finally cut it. cut a single hour and the year hands you two weeks, so you do not have to win all four. read insights by hour instead of by app and the four hours turn out to sit in the evening, not spread across the day. every pickup restarts whatever you were in the middle of, which is why fifty a day feels like the entire evening. decide what the 61 days buy before you take them back, because hours with nowhere to go come straight back to the phone. #screentime #focus #productivity #habits"
+   "caption": "four hours a day is 61 days a year. arco focus insights counts the hours per app and per day, and twenty four on one app is where the 61 days are hiding. blocked hours shut the evening window, so one hour back is fifteen days and you do not have to win all four. plan the day first and the time you cut lands on a block, because hours with nothing on them come straight back to the phone. focus time is counted by the week, so the hour you took back is something you can point at. search arco focus on the app store. #screentime #focus #productivity #habits"
   },
   {
    "topic": "second-hour",
    "title": "the hard part is not starting, it is the second hour",
-   "caption": "starting is easy. hour two is where it dies. arco focus puts every distracting app away for the whole session, so an hour of work is an hour now and not forty minutes and a scroll. put both blocks on the day while you are still planning it, so hour two starts without a decision you no longer have. run the break on a timer instead of on how you feel, because ten minutes stops by itself and open ended rest does not. stop mid sentence and leave the file open, so coming back is continuing rather than starting. walk away from the desk and leave the phone sitting on it. #discipline #focus #deepwork #productivity"
+   "caption": "starting is easy. hour two is where it dies. arco focus puts both blocks on the timeline while you are still planning, so hour two starts without a decision you no longer have. start the timer and the feeds stay locked until it ends, so an hour of work is an hour and not forty minutes and a scroll. the widget shows the block that is running, so the walk back to the desk does not pass through a feed. focus time is counted by the week, so the second hour stops being a mood and starts being a number. comment arco and i will send my setup. #discipline #focus #deepwork #productivity"
   },
   {
    "topic": "nobody-talks",
    "title": "nobody talks about these 5 apps and they run my whole day",
-   "caption": "arco focus holds the plan and the block that protects it, so tasks get a time on the timeline and focus mode shuts the apps for it. manus works a task through its own browser session and hands back the finished file, so the research hour you keep postponing happens while you are in a meeting. granola writes the meeting notes from your mac audio with no bot joining the call, so an afternoon of calls leaves notes you never had to take. superwhisper turns speech into text on device, straight into whatever app has focus, so the first draft happens at talking speed. n8n runs your automations on your own machine rather than a metered cloud account, so the admin that took an evening a week runs while you are asleep. #productivity #tools #apps #automation"
+   "caption": "arco focus holds the plan and the block that protects it, so tasks get a time on the timeline and focus mode shuts the apps for it. manus works a task through its own browser session and hands back the finished file, so the research hour you keep postponing happens while you are in a meeting. granola writes the meeting notes from your mac audio with no bot joining the call, so an afternoon of calls leaves notes you never had to take. superwhisper turns speech into text on device, straight into whatever app has focus, so the first draft happens at talking speed. n8n runs your automations on your own machine rather than a metered cloud account, so the admin that took an evening a week runs while you are asleep. comment arco and i will send my setup. #productivity #tools #apps #automation"
   },
   {
    "topic": "home-screen-five",
@@ -1589,12 +1589,12 @@
   {
    "topic": "work-by-noon-14",
    "title": "the tools i use to do a full day of work by noon",
-   "caption": "arco focus plans the whole day before i start it, so nothing waits on a decision and i get more done by noon than i used to by six. gemini scheduled actions run a prompt at a time you set and send the result, so your inbox summary is written by 7am. a notion database template opens the page with its fields already filled, so the morning admin is three clicks before coffee. zapier moves a record between two apps the moment it changes, so the 9am handover already happened while you slept. sentry cron monitors alert you when a scheduled job did not run, so a broken backup is an 8am alert and not a lunchtime discovery. #productivity #tools #apps #automation"
+   "caption": "arco focus plans the whole day before i start it, so nothing waits on a decision and i get more done by noon than i used to by six. gemini scheduled actions run a prompt at a time you set and send the result, so your inbox summary is written by 7am. a notion database template opens the page with its fields already filled, so the morning admin is three clicks before coffee. zapier moves a record between two apps the moment it changes, so the 9am handover already happened while you slept. sentry cron monitors alert you when a scheduled job did not run, so a broken backup is an 8am alert and not a lunchtime discovery. comment arco and i will send my setup. #productivity #tools #apps #automation"
   },
   {
    "topic": "twelve-apps-8",
    "title": "i pay for 12 apps, these 5 do all the work",
-   "caption": "arco focus gives every task a time and the block that protects it in the same app, so i stopped running a planner and a blocker that knew nothing about each other. perplexity aims a search at papers or one site alone and cites what it used, which is the research tool and the citation manager on one bill. canva resizes one design into every format in a click, taking over the thumbnail tool and the deck tool at once. supabase gives you database, auth and file storage behind one project, so three subscriptions sit on one free tier. vercel builds, hosts and previews every branch, so the host, the ci runner and the staging server stopped being three bills. #productivity #tools #apps #saas"
+   "caption": "arco focus gives every task a time and the block that protects it in the same app, so i stopped running a planner and a blocker that knew nothing about each other. perplexity aims a search at papers or one site alone and cites what it used, which is the research tool and the citation manager on one bill. canva resizes one design into every format in a click, taking over the thumbnail tool and the deck tool at once. supabase gives you database, auth and file storage behind one project, so three subscriptions sit on one free tier. vercel builds, hosts and previews every branch, so the host, the ci runner and the staging server stopped being three bills. comment arco and i will send my setup. #productivity #tools #apps #saas"
   },
   {
    "topic": "rest-of-my-life-4",
@@ -1604,7 +1604,7 @@
   {
    "topic": "best-for-last-10",
    "title": "5 tools to stay productive, i saved the best for last",
-   "caption": "arco focus blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. antigravity drives your editor and a browser in the same agent run, so the work continues through the stretch where you would go looking elsewhere. clickup shows one list filtered to only what is due today, holding you through the hour when everything starts looking urgent. loom viewers comment at a timestamp rather than under the video, carrying the feedback round without a meeting cutting the day. posthog puts feature flags and session replay in the same tool, keeping you on the build through the week you would have spent guessing. #productivity #tools #apps #focus"
+   "caption": "arco focus blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. antigravity drives your editor and a browser in the same agent run, so the work continues through the stretch where you would go looking elsewhere. clickup shows one list filtered to only what is due today, holding you through the hour when everything starts looking urgent. loom viewers comment at a timestamp rather than under the video, carrying the feedback round without a meeting cutting the day. posthog puts feature flags and session replay in the same tool, keeping you on the build through the week you would have spent guessing. comment arco and i will send my setup. #productivity #tools #apps #focus"
   }
  ]
 }

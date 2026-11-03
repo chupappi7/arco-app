@@ -12,6 +12,7 @@
           shared with the post before.
 """
 from _tools_photo import main
+from _veiled_screens import TASKS
 
 main(
     topic='rest-of-my-life-4',
@@ -40,4 +41,8 @@ main(
         ('Figma',
          ['Figma auto layout resizes a frame to fit whatever ends up inside it.',
           'The file still works after the brand, the copy and the team have all changed.']),
-    ])
+    ],
+    cta=(TASKS,
+         'Search \u201carco focus\u201d.',
+         'The planner and the blocker are one app. '
+         'This screen is where you start.'))

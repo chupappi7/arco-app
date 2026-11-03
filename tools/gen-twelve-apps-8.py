@@ -12,6 +12,7 @@
           shared with the post before.
 """
 from _tools_photo import main
+from _veiled_screens import TODAY_NOW
 
 main(
     topic='twelve-apps-8',
@@ -41,4 +42,8 @@ main(
         ('Vercel',
          ['Vercel builds the site, hosts it and gives every branch its own preview URL.',
           'The host, the CI runner and the staging server stopped being three bills.']),
-    ])
+    ],
+    cta=(TODAY_NOW,
+         'Comment \u201cARCO\u201d.',
+         'I will send the blocks and the schedule I use. '
+         'Or search \u201carco focus\u201d on the App Store.'))

@@ -12,6 +12,7 @@
           shared with the post before.
 """
 from _tools_photo import main
+from _veiled_screens import GOOD_HABITS
 
 main(
     topic='work-by-noon-14',
@@ -40,4 +41,8 @@ main(
         ('Sentry',
          ['Sentry cron monitors alert you when a scheduled job did not run on time.',
           'A broken overnight backup is an alert at 8am, not a discovery after lunch.']),
-    ])
+    ],
+    cta=(GOOD_HABITS,
+         'Comment \u201cARCO\u201d.',
+         'I will send the blocks and the schedule I use. '
+         'Or search \u201carco focus\u201d on the App Store.'))

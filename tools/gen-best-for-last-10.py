@@ -12,6 +12,7 @@
           shared with the post before.
 """
 from _tools_photo import main
+from _veiled_screens import CONTROL
 
 main(
     topic='best-for-last-10',
@@ -39,4 +40,8 @@ main(
         ('PostHog',
          ['PostHog puts feature flags and session replay inside the same tool.',
           'It keeps you on the build through the week you would have spent guessing.']),
-    ])
+    ],
+    cta=(CONTROL,
+         'Comment \u201cARCO\u201d.',
+         'I will send the blocks and the schedule I use. '
+         'Or search \u201carco focus\u201d on the App Store.'))

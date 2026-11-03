@@ -12,6 +12,7 @@
           shared with the post before.
 """
 from _tools_photo import main
+from _veiled_screens import PLAN_DAY
 
 main(
     topic='4x-productivity-15',
@@ -39,4 +40,8 @@ main(
         ('CleanShot X',
          ['CleanShot X pins a screenshot so it floats above every other window.',
           'You copy from it without the window switching that eats half an afternoon.']),
-    ])
+    ],
+    cta=(PLAN_DAY,
+         'Search \u201carco focus\u201d.',
+         'The planner and the blocker are one app. '
+         'This screen is where you start.'))
