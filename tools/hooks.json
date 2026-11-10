@@ -1605,6 +1605,90 @@
    "topic": "best-for-last-10",
    "title": "5 tools to stay productive, i saved the best for last",
    "caption": "arco focus blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. antigravity drives your editor and a browser in the same agent run, so the work continues through the stretch where you would go looking elsewhere. clickup shows one list filtered to only what is due today, holding you through the hour when everything starts looking urgent. loom viewers comment at a timestamp rather than under the video, carrying the feedback round without a meeting cutting the day. posthog puts feature flags and session replay in the same tool, keeping you on the build through the week you would have spent guessing. comment arco and i will send my setup. #productivity #tools #apps #focus"
+  },
+  {
+   "topic": "ship-weekend-6",
+   "title": "how i ship in a weekend what used to take a month",
+   "caption": "how i ship in a weekend what used to take a month. one button in arco starts the block and locks every app on the list, no settings and no deciding. claude code plan mode reads the project and writes the plan before it touches a file, so you fix the approach in one message instead of undoing a day of edits. firebase authentication gives you apple, google and email sign in from one sdk, so the login screen takes an afternoon instead of the first week. superwall decides which paywall shows at which moment in the app from its dashboard, so you test the paywall while you build the next feature with no new release. every testflight build carries a what to test note that testers read first, so feedback comes back about the change you made and not the whole app. #buildinpublic #indiehacker #solofounder #coding #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-10 by gen-ship-weekend-6.py. build pillar via _tools_photo(pillar=build). Roster ARCO, Claude, Firebase, Superwall, TestFlight; Claude the one LLM. No CTA: tools and build posts end on the fifth app (Thinh, 2026-11-10)."
+  },
+  {
+   "topic": "wish-i-knew-at-17-12",
+   "title": "5 apps i wish someone showed me at 17",
+   "caption": "5 apps i wish someone showed me at 17. arco focus mode blocks every app on my list for the whole session, so the phone stops being a decision while the timer runs. gemini guided learning breaks a topic into steps and checks each one before moving on, so you finish the chapter able to explain it. the notion web clipper saves any article into a database with its link attached, so research for an essay sits in one place instead of forty tabs. paste a table into a canva chart and it draws the graph in the style of the deck, so a class presentation stops being a screenshot of a spreadsheet. github skills runs free courses inside a repo of your own and checks each step you push, so you learn git by making real commits. #studytok #productivity #apps #studentlife #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-10 by gen-wish-i-knew-at-17-12.py. tools pillar, theme study. Roster ARCO, Gemini, Notion, Canva, GitHub; Gemini the one LLM. No CTA: tools and build posts end on the fifth app (Thinh, 2026-11-10)."
+  },
+  {
+   "topic": "launch-weekend-4",
+   "title": "launch an app in one weekend",
+   "caption": "launch an app in one weekend. the block i am in sits on the arco lock screen with the time left running, so picking up the phone tells me to get back to work. run /review in codex and it reads your uncommitted changes the way a reviewer would, so saturday's bug is found before sunday's launch. stripe checkout shows apple pay and google pay with no extra code, so the first sale takes two taps on a phone. cloudflare turnstile replaces the captcha on your waitlist form for free, so bots stop filling the list and real people never solve a puzzle. a posthog survey asks one question inside the product at the moment you pick, so launch week feedback comes from people using it. #buildinpublic #indiehacker #appdev #startup #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-10 by gen-launch-weekend-4.py. build pillar via _tools_photo(pillar=build). Roster ARCO, Codex, Stripe, Cloudflare, PostHog; Codex the one LLM. No CTA: tools and build posts end on the fifth app (Thinh, 2026-11-10)."
+  },
+  {
+   "topic": "home-screen-five-2",
+   "title": "the 5 apps on my home screen, everything else is in a folder",
+   "caption": "the 5 apps on my home screen, everything else is in a folder. i start a session in arco and every app on the list locks itself. perplexity can sit on the iphone action button and answer with sources from one press, so the question gets asked before a feed gets the tap. endel reads my heart rate from the apple watch and shifts the sound with it, so starting to focus is one tap. the github app shows the whole diff of a pull request and merges it from the phone, so a one line fix ships from the coffee shop. loom on the iphone records the screen with your camera in the corner, so a walkthrough of the bug goes out in the time a message would take. #homescreen #productivity #iphone #apps #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-10 by gen-home-screen-five-2.py. tools pillar, theme focus, phone apps only. Roster ARCO, Perplexity, Endel, GitHub, Loom; Perplexity the one LLM. No CTA: tools and build posts end on the fifth app (Thinh, 2026-11-10)."
+  },
+  {
+   "topic": "ten-x-14",
+   "title": "how i 10x'd my productivity",
+   "caption": "how i 10x'd my productivity. arco focus mode puts every distracting app away for the whole session, so an hour of work is an hour and not forty minutes and a scroll. chatgpt reads a screenshot of a table and hands it back as a spreadsheet file, so the retyping is gone. raycast snaps the front window to half or a third of the screen on one hotkey, so arranging windows stops being a step. cmd k in linear runs any action on the issue you are on from the keyboard, so the click path through three menus disappears. cleanshot x copies the text out of any part of the screen you drag over, so retyping from a video or a locked pdf is no longer part of the job. #productivity #tools #apps #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-10 by gen-ten-x-14.py. tools pillar, theme focus. Roster ARCO, ChatGPT, Raycast, Linear, CleanShot X; ChatGPT the one LLM. No CTA: tools and build posts end on the fifth app (Thinh, 2026-11-10)."
+  },
+  {
+   "topic": "boring-phone-home",
+   "title": "my phone is boring now and it changed everything",
+   "caption": "my phone is boring now and it changed everything, here is why. a blocked app opens onto an arco focus shield asking what it adds to your day, with one button that locks you back in. a timeline widget lists the blocks in order and ticks each one off, so unlocking the phone shows what is next before anything new. the tasks widget shows today's list with anything late flagged in red, so checking it never means opening an app. insights splits screen time into distracting, entertainment and everyday, app by app, so you see exactly where the hours went. comment arco and i will send my setup. #screentime #digitalminimalism #dopaminedetox #productivity #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-10 by gen-boring-phone-home.py. screentime pillar, _veiled_screens: shield, timeline widget, tasks widget, Insights, then the closing card."
   }
  ]
 }

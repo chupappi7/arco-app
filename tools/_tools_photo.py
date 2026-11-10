@@ -92,7 +92,8 @@ def assert_fits(name, lines):
         raise SystemExit(f'{name}: copy runs to y={y}')
 
 
-def build(topic, hook, theme, bgs, arco, tools, only=None, cta=None):
+def build(topic, hook, theme, bgs, arco, tools, only=None, cta=None,
+          pillar='tools'):
     """arco: ARCO's body lines, drawn once with next_arco_angle(theme) and
     frozen in the generator. tools: [(name, [mechanism, consequence])] after
     ARCO. bgs: hook then one per roster slide. `cta` adds a closing slide:
@@ -103,7 +104,7 @@ def build(topic, hook, theme, bgs, arco, tools, only=None, cta=None):
     roster = ['ARCO'] + [t[0] for t in tools]
     if len(roster) != 5 or len(bgs) != 6:
         raise SystemExit('a tools post is five apps on six slides')
-    if not any(h['lines'] == hook for h in hook_rules.eligible(topic, 'tools')):
+    if not any(h['lines'] == hook for h in hook_rules.eligible(topic, pillar)):
         raise SystemExit(f'hook not eligible: {hook}')
 
     # `theme` was accepted and then ignored -- the generator drew its own
@@ -121,6 +122,8 @@ def build(topic, hook, theme, bgs, arco, tools, only=None, cta=None):
         print(f'hook lens: every tool point answers -- {lens}')
     for name in roster:
         c.assert_audience([name])
+    # preflight counts LLMs only for the tools pillar; build posts carry one too.
+    c.assert_one_llm(roster)
 
     # Judge background freshness against the post just before this one, so a
     # rebuild after later posts still passes.
@@ -131,7 +134,7 @@ def build(topic, hook, theme, bgs, arco, tools, only=None, cta=None):
         return h[:idx[0]] if idx else h
     c.bg_history = upto_here
     try:
-        preflight(topic, roster, bgs, pillar='tools', hook=hook)
+        preflight(topic, roster, bgs, pillar=pillar, hook=hook)
     finally:
         c.bg_history = full
     for bg in bgs[1:]:
@@ -166,6 +169,9 @@ def build(topic, hook, theme, bgs, arco, tools, only=None, cta=None):
     # ask beside it. It stays opt-in, so the posts already out rebuild
     # unchanged, and the roster slides keep reading as a recommendation
     # because the ask is not on any of them.
+    # Thinh, 2026-11-10: new tools and build posts pass no cta. The ask drew
+    # 2 comments on ~10.6k views and pointed at an App Store search that
+    # does not find ARCO. Kept so the 3 Nov posts still rebuild as shipped.
     if cta and want(len(roster) + 2):
         from _veiled_screens import WIDE, veiled
         (src, crop), ct, cb = cta
