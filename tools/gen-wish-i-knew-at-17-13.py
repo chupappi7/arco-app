@@ -3,8 +3,9 @@
 
   hook      "5 apps i wish someone / showed me at 17", from the approved pool, word for word.
   theme     study -- hook_pool.json binds it.
-  roster    Gemini, Obsidian, Notion, GitHub. Gemini is the one LLM. Every
-            point checked against every earlier generator: none taught before.
+  roster    Gemini, Obsidian, Notion, GitHub. Gemini is the one LLM. Points were
+            checked against the newer generators only; about half repeat
+            Sep-Oct lessons, all 3+ weeks old (allowed by Thinh, 2026-11-11).
   ARCO      angle drawn once with next_arco_angle('study') and frozen below.
   photos    hook frame least recently used as a hook; app frames shuffled per post,
             outside a 3-post cooldown, at most 2 shared with any of the last 10. Picked 2026-11-11.

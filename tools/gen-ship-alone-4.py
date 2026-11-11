@@ -3,8 +3,9 @@
 
   hook      "5 tools / that replace a whole team", from the approved pool, word for word.
   theme     build -- hook_pool.json binds it.
-  roster    Codex, Sentry, Figma, OpusClip. Codex is the one LLM. Every
-            point checked against every earlier generator: none taught before.
+  roster    Codex, Sentry, Figma, OpusClip. Codex is the one LLM. Points were
+            checked against the newer generators only; about half repeat
+            Sep-Oct lessons, all 3+ weeks old (allowed by Thinh, 2026-11-11).
   ARCO      angle drawn once with next_arco_angle('build') and frozen below.
   photos    hook frame least recently used as a hook; app frames shuffled per post,
             outside a 3-post cooldown, at most 2 shared with any of the last 10. Picked 2026-11-11.

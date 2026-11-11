@@ -1,0 +1,7 @@
+{
+ "hook": [
+  "the whole stack",
+  "for a one person app"
+ ],
+ "pillar": "build"
+}

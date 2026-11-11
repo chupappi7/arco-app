@@ -2013,5 +2013,285 @@
    "Firebase",
    "Framer"
   ]
+ },
+ {
+  "topic": "pay-double-3",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "Notion",
+   "Captions",
+   "Cloudflare"
+  ]
+ },
+ {
+  "topic": "4x-productivity-17",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Raycast",
+   "Loom",
+   "Zapier"
+  ]
+ },
+ {
+  "topic": "report-not-problem-2",
+  "tools": [
+   "ARCO"
+  ]
+ },
+ {
+  "topic": "boring-part",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "Descript",
+   "GitHub",
+   "Zapier"
+  ]
+ },
+ {
+  "topic": "ship-weekend-7",
+  "tools": [
+   "ARCO",
+   "Codex",
+   "GitHub",
+   "Linear",
+   "Stripe"
+  ]
+ },
+ {
+  "topic": "one-person-stack",
+  "tools": [
+   "ARCO",
+   "Cursor",
+   "Supabase",
+   "Firebase",
+   "Vercel"
+  ]
+ },
+ {
+  "topic": "stack-at-19-2",
+  "tools": [
+   "ARCO",
+   "Perplexity",
+   "Stripe",
+   "Airtable",
+   "Canva"
+  ]
+ },
+ {
+  "topic": "wish-i-knew-at-17-14",
+  "tools": [
+   "ARCO",
+   "Perplexity",
+   "Notion",
+   "Obsidian",
+   "Canva"
+  ]
+ },
+ {
+  "topic": "sixty-one-days-2",
+  "tools": [
+   "ARCO"
+  ]
+ },
+ {
+  "topic": "open-first",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Obsidian",
+   "Raycast",
+   "Linear"
+  ]
+ },
+ {
+  "topic": "ten-x-15",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Raycast",
+   "Zapier",
+   "Higgsfield"
+  ]
+ },
+ {
+  "topic": "deleted-twenty",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "Notion",
+   "CleanShot X",
+   "ClickUp"
+  ]
+ },
+ {
+  "topic": "rest-of-my-life-6",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "GitHub",
+   "Figma",
+   "Raycast"
+  ]
+ },
+ {
+  "topic": "work-by-noon-16",
+  "tools": [
+   "ARCO",
+   "Manus",
+   "Sentry",
+   "Cloudflare",
+   "Higgsfield"
+  ]
+ },
+ {
+  "topic": "second-hour-2",
+  "tools": [
+   "ARCO"
+  ]
+ },
+ {
+  "topic": "look-organized",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "Granola",
+   "Notion",
+   "Linear"
+  ]
+ },
+ {
+  "topic": "launch-weekend-5",
+  "tools": [
+   "ARCO",
+   "Codex",
+   "GitHub",
+   "Figma",
+   "Framer"
+  ]
+ },
+ {
+  "topic": "seven-day-build",
+  "tools": [
+   "ARCO",
+   "Cursor",
+   "Supabase",
+   "Stripe",
+   "TestFlight"
+  ]
+ },
+ {
+  "topic": "pay-for-twelve-9",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Canva",
+   "Photoroom",
+   "Cloudflare"
+  ]
+ },
+ {
+  "topic": "4x-productivity-18",
+  "tools": [
+   "ARCO",
+   "Antigravity",
+   "ElevenLabs",
+   "Linear",
+   "Cloudflare"
+  ]
+ },
+ {
+  "topic": "boring-phone-widgets-2",
+  "tools": [
+   "ARCO"
+  ]
+ },
+ {
+  "topic": "stopped-working-late",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "n8n",
+   "Sentry",
+   "CapCut"
+  ]
+ },
+ {
+  "topic": "ship-weekend-8",
+  "tools": [
+   "ARCO",
+   "Codex",
+   "Supabase",
+   "Figma",
+   "TestFlight"
+  ]
+ },
+ {
+  "topic": "study-apps",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "ElevenLabs",
+   "Notion",
+   "Loom"
+  ]
+ },
+ {
+  "topic": "nobody-talks-2",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Zapier",
+   "Buffer",
+   "Notion"
+  ]
+ },
+ {
+  "topic": "ten-x-16",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "Supabase",
+   "Runway",
+   "Superwhisper"
+  ]
+ },
+ {
+  "topic": "boring-phone-home-2",
+  "tools": [
+   "ARCO"
+  ]
+ },
+ {
+  "topic": "students-sleeping-on",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "GitHub",
+   "Figma",
+   "Make"
+  ]
+ },
+ {
+  "topic": "wish-i-knew-at-17-15",
+  "tools": [
+   "ARCO",
+   "Perplexity",
+   "Obsidian",
+   "CapCut",
+   "Higgsfield"
+  ]
+ },
+ {
+  "topic": "start-with-no-money",
+  "tools": [
+   "ARCO",
+   "Manus",
+   "Cloudflare",
+   "Firebase",
+   "Stripe"
+  ]
  }
 ]

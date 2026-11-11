@@ -1,0 +1,7 @@
+{
+ "hook": [
+  "5 apps",
+  "i open before anything else"
+ ],
+ "pillar": "tools"
+}

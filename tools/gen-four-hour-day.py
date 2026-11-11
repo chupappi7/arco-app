@@ -3,8 +3,9 @@
 
   hook      "i work 4 hours a day / these 5 apps are why", from the approved pool, word for word.
   theme     focus -- hook_pool.json binds it.
-  roster    Claude, ElevenLabs, Stripe, GitHub. Claude is the one LLM. Every
-            point checked against every earlier generator: none taught before.
+  roster    Claude, ElevenLabs, Stripe, GitHub. Claude is the one LLM. Points were
+            checked against the newer generators only; about half repeat
+            Sep-Oct lessons, all 3+ weeks old (allowed by Thinh, 2026-11-11).
   ARCO      angle drawn once with next_arco_angle('focus') and frozen below.
   photos    hook frame least recently used as a hook; app frames shuffled per post,
             outside a 3-post cooldown, at most 2 shared with any of the last 10. Picked 2026-11-11.
