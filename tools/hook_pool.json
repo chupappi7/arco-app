@@ -1,5 +1,5 @@
 {
- "_note": "Hooks Thinh wrote or approved. hook_slide refuses anything not in here or a close rewording of it. `pillar` is binding: a hook decides the post's shape, so a screentime hook cannot be answered with a tool roster. `theme` is binding too: it picks ARCO's angle, so the app slide answers the question the hook asked instead of whatever the generator felt like declaring. `lens` is what every tool point after ARCO has to answer -- guidance for whoever writes the roster, not something a regex can judge.",
+ "_note": "Hooks Thinh wrote or approved. hook_slide refuses anything not in here or a close rewording of it. `pillar` is binding: a hook decides the post's shape, so a screentime hook cannot be answered with a tool roster. `theme` is binding too: it picks ARCO's angle, so the app slide answers the question the hook asked instead of whatever the generator felt like declaring. `lens` is what every tool point after ARCO has to answer -- guidance for whoever writes the roster, not something a regex can judge. `origin` (added 2026-11-11): 'claude' hooks were written by Claude at Thinh's request (\"just generate more hooks then experiment and test\") and are on trial against his own; 'restored' hooks shipped before this pool existed and were never migrated. Untagged = Thinh's.",
  "hooks": [
   {
    "lines": [
@@ -253,6 +253,270 @@
    "pillar": "tools",
    "theme": "focus",
    "lens": "why it earns a place on the home screen"
+  },
+  {
+   "lines": [
+    "i barely type anymore",
+    "these 5 tools do it for me"
+   ],
+   "pillar": "tools",
+   "theme": "focus",
+   "lens": "the typing it takes off your hands",
+   "origin": "restored",
+   "origin_why": "type-less-2/3, 1343 median over 6 outings, shipped before the pool existed",
+   "added": "2026-11-11",
+   "used": true
+  },
+  {
+   "lines": [
+    "5 tools",
+    "that replace a whole team"
+   ],
+   "pillar": "build",
+   "theme": "build",
+   "lens": "the job a hire used to do",
+   "origin": "restored",
+   "origin_why": "ship-alone-2/3, 1166 median over 6 outings, shipped before the pool existed",
+   "added": "2026-11-11",
+   "used": true
+  },
+  {
+   "lines": [
+    "5 tools",
+    "i would pay double for"
+   ],
+   "pillar": "tools",
+   "theme": "planning",
+   "lens": "what it does that is worth the price twice over",
+   "origin": "restored",
+   "origin_why": "pay-double-2, shipped before the pool existed",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "5 tools",
+    "that saved me hours this week"
+   ],
+   "pillar": "tools",
+   "theme": "planning",
+   "lens": "the hours it handed back this week",
+   "origin": "restored",
+   "origin_why": "saved-hours-2/3, shipped before the pool existed",
+   "added": "2026-11-11",
+   "used": true
+  },
+  {
+   "lines": [
+    "5 apps",
+    "that do the boring part"
+   ],
+   "pillar": "tools",
+   "theme": "focus",
+   "lens": "the boring step it does for you",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "i work 4 hours a day",
+    "these 5 apps are why"
+   ],
+   "pillar": "tools",
+   "theme": "focus",
+   "lens": "the step it removes from a working day",
+   "origin": "claude",
+   "added": "2026-11-11",
+   "used": true
+  },
+  {
+   "lines": [
+    "5 apps",
+    "i open before anything else"
+   ],
+   "pillar": "tools",
+   "theme": "focus",
+   "lens": "what it settles first thing so the day starts clean",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "i deleted 20 apps",
+    "these 5 took over"
+   ],
+   "pillar": "tools",
+   "theme": "planning",
+   "lens": "what it absorbed from the apps it replaced",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "5 apps",
+    "that make me look organized"
+   ],
+   "pillar": "tools",
+   "theme": "planning",
+   "lens": "the thing it keeps track of so you don't have to",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "i stopped working late",
+    "these 5 apps are why"
+   ],
+   "pillar": "tools",
+   "theme": "planning",
+   "lens": "the work it finishes before evening",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "5 tools",
+    "that feel like cheating"
+   ],
+   "pillar": "tools",
+   "theme": "focus",
+   "lens": "the hour of work it turns into a minute",
+   "origin": "claude",
+   "added": "2026-11-11",
+   "used": true
+  },
+  {
+   "lines": [
+    "my whole day",
+    "runs on these 5 apps"
+   ],
+   "pillar": "tools",
+   "theme": "planning",
+   "lens": "the part of the day it runs",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "5 study apps",
+    "that actually did something"
+   ],
+   "pillar": "tools",
+   "theme": "study",
+   "lens": "the thing it does that moves a grade",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "5 apps students",
+    "are sleeping on"
+   ],
+   "pillar": "tools",
+   "theme": "study",
+   "lens": "what it does for a student that most never find",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "one person, no team",
+    "this is the setup"
+   ],
+   "pillar": "build",
+   "theme": "build",
+   "lens": "the role it fills on a one-person team",
+   "origin": "claude",
+   "added": "2026-11-11",
+   "used": true
+  },
+  {
+   "lines": [
+    "give me seven days",
+    "and i'd build it like this"
+   ],
+   "pillar": "build",
+   "theme": "build",
+   "lens": "the day of the build it handles",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "5 tools to ship",
+    "before you feel ready"
+   ],
+   "pillar": "build",
+   "theme": "build",
+   "lens": "the step it shrinks so you ship this week",
+   "origin": "claude",
+   "added": "2026-11-11",
+   "used": true
+  },
+  {
+   "lines": [
+    "the whole stack",
+    "for a one person app"
+   ],
+   "pillar": "build",
+   "theme": "build",
+   "lens": "the layer of the app it covers",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "how i'd start at 19",
+    "with no money"
+   ],
+   "pillar": "build",
+   "theme": "business",
+   "lens": "the cost it takes to zero",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "how i stopped picking up my phone",
+    "the second i wake up"
+   ],
+   "pillar": "screentime",
+   "theme": "screentime",
+   "lens": "how it keeps the first hour off the phone",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "how i stopped needing",
+    "motivation to start"
+   ],
+   "pillar": "discipline",
+   "theme": "discipline",
+   "lens": "the part of starting it takes off willpower",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "the 4 hours",
+    "that decide your whole day"
+   ],
+   "pillar": "discipline",
+   "theme": "schedule",
+   "lens": "how it protects the hours that matter",
+   "origin": "claude",
+   "added": "2026-11-11"
+  },
+  {
+   "lines": [
+    "the study setup that got me",
+    "through exam season"
+   ],
+   "pillar": "learn",
+   "theme": "study",
+   "lens": "what it does during exam weeks",
+   "origin": "claude",
+   "added": "2026-11-11"
   }
  ]
 }

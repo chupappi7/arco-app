@@ -1689,6 +1689,174 @@
     "06.jpg"
    ],
    "_note": "built 2026-11-10 by gen-boring-phone-home.py. screentime pillar, _veiled_screens: shield, timeline widget, tasks widget, Insights, then the closing card."
+  },
+  {
+   "topic": "type-less-4",
+   "title": "i barely type anymore these 5 tools do it for me",
+   "caption": "i barely type anymore these 5 tools do it for me. arco: focus mode blocks every app on my list for the whole session. the phone stops being a decision while the timer runs. tap the mic in the chatgpt message box and it types out what you say with the punctuation in, so a long prompt takes as long as it takes to say, not to type. superwhisper modes rewrite what you say as an email or a note before it lands in the app, so you talk the way you think and the text comes out ready to send. granola drafts the follow up email from the meeting it just took notes on, so the recap goes out a minute after the call with nothing typed up. loom writes the title, the summary and the chapters of a recording when you stop, so the video goes out with its write up done and nothing typed under it. #productivity #tools #apps #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-11 by gen-type-less-4.py. tools pillar, theme focus. Roster ARCO, ChatGPT, Superwhisper, Granola, Loom; ChatGPT the one LLM. No CTA. Frequency test week 1 (14-20 Nov)."
+  },
+  {
+   "topic": "wish-i-knew-at-17-13",
+   "title": "5 apps i wish someone showed me at 17",
+   "caption": "5 apps i wish someone showed me at 17. arco: i start a session and every app on the list locks itself. four hours later the phone has not been picked up once. upload your notes to gemini and audio overview turns them into a podcast with two hosts, so revision happens on the bus with headphones in, not only at a desk. obsidian canvas lays your notes out as cards you connect on one board, so a whole topic fits on one screen and the gaps between ideas show. any notion page goes live as a website from the publish tab, so your projects are online as a portfolio years before anyone asks for one. the github student developer pack unlocks paid developer tools free with a school email, so you learn on the same tools working developers pay for. #studytok #productivity #apps #studentlife #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-11 by gen-wish-i-knew-at-17-13.py. tools pillar, theme study. Roster ARCO, Gemini, Obsidian, Notion, GitHub; Gemini the one LLM. No CTA. Frequency test week 1 (14-20 Nov)."
+  },
+  {
+   "topic": "ship-alone-4",
+   "title": "5 tools that replace a whole team",
+   "caption": "5 tools that replace a whole team. arco: one button starts the block and locks every app on the list. no settings and no deciding, i am in and the phone is out. tag @codex in a slack thread and it takes the task and replies with a pull request, so the backlog gets worked while you are on something else. sentry seer reads the stack trace of an error and proposes the fix, so a crash arrives with its likely cause, so being on call takes ten minutes. figma make turns a prompt into a prototype you can click through on your phone, so you test the idea in your hand before anyone draws a final screen. opusclip cuts one long video into short clips and scores each by how well it holds attention, so one recording becomes a week of posts without an editor. #buildinpublic #indiehacker #solofounder #coding #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-11 by gen-ship-alone-4.py. build pillar, theme build. Roster ARCO, Codex, Sentry, Figma, OpusClip; Codex the one LLM. No CTA. Frequency test week 1 (14-20 Nov)."
+  },
+  {
+   "topic": "rest-of-my-life-5",
+   "title": "5 apps i will use for the rest of my life",
+   "caption": "5 apps i will use for the rest of my life. arco: habits take a real slot on the day, the same as any task. mine lasted past the first month because the day made room for it. connect google calendar and claude plans the week around the meetings already in it, so the plan you get fits the real week, not an empty one. notion mail sorts the inbox into views by rules you write in plain words, so the mail that needs you is the first thing you see. the raycast calculator converts currencies and time zones as you type the question, so scheduling a call across countries stops being a search. cleanshot x scrolling capture saves a whole long page as one image, so a full thread or a receipt is one shot instead of six. #productivity #tools #apps #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-11 by gen-rest-of-my-life-5.py. tools pillar, theme planning. Roster ARCO, Claude, Notion, Raycast, CleanShot X; Claude the one LLM. No CTA. Frequency test week 1 (14-20 Nov)."
+  },
+  {
+   "topic": "feel-like-cheating",
+   "title": "5 tools that feel like cheating",
+   "caption": "5 tools that feel like cheating. arco: every time i open tiktok the shield comes up instead of the feed. the reflex still happens, it just turns into a reminder to lock in. perplexity labs answers one question with a report, the charts and a spreadsheet, so an afternoon of research and formatting comes back in minutes. photoroom batch mode edits fifty photos at once with the same background, so a whole set of shots is done in the time one used to take. describe an automation in one sentence and zapier copilot builds the zap, so an hour of setup turns into a line of plain words. descript studio sound strips the echo and the noise out of a recording in one click, so a laptop mic in a bedroom sounds like a booth. #productivity #tools #apps #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-11 by gen-feel-like-cheating.py. tools pillar, theme focus. Roster ARCO, Perplexity, Photoroom, Zapier, Descript; Perplexity the one LLM. No CTA. Frequency test week 1 (14-20 Nov)."
+  },
+  {
+   "topic": "work-by-noon-15",
+   "title": "the tools i use to do a full day of work by noon",
+   "caption": "the tools i use to do a full day of work by noon. arco: the block i am in sits on the lock screen with the time left running. i pick the phone up and it tells me to get back to work. a chatgpt task runs a prompt at the time you set and sends you the answer, so the morning brief is waiting before you open a single app. drag a clickup task onto the calendar view and it takes that hour of the day, so every task has a start time, so noon arrives with them done. the daily notes plugin opens today's note from your own template, so the morning starts on a page that already lists what to do. a make scenario reads new email and files every attachment into the right folder, so the inbox chores are finished before you sit down. #productivity #tools #apps #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-11 by gen-work-by-noon-15.py. tools pillar, theme planning. Roster ARCO, ChatGPT, ClickUp, Obsidian, Make; ChatGPT the one LLM. No CTA. Frequency test week 1 (14-20 Nov)."
+  },
+  {
+   "topic": "no-team-setup",
+   "title": "one person, no team this is the setup",
+   "caption": "one person, no team this is the setup. arco: tasks with no time wait in anytime instead of crowding today. today holds only what i gave an hour to, so i actually finish it. cursor bugbot reviews every pull request and flags the bugs before you merge, so you get the second reviewer without hiring a second engineer. supabase edge functions run your server code with no server to set up, so the backend is a few files, not a server you have to look after. revenuecat paywalls are built in its dashboard and change without an app update, so pricing tests run while you keep building the product. runway aleph edits a video you already shot from a written instruction, so a reshoot becomes a sentence instead of a day. #buildinpublic #indiehacker #solofounder #coding #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-11 by gen-no-team-setup.py. build pillar, theme build. Roster ARCO, Cursor, Supabase, RevenueCat, Runway; Cursor the one LLM. No CTA. Frequency test week 1 (14-20 Nov)."
+  },
+  {
+   "topic": "4x-productivity-16",
+   "title": "the tools i used to 4x my productivity",
+   "caption": "the tools i used to 4x my productivity. arco: i manage all my tasks here and plan the day in 30 seconds. focus mode puts every distraction away. gemini in gmail summarises a long thread in a card at the top of it, so catching up on a thread takes a glance instead of ten minutes. notion ai autofill fills a database column from what each page says, so tagging fifty rows by hand is no longer part of the week. canva bulk create fills one template from a spreadsheet, a design per row, so fifty graphics take the time of making one. linear asks turns a request in a slack thread into an issue, so requests stop getting lost in chat and land in the queue. #productivity #tools #apps #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-11 by gen-4x-productivity-16.py. tools pillar, theme planning. Roster ARCO, Gemini, Notion, Canva, Linear; Gemini the one LLM. No CTA. Frequency test week 1 (14-20 Nov)."
+  },
+  {
+   "topic": "four-hour-day",
+   "title": "i work 4 hours a day these 5 apps are why",
+   "caption": "i work 4 hours a day these 5 apps are why. arco: focus mode puts every distracting app away for the whole session. an hour of work is an hour now, not forty minutes and a scroll. claude builds the actual file, a spreadsheet, a deck or a doc, and hands it back to download, so the step between the answer and the document disappears. elevenlabs dubs a video into another language in your own voice, so re-recording every version is no longer part of the job. stripe invoicing sends the reminders on its own until the invoice is paid, so chasing payment stops being a task in the day. github actions runs your tests on every push, so checking that nothing broke is no longer a step you do by hand. #productivity #tools #apps #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-11 by gen-four-hour-day.py. tools pillar, theme focus. Roster ARCO, Claude, ElevenLabs, Stripe, GitHub; Claude the one LLM. No CTA. Frequency test week 1 (14-20 Nov)."
+  },
+  {
+   "topic": "business-at-19-4",
+   "title": "the tools i use to run my business at 19 years old",
+   "caption": "the tools i use to run my business at 19 years old. arco: every task i have is in here and the day gets planned in 30 seconds. focus mode puts every distraction away while i work. manus builds a full slide deck from one prompt, with the research done for it, so the pitch deck is a draft in minutes instead of a weekend. cloudflare email routing forwards hello at your domain to your own inbox for free, so you write from a company address on day one without paying for mail. the posthog free tier covers a million events every month, so you see what customers do from launch day without a bill. the buffer free plan schedules posts across three channels, so a week of marketing goes out while you work on the product. #buildinpublic #entrepreneur #startup #apps #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-11 by gen-business-at-19-4.py. build pillar, theme business. Roster ARCO, Manus, Cloudflare, PostHog, Buffer; Manus the one LLM. No CTA. Frequency test week 1 (14-20 Nov)."
+  },
+  {
+   "topic": "saved-hours-4",
+   "title": "5 tools that saved me hours this week",
+   "caption": "5 tools that saved me hours this week. arco: every task i have gets a time on the day's timeline, not a list. blocked hours shuts the feeds for those windows without me asking. comet, the perplexity browser, compares open tabs and fills in forms when you ask, so the hour of tab hopping comes back finished. an airtable ai field writes a summary of every record in the table, so reading every row turns into reading one column. figma dev mode shows the exact spacing and code for any layer you click, so handoff questions stop eating the week. capcut removes the background of a video with no green screen, so the shot works anywhere, without a studio. #productivity #tools #apps #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-11 by gen-saved-hours-4.py. tools pillar, theme planning. Roster ARCO, Perplexity, Airtable, Figma, CapCut; Perplexity the one LLM. No CTA. Frequency test week 1 (14-20 Nov)."
+  },
+  {
+   "topic": "ship-before-ready",
+   "title": "5 tools to ship before you feel ready",
+   "caption": "5 tools to ship before you feel ready. arco: tasks without a time wait in anytime until the day has room for them. focus mode blocks the apps i chose for exactly that block. the antigravity agent manager runs several agents on separate tasks at once, so three features move while you review the first. a testflight public link lets anyone join the beta without you adding their email, so your first testers come from one post, not a list of addresses. firebase crashlytics reports each crash with the line of code it happened on, so you ship the rough version knowing a crash will say where. a framer site goes live on a free framer.website address, so the landing page exists before the app does. #buildinpublic #indiehacker #solofounder #coding #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-11 by gen-ship-before-ready.py. build pillar, theme build. Roster ARCO, Antigravity, TestFlight, Firebase, Framer; Antigravity the one LLM. No CTA. Frequency test week 1 (14-20 Nov)."
   }
  ]
 }

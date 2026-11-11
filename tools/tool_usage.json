@@ -1893,5 +1893,125 @@
   "tools": [
    "ARCO"
   ]
+ },
+ {
+  "topic": "type-less-4",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "Superwhisper",
+   "Granola",
+   "Loom"
+  ]
+ },
+ {
+  "topic": "wish-i-knew-at-17-13",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Obsidian",
+   "Notion",
+   "GitHub"
+  ]
+ },
+ {
+  "topic": "ship-alone-4",
+  "tools": [
+   "ARCO",
+   "Codex",
+   "Sentry",
+   "Figma",
+   "OpusClip"
+  ]
+ },
+ {
+  "topic": "rest-of-my-life-5",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "Notion",
+   "Raycast",
+   "CleanShot X"
+  ]
+ },
+ {
+  "topic": "feel-like-cheating",
+  "tools": [
+   "ARCO",
+   "Perplexity",
+   "Photoroom",
+   "Zapier",
+   "Descript"
+  ]
+ },
+ {
+  "topic": "work-by-noon-15",
+  "tools": [
+   "ARCO",
+   "ChatGPT",
+   "ClickUp",
+   "Obsidian",
+   "Make"
+  ]
+ },
+ {
+  "topic": "no-team-setup",
+  "tools": [
+   "ARCO",
+   "Cursor",
+   "Supabase",
+   "RevenueCat",
+   "Runway"
+  ]
+ },
+ {
+  "topic": "4x-productivity-16",
+  "tools": [
+   "ARCO",
+   "Gemini",
+   "Notion",
+   "Canva",
+   "Linear"
+  ]
+ },
+ {
+  "topic": "four-hour-day",
+  "tools": [
+   "ARCO",
+   "Claude",
+   "ElevenLabs",
+   "Stripe",
+   "GitHub"
+  ]
+ },
+ {
+  "topic": "business-at-19-4",
+  "tools": [
+   "ARCO",
+   "Manus",
+   "Cloudflare",
+   "PostHog",
+   "Buffer"
+  ]
+ },
+ {
+  "topic": "saved-hours-4",
+  "tools": [
+   "ARCO",
+   "Perplexity",
+   "Airtable",
+   "Figma",
+   "CapCut"
+  ]
+ },
+ {
+  "topic": "ship-before-ready",
+  "tools": [
+   "ARCO",
+   "Antigravity",
+   "TestFlight",
+   "Firebase",
+   "Framer"
+  ]
  }
 ]
