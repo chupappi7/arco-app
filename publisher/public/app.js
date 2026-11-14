@@ -159,11 +159,11 @@ function menu() {
   const email = S.me.user?.email || '';
   return `<a class="brand-row" href="#overview"><img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30"><b>ARCO Publisher</b></a>
     ${wsBox()}
-    <a class="create-side" href="#compose">${ui('plus', 16)}Create post</a>
+    <a class="create-side" href="#compose" title="Create post">${ui('plus', 16)}<span class="lb">Create post</span></a>
     <nav class="nav" aria-label="Main">${items.map(([k, l, i, n, tone]) =>
-      `<a href="#${k}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${ui(i)}${l}${n ? `<span class="n ${tone || ''}" title="${tone === 'bad' ? `${n} failed in the last 7 days` : `${n} waiting`}">${n}</span>` : ''}</a>`).join('')}</nav>
+      `<a href="#${k}" title="${l}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${ui(i)}<span class="lb">${l}</span>${n ? `<span class="n ${tone || ''}" title="${tone === 'bad' ? `${n} failed in the last 7 days` : `${n} waiting`}">${n}</span>` : ''}</a>`).join('')}</nav>
     <div class="grow"></div>
-    <nav class="nav"><a href="#settings" class="${S.view === 'settings' ? 'on' : ''}">${ui('gear')}Settings</a></nav>
+    <nav class="nav"><a href="#settings" title="Settings" class="${S.view === 'settings' ? 'on' : ''}">${ui('gear')}<span class="lb">Settings</span></a></nav>
     <div class="me"><span class="av-me">${esc((email[0] || '?').toUpperCase())}</span>
       <div><b>${esc(email)}</b><a href="/api/auth/logout">Sign out</a></div></div>`;
 }
