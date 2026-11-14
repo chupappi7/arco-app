@@ -2277,6 +2277,76 @@
     "06.jpg"
    ],
    "_note": "built 2026-11-11 by gen-start-with-no-money.py (new). build pillar, theme business. Roster ARCO, Manus, Cloudflare, Firebase, Stripe; Manus the one LLM. No CTA. Frequency test week 1."
+  },
+  {
+   "topic": "instagram-asks-first",
+   "title": "instagram opens to this now and i close it every time",
+   "caption": "instagram opens to this now and i close it every time, here is why. during a focus block it opens to a shield: what does this add to your day? One tap locks it again. today puts every block on a timeline with a red line for now, so the next thing to start is right there. the habit chart widget shows this week’s hours and a Start button that runs the timer without opening anything. insights splits screen time into distracting, entertainment and everyday, against the week before. all of it is arco. comment arco and i'll send my setup, or search arco focus on the App Store. #screentime #digitaldetox #phoneaddiction #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-14 by gen-instagram-asks-first.py. ARCO-UI post (Thinh: more eyes on the UI), big-screen design, new claude hook. Added on top of frequency test week 1 for 2026-11-16."
+  },
+  {
+   "topic": "day-on-one-screen",
+   "title": "my whole day fits on one screen this is how i run it",
+   "caption": "my whole day fits on one screen this is how i run it, here is why. each block takes the space its hours take, with a red line for now, so a gap in the plan shows at a glance. the timeline widget lists today’s blocks and ticks off the done ones, without opening the app. the tasks widget colours each one by project and flags what is overdue, like 1D LATE in red. inside a focus block, Instagram and TikTok open to a shield instead of the feed. all of it is arco. comment arco and i'll send my setup, or search arco focus on the App Store. #productivity #dayplanner #discipline #routine #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-14 by gen-day-on-one-screen.py. ARCO-UI post (Thinh: more eyes on the UI), big-screen design, new claude hook. Added on top of frequency test week 1 for 2026-11-17."
+  },
+  {
+   "topic": "plan-in-60-seconds",
+   "title": "i plan my whole day in 60 seconds every morning, like this",
+   "caption": "i plan my whole day in 60 seconds every morning, like this, here is why. plan your day sits at the top of Today with a count of tasks that have no time yet. Give each one a slot. red, orange or blue: the flag on each task decides what gets the morning slot and what waits. habit widgets fill a day for each one you kept, so a missed morning shows on the home screen. once a focus block starts, distracting apps open to a shield and one button: Lock back in. all of it is arco. comment arco and i'll send my setup, or search arco focus on the App Store. #productivity #dayplanner #discipline #routine #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-14 by gen-plan-in-60-seconds.py. ARCO-UI post (Thinh: more eyes on the UI), big-screen design, new claude hook. Added on top of frequency test week 1 for 2026-11-18."
+  },
+  {
+   "topic": "five-hours-deep-work",
+   "title": "5 hours of deep work a day this is the whole setup",
+   "caption": "5 hours of deep work a day this is the whole setup, here is why. tap play on a timed block and its timer runs. The minutes go to that habit’s total for the day. the chart widget shows hours per day for the week and the change on last week, like 20h 15m, up 25%. the timeline widget shows what is done and what starts next, so the phone opens on the plan. during the block, TikTok and Instagram open to a shield instead of the feed. all of it is arco. comment arco and i'll send my setup, or search arco focus on the App Store. #deepwork #productivity #focus #buildinpublic #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-14 by gen-five-hours-deep-work.py. ARCO-UI post (Thinh: more eyes on the UI), big-screen design, new claude hook. Added on top of frequency test week 1 for 2026-11-19."
+  },
+  {
+   "topic": "screen-time-under-3",
+   "title": "8 hours of screen time to under 3 this is my phone now",
+   "caption": "8 hours of screen time to under 3 this is my phone now, here is why. insights splits the week into distracting, entertainment and everyday, with the hours for each app. during focus, a blocked app asks what it adds to your day. Lock back in is the big button. the timeline widget puts today’s blocks on the home screen, ticked off as they get done. today lays tasks and habits on one timeline, so free time is planned before the phone fills it. all of it is arco. comment arco and i'll send my setup, or search arco focus on the App Store. #screentime #digitaldetox #phoneaddiction #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg",
+    "06.jpg"
+   ],
+   "_note": "built 2026-11-14 by gen-screen-time-under-3.py. ARCO-UI post (Thinh: more eyes on the UI), big-screen design, new claude hook. Added on top of frequency test week 1 for 2026-11-20."
   }
  ]
 }
