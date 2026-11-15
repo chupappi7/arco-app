@@ -161,6 +161,20 @@ describe('mcp tools', () => {
     expect((await tool(h, 'list_folders', {})).data.folders[0].status).toBe('scheduled');
   });
 
+  it('records the folder a post made in the app came from, and shows where drafts came from', async () => {
+    const { h } = await workspace({ review: false });
+    const key = { Authorization: h.Authorization.replace('Bearer', 'Key') };
+    const f = await folderWithPhotos(h, 'Manual', 1);
+    const copy = await (await callWorker('/v1/media/copy', { method: 'POST', headers: key, body: { keys: [f.items?.[0]?.key || (await tool(h, 'list_folders', {})).data.folders[0].items[0].key] } })).json();
+    const res = await callWorker('/v1/posts', { method: 'POST', headers: key, body: { account_id: 'acc_ig', image_keys: [copy.media[0].key], caption: 'x',
+      scheduled_at: Math.floor(Date.now() / 1000) + 3600, folder_id: f.id } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ folder_id: f.id, source: null });
+    expect((await tool(h, 'list_folders', {})).data.folders[0].status).toBe('scheduled');
+    const bad = await callWorker('/v1/posts', { method: 'POST', headers: key, body: { account_id: 'acc_ig', image_keys: [copy.media[0].key], caption: 'x', folder_id: 'fld_nope' } });
+    expect((await bad.json()).error).toMatch(/folder no longer exists/);
+  });
+
   it('refuses Instagram for PNG photos and reports an empty folder', async () => {
     const { h } = await workspace();
     const png = await folderWithPhotos(h, 'PNGs', 1, PNG_B64);

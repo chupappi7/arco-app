@@ -93,6 +93,7 @@ export function postJson(env, row) {
     cover_index: row.cover_index, settings: JSON.parse(row.settings), scheduled_at: row.scheduled_at,
     attempts: row.attempts, public_post_id: row.public_post_id, fail_reason: row.fail_reason,
     group_id: row.group_id ?? null, updated_at: row.updated_at,
+    folder_id: row.folder_id ?? null, batch_id: row.batch_id ?? null, source: row.source ?? null,
     post_url: row.status === 'published' ? (row.post_url || tiktokUrl(row)) : null,
     stats: row.stats ? JSON.parse(row.stats) : null, stats_at: row.stats_at ?? null,
   };
@@ -114,6 +115,14 @@ export async function createPost(env, tk, w, input) {
   const p = validatePost(input, now(), account.platform, { draft });
   // Posts made together share a group, so a draft reopens with all its accounts.
   const group = input.group_id == null ? null : String(input.group_id);
+  // The library folder it was made from, so the folder shows as scheduled.
+  let folder = null;
+  if (input.folder_id != null) {
+    const sc = inScope(w, 'brand_id');
+    const f = await env.DB.prepare(`SELECT id FROM library_folders WHERE id = ? AND workspace_id = ?${sc.sql}`).bind(String(input.folder_id), ws, ...sc.binds).first();
+    if (!f) bad('That library folder no longer exists');
+    folder = f.id;
+  }
   if (group !== null && !/^grp_[0-9a-f]{16}$/.test(group)) bad('group_id is invalid');
   if (account.needs_reconnect) throw new HttpError(409, 'Reconnect this account before posting', 'needs_reconnect');
 
@@ -177,11 +186,11 @@ export async function createPost(env, tk, w, input) {
   }
   await env.DB.batch([
     env.DB.prepare(`INSERT INTO posts (id, workspace_id, account_id, status, title, caption, image_keys, video_key, cover_index,
-        settings, scheduled_at, next_attempt_at, created_at, updated_at, group_id, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        settings, scheduled_at, next_attempt_at, created_at, updated_at, group_id, created_by, folder_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(id, ws, p.account_id, kind, p.title, p.caption, JSON.stringify(p.image_keys), p.video_key, p.cover_index,
             JSON.stringify(p.settings), p.scheduled_at, p.scheduled_at, t, t, group,
-            typeof w === 'string' ? null : w.userId || null),
+            typeof w === 'string' ? null : w.userId || null, folder),
     ...(p.image_keys.length ? [env.DB.prepare(`UPDATE media SET post_id = ?, delete_after = NULL WHERE workspace_id = ? AND key IN (${marks})`)
       .bind(id, ws, ...p.image_keys)] : []),
   ]);

@@ -136,7 +136,7 @@ function route() {
   if (signedIn && S.view === 'calendar') loadWeek();
   if (signedIn && S.view === 'drafts') loadDrafts();
   if (signedIn && S.view === 'analytics') loadStats();
-  if (signedIn && S.view === 'library') loadLibrary();
+  if (signedIn && S.view === 'library') { if (S.lastView !== 'library') S.folderOpen = null; loadLibrary(); }
   S.anim = S.lastView !== S.view; S.lastView = S.view;
   render();
   window.scrollTo(0, 0);
@@ -675,7 +675,7 @@ function composeView() {
             <input type="text" id="title" maxlength="200" value="${esc(S.title)}" placeholder="A short title for the photo post">
             <div class="count ${len(S.title) > 90 ? 'bad' : ''}">${len(S.title)} / 90</div>` : ''}
           ${S.me.ai_enabled && S.ai.open ? aiPanel() : ''}
-          ${captionTabs(pls)}
+          ${folderHint()}${captionTabs(pls)}
           <div class="limits" id="caplimits">${limitsLine()}</div>
           ${S.me.ai_enabled && S.caption.trim() ? `<div class="rewrites"><span class="note">Rewrite</span>${Object.entries(REWRITE_LABEL)
             .map(([k, l]) => `<button type="button" class="chip" data-rewrite="${k}" ${S.ai.busy ? 'disabled' : ''}>${l}</button>`).join('')}</div>` : ''}
@@ -781,7 +781,66 @@ function pickList() {
 // ---- library: photos uploaded ahead of time, filed by brand ---------------
 
 async function loadLibrary() {
-  try { S.lib = await api('/library'); } catch (e) { S.lib = { items: [], err: e.message }; }
+  try { [S.lib, S.folders] = await Promise.all([api('/library'), api('/folders').then(r => r.folders)]); }
+  catch (e) { S.lib = S.lib || { items: [] }; S.folders = S.folders || []; S.flash = { kind: 'err', text: e.message }; }
+  render();
+}
+const reloadLibrary = async () => { [S.lib, S.folders] = await Promise.all([api('/library'), api('/folders').then(r => r.folders)]); };
+
+// ---- library folders: one folder = one post, ready to schedule -------------
+const FSTATUS = { unused: 'Not used yet', awaiting_approval: 'Waiting for approval', scheduled: 'Scheduled', posted: 'Posted' };
+const folderStatus = f => (f.status === 'scheduled' && f.next_at ? `Scheduled ${fmt(f.next_at, { weekday: 'short', day: 'numeric', month: 'short' })}`
+  : f.status === 'posted' && f.posted_at ? `Posted ${fmt(f.posted_at, { day: 'numeric', month: 'short' })}` : FSTATUS[f.status]);
+const foldersShown = (b = curBrand()) => (S.folders || []).filter(f => b === 'all' || (b === 'none' ? !f.brand_id : f.brand_id === b || !f.brand_id));
+const folderOf = id => (S.folders || []).find(f => f.id === id);
+const itemPic = (i, attrs = '') => (i.kind === 'video' || isVideoItem(i)) ? `<video src="${esc(i.url)}" muted playsinline preload="metadata" ${attrs}></video>` : `<img src="${esc(i.url)}" alt="" loading="lazy" ${attrs}>`;
+
+function folderCard(f) {
+  const n = f.items.length, kind = f.kind === 'video' ? 'Video' : `${n} photo${n === 1 ? '' : 's'}`;
+  return `<div class="fcard" data-folder="${f.id}" role="button" tabindex="0">
+    <div class="fthumbs">${f.items.slice(0, 3).map(i => itemPic(i)).join('') || `<span class="fempty">${ui('image', 22)}</span>`}${n > 3 ? `<span class="fmore">+${n - 3}</span>` : ''}</div>
+    <div class="fbody"><b>${esc(f.name)}</b>
+      <span class="fmeta">${f.brand_id && brandName(f.brand_id) ? `<i class="hdot" style="background:${brandHue(f.brand_id)}"></i>${esc(brandName(f.brand_id))} · ` : ''}${n ? kind : 'Empty'}</span>
+      ${f.note ? `<p class="fnote">${esc(f.note)}</p>` : ''}
+      <span class="fst ${f.status}">${folderStatus(f)}</span></div></div>`;
+}
+
+function folderDetail(f) {
+  const n = f.items.length, isVid = f.kind === 'video';
+  return `<section class="panel fdetail">
+    <header><button class="btn ghost sm" id="fback">${ui('chev', 14)}Library</button><span class="fst ${f.status}">${folderStatus(f)}</span>
+      <span class="hacts">${n ? `<button class="btn" data-fsched="${f.id}">${ui('plus', 15)}Schedule</button>` : ''}<button class="btn ghost danger" data-fdel="${f.id}">Delete folder</button></span></header>
+    <div class="fform">
+      <label class="f" for="fname">Name</label><input type="text" id="fname" maxlength="80" value="${esc(f.name)}">
+      ${S.me.brands.length ? `<label class="f" for="fbrandsel">Brand</label><select id="fbrandsel"><option value="">Shared, every brand</option>
+        ${S.me.brands.map(x => `<option value="${x.id}" ${f.brand_id === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
+      <label class="f" for="fnoteinp">Note <span class="note">for whoever writes the caption: the offer, a code, what to stress, "not before Friday"</span></label>
+      <textarea id="fnoteinp" maxlength="2000" placeholder="e.g. 20% off with code BF20. Don't post before Friday.">${esc(f.note || '')}</textarea>
+      <div class="fsave"><button class="btn sec" id="fsave">Save</button></div>
+    </div>
+    <div class="fitems">${n ? `<p class="note">${isVid ? 'One video.' : 'Posted in this order. The first photo is the cover.'}</p>
+      <div class="mgrid lib">${f.items.map((i, k) => `<div class="mt fi">${itemPic(i)}${!isVid ? `<span class="mn">${k + 1}</span>` : ''}
+        <div class="ctl">${!isVid ? `<button data-fmv="${k}:-1" aria-label="Move earlier" ${k ? '' : 'disabled'}>‹</button>` : ''}
+          <button data-fout="${esc(i.key)}" aria-label="Take out of the folder" title="Take out of the folder">×</button>
+          ${!isVid ? `<button data-fmv="${k}:1" aria-label="Move later" ${k < n - 1 ? '' : 'disabled'}>›</button>` : ''}</div></div>`).join('')}</div>`
+      : '<p class="note">Empty. Upload into it above, or select photos further down the Library and use "Move to folder".</p>'}</div>
+  </section>`;
+}
+
+// Above the caption: the note of the folder this post comes from.
+function folderHint() {
+  const f = folderOf(S.fromFolder);
+  return f ? `<div class="fhint">${ui('image', 14)}<span>From <b>${esc(f.name)}</b>${f.note ? `: ${esc(f.note)}` : ''}</span></div>` : '';
+}
+
+async function scheduleFolder(id) {
+  const f = folderOf(id);
+  if (!f || !f.items.length) return;
+  resetComposer();
+  if (f.brand_id && brandName(f.brand_id) && curBrand() !== f.brand_id) setBrand(f.brand_id);
+  location.hash = '#compose';
+  await useFromLibrary(f.items.map(i => i.key));
+  S.fromFolder = f.id;
   render();
 }
 // A brand's own photos plus the shared ones (in no brand).
@@ -794,7 +853,17 @@ const libTile = (i, sel, attr) => `<label class="mt lt ${sel ? 'sel' : ''}">${is
   ${i.brand_id && brandName(i.brand_id) ? `<span class="ltb" style="background:${brandHue(i.brand_id)}" title="${esc(brandName(i.brand_id))}"></span>` : ''}</label>`;
 
 function libraryView() {
-  const b = curBrand(), items = libShown(b), sel = (S.libSel || []).filter(k => items.some(i => i.key === k));
+  const open = S.folderOpen && folderOf(S.folderOpen);
+  const b = curBrand(), items = libShown(b).filter(i => !i.folder_id), sel = (S.libSel || []).filter(k => items.some(i => i.key === k));
+  const folders = foldersShown(b), fsel = S.fFilter || 'all';
+  const fshown = folders.filter(f => fsel === 'all' || f.status === fsel);
+  const folderSec = !S.folders ? '' : `<section class="panel"><header><h2>Posts ready to go</h2><span class="note">${folders.length ? `${folders.length} folder${folders.length === 1 ? '' : 's'} · one folder is one post` : 'One folder is one post: its photos in order, or one video, with a note'}</span>
+      <span class="hacts"><button class="btn sec" id="fnew">${ui('plus', 15)}New folder</button></span></header>
+    ${S.newFolder ? `<form class="fnewform" id="fnewform"><input type="text" id="fnewname" maxlength="80" placeholder="Folder name, e.g. Black Friday promo" aria-label="Folder name" required>
+      <input type="text" id="fnewnote" maxlength="2000" placeholder="Note for the caption (optional)" aria-label="Note">
+      <button class="btn">Create</button><button type="button" class="btn ghost" id="fnewcancel">Cancel</button></form>` : ''}
+    ${folders.length ? `<div class="chips fchips">${[['all', 'All'], ...Object.entries(FSTATUS)].map(([k, l]) => `<button class="chip ${fsel === k ? 'on' : ''}" data-ffilter="${k}">${l}${k === 'all' ? '' : ` · ${folders.filter(f => f.status === k).length}`}</button>`).join('')}</div>
+      <div class="fgrid">${fshown.map(folderCard).join('') || '<p class="note">No folders with that status.</p>'}</div>` : ''}</section>`;
   const target = b === 'all' || b === 'none' ? (S.libBrand ?? '') : b;
   const up = (S.libUp || []).map(u => `<div class="mt up">${u.video ? `<video src="${esc(u.url)}" muted playsinline preload="metadata"></video>` : `<img src="${esc(u.url)}" alt="">`}</div>`).join('');
   const brandSel = (id, val, first) => `<select id="${id}" aria-label="Brand">${first}${S.me.brands.map(x => `<option value="${x.id}" ${val === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`;
@@ -807,12 +876,13 @@ function libraryView() {
           <div class="mgrid lib">${list.map(i => libTile(i, sel.includes(i.key), 'data-lsel')).join('')}</div></section>`;
       }).join('') || (up ? '' : `<section class="panel empty"><b>Nothing here yet.</b>Upload the photos and videos you plan to post. When you schedule, pick them with "From library".</section>`);
   return `<form class="panel libup" id="libdrop" onsubmit="return false">
-      <label class="libdz"><input type="file" id="libfiles" accept="${ACCEPT}" multiple>${ui('plus', 22)}<b>Upload photos and videos</b><span>Drop files here, or click to choose. JPG or PNG photos up to 5 MB, MP4 or MOV videos up to ${videoMb()} MB.</span></label>
-      ${S.me.brands.length ? `<div class="libto"><span class="note">File under</span>${brandSel('libbrand', target, '<option value="">Shared, every brand</option>')}</div>` : ''}
+      <label class="libdz"><input type="file" id="libfiles" accept="${ACCEPT}" multiple>${ui('plus', 22)}<b>${open ? `Upload into "${esc(open.name)}"` : 'Upload photos and videos'}</b><span>Drop files here, or click to choose. JPG or PNG photos up to 5 MB, MP4 or MOV videos up to ${videoMb()} MB.</span></label>
+      ${S.me.brands.length && !open ? `<div class="libto"><span class="note">File under</span>${brandSel('libbrand', target, '<option value="">Shared, every brand</option>')}</div>` : ''}
       ${up ? `<div class="mgrid">${up}</div>` : ''}</form>
-    ${body}
-    ${sel.length ? `<div class="libbar"><b>${sel.length} selected</b>
+    ${open ? folderDetail(open) : folderSec + (items.length || !folders.length ? `<h3 class="libsub">Not in a folder</h3>${body}` : '')}
+    ${sel.length && !open ? `<div class="libbar"><b>${sel.length} selected</b>
       <button class="btn" id="libsched">${ui('plus', 15)}Schedule</button>
+      ${(S.folders || []).length ? `<select id="libtofolder" aria-label="Move to folder"><option value="" disabled selected>Move to folder…</option>${foldersShown(b).map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join('')}</select>` : ''}
       ${S.me.brands.length ? `${brandSel('libmove', '', '<option value="" disabled selected>Move to…</option><option value="-">Shared</option>')}` : ''}
       <button class="btn ghost danger" id="librm">Remove</button><button class="btn ghost" id="libclear">Clear</button></div>` : ''}`;
 }
@@ -838,11 +908,11 @@ function videoMeta(file) {
 
 // Videos skip the site's proxy: a ticket from the API, then one PUT straight
 // to the Worker, which streams it into the library.
-async function uploadVideoFile(file, brand) {
+async function uploadVideoFile(file, brand, folderId) {
   const type = file.type === 'video/quicktime' || /\.mov$/i.test(file.name) ? 'video/quicktime' : 'video/mp4';
   if (file.size > videoMb() * 1024 * 1024) throw new Error(`Each video must be ${videoMb()} MB or smaller`);
   const meta = await videoMeta(file);
-  const t = await send('/media/video', 'POST', { content_type: type, bytes: file.size, name: file.name, brand_id: brand, ...meta });
+  const t = await send('/media/video', 'POST', { content_type: type, bytes: file.size, name: file.name, brand_id: brand, folder_id: folderId || undefined, ...meta });
   let r;
   try { r = await fetch(t.upload_url, { method: 'PUT', headers: { 'Content-Type': type }, body: file }); }
   catch { throw new Error('The upload did not go through. Check the connection and try again.'); }
@@ -852,17 +922,19 @@ async function uploadVideoFile(file, brand) {
 }
 
 async function uploadToLibrary(files) {
-  const brand = $('libbrand')?.value || null;
+  const folder = S.folderOpen && folderOf(S.folderOpen);
+  const brand = folder ? folder.brand_id : $('libbrand')?.value || null;
   S.libBrand = brand || '';
   S.libUp = S.libUp || [];
   for (const file of [...files].slice(0, 100)) {
     const u = { url: URL.createObjectURL(file), video: isVideoFile(file) };
     S.libUp.push(u); render();
     try {
-      if (u.video) { await uploadVideoFile(file, brand); S.lib = await api('/library'); S.libUp.splice(S.libUp.indexOf(u), 1); render(); continue; }
+      if (u.video) { await uploadVideoFile(file, brand, folder?.id); await reloadLibrary(); S.libUp.splice(S.libUp.indexOf(u), 1); render(); continue; }
       const { blob, type } = await shrink(file);
       const m = await api('/media', { method: 'POST', headers: { 'Content-Type': type }, body: blob });
-      S.lib = await send('/library', 'POST', { keys: [m.key], brand_id: brand, names: { [m.key]: file.name } });
+      S.lib = await send('/library', 'POST', { keys: [m.key], brand_id: brand, folder_id: folder?.id, names: { [m.key]: file.name } });
+      if (folder) S.folders = (await api('/folders')).folders;
     } catch (e) { S.flash = { kind: 'err', text: `${file.name}: ${e.message}` }; }
     S.libUp.splice(S.libUp.indexOf(u), 1); render();
   }
@@ -890,8 +962,10 @@ async function useFromLibrary(keys) {
 }
 
 function libPicker() {
-  const items = libShown(), sel = S.libPickSel || [];
+  const items = libShown().filter(i => !i.folder_id), sel = S.libPickSel || [];
+  const fs = foldersShown().filter(f => f.items.length).sort((a, b) => (a.status !== 'unused') - (b.status !== 'unused'));
   return `<div class="libpick"><div class="lph"><b>From library${curBrand() !== 'all' ? ` · ${esc(brandLabel(curBrand()))}` : ''}</b><span class="note">${sel.length ? `${sel.length} selected` : 'Pick photos in order, or one video'}</span></div>
+    ${fs.length ? `<p class="note lpsub">Folders · one tap adds the whole post</p><div class="fgrid lpf2">${fs.map(f => folderCard(f).replace('data-folder=', 'data-usefolder=')).join('')}</div><p class="note lpsub">Single photos and videos</p>` : ''}
     ${!S.lib ? `<div class="mgrid">${[...Array(6)].map(() => `<div class="mt">${sk('100%', 120)}</div>`).join('')}</div>`
       : items.length ? `<div class="mgrid lib">${items.map(i => libTile(i, sel.includes(i.key), 'data-lpick')).join('')}</div>`
       : `<p class="note">The library is empty${curBrand() !== 'all' ? ' for this brand' : ''}. <a href="#library">Upload photos or videos to it</a>.</p>`}
@@ -1275,7 +1349,7 @@ async function submit() {
         made.push(await api('/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
           account_id: j.id, image_keys: keys[n], video_key: S.video?.key, cover_index: S.cover, title: S.video ? '' : S.title, caption: captionFor(j.platform),
           settings: j.platform !== 'tiktok' ? {} : ttSettings(t, t.privacy),
-          scheduled_at: plan ? plan[j.id] : at,
+          scheduled_at: plan ? plan[j.id] : at, folder_id: S.fromFolder || undefined,
           // An edit replaces the one post it came from.
           replaces: S.replaces && S.replacesAccount === j.id ? S.replaces : undefined,
         }) }));
@@ -1347,7 +1421,7 @@ function resultView() {
 // Targets stay selected for the next post; privacy is chosen again each time.
 function resetComposer() {
   Object.assign(S, { images: [], video: null, cover: 0, title: '', caption: '', when: 'now', at: '', status: null, replaces: null,
-    replacesAccount: null, over: {}, fromDraft: null, draftGroup: null });
+    replacesAccount: null, over: {}, fromDraft: null, draftGroup: null, fromFolder: null });
   for (const t of Object.values(S.tt)) { t.privacy = ''; t.comment = false; }
   S.set = { music: false, duet: false, stitch: false, disclose: false, brand: false, branded: false };
 }
@@ -1542,7 +1616,7 @@ async function saveDraft() {
       const t = S.tt[j.id] || {};
       try {
         await send('/posts', 'POST', { account_id: j.id, image_keys: keys[n], video_key: S.video?.key, cover_index: S.cover, title: S.video ? '' : S.title,
-          caption: captionFor(j.platform), draft: true, group_id: group,
+          caption: captionFor(j.platform), draft: true, group_id: group, folder_id: S.fromFolder || undefined,
           settings: j.platform !== 'tiktok' ? {} : ttSettings(t, t.privacy || '') });
       } catch (e) { errors.push(`${handle(acct(j.id))}: ${e.message}`); }
     }
@@ -1592,16 +1666,44 @@ function draftsView() {
   const b = curBrand(), groups = draftGroups().filter(g => g.some(d => inBrand(acct(d.account_id), b)));
   if (!groups.length) return `<section class="panel empty"><b>No drafts${b === 'all' ? '' : ` for ${esc(brandLabel(b))}`}.</b>Use "Save draft" while creating a post to keep it for later.
     <div><a class="btn" href="#compose">${ui('plus', 16)}Create post</a></div></section>`;
-  return `<div class="panel"><div class="list drafts">${groups.map(g => {
-    const d = g[0], cover = thumbOf(d), key = esc(d.group_id || d.id);
-    return `<div class="drow" data-opendraft="${key}" role="button" tabindex="0">
+  const ai = groups.filter(g => g[0].source === 'ai'), own = groups.filter(g => g[0].source !== 'ai');
+  const list = gs => `<div class="list drafts">${gs.map(g => {
+    const d = g[0], cover = thumbOf(d), key = esc(d.group_id || d.id), isAi = d.source === 'ai';
+    const due = isAi && d.scheduled_at > Date.now() / 1000;
+    return `<div class="drow ${S.approving === key ? 'open' : ''}" data-opendraft="${key}" role="button" tabindex="0">
       ${cover ? pic(cover, 'class="thumb" alt=""') : '<span class="noimg"></span>'}
-      <div class="wh"><b>${esc(d.caption || d.title || 'No caption yet')}</b>
-        <span>${g.length === 1 ? who(g[0]) : `${g.length} accounts`} · ${d.video ? 'Video' : `${d.images.length} photo${d.images.length === 1 ? '' : 's'}`} · saved ${fmt(d.updated_at, { month: 'short', day: 'numeric' })}</span></div>
+      <div class="wh"><b>${isAi ? '<em class="aib">AI</em>' : ''}${esc(d.caption || d.title || 'No caption yet')}</b>
+        <span>${g.length === 1 ? who(g[0]) : `${g.length} accounts`} · ${d.video ? 'Video' : `${d.images.length} photo${d.images.length === 1 ? '' : 's'}`} · ${isAi
+          ? (due ? `planned for ${fmt(d.scheduled_at, { weekday: 'short', day: 'numeric', month: 'short' })} ${at(d.scheduled_at)}` : '<span class="late">planned time has passed</span>')
+          : `saved ${fmt(d.updated_at, { month: 'short', day: 'numeric' })}`}</span></div>
       <span class="dacc">${g.slice(0, 4).map(x => withBadge(avatar(acct(x.account_id)?.avatar_url, x.username), x.platform || 'tiktok')).join('')}</span>
-      <button class="btn sec sm" data-opendraft="${key}">Open</button>
-      <button class="btn ghost danger sm" data-deldraft="${key}" aria-label="Delete draft">${ui('x', 14)}</button></div>`;
-  }).join('')}</div></div>`;
+      ${isAi && due ? `<button class="btn sm" data-approve="${key}">Approve</button>` : ''}
+      <button class="btn sec sm" data-opendraft="${key}">${isAi ? 'Edit' : 'Open'}</button>
+      <button class="btn ghost danger sm" data-deldraft="${key}" aria-label="Delete draft">${ui('x', 14)}</button></div>
+      ${S.approving === key ? approvePanel(g) : ''}`;
+  }).join('')}</div>`;
+  return `${ai.length ? `<section class="panel"><header><h2>From AI, waiting for approval</h2><span class="note">${ai.length} post${ai.length === 1 ? '' : 's'} · they go out only after you approve them</span>
+      ${ai.length > 1 ? `<span class="hacts"><button class="btn sec" id="approveall">Approve all</button></span>` : ''}</header>${list(ai)}</section>` : ''}
+    ${own.length ? `<div class="panel">${ai.length ? '<header><h2>Your drafts</h2></header>' : ''}${list(own)}</div>` : ''}`;
+}
+
+// Approving an AI draft: it goes out at its planned time; TikTok asks who
+// can see it, every time, as its rules require.
+function approvePanel(g) {
+  const tts = g.filter(x => x.platform === 'tiktok'), key = esc(g[0].group_id || g[0].id);
+  return `<div class="apanel" data-stop="1"><p>Goes out <b>${fmt(g[0].scheduled_at, { weekday: 'long', day: 'numeric', month: 'short' })} at ${at(g[0].scheduled_at)}</b> to ${g.map(x => who(x)).join(', ')}.</p>
+    ${tts.map(x => `<label class="f" for="apv-${x.id}">Who can see it on TikTok ${who(x)}</label>
+      <select id="apv-${x.id}" data-apriv="${x.id}"><option value="">Choose…</option>${Object.entries(PRIVACY_LABEL).map(([k, l]) => `<option value="${k}" ${x.settings?.privacy_level === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`).join('')}
+    <div class="aacts"><button class="btn ghost" id="apcancel">Cancel</button><button class="btn" data-apgo="${key}">Approve ${g.length > 1 ? `${g.length} posts` : 'post'}</button></div></div>`;
+}
+
+async function approveGroup(g, privacy = {}) {
+  const errs = [];
+  for (const x of g) {
+    try { await send(`/posts/${x.id}/approve`, 'POST', x.platform === 'tiktok' ? { privacy_level: privacy[x.id] || x.settings?.privacy_level || undefined } : {}); }
+    catch (e) { errs.push(`${PLATFORM[x.platform]} ${handle(x)}: ${e.message}`); }
+  }
+  return errs;
 }
 
 function openDraft(key) {
@@ -1618,7 +1720,8 @@ function openDraft(key) {
   const tt = g.find(x => x.platform === 'tiktok');
   Object.assign(S, { images: src.image_keys.map((k, n) => ({ key: k, url: src.images[n] })), cover: src.cover_index,
     caption: main, title: (tt || src).title || '', fromDraft: g.map(x => x.id), draftGroup: key, targets: [],
-    video: src.video_key ? { key: src.video_key, url: src.video } : null });
+    video: src.video_key ? { key: src.video_key, url: src.video } : null, fromFolder: src.folder_id || null });
+  if (src.source === 'ai' && src.scheduled_at > Date.now() / 1000 + 6 * 60) { S.when = 'later'; S.at = localInput(src.scheduled_at * 1000); }
   for (const x of g) if (x.caption !== main) S.over[x.platform] = x.caption;
   const s = tt?.settings || {};
   S.set = { music: !!s.auto_add_music, duet: s.disable_duet === false, stitch: s.disable_stitch === false,
@@ -1959,8 +2062,12 @@ function settingsView() {
     ${srow('Sign out', 'On this device, or on every device at once.', '<a class="btn sec" href="/api/auth/logout">Sign out</a><button class="btn ghost" id="logoutall">Sign out everywhere</button>')}
   </section>`;
   if (tab === 'developer') body = `<section class="panel">
-    ${srow('API key', 'For posting from your own tools. It can do everything an admin can. A new key disables the old one.',
+    ${srow('API key', 'For AI assistants and your own tools. It can do everything an admin can. A new key disables the old one.',
       `${S.apiKey ? `<code class="key">${esc(S.apiKey)}</code><span class="note warn">Copy it now. It won't be shown again.</span>` : ''}<button class="btn sec" id="apikey">${S.me.api_key_set ? 'Create a new key' : 'Create key'}</button>`)}
+    ${srow('Schedule with AI', 'Connect Claude or another assistant over MCP, with the API key. It plans posts from your library folders.',
+      `<code class="key">${esc(location.origin)}/mcp</code><a class="btn sec" href="/ai.html" target="_blank" rel="noopener">How to connect</a>`)}
+    ${srow('AI posts need approval', S.me.ai_review !== false ? 'On: posts an AI schedules wait in Drafts until someone approves them.' : 'Off: posts an AI schedules go straight onto the calendar.',
+      `<label class="sw"><input type="checkbox" id="aireview" ${S.me.ai_review !== false ? 'checked' : ''} aria-label="AI posts need approval"><span></span></label>`)}
   </section>`;
   return nav + body;
 }
@@ -2095,6 +2202,61 @@ function bind() {
   on('#closepick', 'click', () => { S.pickOpen = false; S.pickAll = false; render(); });
   on('#pickall', 'click', () => { S.pickAll = true; render(); });
   on('#libfiles', 'change', e => uploadToLibrary(e.target.files));
+  on('[data-folder]', 'click', e => { S.folderOpen = e.currentTarget.dataset.folder; S.libSel = []; render(); window.scrollTo(0, 0); });
+  on('[data-folder]', 'keydown', e => { if (e.key === 'Enter') e.currentTarget.click(); });
+  on('#fback', 'click', () => { S.folderOpen = null; render(); });
+  on('[data-ffilter]', 'click', e => { S.fFilter = e.currentTarget.dataset.ffilter; render(); });
+  on('#fnew', 'click', () => { S.newFolder = true; render(); $('fnewname')?.focus(); });
+  on('#fnewcancel', 'click', () => { S.newFolder = false; render(); });
+  on('#fnewform', 'submit', async e => { e.preventDefault();
+    const b = curBrand(), name = $('fnewname').value.trim(), note = $('fnewnote').value.trim();
+    try { const f = await send('/folders', 'POST', { name, note: note || undefined, brand_id: b === 'all' || b === 'none' ? (S.libBrand || null) : b });
+      S.newFolder = false; await reloadLibrary(); S.folderOpen = f.id; } catch (er) { S.flash = { kind: 'err', text: er.message }; }
+    render(); });
+  on('#fsave', 'click', async () => { const f = folderOf(S.folderOpen); if (!f) return;
+    try { await send(`/folders/${f.id}`, 'PATCH', { name: $('fname').value, note: $('fnoteinp').value, ...($('fbrandsel') ? { brand_id: $('fbrandsel').value || null } : {}) });
+      await reloadLibrary(); toast('Folder saved.'); } catch (er) { S.flash = { kind: 'err', text: er.message }; }
+    render(); });
+  on('[data-fmv]', 'click', async e => { const f = folderOf(S.folderOpen); if (!f) return;
+    const [k, d] = e.currentTarget.dataset.fmv.split(':').map(Number), order = f.items.map(i => i.key);
+    [order[k], order[k + d]] = [order[k + d], order[k]];
+    f.items = order.map(key => f.items.find(i => i.key === key)); render();
+    try { await send(`/folders/${f.id}`, 'PATCH', { order }); } catch (er) { S.flash = { kind: 'err', text: er.message }; await reloadLibrary(); render(); } });
+  on('[data-fout]', 'click', async e => { const f = folderOf(S.folderOpen); if (!f) return;
+    try { await send('/library', 'PATCH', { keys: [e.currentTarget.dataset.fout], brand_id: f.brand_id }); await reloadLibrary(); } catch (er) { S.flash = { kind: 'err', text: er.message }; }
+    render(); });
+  on('[data-fsched]', 'click', e => scheduleFolder(e.currentTarget.dataset.fsched));
+  on('[data-fdel]', 'click', async e => { const f = folderOf(e.currentTarget.dataset.fdel); if (!f) return;
+    if (!await ask({ title: `Delete "${f.name}"?`, ok: 'Delete folder', danger: true, icon: ui('image', 22),
+      list: [[true, 'Its photos and video stay in the library, outside any folder'], [true, 'Posts already scheduled from it are not touched']] })) return;
+    try { await send(`/folders/${f.id}`, 'DELETE'); S.folderOpen = null; await reloadLibrary(); } catch (er) { S.flash = { kind: 'err', text: er.message }; }
+    render(); });
+  on('#libtofolder', 'change', async e => { const id = e.target.value;
+    try { await send('/library', 'PATCH', { keys: S.libSel || [], folder_id: id }); S.libSel = []; await reloadLibrary(); } catch (er) { S.flash = { kind: 'err', text: er.message }; }
+    render(); });
+  on('[data-approve]', 'click', e => { e.stopPropagation(); S.approving = e.currentTarget.dataset.approve; render(); });
+  on('[data-stop]', 'click', e => e.stopPropagation());
+  on('#apcancel', 'click', e => { e.stopPropagation(); S.approving = null; render(); });
+  on('[data-apgo]', 'click', async e => { e.stopPropagation();
+    const g = draftGroups().find(x => (x[0].group_id || x[0].id) === e.currentTarget.dataset.apgo); if (!g) return;
+    const privacy = Object.fromEntries([...document.querySelectorAll('[data-apriv]')].map(el => [el.dataset.apriv, el.value]));
+    if (g.some(x => x.platform === 'tiktok' && !privacy[x.id])) { toast('Choose who can see it on TikTok first.', 'err'); return; }
+    e.currentTarget.disabled = true;
+    const errs = await approveGroup(g, privacy);
+    S.approving = null;
+    if (errs.length) S.flash = { kind: 'err', text: errs.join(' · ') }; else toast(`Approved. It goes out ${fmt(g[0].scheduled_at, { weekday: 'short' })} at ${at(g[0].scheduled_at)}.`);
+    await loadDrafts(); refreshCounts(); });
+  on('#approveall', 'click', async () => {
+    const gs = draftGroups().filter(g => g[0].source === 'ai' && g[0].scheduled_at > Date.now() / 1000);
+    const tt = gs.flat().filter(x => x.platform === 'tiktok' && !x.settings?.privacy_level);
+    if (tt.length) { toast(`${tt.length} TikTok post${tt.length === 1 ? ' needs' : 's need'} a "who can see it" choice. Approve those one by one.`, 'err'); return; }
+    if (!await ask({ title: `Approve ${gs.length} posts?`, ok: 'Approve all', icon: ui('check', 22), body: 'Each goes out at its planned time.' })) return;
+    const errs = []; for (const g of gs) errs.push(...await approveGroup(g));
+    if (errs.length) S.flash = { kind: 'err', text: errs.join(' · ') }; else toast('All approved.');
+    await loadDrafts(); refreshCounts(); });
+  on('#aireview', 'change', async e => { const v = e.target.checked;
+    try { await send('/workspace', 'PATCH', { ai_review: v }); S.me.ai_review = v; } catch (er) { S.flash = { kind: 'err', text: er.message }; }
+    render(); });
   on('#libdrop', 'dragover', e => { e.preventDefault(); e.currentTarget.classList.add('over'); });
   on('#libdrop', 'dragleave', e => e.currentTarget.classList.remove('over'));
   on('#libdrop', 'drop', e => { e.preventDefault(); e.currentTarget.classList.remove('over'); uploadToLibrary(e.dataTransfer.files); });
@@ -2109,7 +2271,10 @@ function bind() {
   on('#libmove', 'change', async e => { const v = e.target.value;
     try { await send('/library', 'PATCH', { keys: S.libSel || [], brand_id: v === '-' ? null : v }); S.libSel = []; } catch (er) { S.flash = { kind: 'err', text: er.message }; }
     loadLibrary(); });
-  on('#fromlib', 'click', () => { S.libPick = true; S.libPickSel = []; render(); if (!S.lib) loadLibrary(); });
+  on('#fromlib', 'click', () => { S.libPick = true; S.libPickSel = []; render(); if (!S.lib || !S.folders) loadLibrary(); });
+  on('[data-usefolder]', 'click', async e => { const f = folderOf(e.currentTarget.dataset.usefolder); if (!f) return;
+    S.libPick = false; S.images = []; S.video = null; S.cover = 0; render();
+    await useFromLibrary(f.items.map(i => i.key)); S.fromFolder = f.id; render(); });
   on('[data-lpick]', 'change', e => { const k = e.target.dataset.lpick; S.libPickSel = (S.libPickSel || []).filter(x => x !== k).concat(e.target.checked ? [k] : []); render(); });
   on('#libcancel', 'click', () => { S.libPick = false; render(); });
   on('#libadd', 'click', async () => { const keys = S.libPickSel || []; S.libPick = false; S.libPickSel = []; render(); await useFromLibrary(keys); render(); });

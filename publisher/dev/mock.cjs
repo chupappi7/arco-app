@@ -24,7 +24,19 @@ const me = {
   facebook_enabled: true, instagram_enabled: true, ai_enabled: true,
 };
 const acc = id => me.accounts.find(a => a.id === id);
-let lib = [];
+// Library: a few photos already filed in folders, plus loose ones.
+let lib = ['f1a', 'f1b', 'f1c', 'f2a', 'f2b', 'l1', 'l2'].map((k, i) => ({ key: 'ws1/' + k, url: `/fake/${k}.svg`, brand_id: i < 3 ? 'b2' : i < 5 ? 'b1' : null,
+  name: `${k}.jpg`, bytes: 1, content_type: 'image/jpeg', folder_id: i < 3 ? 'fld1' : i < 5 ? 'fld2' : null, position: i < 3 ? i : i - 3, created_at: 1 }));
+let folders = [{ id: 'fld1', name: 'Black Friday promo', brand_id: 'b2', note: '20% off with code BF20. Not before Friday.', created_at: 2 },
+  { id: 'fld2', name: 'Focus mode explained', brand_id: 'b1', note: 'Link in bio', created_at: 1 }, { id: 'fld3', name: 'Croissants, behind the scenes', brand_id: 'b2', note: null, created_at: 3 }];
+me.ai_review = true;
+const folderJson = f => { const items = lib.filter(i => i.folder_id === f.id).sort((a, b) => a.position - b.position)
+    .map(i => ({ key: i.key, url: i.url, kind: /^video/.test(i.content_type || '') ? 'video' : 'photo', name: i.name }));
+  const ps = posts.filter(x => x.folder_id === f.id), has = st => ps.some(x => x.status === st);
+  const status = has('published') ? 'posted' : has('queued') ? 'scheduled' : has('draft') ? 'awaiting_approval' : 'unused';
+  return { ...f, brand: f.brand_id ? me.brands.find(b => b.id === f.brand_id)?.name : null, kind: items.some(i => i.kind === 'video') ? 'video' : items.length ? 'photos' : 'empty',
+    items, status, next_at: ps.filter(x => x.status !== 'published').map(x => x.scheduled_at).sort()[0] || null,
+    posted_at: ps.filter(x => x.status === 'published').map(x => x.scheduled_at).sort().pop() || null }; };
 const mk = (id, a, st, h, cap, extra = {}) => ({ id, account_id: a, platform: acc(a).platform, username: acc(a).username, status: st, title: '', caption: cap,
   images: [`/fake/${id}.svg`, `/fake/${id}b.svg`], image_keys: ['k' + id], cover_index: 0, settings: {}, scheduled_at: H(h),
   post_url: st === 'published' ? 'https://example.com/p' : null, fail_reason: st === 'failed' ? 'Instagram could not process the images: aspect ratio not supported' : null,
@@ -40,6 +52,10 @@ const posts = [
   mk('p8', 'a3', 'queued', 30, 'Tomorrow: new colorway'),
   mk('p9', 'a1', 'queued', 52, 'Study timer setup'),
   mk('d1', 'a2', 'draft', -20, 'Draft: weekend vibes'),
+  // An AI plan waiting for approval: one post to two Bakery accounts... and ARCO's TikTok.
+  mk('ai1', 'a1', 'draft', 26, 'Your focus, explained in 7 slides. Which one surprised you?', { source: 'ai', batch_id: 'bat_1', folder_id: 'fld2', group_id: 'grp_ai1', settings: { privacy_level: '' } }),
+  mk('ai2', 'a2', 'draft', 26, 'Your focus, explained in 7 slides 🧠 #focus #productivity', { source: 'ai', batch_id: 'bat_1', folder_id: 'fld2', group_id: 'grp_ai1' }),
+  mk('ai3', 'a4', 'draft', 75, 'Black Friday starts now: 20% off everything with code BF20.', { source: 'ai', batch_id: 'bat_1', folder_id: 'fld1', group_id: 'grp_ai2' }),
 ];
 const svg = id => { const n = [...id].reduce((s, c) => s + c.charCodeAt(0), 0); const h = [[28, 12], [205, 225], [110, 95], [320, 295], [42, 30], [250, 265]][n % 6];
   return `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='500'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='hsl(${h[0]},60%,78%)'/><stop offset='1' stop-color='hsl(${h[1]},42%,42%)'/></linearGradient></defs><rect width='400' height='500' fill='url(#g)'/></svg>`; };
@@ -58,16 +74,33 @@ http.createServer(async (q, r) => {
   if (p === '/api/v1/posts' && q.method === 'GET') return j({ posts: empty ? [] : quiet ? posts.filter(x => x.status === 'published' || x.status === 'failed').slice(0, 3).map((x, i) => i === 1 ? { ...x, username: '' } : x) : posts.filter(x => x.status !== 'draft') });
   if (p === '/api/v1/posts' && q.method === 'POST') { const o = await body(q), id = 'n' + Math.random().toString(16).slice(2, 8);
     const x = { ...mk(id, o.account_id, 'queued', 0, o.caption || ''), scheduled_at: o.scheduled_at || now(), images: (o.image_keys || []).map(k => '/media/' + k),
-      image_keys: o.image_keys || [], video_key: o.video_key || null, video: o.video_key ? '/media/' + o.video_key : null, settings: o.settings || {},
+      image_keys: o.image_keys || [], video_key: o.video_key || null, video: o.video_key ? '/media/' + o.video_key : null, settings: o.settings || {}, folder_id: o.folder_id || null,
       created: Date.now(), fail: acc(o.account_id).platform === 'instagram' };
     posts.push(x); return j(x); }
   if (/^\/api\/v1\/posts\/\w+\/retry$/.test(p)) { const x = posts.find(y => y.id === p.split('/')[4]);
     if (x) Object.assign(x, { status: 'queued', fail: false, created: Date.now(), fail_reason: null }); return j(x || {}); }
   if (p === '/api/v1/library' && q.method === 'GET') return j({ items: lib });
+  if (p === '/api/v1/folders' && q.method === 'GET') return j({ folders: folders.map(folderJson).sort((a, b) => b.created_at - a.created_at) });
+  if (p === '/api/v1/folders' && q.method === 'POST') { const o = await body(q), f = { id: 'fld' + Math.random().toString(16).slice(2, 7), name: o.name, brand_id: o.brand_id || null, note: o.note || null, created_at: now() };
+    folders.push(f); return j(folderJson(f)); }
+  if (/^\/api\/v1\/folders\/\w+$/.test(p)) { const f = folders.find(x => x.id === p.split('/')[4]); const o = await body(q);
+    if (q.method === 'DELETE') { folders = folders.filter(x => x !== f); for (const i of lib) if (i.folder_id === f.id) i.folder_id = null; return j({ ok: true }); }
+    if (o.name !== undefined) f.name = o.name; if (o.note !== undefined) f.note = o.note || null;
+    if (o.brand_id !== undefined) { f.brand_id = o.brand_id; for (const i of lib) if (i.folder_id === f.id) i.brand_id = o.brand_id; }
+    if (o.order) o.order.forEach((k, n) => { const i = lib.find(x => x.key === k); if (i) i.position = n; });
+    return j(folderJson(f)); }
+  if (/^\/api\/v1\/posts\/\w+\/approve$/.test(p)) { const x = posts.find(y => y.id === p.split('/')[4]), o = await body(q);
+    if (x.platform === 'tiktok' && !o.privacy_level) return j({ error: 'Choose who can view this post' }, 400);
+    Object.assign(x, { status: 'queued', settings: { ...x.settings, privacy_level: o.privacy_level } }); return j(x); }
+  if (p === '/api/v1/workspace' && q.method === 'PATCH') { const o = await body(q); if (o.ai_review !== undefined) me.ai_review = o.ai_review; return j({ ok: true }); }
   if (p === '/api/v1/library' && q.method === 'POST') { const o = await body(q);
-    for (const k of o.keys) lib.unshift({ key: k, url: '/media/' + k, brand_id: o.brand_id || null, name: (o.names || {})[k] || null, bytes: 1, created_at: now() });
+    const f = folders.find(x => x.id === o.folder_id);
+    for (const k of o.keys) lib.unshift({ key: k, url: '/media/' + k, brand_id: f ? f.brand_id : o.brand_id || null, name: (o.names || {})[k] || null, bytes: 1, created_at: now(),
+      folder_id: f ? f.id : null, position: f ? lib.filter(i => i.folder_id === f.id).length : null });
     return j({ items: lib }); }
-  if (p === '/api/v1/library' && q.method === 'PATCH') { const o = await body(q); for (const i of lib) if (o.keys.includes(i.key)) i.brand_id = o.brand_id; return j({ ok: true }); }
+  if (p === '/api/v1/library' && q.method === 'PATCH') { const o = await body(q), f = folders.find(x => x.id === o.folder_id);
+    for (const i of lib) if (o.keys.includes(i.key)) { if (f) Object.assign(i, { folder_id: f.id, brand_id: f.brand_id, position: 99 }); else Object.assign(i, { brand_id: o.brand_id, folder_id: null }); }
+    return j({ ok: true }); }
   if (p === '/api/v1/library/remove') { const o = await body(q); lib = lib.filter(i => !o.keys.includes(i.key)); return j({ ok: true }); }
   if (p === '/api/v1/drafts') return j({ drafts: empty ? [] : posts.filter(x => x.status === 'draft') });
   if (p === '/api/v1/ai/usage') return j({ limit: 50, remaining: 47 });
@@ -97,7 +130,8 @@ http.createServer(async (q, r) => {
       j({ key, url: '/media/' + key }); }); }
   if (p === '/api/v1/media' && q.method === 'POST') { const ch = []; q.on('data', d => ch.push(d)); return q.on('end', () => { const key = 'ws1/' + Math.random().toString(16).slice(2) + '.jpg'; media[key] = Buffer.concat(ch); j({ key, url: '/media/' + key }); }); }
   if (p === '/api/v1/media/copy') { const o = await body(q);
-    return j({ media: (o.keys || []).map(k => { const key = 'ws1/' + Math.random().toString(16).slice(2) + '.jpg'; media[key] = media[k]; return { key, url: '/media/' + key }; }) }); }
+    return j({ media: (o.keys || []).map(k => { const key = 'ws1/' + Math.random().toString(16).slice(2) + '.jpg', fake = lib.find(i => i.key === k && i.url.startsWith('/fake/'));
+      if (fake) return { key, url: fake.url }; media[key] = media[k]; return { key, url: '/media/' + key }; }) }); }
   if (p.startsWith('/media/') && media[p.slice(7)]) { r.setHeader('Content-Type', /\.mp4$/.test(p) ? 'video/mp4' : /\.mov$/.test(p) ? 'video/quicktime' : 'image/jpeg'); return r.end(media[p.slice(7)]); }
   if (p.startsWith('/api/')) { await body(q); return j({ ok: true }); }
   const f = path.join(root, p === '/' ? 'index.html' : p);
