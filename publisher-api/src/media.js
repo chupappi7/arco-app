@@ -54,7 +54,7 @@ export async function serveMedia(env, key, method = 'GET', req = null) {
   const part = method !== 'HEAD' && range && obj.range ? obj.range : null;
   let offset = 0, length = obj.size;
   if (part) {
-    if ('suffix' in part) { length = Math.min(part.suffix, obj.size); offset = obj.size - length; }
+    if (part.suffix != null) { length = Math.min(part.suffix, obj.size); offset = obj.size - length; }
     else { offset = part.offset ?? 0; length = part.length ?? obj.size - offset; }
   }
   return new Response(method === 'HEAD' ? null : obj.body, {

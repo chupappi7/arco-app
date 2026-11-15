@@ -102,7 +102,7 @@ async function loadMe() {
   restoreTargets();
   const b = curBrand();
   if (b !== 'all') { S.targets = S.targets.filter(id => inBrand(acct(id), b));
-    if (!S.targets.length) for (const a of brandAccounts(b)) if (!a.needs_reconnect) S.targets.push(a.id); }
+    if (!S.targets.length) for (const a of brandAccounts(b)) if (!a.needs_reconnect) toggleTarget(a.id, true, false); }
   refreshCounts();
 }
 
