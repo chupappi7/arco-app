@@ -5339,7 +5339,7 @@ html,body{margin:0;height:100%}
     rgba(var(--accent-rgb),.1) 0deg 1.4deg,transparent 1.4deg 6deg);
   animation:spinback 150s linear infinite}
 .hud .h7{inset:352px;border:1px solid rgba(var(--accent-rgb),.11)}
-@media(max-width:900px){.hud{display:none}}
+@media(max-width:1023px){.hud{display:none}}
 
 /* Satellite dials. Each is three rings: a comb, a broken ring and an arc,
    turning against each other the way the big one does. */
@@ -5365,8 +5365,8 @@ html,body{margin:0;height:100%}
 .sat.a{left:16%;top:13%;width:168px;height:168px;margin:-84px 0 0 -84px}
 .sat.b{left:80%;top:74%;width:224px;height:224px;margin:-112px 0 0 -112px}
 .sat.c{left:70%;top:9%;width:96px;height:96px;margin:-48px 0 0 -48px}
-@media(max-width:1200px){.sat.c{display:none}}
-@media(max-width:900px){.sat{display:none}}
+@media(max-width:1439px){.sat.c{display:none}}
+@media(max-width:1023px){.sat{display:none}}
 
 /* Readouts. A console shows numbers. These are the real ones — the same
    figures the pages are built from — set low enough to be texture until you
@@ -5391,7 +5391,7 @@ html,body{margin:0;height:100%}
 .hudread .rows b{font-weight:700;font-variant-numeric:tabular-nums;
   color:rgba(var(--accent-rgb),.62);min-width:56px;text-align:right;
   text-shadow:0 0 16px rgba(var(--accent-rgb),.4)}
-@media(max-width:1200px){.hudread{display:none}}
+@media(max-width:1439px){.hudread{display:none}}
 
 /* Hairlines between the dials. A console is wired together; without these
    the circles float. */
@@ -5399,7 +5399,7 @@ html,body{margin:0;height:100%}
 .wire.w1{left:16%;top:13%;width:54%;height:1px}
 .wire.w2{left:70%;top:13%;width:1px;height:61%}
 .wire.w3{left:24%;top:74%;width:56%;height:1px}
-@media(max-width:900px){.wire{display:none}}
+@media(max-width:1023px){.wire{display:none}}
 @media(prefers-reduced-motion:reduce){.hud i{animation:none}}
 
 /* Corner brackets — the frame that makes the page an instrument panel. */
@@ -5549,7 +5549,7 @@ aside{background:var(--surface);border-right:1px solid var(--line);
   border:1px solid var(--line-2);font:500 11.5px/1 "Fira Code",monospace;color:var(--muted)}
 .hooksup .hp b{color:var(--text);font-weight:600}
 .hooksup .sub{font-size:12px}
-@media (max-width:900px){ .crow{flex-wrap:wrap} .crow .sp{display:none} }
+@media (max-width:639px){ .crow{flex-wrap:wrap} .crow .sp{display:none} }
 
 /* ---------- the composer ----------
    One card per slide, laid out the way the carousel is: the photo on the
@@ -5681,7 +5681,7 @@ body.boot main{animation:wake .6s ease both .15s}
 .libbar .segs{margin:0}
 .libbar.sort{margin-bottom:14px}
 .libbar.sort .seg{padding:5px 10px;font-size:10.5px}
-@media (max-width:900px){ .libbar .lbl{width:auto} }
+@media (max-width:639px){ .libbar .lbl{width:auto} }
 /* ---------- new post ----------
    One question, five answers, one button. */
 .np{max-width:640px}
@@ -5836,8 +5836,8 @@ body.boot main{animation:wake .6s ease both .15s}
 .wc.empty:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
 .wc.empty.past{font:500 9px/1 "Fira Code",monospace;color:var(--dim);opacity:.45}
 .weeklist{display:none}
-@media (max-width:900px){ .wgrid{display:none} .weeklist{display:block} }
-@media (max-width:900px){ .srow .sth{display:none} }
+@media (max-width:639px){ .wgrid{display:none} .weeklist{display:block} }
+@media (max-width:639px){ .srow .sth{display:none} }
 
 /* ---------- users ----------
    Distributions, not totals: "how many habits does a real user keep" is a
@@ -5874,7 +5874,7 @@ body.boot main{animation:wake .6s ease both .15s}
    however long the status text runs. */
 .ighead{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
   gap:12px;margin:2px 0 0}
-@media(max-width:900px){.ighead{grid-template-columns:1fr;gap:8px}}
+@media (max-width:639px){.ighead{grid-template-columns:1fr;gap:8px}}
 .btn.qd{font-weight:600}
 .slbgwrap{position:relative;flex:none;width:84px;align-self:flex-start}
 /* Without align-self the wrapper stretches to the card's height and the
@@ -5883,7 +5883,7 @@ body.boot main{animation:wake .6s ease both .15s}
   border-radius:7px;border:1px solid var(--line-2);background:rgba(var(--ink-rgb),.82);
   color:var(--muted);font-size:13px;line-height:22px}
 .reroll:hover{color:var(--accent);border-color:var(--accent)}
-@media (max-width:900px){ .slbgwrap{width:66px} }
+@media (max-width:639px){ .slbgwrap{width:66px} }
 
 .slrows{display:flex;flex-direction:column;gap:10px;margin:12px 0 0}
 .slrow{display:flex;gap:13px;padding:12px;border:1px solid var(--line);
@@ -5982,7 +5982,7 @@ body.boot main{animation:wake .6s ease both .15s}
   margin:16px 0 0;padding:12px 14px;background:var(--surface);
   border:1px solid var(--line-2);border-radius:13px;box-shadow:0 8px 24px rgba(var(--ink-rgb),.55)}
 .cbar .sum{flex:1;min-width:170px;font-size:12px;color:var(--dim);line-height:1.45}
-@media (max-width:900px){
+@media (max-width:639px){
   .slrow{padding:10px;gap:10px}
   .slbg{width:66px}
   .bgrid{grid-template-columns:repeat(auto-fill,minmax(76px,1fr))}
@@ -6227,12 +6227,12 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 /* Deselected reads as switched off: dimmed and hollow, not another colour. */
 .pilla.off{background:transparent;color:var(--dim);opacity:.45}
 .pilla.off:hover{opacity:.8}
-@media(max-width:900px){.acctfilter{margin-left:0;width:100%}}
+@media (max-width:639px){.acctfilter{margin-left:0;width:100%}}
 /* Six tiles in an auto-fit grid landed 5 + 1. Fixed column counts that divide
    six evenly keep every row full at any width. */
 .mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin:0 0 22px}
-@media(min-width:1500px){.mgrid{grid-template-columns:repeat(6,1fr)}}
-@media(max-width:1100px){.mgrid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1440px){.mgrid{grid-template-columns:repeat(6,1fr)}}
+@media(max-width:1023px){.mgrid{grid-template-columns:repeat(2,1fr)}}
 .mtile{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:16px 17px}
 .ml{font-size:12px;color:var(--muted);margin-bottom:9px}
 .mn{font:600 30px/1 "Fira Code",monospace;color:var(--text);letter-spacing:-.02em}
@@ -6281,7 +6281,7 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .pbar .pv{flex:0 0 44px;text-align:right;font:600 12px/1 "Fira Code",monospace;color:var(--text)}
 .pbar .ps{flex:0 0 66px;text-align:right;font:400 11px/1 "Fira Code",monospace;color:var(--dim)}
 .pbar.thin{opacity:.45}
-@media (max-width:900px){ .pbar .pn{flex-basis:88px} .pbar .ps{display:none} }
+@media (max-width:639px){ .pbar .pn{flex-basis:88px} .pbar .ps{display:none} }
 
 /* ---------- published: the date-cohort browser ---------- */
 .rlab{font:600 12px/1 system-ui;color:var(--dim);margin-right:4px;
@@ -6350,7 +6350,7 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .prate{flex:none;min-width:48px;text-align:right;font:500 12px/1 "Fira Code",monospace;
   color:var(--dim)}
 .prate.good{color:var(--ok)}
-@media (max-width:900px){
+@media (max-width:1023px){
   /* The row keeps its meaning at 393px by dropping to two lines rather than
      shrinking every column until none of them can be read. */
   .phead{display:none}
@@ -6481,7 +6481,7 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
   background:var(--surface);border:1px solid var(--line-2);border-radius:14px;padding:18px}
 .revfix input{background:var(--surface-2);border:1px solid var(--line-2);
   color:var(--text);border-radius:9px;padding:10px 11px;font:500 13px/1 system-ui}
-@media (max-width:760px){
+@media (max-width:639px){
   /* Two across on a phone keeps a slide big enough to read the hook on. */
   .revsheet{grid-template-columns:repeat(2,1fr)}
   .revtop{flex-wrap:wrap}
@@ -6549,9 +6549,9 @@ h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.01em}
 .fastrow.end{justify-content:flex-end;margin-top:16px;position:sticky;bottom:-20px;
   background:var(--surface);padding:12px 0 2px;margin-bottom:0;
   box-shadow:0 -10px 14px -8px var(--surface)}
-/* Seven day columns do not fit a phone. Below 900 the grid scrolls sideways
+/* Seven day columns do not fit a phone. Below 640 the grid scrolls sideways
    with the account column pinned, which keeps the row labels readable. */
-@media (max-width:900px){
+@media (max-width:639px){
   .calgrid{overflow-x:auto;grid-template-columns:112px repeat(7,minmax(74px,1fr))!important}
   .calacc{position:sticky;left:0;z-index:2}
 }
@@ -6685,7 +6685,7 @@ tr:hover .ad{opacity:.9}
 .pcard{display:flex;flex-direction:column}
 .pcard ul.tight{flex:1}
 .pcard .do{margin-top:auto}
-@media(max-width:1000px){.panelrow{grid-template-columns:1fr}}
+@media(max-width:1023px){.panelrow{grid-template-columns:1fr}}
 .pcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 16px}
 .pcard h4{margin:0 0 3px;font-size:13px;font-weight:600;color:var(--text)}
 .pcard .why{font-size:11px;color:var(--dim);margin:0 0 12px}
@@ -6733,7 +6733,7 @@ tr:hover .ad{opacity:.9}
 /* Six columns in half a screen: the gutters go before the figures do. */
 .duo .mx.cmp td{padding-left:6px;padding-right:6px}
 .duo .mx.cmp th{padding-left:6px;padding-right:6px}
-@media(max-width:1180px){.duo{grid-template-columns:1fr}}
+@media(max-width:1023px){.duo{grid-template-columns:1fr}}
 /* Capped and centred. Five points stretched across the full width of a
    desktop is a flat line whatever the numbers do. */
 .chartwrap{position:relative;max-width:720px;margin:6px auto 0}
@@ -6759,7 +6759,7 @@ tr:hover .ad{opacity:.9}
 #menubtn,#refreshbtn{display:none}
 @keyframes spin360{to{transform:rotate(360deg)}}
 #refreshbtn.spinning svg{animation:spin360 .7s linear infinite}
-@media (max-width:900px){
+@media (max-width:639px){
   /* The strip could only ever show three of six pages. */
   aside nav{display:none}
   #menubtn{display:inline-flex;align-items:center;justify-content:center;
@@ -6797,7 +6797,7 @@ tr:hover .ad{opacity:.9}
 .pill2.warn b{color:var(--warn)}
 .pill2.off{opacity:.6}
 .chartrow2{display:grid;grid-template-columns:1.55fr 1fr;gap:14px}
-@media(max-width:960px){.chartrow2{grid-template-columns:1fr}}
+@media(max-width:1023px){.chartrow2{grid-template-columns:1fr}}
 .pcard ul.tight li .ir.hit,.chart ul.tight li .ir.hit{color:var(--ok)}
 .chart ul.tight{list-style:none;margin:0;padding:0}
 .chart ul.tight li{display:flex;align-items:baseline;gap:9px;padding:8px 0;
@@ -6850,7 +6850,7 @@ tr:hover .ad{opacity:.9}
 .redobar input{flex:1;min-width:260px;background:var(--surface-2);border:1px solid var(--line-2);
   border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px}
 .copyrow{display:grid;grid-template-columns:1fr 2fr;gap:14px}
-@media(max-width:820px){.copyrow{grid-template-columns:1fr}}
+@media(max-width:1023px){.copyrow{grid-template-columns:1fr}}
 .runpill{display:inline-flex;align-items:center;gap:8px;background:var(--surface-2);
   border:1px solid var(--line-2);border-radius:20px;padding:7px 14px;font-size:12px;
   color:var(--muted);cursor:pointer}
@@ -6862,7 +6862,7 @@ tr:hover .ad{opacity:.9}
 .trow .dot{width:8px;height:8px;border-radius:50%;background:var(--line-2);
   display:inline-block}
 #jobs .toast{position:fixed;right:22px;bottom:22px;z-index:55;width:310px}
-@media(max-width:900px){#jobs .toast{right:12px;left:12px;bottom:12px;width:auto}}
+@media (max-width:639px){#jobs .toast{right:12px;left:12px;bottom:12px;width:auto}}
 .toast{position:fixed;right:22px;bottom:22px;z-index:60;width:330px;
   background:var(--surface);border:1px solid var(--line-2);border-radius:13px;
   padding:15px 17px;box-shadow:0 18px 44px rgba(0,0,0,.55);
@@ -7068,7 +7068,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
 .pa:hover{border-color:var(--accent)}
 .pa .t{font-size:14px;font-weight:600}
 .pa .d{font-size:12.5px;color:var(--dim)}
-@media (max-width:900px){
+@media (max-width:639px){
   .postwrap{grid-template-columns:1fr}
   .picker{position:static;flex-direction:row;overflow-x:auto;padding-bottom:6px}
   .picker .cap-l{display:none}
@@ -7103,7 +7103,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
 .toggle:hover{border-color:var(--accent);color:var(--text)}
 .toggle[aria-pressed="true"]{background:var(--accent);color:#04222f;border-color:var(--accent)}
 .toggle svg{width:16px;height:16px}
-@media (max-width:900px){
+@media (max-width:639px){
   .app{grid-template-columns:1fr;height:auto;min-height:100vh}
   /* The sidebar becomes a scrolling strip at the top: hiding it left a phone
      with no filters and no account state, which is most of the tool. */
@@ -7216,15 +7216,6 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
   .age{padding:5px 8px}
 }
 
-/* --- narrow phones --- */
-@media (max-width:430px){
-  .mgrid{grid-template-columns:1fr 1fr}
-  .kpis{grid-template-columns:1fr 1fr}
-  .strip .sl{width:62vw}
-  .wrap{padding:14px 12px 44px}
-  .bar{padding:12px 12px}
-  h1{font-size:15px}
-}
 .kfun{display:flex;flex-direction:column;gap:3px;margin-top:6px}
 .kfun .row{display:grid;grid-template-columns:150px 1fr 62px;align-items:center;gap:10px;
   font-size:12.5px}
@@ -7234,6 +7225,82 @@ input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--te
 .kfun .vv{text-align:right;font-variant-numeric:tabular-nums}
 .kfun .row.drop .fl{background:linear-gradient(90deg,#c2554a,#E08968)}
 .kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0 18px}
+/* ---------- screen sizes: phone <640 · tablet 640–1023 · laptop 1024–1439 · desktop 1440–1919 · large 1920+ ----------
+   One breakpoint set for the whole page. Inside a tier, padding and type
+   scale with clamp(); cards are size containers so their insides answer to
+   the card's width, not the window's. */
+.wrap{max-width:1840px;margin-inline:auto;
+  padding:clamp(12px,1.2vw,22px) clamp(16px,2.2vw,40px) 60px}
+/* The bar spans the window but its contents line up with the capped column. */
+.bar{padding:clamp(12px,1.25vw,20px)
+  max(clamp(16px,2.2vw,40px),calc((100% - 1840px)/2 + clamp(16px,2.2vw,40px)))}
+h1{font-size:clamp(16px,.85rem + .35vw,21px)}
+.cx:not(.np){max-width:none}
+/* cards are as tall as what is in them, not as tall as their neighbour */
+.panelrow,.tdgrid{align-items:start}
+.rwcell i,.rwcell u{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legend{flex-wrap:wrap;row-gap:6px}
+.legend>span{white-space:nowrap}
+@media (min-width:640px){
+  .rwstrip{grid-template-columns:repeat(auto-fit,minmax(min(104px,100%),1fr))}
+}
+.pcard,.chart,.ubox,.mtile,.rwcell{container-type:inline-size}
+.pcard h4,.chart h4,.ubox h4,.rwcell b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@container (max-width:380px){
+  .kfun .row{grid-template-columns:96px 1fr 52px;gap:7px}
+}
+
+/* phone: compact top bar + page sheet (above); the accounts strip scrolls
+   instead of squeezing five cards into the width of one */
+@media (max-width:639px){
+  body.boot main::after{left:0}
+  .accounts{flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  .acct{flex:0 0 auto;width:124px}
+  .acct .cad span{display:none}
+  .cad{white-space:nowrap}
+  .hidnote{flex:none;white-space:nowrap;align-self:center}
+  .bar{gap:10px}
+  .bar .sub{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #refreshbtn{flex:none}
+  .acctfilter{overflow-x:auto;scrollbar-width:none}
+  .pilla{flex:none}
+}
+
+/* tablet: the sidebar folds to an icon rail */
+@media (min-width:640px) and (max-width:1023px){
+  .app{grid-template-columns:76px minmax(0,1fr)}
+  body.boot main::after{left:76px}
+  aside{padding:12px 8px;gap:16px}
+  .brand{padding:0;justify-content:center}
+  .brand>div{display:none}
+  .eye{transform:scale(.78);margin:-8px}
+  .navlabel,.hidnote,.accounts .empty{display:none}
+  .nav{position:relative;justify-content:center;width:52px;height:46px;min-height:0;
+    padding:0;margin:0 auto;border-radius:10px}
+  .nav[aria-current="true"]{border-radius:10px}
+  .nav>span:not([class]){display:none}
+  .nav .ct{position:absolute;top:3px;right:1px;margin:0;font-size:9.5px}
+  .nav .badge{position:absolute;top:8px;left:8px;margin:0}
+  .accounts{gap:6px}
+  .acct{padding:8px 4px;text-align:center}
+  .acct .top{justify-content:center}
+  .acct .h,.astat span,.astat i,.acct .cad b,.acct .cad span,.acct button{display:none}
+  .astat{justify-content:center;margin-top:5px}
+  .astat b{font-size:14px}
+  .cad{justify-content:center;margin-top:6px}
+}
+
+/* desktop: Make puts the form and the briefs side by side */
+@media (min-width:1440px){
+  .mkcols{display:grid;grid-template-columns:minmax(0,640px) minmax(0,1fr);
+    gap:clamp(28px,2.6vw,56px);align-items:start}
+  .mkcols .brwrap{margin:0;border-top:0;padding-top:0}
+}
+/* large: Today's four cards sit in one row */
+@media (min-width:1920px){
+  .tdgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:20px 0}
+  .tdgrid>.panelrow{display:contents}
+}
 </style></head><body>
 <script>
 (function(){try{
@@ -7529,8 +7596,8 @@ function todayView(){
     `${T.unapproved_n} to judge · ${T.ready_n} ready · ${bl.length} blocker${bl.length===1?'':'s'}`;
 
   return runwayStrip()
-    + `<div class="panelrow">${approve}${ready}</div>`
-    + `<div class="panelrow">${makeCard}${maturedCard}</div>`
+    + `<div class="tdgrid"><div class="panelrow">${approve}${ready}</div>`
+    + `<div class="panelrow">${makeCard}${maturedCard}</div></div>`
     + `<div class="panelrow one">${blockers}</div>`;
 }
 
@@ -9285,7 +9352,7 @@ function render_(){
     const typing = document.activeElement
       && ['brin','npnote'].includes(document.activeElement.id);
     if(typing) return;
-    view.innerHTML = composeView() + briefsView();
+    view.innerHTML = `<div class="mkcols">${composeView()}${briefsView()}</div>`;
     if(!HOOKS) loadHooks();
     if(!NOTES) loadNotes();
     return;
