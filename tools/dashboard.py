@@ -172,8 +172,14 @@ ACCOUNTS = [
     {'key': 'max', 'label': 'maxmilian.dev', 'short': 'maxmilian', 'brand': 'arco'},
     {'key': 'prodgod', 'label': 'productivity_god', 'short': 'prodgod', 'brand': 'arco'},
     {'key': 'jackson', 'label': 'jackson21.dev', 'short': 'jackson21', 'brand': 'arco'},
+    {'key': 'focus', 'label': 'focuswmarco', 'short': 'focusw', 'brand': 'arco'},
     {'key': 'viet', 'label': 'huynhlearnsviet', 'short': 'huynhviet',
      'brand': 'lockviet'},
+    {'key': 'jay', 'label': 'jay.locksin', 'short': 'jaylocks', 'brand': 'arco'},
+    {'key': 'mia', 'label': 'miapracticestalking', 'short': 'mia', 'brand': 'konvo'},
+    {'key': 'linh', 'label': 'learnvietwithlinh', 'short': 'linhviet', 'brand': 'lockviet'},
+    {'key': 'vietdaily', 'label': 'vietnamese.daily.words', 'short': 'vietdaily', 'brand': 'lockviet'},
+    {'key': 'bao', 'label': 'baolearnsviet', 'short': 'baoviet', 'brand': 'lockviet'},
 ]
 DEFAULT_BRAND = 'arco'       # what a topic belongs to unless it says otherwise
 
@@ -9783,7 +9789,7 @@ function offlineNote(e){
 let anAccs = null;   // null = all three; otherwise a Set of account keys
 const AN_TOP = 20;
 const ACOL = {vn:'#38BDF8', getarco:'#A78BFA', us:'#22C55E', max:'#F59E0B',
-              prodgod:'#F472B6', jackson:'#F87171'};
+              prodgod:'#F472B6', jackson:'#F87171', focus:'#FACC15', jay:'#34D399', mia:'#60A5FA', linh:'#FB923C', vietdaily:'#C084FC', bao:'#2DD4BF'};
 
 // Three states so the button says what it is doing: idle, working, done.
 // It used to relabel the element it was clicked on, which the re-render then

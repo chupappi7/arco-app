@@ -40,3 +40,4 @@ tools/.gen/
 tools/*.prerestore
 tools/*.predupe
 tools/*.prerun
+.playwright-mcp/

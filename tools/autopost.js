@@ -267,9 +267,15 @@ const ACCOUNT_ENV = {
   max: { env: 'TIKTOK_REFRESH_TOKEN_MAX', label: 'maxmilian.dev' },
   prodgod: { env: 'TIKTOK_REFRESH_TOKEN_PRODGOD', label: 'productivity_god' },
   jackson: { env: 'TIKTOK_REFRESH_TOKEN_JACKSON', label: 'jackson21.dev' },
+  focus: { env: 'TIKTOK_REFRESH_TOKEN_FOCUS', label: 'focuswmarco' },
   // LockViet, not ARCO. Nothing this repo builds belongs here; the
   // dashboard's brand guard is what enforces that, not this map.
   viet: { env: 'TIKTOK_REFRESH_TOKEN_VIET', label: 'huynhlearnsviet' },
+  jay: { env: 'TIKTOK_REFRESH_TOKEN_JAY', label: 'jay.locksin' },
+  mia: { env: 'TIKTOK_REFRESH_TOKEN_MIA', label: 'miapracticestalking' },
+  linh: { env: 'TIKTOK_REFRESH_TOKEN_LINH', label: 'learnvietwithlinh' },
+  vietdaily: { env: 'TIKTOK_REFRESH_TOKEN_VIETDAILY', label: 'vietnamese.daily.words' },
+  bao: { env: 'TIKTOK_REFRESH_TOKEN_BAO', label: 'baolearnsviet' },
 };
 
 // Two TikTok apps, two credential sets. The production app is approved to

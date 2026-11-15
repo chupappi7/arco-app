@@ -62,9 +62,15 @@ const EXPECTED_USERNAME = {
   max: 'maxmilian.dev',
   prodgod: 'productivity_god',
   jackson: 'jackson21.dev',
+  focus: 'focuswmarco',
   // Not an ARCO account. LockViet has its own app and its own
   // audience, so nothing built by this pipeline belongs on it.
   viet: 'huynhlearnsviet',
+  jay: 'jay.locksin',
+  mia: 'miapracticestalking',
+  linh: 'learnvietwithlinh',
+  vietdaily: 'vietnamese.daily.words',
+  bao: 'baolearnsviet',
 };
 
 // video.upload drafts to the creator's inbox; video.publish is what Direct
