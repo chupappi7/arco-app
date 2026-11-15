@@ -407,9 +407,14 @@ function overviewView() {
   const fchg = sacc.filter(a => a.change != null), ftot = sacc.filter(a => a.followers != null);
   const followers = fchg.length ? fchg.reduce((n, a) => n + a.change, 0) : null;
   const next7 = upcoming.filter(p => p.scheduled_at < now + week).length;
+  // Platforms count differently (Facebook has no views), so each figure also shows its parts.
+  const oplats = ORDER.filter(pl => acc.some(a => platformOf(a) === pl));
+  const split = key => oplats.length < 2 ? '' : ksplit(oplats.map(pl => {
+    const list = cur.filter(p => (p.platform || 'tiktok') === pl && p.stats && key(p.stats) != null);
+    return [pl, list.length ? list.reduce((n, p) => n + key(p.stats), 0) : null]; }));
   const kpis = [
-    ['#analytics', 'Views · 7 days', num(views), views == null ? (S.ovStats?.tiktok_reconnect ? 'Reconnect TikTok for views' : 'Shows once platforms share it') : trend(pct(views, pviews)) || `${cur.length} post${cur.length === 1 ? '' : 's'}`, spark(s => s.views || 0)],
-    ['#analytics', 'Engagement', num(eng), eng == null ? 'Likes, comments and shares' : trend(pct(eng, peng)) || (views ? `${(eng / views * 100).toFixed(1)}% of views` : 'likes, comments, shares'), spark(engOf)],
+    ['#analytics', 'Views · 7 days', num(views), views == null ? (S.ovStats?.tiktok_reconnect ? 'Reconnect TikTok for views' : 'Shows once platforms share it') : trend(pct(views, pviews)) || `${cur.length} post${cur.length === 1 ? '' : 's'}`, spark(s => s.views || 0), split(s => s.views)],
+    ['#analytics', 'Engagement', num(eng), eng == null ? 'Likes, comments and shares' : trend(pct(eng, peng)) || (views ? `${(eng / views * 100).toFixed(1)}% of views` : 'likes, comments, shares'), spark(engOf), split(engOf)],
     ['#analytics', 'New followers', followers == null ? '–' : signed(followers), ftot.length ? `${num(ftot.reduce((n, a) => n + a.followers, 0))} in total` : S.ovStats ? 'Shows after a day' : '', ''],
     ['#calendar', 'Published · 7 days', String(cur.length), `${next7} scheduled next 7 days${failed.length ? ` · <span class="dn">${failed.length} failed</span>` : ''}`, ''],
   ];
@@ -462,7 +467,7 @@ function overviewView() {
 
   return `<div class="ohead"><div><h1>${greeting()}</h1><p>${sub}</p></div>${chips}</div>
   ${alert}
-  <div class="kpis">${kpis.map(([href, l, v, note, sp]) => `<a href="${href}" class="kpi"><span>${l}</span><b>${v}</b><small>${note}</small>${sp}</a>`).join('')}</div>
+  <div class="kpis">${kpis.map(([href, l, v, note, sp, parts = '']) => `<a href="${href}" class="kpi"><span>${l}</span><b>${v}</b><small>${note}</small>${parts}${sp}</a>`).join('')}</div>
   ${weekCard}
   <div class="obot">${accCard}${topCard}</div>`;
 }
@@ -516,6 +521,10 @@ function chart(series, key, { kind = 'bar', label, fmtv = num } = {}) {
       <i class="cx"></i><div class="ctip" role="status"></div><div class="xax">${ticks}</div></div></div>`;
 }
 
+// One figure's parts per platform; "–" where that platform does not report it.
+const ksplit = parts => `<span class="ksplit">${parts.map(([pl, v]) =>
+  `<span title="${PLATFORM[pl]}${v == null ? ': not reported' : ''}">${icon(pl, 11)}${v == null ? '–' : num(v)}</span>`).join('')}</span>`;
+
 function analyticsView() {
   const st = S.stats, days = S.statsDays || 30, plat = S.statsPlat || 'all';
   const plats = ORDER.filter(pl => brandAccounts().some(a => platformOf(a) === pl));
@@ -532,6 +541,7 @@ function analyticsView() {
     const pct = Math.round((v - pv) / pv * 100); return [`${pct > 0 ? '↑' : pct < 0 ? '↓' : '='} ${Math.abs(pct)}%<span class="vs"> vs previous ${days} days</span>`, pct > 0 ? 'up' : pct < 0 ? 'down' : '']; };
   const kpis = [['Views', T.views], ['Likes', T.likes], ['Comments', T.comments], ['Shares', T.shares]]
     .map(([l, v]) => [l, v == null ? '–' : num(v), ...delta(v, P[l.toLowerCase()])])
+    .map(k => [...k, plat === 'all' && st.by_platform.length > 1 ? ksplit(st.by_platform.map(x => [x.platform, x[k[0].toLowerCase()]])) : ''])
     .concat([['Followers', F.total == null ? '–' : num(F.total), F.change == null ? 'change shows after a day' : `${signed(F.change)} in ${days} days`, F.change > 0 ? 'up' : F.change < 0 ? 'down' : '']]);
 
   const prow = x => `<div class="bprow">${appIcon(x.platform, 26)}<div class="bpn"><b>${PLATFORM[x.platform]}</b><span>${x.posts} post${x.posts === 1 ? '' : 's'}</span></div>
@@ -549,7 +559,7 @@ function analyticsView() {
   ].filter(Boolean);
 
   return `${filters}
-    <div class="kpis five">${kpis.map(([l, v, n, c]) => `<div class="kpi"><span>${l}</span><b>${v}</b><small class="${c}">${n}</small></div>`).join('')}</div>
+    <div class="kpis five">${kpis.map(([l, v, n, c, parts = '']) => `<div class="kpi"><span>${l}</span><b>${v}</b><small class="${c}">${n}</small>${parts}</div>`).join('')}</div>
     <div class="angrid">
       <section class="panel ocard"><header><h2>Followers</h2><span class="note">total, ${days} days</span></header>${chart(st.series, 'followers', { kind: 'line', label: 'Followers' })}</section>
       ${plat === 'all' ? `<section class="panel ocard"><header><h2>By platform</h2></header><div class="bplist">${st.by_platform.map(prow).join('') || '<div class="cempty2">No accounts yet.</div>'}</div></section>`

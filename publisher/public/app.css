@@ -1174,3 +1174,5 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .aistep>header{flex-wrap:wrap;row-gap:2px}
 .aistep>header .note{flex-basis:100%;margin-left:34px}
 .aistep>header{justify-content:flex-start}.aistep>header h2{margin:0}
+.kpi .ksplit{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px}
+.kpi .ksplit span{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:var(--soft-ink, var(--mute));font-variant-numeric:tabular-nums}
