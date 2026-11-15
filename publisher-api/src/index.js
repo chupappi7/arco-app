@@ -8,6 +8,9 @@ import { listAccounts, creatorInfoFor, disconnect, refreshInstagramTokens } from
 import * as L from './limits.js';
 import { uploadMedia, serveMedia, copyMedia, videoTicket, uploadVideo, uploadCors } from './media.js';
 import { listLibrary, addToLibrary, moveInLibrary, removeFromLibrary } from './library.js';
+import { listFolders, createFolder, updateFolder, deleteFolder } from './folders.js';
+import { freeSlots, schedulePlan, undoBatch, approvePost, findPosts, resolveBrand, workspaceInfo, parseWhen } from './planner.js';
+import { mcp } from './mcp.js';
 import { createPost, listPosts, cancelPost, retryPost, listDrafts, updatePost } from './posts.js';
 import { tick, publishNow } from './publisher.js';
 import { notifyFailures } from './notify.js';
@@ -18,7 +21,7 @@ import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './bra
 
 async function me(req, env, { who }) {
   const ws = who.ws;
-  const row = await env.DB.prepare('SELECT name, timezone, slots, api_key_hash FROM workspaces WHERE id = ?').bind(ws).first();
+  const row = await env.DB.prepare('SELECT name, timezone, slots, api_key_hash, ai_review FROM workspaces WHERE id = ?').bind(ws).first();
   const user = who.userId ? await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(who.userId).first() : null;
   return json({
     user: user ? { id: who.userId, email: user.email } : null,
@@ -30,6 +33,7 @@ async function me(req, env, { who }) {
     accounts: await listAccounts(env, who),
     brands: await listBrands(env, who),
     api_key_set: !!row?.api_key_hash,
+    ai_review: row ? !!row.ai_review : true,
     limits: { accounts: L.MAX_ACCOUNTS, queued: L.MAX_QUEUED, images: L.MAX_IMAGES,
               image_bytes: L.MAX_IMAGE_BYTES, workspace_bytes: L.MAX_WORKSPACE_BYTES,
               min_lead_seconds: L.MIN_LEAD_SECONDS, ig_images: L.IG_MAX_IMAGES, ig_caption: L.IG_MAX_CAPTION,
@@ -87,6 +91,24 @@ export const ROUTES = [
   ['POST', '/v1/library', async (req, env, { who }) => json(await addToLibrary(env, who, await body(req))), 'member'],
   ['PATCH', '/v1/library', async (req, env, { who }) => json(await moveInLibrary(env, who, await body(req))), 'member'],
   ['POST', '/v1/library/remove', async (req, env, { who }) => json(await removeFromLibrary(env, who, await body(req))), 'member'],
+  ['GET', '/v1/folders', async (req, env, { who, url }) => json({ folders: await listFolders(env, who,
+    { brand: url.searchParams.get('brand') || 'all', status: url.searchParams.get('status') || 'all' }) }), 'member'],
+  ['POST', '/v1/folders', async (req, env, { who }) => json(await createFolder(env, who, await body(req))), 'member'],
+  ['PATCH', '/v1/folders/:id', async (req, env, { who, params }) => json(await updateFolder(env, who, params.id, await body(req))), 'member'],
+  ['DELETE', '/v1/folders/:id', async (req, env, { who, params, url }) =>
+    json(await deleteFolder(env, who, params.id, { removeItems: url.searchParams.get('remove_items') === '1' })), 'member'],
+  ['GET', '/v1/slots', async (req, env, { who, url }) => {
+    const info = await workspaceInfo(env, who.ws), from = url.searchParams.get('from');
+    return json(await freeSlots(env, who, await resolveBrand(env, who, url.searchParams.get('brand') ?? 'none'),
+      { info, count: Math.min(50, Math.max(1, Number(url.searchParams.get('count')) || 10)), from: from ? parseWhen(from, info.timezone) : undefined }));
+  }, 'member'],
+  ['POST', '/v1/plans', async (req, env, { who, tk }) => json(await schedulePlan(env, tk, who, await body(req))), 'member'],
+  ['POST', '/v1/batches/:id/undo', async (req, env, { who, params }) => json(await undoBatch(env, who, params.id)), 'member'],
+  ['GET', '/v1/agenda', async (req, env, { who, url }) => json(await findPosts(env, who, Object.fromEntries(
+    ['from', 'to', 'brand', 'status'].filter(k => url.searchParams.has(k)).map(k => [k, url.searchParams.get(k)])))), 'member'],
+  ['POST', '/v1/posts/:id/approve', async (req, env, { who, params, tk }) => json(await approvePost(env, tk, who, params.id, await body(req))), 'member'],
+  ['POST', '/mcp', mcp, 'member'],
+  ['GET', '/mcp', async () => new Response('ARCO Publisher MCP: POST JSON-RPC here.', { status: 405, headers: { Allow: 'POST' } }), 'public'],
   ['POST', '/v1/media/copy', async (req, env, { who }) => json(await copyMedia(env, who, (await body(req)).keys)), 'member'],
   ['POST', '/v1/media/video', async (req, env, { who }) => json(await videoTicket(env, who, await body(req), req)), 'member'],
   // The page PUTs a video here directly (cross-origin), with a ticket from above.
@@ -155,7 +177,7 @@ export default {
         }
         if (access !== 'public' && access !== 'internal') {
           const who = await callerFor(env, req);
-          if (!who) return json({ error: 'Sign in first' }, 401);
+          if (!who) return json({ error: 'Sign in first' }, 401, url.pathname === '/mcp' ? { 'WWW-Authenticate': 'Bearer realm="ARCO Publisher"' } : {});
           need(who, access);
           context.who = who;
         }

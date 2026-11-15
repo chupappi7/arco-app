@@ -3,6 +3,7 @@ import { randomToken } from './crypto.js';
 import { MAX_IMAGE_BYTES, MAX_WORKSPACE_BYTES, KEEP_UNATTACHED, MAX_VIDEO_BYTES, UPLOAD_TICKET_TTL, MAX_LIBRARY } from './limits.js';
 import { wsOf, scopeOf, inScope } from './scope.js';
 import { brandFor } from './library.js';
+import { getFolder } from './folders.js';
 
 const TYPES = {
   'image/jpeg': { ext: 'jpg', magic: [0xff, 0xd8, 0xff] },
@@ -144,13 +145,18 @@ export async function videoTicket(env, w, body, req) {
   const bytes = Number(b.bytes);
   if (!Number.isInteger(bytes) || bytes < 1) throw new HttpError(400, 'The video is empty');
   if (bytes > MAX_VIDEO_BYTES) throw new HttpError(400, `Each video must be ${MAX_VIDEO_BYTES / 1024 / 1024} MB or smaller`);
-  const brandId = await brandFor(env, w, b.brand_id);
+  const folder = b.folder_id ? await getFolder(env, w, b.folder_id) : null;
+  if (folder) {
+    const { n: inside } = await env.DB.prepare('SELECT COUNT(*) AS n FROM media WHERE folder_id = ? AND in_library = 1').bind(folder.id).first();
+    if (inside) throw new HttpError(400, 'A folder holds photos or one video, not both. Make a new folder for this video.');
+  }
+  const brandId = folder ? folder.brand_id : await brandFor(env, w, b.brand_id);
   const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM media WHERE workspace_id = ? AND in_library = 1').bind(ws).first();
   if (n >= MAX_LIBRARY) throw new HttpError(409, `The library holds up to ${MAX_LIBRARY} items`);
   if ((await workspaceBytes(env, ws)) + bytes > MAX_WORKSPACE_BYTES) throw new HttpError(409, FULL);
   const claims = {
     key: `${ws}/${randomToken('', 16)}.${ext}`, ws, bytes, type: String(b.content_type).toLowerCase(),
-    brand: brandId, name: String(b.name ?? '').slice(0, 120) || null,
+    brand: brandId, folder: folder ? folder.id : null, name: String(b.name ?? '').slice(0, 120) || null,
     dur: int(b.duration_ms, 24 * 3600 * 1000), w: int(b.width, 20000), h: int(b.height, 20000),
     exp: now() + UPLOAD_TICKET_TTL,
   };
@@ -210,7 +216,7 @@ export async function uploadVideo(env, token, req) {
   }
   const t = now();
   await env.DB.prepare(`INSERT INTO media (key, workspace_id, bytes, content_type, created_at, delete_after,
-      in_library, brand_id, name, duration_ms, width, height) VALUES (?, ?, ?, ?, ?, NULL, 1, ?, ?, ?, ?, ?)`)
-    .bind(c.key, c.ws, c.bytes, c.type, t, c.brand, c.name, c.dur, c.w, c.h).run();
+      in_library, brand_id, name, duration_ms, width, height, folder_id, position) VALUES (?, ?, ?, ?, ?, NULL, 1, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(c.key, c.ws, c.bytes, c.type, t, c.brand, c.name, c.dur, c.w, c.h, c.folder ?? null, c.folder ? 0 : null).run();
   return { key: c.key, url: mediaUrl(env, c.key), bytes: c.bytes, content_type: c.type };
 }

@@ -39,3 +39,4 @@ export const TIKTOK_VIDEO_CAPTION = 2200;
 export const IG_REEL_MIN_MS = 3000;
 export const IG_REEL_MAX_MS = 15 * 60 * 1000;
 export const FB_VIDEO_MAX_MS = 20 * 60 * 1000;
+export const MAX_FOLDERS = 300;

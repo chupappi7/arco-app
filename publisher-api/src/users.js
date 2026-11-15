@@ -155,10 +155,12 @@ export async function sessionCaller(env, sessionId) {
 
 export async function callerFor(env, req) {
   const auth = req.headers.get('Authorization') || '';
-  if (auth.startsWith('Key ')) {
+  // "Key apk_…", or "Bearer apk_…" as MCP clients send it.
+  const key = auth.startsWith('Key ') ? auth.slice(4).trim() : auth.startsWith('Bearer apk_') ? auth.slice(7).trim() : null;
+  if (key) {
     // An API key acts as an admin of its workspace (it cannot manage people).
     const row = await env.DB.prepare('SELECT id FROM workspaces WHERE api_key_hash = ?')
-      .bind(await sha256Hex(auth.slice(4).trim())).first();
+      .bind(await sha256Hex(key)).first();
     return row ? { ws: row.id, userId: null, role: 'admin', scope: null, via: 'key' } : null;
   }
   return sessionCaller(env, cookie(req, 'tt_sid'));
@@ -214,6 +216,10 @@ export async function updateWorkspace(env, who, body) {
   }
   if (body?.slots !== undefined) {
     await env.DB.prepare('UPDATE workspaces SET slots = ? WHERE id = ?').bind(cleanSlots(body.slots), who.ws).run();
+  }
+  if (body?.ai_review !== undefined) {
+    if (typeof body.ai_review !== 'boolean') throw new HttpError(400, 'ai_review must be true or false');
+    await env.DB.prepare('UPDATE workspaces SET ai_review = ? WHERE id = ?').bind(body.ai_review ? 1 : 0, who.ws).run();
   }
   return { ok: true };
 }

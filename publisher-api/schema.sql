@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS workspaces (
   timezone TEXT,                           -- IANA zone; NULL means the viewer's own
   slots TEXT,                              -- default posting times, JSON {days, times}
   created_at INTEGER NOT NULL,
-  api_key_hash TEXT
+  api_key_hash TEXT,
+  ai_review INTEGER NOT NULL DEFAULT 1      -- 1: posts an AI agent makes wait as drafts for approval
 );
 CREATE UNIQUE INDEX IF NOT EXISTS workspaces_api_key ON workspaces(api_key_hash);
 
@@ -110,10 +111,26 @@ CREATE TABLE IF NOT EXISTS media (
   name TEXT,                               -- library only: the file name it was uploaded as
   duration_ms INTEGER,                     -- video only, as the browser read it
   width INTEGER,
-  height INTEGER
+  height INTEGER,
+  folder_id TEXT,                          -- library only: the folder (one folder = one post)
+  position INTEGER                         -- library only: order inside the folder, cover first
 );
 CREATE INDEX IF NOT EXISTS media_ws ON media(workspace_id);
 CREATE INDEX IF NOT EXISTS media_library ON media(workspace_id, in_library);
+CREATE INDEX IF NOT EXISTS media_folder ON media(folder_id);
+
+-- Library folders: one folder holds one post's photos (in order) or video,
+-- with a note for whoever writes the caption, person or AI agent.
+CREATE TABLE IF NOT EXISTS library_folders (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  brand_id TEXT,
+  name TEXT NOT NULL,
+  note TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS library_folders_ws ON library_folders(workspace_id);
 CREATE INDEX IF NOT EXISTS media_delete ON media(delete_after);
 
 CREATE TABLE IF NOT EXISTS posts (
@@ -135,6 +152,9 @@ CREATE TABLE IF NOT EXISTS posts (
   post_url TEXT,
   group_id TEXT,                           -- posts made together (one composer submit)
   created_by TEXT,                         -- user who made it (told if it fails)
+  folder_id TEXT,                          -- the library folder it was made from
+  batch_id TEXT,                           -- the AI scheduling run that made it (undone as one)
+  source TEXT,                             -- 'ai' when an agent made it through MCP
   notified INTEGER NOT NULL DEFAULT 0,     -- 1 once a failure has been emailed
   fail_reason TEXT,
   stats TEXT,                              -- JSON: likes, comments, shares, views, reach, saves
@@ -143,6 +163,8 @@ CREATE TABLE IF NOT EXISTS posts (
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS posts_due ON posts(status, next_attempt_at);
+CREATE INDEX IF NOT EXISTS posts_folder ON posts(folder_id);
+CREATE INDEX IF NOT EXISTS posts_batch ON posts(batch_id);
 CREATE INDEX IF NOT EXISTS posts_stats ON posts(status, stats_at);
 
 -- One follower count per account per UTC day, for "new followers".

@@ -62,7 +62,7 @@ export function validatePost(input, t = now(), platform = 'tiktok', { draft = fa
 const fmtLength = ms => { const s = Math.round(ms / 1000); return s < 60 ? `${s} s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} min`; };
 
 // TikTok's limit comes from the account itself (creator info), at createPost.
-function checkLength(platform, ms) {
+export function checkLength(platform, ms) {
   if (platform === 'instagram' && (ms < IG_REEL_MIN_MS || ms > IG_REEL_MAX_MS)) {
     bad(`Instagram Reels must be ${fmtLength(IG_REEL_MIN_MS)} to ${fmtLength(IG_REEL_MAX_MS)} long; this video is ${fmtLength(ms)}`);
   }
@@ -98,7 +98,7 @@ export function postJson(env, row) {
   };
 }
 
-async function loadPost(env, w, id) {
+export async function loadPost(env, w, id) {
   const sc = inScope(w, 'a.brand_id');
   const row = await env.DB.prepare(`SELECT p.*, a.username, a.platform FROM posts p LEFT JOIN accounts a ON a.id = p.account_id
       WHERE p.id = ? AND p.workspace_id = ?${sc.sql}`).bind(id, wsOf(w), ...sc.binds).first();

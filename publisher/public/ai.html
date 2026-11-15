@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>AI scheduling · ARCO Publisher</title>
+<meta name="description" content="Connect Claude or another AI assistant to ARCO Publisher and let it schedule your posts from your library.">
+<style>
+:root{
+  --bg:#F4F4F5; --surface:#FFFFFF; --well:#FAFAFA; --line:#E4E4E7; --line-2:#D4D4D8;
+  --text:#18181B; --muted:#52525B; --dim:#71717A; --accent:#0369A1; --code:#F4F4F5; --ok:#15803D; --warn:#B45309;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#111215; --surface:#1A1B1F; --well:#202126; --line:#2A2B31; --line-2:#3A3B42;
+  --text:#ECECEE; --muted:#B4B4BB; --dim:#8B8B94; --accent:#7CC4F4; --code:#24252B; --ok:#4ADE80; --warn:#FBBF24;
+}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px 80px}
+header{display:flex;align-items:center;gap:12px;padding:22px 0;border-bottom:1px solid var(--line);margin-bottom:28px}
+header img{width:30px;height:30px;border-radius:8px}
+header b{font-size:16px}
+header a.back{margin-left:auto;font-size:14px;text-decoration:none}
+h1{font-size:clamp(28px,4vw,38px);line-height:1.15;letter-spacing:-.02em;margin:0 0 10px}
+.lead{font-size:17px;color:var(--muted);margin:0 0 26px;max-width:640px}
+h2{font-size:21px;letter-spacing:-.01em;margin:44px 0 12px;scroll-margin-top:16px}
+h3{font-size:16px;margin:24px 0 8px}
+p,li{color:var(--text)}
+.muted{color:var(--muted)}
+nav.toc{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 20px;margin-bottom:8px}
+nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:28px}
+nav.toc li{break-inside:avoid;margin:2px 0}
+@media (max-width:620px){nav.toc ol{columns:1}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0}
+.steps{counter-reset:s;list-style:none;padding:0;margin:14px 0}
+.steps>li{counter-increment:s;position:relative;padding:0 0 16px 44px}
+.steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--text);color:var(--bg);font-weight:700;font-size:13px;display:grid;place-items:center}
+code{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code);border-radius:5px;padding:1px 5px;overflow-wrap:anywhere}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;margin:10px 0}
+pre code{background:none;padding:0;font-size:12.5px;overflow-wrap:normal}
+.prompts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:12px 0}
+.prompt{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:12px 14px;font-size:14.5px}
+.prompt small{display:block;color:var(--dim);font-size:12px;margin-top:6px}
+.tree{font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;white-space:pre}
+.tw{overflow-x:auto;margin:12px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);font-weight:600}
+tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 0}
+.tabs button{font:inherit;font-size:14px;border:1px solid var(--line-2);background:var(--surface);color:var(--text);border-radius:999px;padding:6px 14px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tab{display:none}.tab.on{display:block}
+.callout{border-radius:10px;padding:12px 14px;margin:14px 0;background:var(--well);border:1px solid var(--line)}
+.callout b{display:block;margin-bottom:2px}
+.callout.warn{border-color:color-mix(in srgb,var(--warn) 45%,var(--line))}
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.flow div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px}
+.flow b{display:block;font-size:13px;color:var(--dim);font-weight:600;margin-bottom:2px}
+footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:var(--dim);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><img src="/apple-touch-icon.png" alt=""><b>ARCO Publisher</b><a class="back" href="/app.html">Open Publisher →</a></header>
+
+<h1>Schedule with AI</h1>
+<p class="lead">Connect Claude, or any assistant that speaks MCP, to Publisher. Fill your library ahead of time. Then just say what you want, like "plan Bakery's week", and it writes the captions, picks the times and schedules the posts. You check the plan first, and nothing goes out until you say so.</p>
+
+<nav class="toc" aria-label="On this page"><ol>
+  <li><a href="#how">How it works</a></li>
+  <li><a href="#setup">Set up Publisher</a></li>
+  <li><a href="#library">Organise the library</a></li>
+  <li><a href="#connect">Connect your AI</a></li>
+  <li><a href="#ask">What to ask</a></li>
+  <li><a href="#approval">Approval and undo</a></li>
+  <li><a href="#tools">What the AI can do</a></li>
+  <li><a href="#api">For developers: the API</a></li>
+  <li><a href="#limits">Limits and safety</a></li>
+  <li><a href="#help">Troubleshooting</a></li>
+</ol></nav>
+
+<h2 id="how">How it works</h2>
+<p>Publisher is organised the way you already think about it. A <b>brand</b> owns its TikTok, Instagram and Facebook accounts, its posting times and its voice. Its <b>library folders</b> hold posts that are ready to go: a folder is one post. The AI works in those terms, so you never have to mention account IDs or file names.</p>
+<div class="flow">
+  <div><b>1 · You</b>Drop content into library folders, with a note if it needs one.</div>
+  <div><b>2 · You ask</b>"Schedule Bakery's new posts for next week."</div>
+  <div><b>3 · AI plans</b>Writes captions in the brand's voice, picks free slots and checks every platform rule.</div>
+  <div><b>4 · You check</b>It shows you the plan. Change anything, or say "go".</div>
+  <div><b>5 · Scheduled</b>The posts appear in your calendar, marked as made by AI, and can be undone as one batch.</div>
+</div>
+
+<h2 id="setup">Set up Publisher</h2>
+<ol class="steps">
+  <li><b>Group accounts into brands.</b> Go to <b>Accounts</b>, make a brand (for example "Bakery") and add its TikTok, Instagram and Facebook accounts. If you only have one brand, the AI simply uses all your accounts.</li>
+  <li><b>Set posting times.</b> On each brand, set the days and times you like to post, such as Mon to Fri at 12:30 and 18:00. When you don't name a time, the AI fills these slots. Also check the workspace <b>time zone</b> in <b>Settings → Workspace</b>.</li>
+  <li><b>Write a brand voice</b> (optional, but it pays off). A few lines on how the brand sounds, plus two or three example captions. The AI reads it before writing anything.</li>
+  <li><b>Create an API key.</b> In <b>Settings → Developer</b>, the workspace owner presses <b>Create API key</b>. Copy it somewhere safe: it is shown only once, and it starts with <code>apk_</code>.</li>
+</ol>
+
+<h2 id="library">Organise the library</h2>
+<p><b>One folder is one post.</b> Each folder holds a post's photos in order (the first one is the cover), or one video. It belongs to a brand and can carry a note.</p>
+<div class="tree">Bakery
+ ├─ Black Friday promo            6 photos · note: "20% off, code BF20, not before Friday"   ● unused
+ ├─ Croissant behind the scenes   8 photos                                                  ● unused
+ └─ Halloween cookies             5 photos                                                  ✓ posted Oct 30
+ARCO
+ └─ Focus mode explained          1 video  · note: "link in bio"                            ◷ scheduled Nov 18</div>
+<ul>
+  <li><b>The note</b> is your brief: the offer, a discount code, what to stress, what to avoid, "not before Friday". The AI writes the caption from the photos, the note and the brand's voice.</li>
+  <li><b>The status</b> keeps itself up to date: <i>unused</i>, <i>awaiting approval</i>, <i>scheduled</i> or <i>posted</i>. That's how "schedule the new ones" works, and why nothing gets posted twice by accident.</li>
+  <li><b>Filling folders:</b> upload in Publisher's Library, or ask the AI to do it. "Make a Bakery folder called Black Friday from these photos" works with files the assistant can reach, or with image links.</li>
+  <li><b>Photos</b> are JPG or PNG up to 5 MB. Instagram only takes JPG and at most 10 photos. <b>Videos</b> are MP4 or MOV up to 100 MB, one per folder.</li>
+</ul>
+
+<h2 id="connect">Connect your AI</h2>
+<p>Publisher's MCP server address:</p>
+<pre><code>https://arco-publisher.vercel.app/mcp</code></pre>
+<p>It signs in with your API key, sent as <code>Authorization: Bearer apk_…</code>. Choose your app:</p>
+<div class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-tab="t-code">Claude Code</button>
+  <button role="tab" aria-selected="false" data-tab="t-desktop">Claude Desktop</button>
+  <button role="tab" aria-selected="false" data-tab="t-other">Cursor and others</button>
+  <button role="tab" aria-selected="false" data-tab="t-web">claude.ai</button>
+</div>
+<div class="tab on" id="t-code" role="tabpanel">
+  <p>Run this once in a terminal, with your key in place of <code>apk_…</code>:</p>
+  <pre><code>claude mcp add --transport http arco-publisher https://arco-publisher.vercel.app/mcp \
+  --header "Authorization: Bearer apk_…"</code></pre>
+  <p class="muted">Then start <code>claude</code> and ask away. Type <code>/mcp</code> to check it shows as connected. Claude Code can also read photos from a folder on your computer and upload them for you.</p>
+</div>
+<div class="tab" id="t-desktop" role="tabpanel">
+  <p>Open <b>Settings → Developer → Edit Config</b> and add this to <code>claude_desktop_config.json</code> (you need Node.js installed):</p>
+  <pre><code>{
+  "mcpServers": {
+    "arco-publisher": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://arco-publisher.vercel.app/mcp",
+               "--header", "Authorization:${ARCO_AUTH}"],
+      "env": { "ARCO_AUTH": "Bearer apk_…" }
+    }
+  }
+}</code></pre>
+  <p class="muted">Restart Claude Desktop. ARCO Publisher then shows up in the tools menu of a new chat.</p>
+</div>
+<div class="tab" id="t-other" role="tabpanel">
+  <p>Any app that supports remote MCP servers over HTTP with headers, such as Cursor, Windsurf or VS Code, takes roughly this:</p>
+  <pre><code>{
+  "mcpServers": {
+    "arco-publisher": {
+      "url": "https://arco-publisher.vercel.app/mcp",
+      "headers": { "Authorization": "Bearer apk_…" }
+    }
+  }
+}</code></pre>
+</div>
+<div class="tab" id="t-web" role="tabpanel">
+  <p>Custom connectors on claude.ai sign in with OAuth, which Publisher doesn't offer yet. For now, use Claude Desktop or Claude Code. They use the same account and the same chats work.</p>
+</div>
+
+<div class="callout warn"><b>Treat the key like a password.</b>It can do anything a workspace admin can: schedule, cancel and read stats for every brand. Don't paste it into shared documents or chats. If it leaks, create a new one in Settings → Developer, which switches the old one off immediately.</div>
+
+<h2 id="ask">What to ask</h2>
+<p>Talk about brands, folders, days and tone, the same way you'd brief a colleague.</p>
+<h3>Planning</h3>
+<div class="prompts">
+  <div class="prompt">Schedule everything new in Bakery for next week, one post a day at the usual times.</div>
+  <div class="prompt">Fill ARCO's empty slots for the next two weeks from the library. Mix the topics so two similar posts never go out back to back.</div>
+  <div class="prompt">Plan next week for every brand and show me the whole plan before you schedule anything.</div>
+</div>
+<h3>One post</h3>
+<div class="prompts">
+  <div class="prompt">Post the Black Friday folder on Friday at 9:00 to all of Bakery's accounts. Mention code BF20 and keep it short.</div>
+  <div class="prompt">Put the gym carousel on TikTok and Instagram tomorrow at 18:00 with a funny caption. Only me on TikTok for now.<small>"Only me" sets TikTok's privacy for that post.</small></div>
+</div>
+<h3>Library</h3>
+<div class="prompts">
+  <div class="prompt">Make a Bakery folder called "Croissants" from the photos in ~/Desktop/croissants, in name order.<small>Claude Code, which can read your files.</small></div>
+  <div class="prompt">What's unused in the library, per brand?</div>
+</div>
+<h3>Afterwards</h3>
+<div class="prompts">
+  <div class="prompt">How did Bakery do in the last 30 days? What do the best posts have in common? Plan next week using that.</div>
+  <div class="prompt">Something failed yesterday. Find out why and retry it.</div>
+  <div class="prompt">Move everything on Friday to Saturday, same times.</div>
+  <div class="prompt">Undo what you just scheduled.</div>
+</div>
+
+<h2 id="approval">Approval and undo</h2>
+<p><b>Approval is on by default.</b> Posts the AI schedules wait in <b>Drafts</b>, marked as AI posts, at their planned time. They go out only after someone approves them in Publisher. For TikTok, you also choose who can see the post when you approve it. Once you trust the results, the workspace owner can switch approval off. The AI then schedules directly, but it still has to choose TikTok's privacy for each post.</p>
+<p>Whichever mode you use:</p>
+<ul>
+  <li><b>Preview first.</b> The AI checks the whole plan and shows it to you before anything is saved: each post's time, accounts and caption, plus any problems such as an Instagram post with too many photos.</li>
+  <li><b>One batch per run.</b> Everything made in one go gets a batch number, and "undo that" cancels whatever from it hasn't been published yet.</li>
+  <li><b>It's all visible.</b> AI posts appear in the calendar like any other post, and you can edit or cancel them there.</li>
+</ul>
+
+<h2 id="tools">What the AI can do</h2>
+<div class="tw"><table>
+  <tr><th>Tool</th><th>What it's for</th></tr>
+  <tr><td><code>get_overview</code></td><td>Brands, their accounts, posting times, voice, library counts, free slots, time zone and approval mode. The AI starts here.</td></tr>
+  <tr><td><code>list_folders</code></td><td>Library folders with photos, notes and status, optionally narrowed to one brand or status.</td></tr>
+  <tr><td><code>create_folder</code>, <code>update_folder</code>, <code>delete_folder</code></td><td>Make, rename, re-note, move or reorder folders.</td></tr>
+  <tr><td><code>upload_to_folder</code></td><td>Add photos (as a link or the file itself) or a video (as a link) to a folder.</td></tr>
+  <tr><td><code>find_slots</code></td><td>A brand's next free posting times.</td></tr>
+  <tr><td><code>schedule_posts</code></td><td>Plan up to 30 posts and check them; then, once you agree, schedule them.</td></tr>
+  <tr><td><code>list_posts</code></td><td>What's scheduled, waiting for approval, published or failed, in any time window.</td></tr>
+  <tr><td><code>update_post</code>, <code>cancel_post</code>, <code>retry_post</code></td><td>Change a post's caption or time, cancel it, or retry a failed one.</td></tr>
+  <tr><td><code>undo_batch</code></td><td>Cancel everything from one scheduling run that hasn't been published yet.</td></tr>
+  <tr><td><code>get_stats</code></td><td>Views, likes, comments, shares and followers against the previous period, plus the top posts.</td></tr>
+</table></div>
+<p class="muted">What it can't do: connect or disconnect accounts, invite or remove people, change the API key, or delete brands. Those stay in Publisher.</p>
+
+<h2 id="api">For developers: the API</h2>
+<p>The same features are plain HTTPS under <code>https://arco-publisher.vercel.app/api/v1</code>, with the header <code>Authorization: Key apk_…</code>. Times are epoch seconds, or <code>2026-11-20T18:00</code> in the workspace's time zone.</p>
+<div class="tw"><table>
+  <tr><th>Call</th><th>Does</th></tr>
+  <tr><td><code>GET /folders?brand=&amp;status=</code></td><td>List folders. <code>status</code>: unused, awaiting_approval, scheduled, posted.</td></tr>
+  <tr><td><code>POST /folders</code></td><td><code>{name, brand_id, note}</code></td></tr>
+  <tr><td><code>PATCH /folders/:id</code></td><td><code>{name, note, brand_id, order: [keys]}</code></td></tr>
+  <tr><td><code>DELETE /folders/:id?remove_items=1</code></td><td>Delete the folder. Its items stay in the library unless <code>remove_items</code> is set.</td></tr>
+  <tr><td><code>POST /media</code> then <code>POST /library</code></td><td>Upload a photo (raw body, <code>Content-Type: image/jpeg</code>), then file it with <code>{keys, folder_id}</code>.</td></tr>
+  <tr><td><code>GET /slots?brand=&amp;count=&amp;from=</code></td><td>Free posting slots.</td></tr>
+  <tr><td><code>POST /plans</code></td><td><code>{posts: [...], confirm}</code>. Same input as the <code>schedule_posts</code> tool. Without <code>confirm: true</code> it only previews.</td></tr>
+  <tr><td><code>POST /batches/:id/undo</code></td><td>Cancel a run's unpublished posts.</td></tr>
+  <tr><td><code>POST /posts/:id/approve</code></td><td>Approve a draft: <code>{privacy_level, at}</code>, both optional.</td></tr>
+  <tr><td><code>GET /agenda?from=&amp;to=&amp;brand=&amp;status=</code></td><td>Posts in a window, drafts included.</td></tr>
+  <tr><td><code>GET /stats?days=&amp;platform=&amp;brand=</code></td><td>Results.</td></tr>
+  <tr><td><code>PATCH /workspace</code></td><td><code>{ai_review: true|false}</code> switches approval for AI posts on or off.</td></tr>
+</table></div>
+<p>A post in a plan looks like this:</p>
+<pre><code>{
+  "folder_id": "fld_…",               // or "library_keys": ["…", "…"]
+  "brand": "Bakery",                  // default: the folder's brand
+  "platforms": ["tiktok", "instagram"],  // optional
+  "at": "2026-11-20T18:00",           // leave out for the next free slot
+  "caption": "Fresh at 4am 🥐",
+  "captions": { "instagram": "Fresh at 4am 🥐 #bakery #croissant" },
+  "tiktok": { "privacy_level": "PUBLIC_TO_EVERYONE" }
+}</code></pre>
+
+<h2 id="limits">Limits and safety</h2>
+<ul>
+  <li><b>Timing:</b> posts must be at least 5 minutes ahead. A workspace can have up to 200 posts waiting and 200 drafts.</li>
+  <li><b>Plans:</b> up to 30 posts each, and up to 10 files per upload call.</li>
+  <li><b>Library:</b> up to 300 folders and 500 items, and 1 GB of storage per workspace.</li>
+  <li><b>Platform rules</b> are checked on every post, exactly as in the app: Instagram's 10 photos, JPG only, 2,200 characters and 30 hashtags; TikTok's privacy options for each account; Reels length; and so on.</li>
+  <li><b>Scope:</b> the AI only sees and touches the workspace its key belongs to.</li>
+</ul>
+
+<h2 id="help">Troubleshooting</h2>
+<div class="tw"><table>
+  <tr><th>You see</th><th>Do this</th></tr>
+  <tr><td>"Sign in first" / 401</td><td>The key is missing, mistyped or replaced. Make sure the header reads <code>Bearer apk_…</code>, with no extra spaces or quotes.</td></tr>
+  <tr><td>"No free posting slot"</td><td>The brand has no posting times, or they're all taken for 4 weeks. Set times on the brand, or give the post a time.</td></tr>
+  <tr><td>"Instagram only accepts JPG photos"</td><td>Convert the photos to JPG, or post that folder to TikTok and Facebook only.</td></tr>
+  <tr><td>"Choose who can view this post"</td><td>Approval is off, so TikTok needs a privacy choice for each post. Tell the AI, for example "public on TikTok".</td></tr>
+  <tr><td>A post failed</td><td>Ask "why did it fail?" (the reason is on the post), fix the cause, then "retry it". Accounts that need reconnecting are skipped and named in the plan.</td></tr>
+  <tr><td>Times are an hour off</td><td>Set the workspace time zone in Settings → Workspace. Without it, the AI works in UTC.</td></tr>
+</table></div>
+
+<footer>ARCO Publisher · <a href="/support.html">Support</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a></footer>
+</div>
+<script>
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === b.dataset.tab));
+}));
+</script>
+</body>
+</html>
