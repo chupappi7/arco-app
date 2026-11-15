@@ -92,6 +92,7 @@ http.createServer(async (q, r) => {
   if (/^\/api\/v1\/posts\/\w+\/approve$/.test(p)) { const x = posts.find(y => y.id === p.split('/')[4]), o = await body(q);
     if (x.platform === 'tiktok' && !o.privacy_level) return j({ error: 'Choose who can view this post' }, 400);
     Object.assign(x, { status: 'queued', settings: { ...x.settings, privacy_level: o.privacy_level } }); return j(x); }
+  if (p === '/api/v1/api-key' && q.method === 'POST') { me.api_key_set = true; return j({ api_key: 'apk_' + 'd3m0'.repeat(16) }); }
   if (p === '/api/v1/workspace' && q.method === 'PATCH') { const o = await body(q); if (o.ai_review !== undefined) me.ai_review = o.ai_review; return j({ ok: true }); }
   if (p === '/api/v1/library' && q.method === 'POST') { const o = await body(q);
     const f = folders.find(x => x.id === o.folder_id);

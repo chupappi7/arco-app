@@ -1146,3 +1146,31 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .lpsub{margin:4px 0 8px}.lpf2{padding:0 0 8px}
 #fback svg{transform:rotate(90deg)}
 .fgrid{align-items:start}
+
+/* ---------- AI assistant ---------- */
+.aigrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,340px);gap:16px;align-items:start}
+.aimain,.aiside{display:flex;flex-direction:column;gap:16px;min-width:0}
+.aimain>.panel,.aiside>.panel{margin:0}
+@media (max-width:1023px){.aigrid{grid-template-columns:minmax(0,1fr)}}
+.aibody{padding:0 18px 16px;display:grid;gap:10px;justify-items:start}
+.aibody p{margin:0}
+.aistep>header{gap:10px}
+.stepn{width:24px;height:24px;border-radius:50%;background:var(--graphite);color:var(--on-dark);font-size:12px;font-weight:800;display:grid;place-items:center;flex:none}
+.aistep.done .stepn{background:var(--success);color:#fff}
+.keybox,.kv{display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:100%}
+.kv>span{font-size:13px;color:var(--mute)}
+.kv code,.keybox code{font-size:12.5px;overflow-wrap:anywhere;background:var(--well);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
+.ctabs2{flex-wrap:wrap}
+.csetup{display:grid;gap:8px;width:100%;min-width:0}
+.cblock{position:relative;width:100%;min-width:0}
+.cblock pre{margin:0;background:var(--well);border:1px solid var(--line);border-radius:10px;padding:12px 14px;padding-right:72px;overflow-x:auto;font-size:12.5px;line-height:1.5}
+.cblock .btn{position:absolute;top:8px;right:8px}
+.aiprompts{display:grid;gap:8px;padding:0 18px 16px}
+.aiprompt{display:flex;align-items:center;gap:10px;justify-content:space-between;border:1px solid var(--line);border-left:3px solid var(--link);border-radius:10px;padding:9px 10px 9px 12px;font-size:14px}
+.aiprompt .btn{flex:none}
+.aisw{display:flex;align-items:center;gap:12px;justify-content:space-between;width:100%}
+.aisw b{display:block}.aisw .note{display:block;margin-top:2px}
+.aiflow{margin:0;padding-left:18px;display:grid;gap:6px;font-size:13.5px;color:var(--mute)}
+.aistep>header{flex-wrap:wrap;row-gap:2px}
+.aistep>header .note{flex-basis:100%;margin-left:34px}
+.aistep>header{justify-content:flex-start}.aistep>header h2{margin:0}

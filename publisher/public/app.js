@@ -127,13 +127,14 @@ async function fileNewAccounts() {
 }
 function saveTargets() { try { localStorage.setItem(SAVED, JSON.stringify(S.targets)); } catch {} }
 
-const VIEWS = ['overview', 'compose', 'library', 'calendar', 'analytics', 'drafts', 'accounts', 'settings'];
+const VIEWS = ['overview', 'compose', 'library', 'calendar', 'analytics', 'drafts', 'accounts', 'ai', 'settings'];
 function route() {
   S.view = (location.hash || '#overview').slice(1);
   if (!VIEWS.includes(S.view)) S.view = 'overview';
   const signedIn = !!S.me && !S.me.needs_email;
   if (signedIn && S.view === 'overview') loadOverview();
   if (signedIn && S.view === 'calendar') loadWeek();
+  if (signedIn && S.view === 'ai') loadAi();
   if (signedIn && S.view === 'drafts') loadDrafts();
   if (signedIn && S.view === 'analytics') loadStats();
   if (signedIn && S.view === 'library') { if (S.lastView !== 'library') S.folderOpen = null; loadLibrary(); }
@@ -147,6 +148,7 @@ function route() {
 // UI icons: one stroke weight everywhere.
 const UI = {
   play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/>',
+  spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m14 6 4 4"/>',
   cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
@@ -176,7 +178,7 @@ function wsBox() {
 
 function menu() {
   const items = [['overview', 'Overview', 'home'], ['compose', 'Schedule', 'edit'], ['library', 'Library', 'image'], ['calendar', 'Calendar', 'cal', S.counts.failed, 'bad'], ['analytics', 'Analytics', 'chart'],
-    ['drafts', 'Drafts', 'draft', S.counts.drafts], ...(can('admin') ? [['accounts', 'Accounts', 'users']] : [])];
+    ['drafts', 'Drafts', 'draft', S.counts.drafts], ...(can('admin') ? [['accounts', 'Accounts', 'users']] : []), ['ai', 'AI assistant', 'spark']];
   const email = S.me.user?.email || '';
   return `<a class="brand-row" href="#overview"><img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30"><b>ARCO Publisher</b></a>
     ${wsBox()}
@@ -205,6 +207,7 @@ const HEADS = {
   drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.', `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
   accounts: () => ['Brands & accounts', 'Each brand holds its TikTok, Instagram and Facebook accounts. Pick a brand when you schedule and its accounts come with it.'],
   settings: () => ['Settings', 'Workspace, people and your account.'],
+  ai: () => ['AI assistant', 'Let Claude, or any assistant that speaks MCP, plan and schedule posts from your library. You check the plan; nothing goes out unseen.', '<a class="btn sec" href="/ai.html" target="_blank" rel="noopener">Full guide</a>'],
 };
 // Grey shapes in the layout of what is coming, instead of the word Loading.
 const sk = (w = '100%', h = 14, cls = '') => `<span class="sk ${cls}" style="width:${w};height:${h}px"></span>`;
@@ -268,7 +271,7 @@ function render() {
   $('mtop').innerHTML = `<img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30">${wsBox()}`;
   $('tabbar').innerHTML = tabbar();
   $('tabbar').classList.toggle('flat', S.view === 'compose');
-  const views = { library: libraryView, analytics: analyticsView, overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
+  const views = { ai: aiView, library: libraryView, analytics: analyticsView, overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
   const head = S.view === 'overview' ? '' : pageHead(...HEADS[S.view]());
   const hadDetail = !!$('overlay'), opener = S.detail && !hadDetail ? document.activeElement?.closest?.('[data-open]')?.dataset.open : null;
   if (S.anim) { $('app').classList.remove('in'); void $('app').offsetWidth; $('app').classList.add('in'); S.anim = false;
@@ -322,10 +325,10 @@ function curBrand() {
   return ok ? S.brand : 'all';
 }
 const brandAccounts = (b = curBrand()) => S.me.accounts.filter(a => inBrand(a, b));
-const brandLabel = b => (b === 'all' ? 'All brands' : b === 'none' ? 'No brand' : brandName(b));
-// The choices: every brand, plus "No brand" while some account is in none.
+const brandLabel = b => (b === 'all' ? 'All brands' : b === 'none' ? 'Personal' : brandName(b));
+// The choices: every brand, plus "Personal" while some account is in none.
 const brandOpts = () => [['all', 'All brands', S.me.accounts.length], ...S.me.brands.map(x => [x.id, x.name, brandAccounts(x.id).length]),
-  ...(S.me.accounts.some(a => !brandName(a.brand_id)) ? [['none', 'No brand', brandAccounts('none').length]] : [])];
+  ...(S.me.accounts.some(a => !brandName(a.brand_id)) ? [['none', 'Personal', brandAccounts('none').length]] : [])];
 const brandDot = k => (k === 'all' ? '' : `<i style="background:${k === 'none' ? 'var(--soft)' : brandHue(k)}"></i>`);
 
 // Switching brand: the Create page picks that brand's accounts, and the
@@ -425,7 +428,7 @@ function overviewView() {
       <div class="wdl">${before.map(tile).join('')}${isT && list.length ? nowLine : ''}${after.map(tile).join('')}</div>
       <button class="wadd" data-newon="${k}" aria-label="Schedule a post on ${esc(dayLabel(d, { weekday: 'long' }))}">${ui('plus', 13)}<span>Schedule</span></button></div>`; };
   const weekEmpty = days.every(d => !onDay(d).length);
-  const legend = brands.length && b === 'all' ? `<span class="legend">${brands.map(x => `<span><i style="background:${brandHue(x.id)}"></i>${esc(x.name)}</span>`).join('')}${loose ? '<span><i style="background:var(--soft)"></i>No brand</span>' : ''}</span>` : '';
+  const legend = brands.length && b === 'all' ? `<span class="legend">${brands.map(x => `<span><i style="background:${brandHue(x.id)}"></i>${esc(x.name)}</span>`).join('')}${loose ? '<span><i style="background:var(--soft)"></i>Personal</span>' : ''}</span>` : '';
   const weekCard = `<section class="panel owk"><header><h2>This week</h2>${legend}<a href="#calendar">Open calendar</a></header>
     ${weekEmpty ? `<div class="splan"><span class="splan-ic">${ui('cal', 22)}</span><b>Nothing scheduled this week</b>
       <span>Plan a post for any day, or set posting times and let "Add to queue" fill them for you.</span>
@@ -787,6 +790,73 @@ async function loadLibrary() {
 }
 const reloadLibrary = async () => { [S.lib, S.folders] = await Promise.all([api('/library'), api('/folders').then(r => r.folders)]); };
 
+// ---- AI assistant: connect an assistant over MCP --------------------------
+async function loadAi() {
+  try { const [f, d] = await Promise.all([api('/folders'), api('/drafts')]); S.folders = f.folders; S.drafts = d.drafts; }
+  catch (e) { S.folders = S.folders || []; S.drafts = S.drafts || []; }
+  if (S.view === 'ai') render();
+}
+const mcpUrl = () => `${location.origin}/mcp`;
+const copyBtn = (text, label = 'Copy') => `<button type="button" class="btn sec sm" data-copy="${esc(text)}">${label}</button>`;
+const codeBlock = text => `<div class="cblock"><pre><code>${esc(text)}</code></pre>${copyBtn(text)}</div>`;
+const CLIENTS = [['code', 'Claude Code'], ['desktop', 'Claude Desktop'], ['other', 'Cursor and others'], ['web', 'claude.ai']];
+function clientSetup(key) {
+  const k = key || 'apk_YOUR_KEY', url = mcpUrl(), c = S.aiClient || 'code';
+  const tabs = `<div class="seg ctabs2" role="tablist">${CLIENTS.map(([id, l]) => `<button role="tab" data-aiclient="${id}" class="${c === id ? 'on' : ''}" aria-selected="${c === id}">${l}</button>`).join('')}</div>`;
+  const body = {
+    code: `<p>Run this once in a terminal. Then start <code>claude</code> and ask away; <code>/mcp</code> shows whether it is connected.</p>
+      ${codeBlock(`claude mcp add --transport http arco-publisher ${url} --header "Authorization: Bearer ${k}"`)}`,
+    desktop: `<p>In Claude Desktop open <b>Settings → Developer → Edit Config</b>, put this in <code>claude_desktop_config.json</code> and restart Claude. Needs Node.js.</p>
+      ${codeBlock(JSON.stringify({ mcpServers: { 'arco-publisher': { command: 'npx', args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${ARCO_AUTH}'], env: { ARCO_AUTH: `Bearer ${k}` } } } }, null, 2))}`,
+    other: `<p>Cursor, Windsurf, VS Code and other apps that take a remote MCP server with headers:</p>
+      ${codeBlock(JSON.stringify({ mcpServers: { 'arco-publisher': { url, headers: { Authorization: `Bearer ${k}` } } } }, null, 2))}`,
+    web: '<p>Custom connectors on claude.ai sign in with OAuth, which Publisher does not offer yet. Use Claude Desktop or Claude Code for now: same account, same chats.</p>',
+  }[c];
+  return `${tabs}<div class="csetup">${body}${key ? '' : '<p class="note">Replace <code>apk_YOUR_KEY</code> with your key. Create one in step 1 to have it filled in here.</p>'}</div>`;
+}
+
+function aiView() {
+  const owner = can('owner'), admin = can('admin'), keySet = !!S.me.api_key_set, key = S.apiKey;
+  const brand = S.me.brands[0]?.name || 'my brand', other = S.me.brands[1]?.name;
+  const unused = (S.folders || []).filter(f => f.status === 'unused' && f.items.length).length;
+  const waiting = (S.drafts || []).filter(d => d.source === 'ai').length;
+  const step = (n, done, title, desc, body) => `<section class="panel aistep ${done ? 'done' : ''}"><header><span class="stepn">${done ? ui('check', 14) : n}</span><h2>${title}</h2>${desc ? `<span class="note">${desc}</span>` : ''}</header><div class="aibody">${body}</div></section>`;
+  const prompts = [
+    `Schedule everything new in ${brand} for next week, one post a day at the usual times. Show me the plan first.`,
+    `What's unused in the library, per brand?`,
+    `Post the newest ${brand} folder tomorrow at 18:00 on TikTok and Instagram. Keep the caption short and funny.`,
+    `How did ${other || brand} do in the last 30 days? What do the best posts have in common? Plan next week using that.`,
+    'Something failed yesterday. Find out why and retry it.',
+    'Undo what you just scheduled.',
+  ];
+  return `<div class="aigrid"><div class="aimain">
+    ${step(1, keySet, 'Create an API key', 'The assistant signs in with it',
+      `${key ? `<div class="keybox"><code class="key">${esc(key)}</code>${copyBtn(key)}</div><p class="note warn">Copy it now; it will not be shown again. It is filled into step 2 until you leave this page.</p>` : ''}
+       <p>${keySet ? 'This workspace has a key. Making a new one switches the old one off at once, so any assistant using it needs the new key.' : 'One key per workspace. It can do what an admin can: schedule, cancel and read stats for every brand. Treat it like a password.'}</p>
+       ${owner ? `<button class="btn ${keySet ? 'sec' : ''}" id="apikey">${keySet ? 'Create a new key' : 'Create API key'}</button>` : '<p class="note">Only the workspace owner can create the key. Ask them for it.</p>'}`)}
+    ${step(2, false, 'Connect your assistant', 'Pick the app you use',
+      `<div class="kv"><span>Server address</span><code>${esc(mcpUrl())}</code>${copyBtn(mcpUrl())}</div>${clientSetup(key)}`)}
+    ${step(3, unused > 0, 'Fill the library', unused ? `${unused} post${unused === 1 ? '' : 's'} ready` : 'Nothing ready yet',
+      `<p><b>One folder is one post:</b> its photos in order, or one video, filed under a brand. Add a note with what the caption should say: the offer, a code, "not before Friday". The assistant writes the caption from the photos, the note and the brand voice.</p>
+       <a class="btn sec" href="#library">Open the library</a>`)}
+    <section class="panel"><header><h2>Try asking</h2><span class="note">Talk in brands, folders, days and tone</span></header>
+      <div class="aiprompts">${prompts.map(p => `<div class="aiprompt"><span>${esc(p)}</span>${copyBtn(p)}</div>`).join('')}</div></section>
+  </div>
+  <aside class="aiside">
+    <section class="panel"><header><h2>Approval</h2></header><div class="aibody">
+      <div class="aisw"><div><b>AI posts need approval</b><span class="note">${S.me.ai_review !== false ? 'Posts the assistant schedules wait in Drafts until someone approves them.' : 'Posts the assistant schedules go straight onto the calendar.'}</span></div>
+        ${admin ? `<label class="sw"><input type="checkbox" id="aireview" ${S.me.ai_review !== false ? 'checked' : ''} aria-label="AI posts need approval"><span></span></label>` : ''}</div>
+      ${waiting ? `<a class="btn" href="#drafts">Review ${waiting} AI post${waiting === 1 ? '' : 's'}</a>` : '<p class="note">No AI posts waiting.</p>'}</div></section>
+    <section class="panel"><header><h2>How a request runs</h2></header><div class="aibody"><ol class="aiflow">
+      <li>It reads your brands, accounts, posting times, voice and library.</li>
+      <li>It plans: captions, times (your free posting slots unless you name one), and checks every platform rule.</li>
+      <li>It shows you the plan. Change anything, or say "go".</li>
+      <li>It schedules them as one batch. "Undo that" cancels the batch.</li></ol></div></section>
+    <section class="panel"><header><h2>It can't</h2></header><div class="aibody"><p class="note">Connect or disconnect accounts, invite or remove people, change the API key or delete brands. Those stay here.</p>
+      <a href="/ai.html#help" target="_blank" rel="noopener">Troubleshooting</a></div></section>
+  </aside></div>`;
+}
+
 // ---- library folders: one folder = one post, ready to schedule -------------
 const FSTATUS = { unused: 'Not used yet', awaiting_approval: 'Waiting for approval', scheduled: 'Scheduled', posted: 'Posted' };
 const folderStatus = f => (f.status === 'scheduled' && f.next_at ? `Scheduled ${fmt(f.next_at, { weekday: 'short', day: 'numeric', month: 'short' })}`
@@ -1056,7 +1126,7 @@ const brandName = id => S.me.brands.find(b => b.id === id)?.name;
 function brandGroups(list = S.me.accounts) {
   const groups = S.me.brands.map(b => ({ id: b.id, name: b.name, accounts: list.filter(a => a.brand_id === b.id) }));
   const loose = list.filter(a => !a.brand_id || !brandName(a.brand_id));
-  if (loose.length) groups.push({ id: 'none', name: S.me.brands.length ? 'Not in a brand' : 'All accounts', accounts: loose });
+  if (loose.length) groups.push({ id: 'none', name: S.me.brands.length ? 'Personal' : 'All accounts', accounts: loose });
   const byPlatform = (a, b) => ORDER.indexOf(platformOf(a)) - ORDER.indexOf(platformOf(b));
   return groups.map(g => ({ ...g, accounts: g.accounts.sort(byPlatform) }));
 }
@@ -1938,7 +2008,7 @@ function accountCard(x) {
     ${x.needs_reconnect ? '<p class="awarn">Access expired or was removed. Reconnect to keep posting.</p>' : ''}
     <div class="aact">
       <select data-move="${x.id}" aria-label="Brand for ${esc(x.username)}">
-        <option value="">No brand</option>
+        <option value="">Personal</option>
         ${S.me.brands.map(b => `<option value="${b.id}" ${x.brand_id === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
       </select>
       ${x.needs_reconnect && connectHref(pl) ? `<a class="btn" href="${connectHref(pl)}">Reconnect</a>` : ''}
@@ -1992,7 +2062,7 @@ function accountsView() {
       <button class="btn">Create brand</button></form>
     ${!S.me.brands.length && a.length ? `<div class="bhint">${ui('users', 16)}<span>Make a brand for each business you post for, then add its TikTok, Instagram and Facebook to it. Scheduling for a brand then picks all of them at once.</span></div>` : ''}
     ${brands.map(card).join('')}
-    ${loose.length ? `<section class="panel brand"><header><h2>${S.me.brands.length ? 'Not in a brand' : 'Your accounts'}</h2><span class="note">${loose.length} account${loose.length === 1 ? '' : 's'}</span></header>
+    ${loose.length ? `<section class="panel brand"><header><h2>${S.me.brands.length ? 'Personal' : 'Your accounts'}</h2><span class="note">${loose.length} account${loose.length === 1 ? '' : 's'}</span></header>
       ${platformSlots(loose, null)}</section>` : ''}
     ${!a.length ? '<section class="panel empty"><b>No accounts yet.</b>Connect TikTok, Instagram or a Facebook Page below.</section>' : ''}
     <section class="panel"><header><h2>Connect an account</h2><span class="note">${a.length} of ${S.me.limits.accounts} connected${S.me.brands.length ? ' · to connect straight into a brand, use its + Add' : ''}</span></header>
@@ -2064,8 +2134,8 @@ function settingsView() {
   if (tab === 'developer') body = `<section class="panel">
     ${srow('API key', 'For AI assistants and your own tools. It can do everything an admin can. A new key disables the old one.',
       `${S.apiKey ? `<code class="key">${esc(S.apiKey)}</code><span class="note warn">Copy it now. It won't be shown again.</span>` : ''}<button class="btn sec" id="apikey">${S.me.api_key_set ? 'Create a new key' : 'Create key'}</button>`)}
-    ${srow('Schedule with AI', 'Connect Claude or another assistant over MCP, with the API key. It plans posts from your library folders.',
-      `<code class="key">${esc(location.origin)}/mcp</code><a class="btn sec" href="/ai.html" target="_blank" rel="noopener">How to connect</a>`)}
+    ${srow('Schedule with AI', 'Connect Claude or another assistant over MCP. It plans posts from your library folders.',
+      '<a class="btn sec" href="#ai">Set up the AI assistant</a>')}
     ${srow('AI posts need approval', S.me.ai_review !== false ? 'On: posts an AI schedules wait in Drafts until someone approves them.' : 'Off: posts an AI schedules go straight onto the calendar.',
       `<label class="sw"><input type="checkbox" id="aireview" ${S.me.ai_review !== false ? 'checked' : ''} aria-label="AI posts need approval"><span></span></label>`)}
   </section>`;
@@ -2395,7 +2465,15 @@ function bind() {
     S.targets = S.targets.filter(x => x !== id); saveTargets(); render();
   });
   on('[data-settab]', 'click', e => { S.setTab = e.currentTarget.dataset.settab; render(); });
-  on('#apikey', 'click', async () => { S.apiKey = (await api('/api-key', { method: 'POST' })).api_key; S.me.api_key_set = true; render(); });
+  on('[data-copy]', 'click', async e => { const b = e.currentTarget;
+    try { await navigator.clipboard.writeText(b.dataset.copy); const t = b.textContent; b.textContent = 'Copied'; setTimeout(() => { b.textContent = t; }, 1400); }
+    catch { toast('Copy did not work here. Select the text and copy it.', 'err'); } });
+  on('[data-aiclient]', 'click', e => { S.aiClient = e.currentTarget.dataset.aiclient; render(); });
+  on('#apikey', 'click', async () => {
+    if (S.me.api_key_set && !await ask({ title: 'Make a new API key?', ok: 'Make a new key', danger: true, icon: ui('spark', 22),
+      list: [[false, 'The current key stops working at once'], [false, 'Any assistant or tool using it needs the new key']] })) return;
+    try { S.apiKey = (await api('/api-key', { method: 'POST' })).api_key; S.me.api_key_set = true; } catch (e) { S.flash = { kind: 'err', text: e.message }; }
+    render(); });
   on('#delws', 'click', async () => {
     if (!await ask({ title: `Delete ${esc(S.me.workspace.name)}?`, ok: 'Delete workspace', danger: true, icon: ui('x', 22), type: S.me.workspace.name,
       list: [[false, 'All its accounts, brands, posts, photos and members are removed now'], [false, 'Scheduled posts never go out'], [false, 'This cannot be undone']] })) return;
