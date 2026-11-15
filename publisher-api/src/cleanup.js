@@ -32,7 +32,7 @@ export async function runCleanup(env, t = now()) {
 export async function deleteWorkspace(env, ws) {
   const { results } = await env.DB.prepare('SELECT key FROM media WHERE workspace_id = ?').bind(ws).all();
   await env.DB.batch([env.DB.prepare(`DELETE FROM follower_history WHERE account_id IN
-      (SELECT id FROM accounts WHERE workspace_id = ?)`).bind(ws)].concat(['media', 'posts', 'accounts', 'sessions', 'brands', 'memberships', 'invites', 'ai_usage'].map(t =>
+      (SELECT id FROM accounts WHERE workspace_id = ?)`).bind(ws)].concat(['media', 'posts', 'accounts', 'sessions', 'brands', 'memberships', 'invites', 'ai_usage', 'library_folders'].map(t =>
     env.DB.prepare(`DELETE FROM ${t} WHERE workspace_id = ?`).bind(ws)))
     .concat(env.DB.prepare('DELETE FROM workspaces WHERE id = ?').bind(ws)));
   await deleteObjects(env, results.map(r => r.key));
