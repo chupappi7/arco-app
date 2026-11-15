@@ -31,7 +31,7 @@ function fakeMeta(over = {}) {
     igAccountStats: async () => { calls.push(['igacc']); return { followers_count: 1500 }; },
     fbPostStats: async (tok, id) => { calls.push(['fb', id]);
       return { reactions: { summary: { total_count: 7 } }, comments: { summary: { total_count: 2 } }, shares: { count: 1 } }; },
-    fbPageStats: async (tok, id) => { calls.push(['fbpage', id]); return { followers_count: 300 }; },
+    fbPageStats: async (tok, id) => { calls.push(['fbpage', id]); return { followers_count: 300, picture: { data: { url: 'https://cdn/new.jpg' } } }; },
     ...over,
   };
 }
@@ -50,8 +50,9 @@ describe('refreshStats', () => {
     const p2 = await env.DB.prepare('SELECT stats FROM posts WHERE id = ?').bind('p2').first();
     expect(JSON.parse(p2.stats)).toEqual({ likes: 7, comments: 2, shares: 1 });
     expect(mt.calls.some(c => c[1] === 'm-p3')).toBe(false);
-    const fb = await env.DB.prepare('SELECT followers FROM accounts WHERE id = ?').bind('fb1').first();
+    const fb = await env.DB.prepare('SELECT followers, avatar_url FROM accounts WHERE id = ?').bind('fb1').first();
     expect(fb.followers).toBe(300);
+    expect(fb.avatar_url).toBe('https://cdn/new.jpg');
     expect(mt.calls).toContainEqual(['fbpage', 'fb1-remote']);
   });
 

@@ -4,7 +4,7 @@ const CONTENT_INIT_URL = 'https://open.tiktokapis.com/v2/post/publish/content/in
 const VIDEO_INIT_URL = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
 const STATUS_URL = 'https://open.tiktokapis.com/v2/post/publish/status/fetch/';
 // Numbers: user.info.stats for the account, video.list for its posts.
-const USER_STATS_URL = 'https://open.tiktokapis.com/v2/user/info/?fields=follower_count,likes_count,video_count';
+const USER_STATS_URL = 'https://open.tiktokapis.com/v2/user/info/?fields=follower_count,likes_count,video_count,avatar_url';
 const VIDEO_QUERY_URL = 'https://open.tiktokapis.com/v2/video/query/?fields=id,view_count,like_count,comment_count,share_count';
 
 const TRANSIENT_CODES = new Set(['internal_error', 'rate_limit_exceeded']);

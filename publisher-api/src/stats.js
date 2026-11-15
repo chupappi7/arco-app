@@ -113,7 +113,9 @@ export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TI
       } else r = a.platform === 'instagram' ? await mt.igAccountStats(token) : await mt.fbPageStats(token, a.open_id.slice(3));
       const followers = count(r.follower_count ?? r.followers_count ?? r.fan_count);
       await env.DB.batch([
-        env.DB.prepare('UPDATE accounts SET followers = ?, stats_at = ? WHERE id = ?').bind(followers, t, a.id),
+        // Platform photo links expire within weeks, so take a fresh one each read.
+        env.DB.prepare('UPDATE accounts SET followers = ?, stats_at = ?, avatar_url = COALESCE(?, avatar_url) WHERE id = ?')
+          .bind(followers, t, r.avatar_url || r.profile_picture_url || r.picture?.data?.url || null, a.id),
         env.DB.prepare(`INSERT INTO follower_history (account_id, day, followers) VALUES (?, ?, ?)
             ON CONFLICT (account_id, day) DO UPDATE SET followers = excluded.followers`).bind(a.id, utcDay(t), followers),
       ]);
