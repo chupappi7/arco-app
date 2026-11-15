@@ -65,6 +65,8 @@ export async function serveMedia(env, key, method = 'GET', req = null) {
       'Accept-Ranges': 'bytes',
       ...(part ? { 'Content-Range': `bytes ${offset}-${offset + length - 1}/${obj.size}` } : {}),
       'Cache-Control': 'public, max-age=3600',
+      // Vercel's proxy cache keys on the URL alone and replays one range to every request.
+      'Vercel-CDN-Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
       // Public only because TikTok and Meta fetch posts by URL; keys are 128
       // random bits, and nothing should index them.
