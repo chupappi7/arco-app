@@ -75,6 +75,12 @@ export async function copyMedia(env, w, keys) {
     const { n: attached } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM media WHERE workspace_id = ? AND key IN (${marks})
         AND post_id IS NOT NULL`).bind(ws, ...keys).first();
     if (n !== attached) throw new HttpError(404, 'One or more images are missing. Upload them again.');
+    const lsc = inScope(w, 'brand_id');
+    const { n: lib } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM media WHERE workspace_id = ? AND key IN (${marks}) AND in_library = 1`)
+      .bind(ws, ...keys).first();
+    const { n: libOk } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM media WHERE workspace_id = ? AND key IN (${marks}) AND in_library = 1${lsc.sql}`)
+      .bind(ws, ...keys, ...lsc.binds).first();
+    if (lib !== libOk) throw new HttpError(404, 'One or more images are missing. Upload them again.');
   }
   const total = keys.reduce((n, k) => n + rows.get(k).bytes, 0);
   if ((await workspaceBytes(env, ws)) + total > MAX_WORKSPACE_BYTES) {

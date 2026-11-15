@@ -7,6 +7,7 @@ import { metaFor, MetaError } from './meta.js';
 import { listAccounts, creatorInfoFor, disconnect, refreshInstagramTokens } from './accounts.js';
 import * as L from './limits.js';
 import { uploadMedia, serveMedia, copyMedia } from './media.js';
+import { listLibrary, addToLibrary, moveInLibrary, removeFromLibrary } from './library.js';
 import { createPost, listPosts, cancelPost, retryPost, listDrafts, updatePost } from './posts.js';
 import { tick, publishNow } from './publisher.js';
 import { notifyFailures } from './notify.js';
@@ -81,6 +82,10 @@ export const ROUTES = [
     json(await assign(env, who.ws, (await body(req)).account_ids, params.id)), 'admin'],
 
   ['POST', '/v1/media', async (req, env, { who }) => json(await uploadMedia(env, who.ws, req)), 'member'],
+  ['GET', '/v1/library', async (req, env, { who, url }) => json(await listLibrary(env, who, url.searchParams.get('brand') || 'all')), 'member'],
+  ['POST', '/v1/library', async (req, env, { who }) => json(await addToLibrary(env, who, await body(req))), 'member'],
+  ['PATCH', '/v1/library', async (req, env, { who }) => json(await moveInLibrary(env, who, await body(req))), 'member'],
+  ['POST', '/v1/library/remove', async (req, env, { who }) => json(await removeFromLibrary(env, who, await body(req))), 'member'],
   ['POST', '/v1/media/copy', async (req, env, { who }) => json(await copyMedia(env, who, (await body(req)).keys)), 'member'],
   ['GET', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`), 'public'],
   // TikTok's fetcher, or a CDN in front of it, may check an image with HEAD first.

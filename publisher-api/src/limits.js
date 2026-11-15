@@ -28,3 +28,4 @@ export const MAX_BRANDS = 25;
 export const FB_MAX_CAPTION = 63206;
 export const MAX_DRAFTS = 200;
 export const AI_DAILY_LIMIT = 50;
+export const MAX_LIBRARY = 500;

@@ -116,7 +116,7 @@ export async function createPost(env, tk, w, input) {
   const marks = p.image_keys.map(() => '?').join(',');
   // Images may come fresh from upload, or from a cancelled/failed post being
   // edited into a new one. Images of a queued or published post are taken.
-  const { results } = await env.DB.prepare(`SELECT key, content_type FROM media WHERE workspace_id = ? AND key IN (${marks})
+  const { results } = await env.DB.prepare(`SELECT key, content_type FROM media WHERE workspace_id = ? AND key IN (${marks}) AND in_library = 0
       AND (post_id IS NULL OR post_id = ? OR post_id IN (SELECT id FROM posts WHERE status IN ('cancelled', 'failed')))`)
     .bind(ws, ...p.image_keys, replaces).all();
   if (results.length !== new Set(p.image_keys).size || results.length !== p.image_keys.length) {

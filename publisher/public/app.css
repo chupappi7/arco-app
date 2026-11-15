@@ -1010,3 +1010,51 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
   .bnav button{width:44px;height:40px;padding:0;justify-content:center}
   .bnav .bsq{width:28px;height:28px;font-size:12px}
 }
+
+/* ---------- library, brand picker, brand manager ---------- */
+.bnav .bnew{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:var(--r-ctl);color:var(--mute);font-size:13.5px;text-decoration:none}
+.bnav .bnew:hover{background:var(--canvas);color:var(--graphite)}
+.bnav .bnew .bsq{background:none;border:1px dashed var(--line);color:var(--mute)}
+@media (min-width:640px) and (max-width:1023px){.bnav .bnew{width:44px;height:40px;padding:0;justify-content:center}}
+.bhint{display:flex;gap:10px;align-items:flex-start;border:1px dashed var(--line);border-radius:var(--r-panel);padding:12px 14px;margin-bottom:16px;color:var(--mute);font-size:13.5px;line-height:1.5}
+.bhint svg{flex:none;margin-top:2px}.bhint a{color:var(--graphite)}
+.bpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;align-items:center}
+.bpick button[role=radio]{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-ctl);padding:9px 10px;text-align:left;color:var(--graphite);min-width:0}
+.bpick button[role=radio]:hover{border-color:var(--soft)}
+.bpick button.on{border-color:var(--graphite);box-shadow:inset 0 0 0 1px var(--graphite)}
+.bpick .bsq,.bsq.big{width:30px;height:30px;border-radius:8px;color:#fff;font-weight:700;font-size:13px;display:grid;place-items:center;flex:none}
+.bpick .nm{min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.bpick .nm b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bpick .nm span{font-size:12px;color:var(--mute);display:flex;align-items:center;gap:3px}
+.bpick .link{justify-self:start}
+.mgrid.two{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.addtile.lib{cursor:pointer;font:inherit;background:none;color:var(--mute)}
+.mgrid.two .addtile.big{grid-column:auto}
+.panel.brand>header{gap:10px}
+.panel.brand>header h2{margin-right:4px}
+.badd{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 18px 14px}
+.badd select{width:auto;max-width:280px}
+.btn.sm{padding:5px 10px;font-size:12.5px;gap:6px}
+.libup{padding:14px}
+.libup.over{outline:2px dashed var(--graphite);outline-offset:-6px}
+.libdz{display:flex;flex-direction:column;align-items:center;gap:4px;border:1px dashed var(--line);border-radius:var(--r-ctl);padding:22px;cursor:pointer;color:var(--mute);text-align:center}
+.libdz b{color:var(--graphite)}.libdz span{font-size:13px}
+.libdz input{position:absolute;width:1px;height:1px;opacity:0}
+.libdz:hover{border-color:var(--soft)}
+.libto{display:flex;align-items:center;gap:10px;margin-top:12px}.libto select{width:auto}
+.libup .mgrid{margin-top:12px}
+.mgrid.lib{padding:0 18px 18px;grid-template-columns:repeat(auto-fill,minmax(clamp(110px,10vw,160px),1fr))}
+.libpick .mgrid.lib{padding:0}
+.mt.lt{cursor:pointer;display:block}
+.mt.lt input{position:absolute;top:7px;left:7px;width:18px;height:18px;margin:0;accent-color:var(--graphite)}
+.mt.lt.sel{outline:2px solid var(--graphite);outline-offset:2px}
+.mt.lt .ltb{position:absolute;right:7px;top:7px;width:10px;height:10px;border-radius:50%;box-shadow:0 0 0 2px rgba(0,0,0,.35)}
+.mt.up{opacity:.5}
+.hdot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px;vertical-align:1px}
+.libbar{position:sticky;bottom:16px;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-panel);padding:10px 14px;box-shadow:0 8px 24px rgba(0,0,0,.25);margin-top:12px}
+.libbar b{margin-right:auto}.libbar select{width:auto}
+@media (max-width:639px){.libbar{bottom:84px}}
+.libpick{display:flex;flex-direction:column;gap:12px}
+.lph{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.lpf{display:flex;justify-content:flex-end;gap:8px}
+.bdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px;flex:none}

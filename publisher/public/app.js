@@ -125,7 +125,7 @@ async function fileNewAccounts() {
 }
 function saveTargets() { try { localStorage.setItem(SAVED, JSON.stringify(S.targets)); } catch {} }
 
-const VIEWS = ['overview', 'compose', 'calendar', 'analytics', 'drafts', 'accounts', 'settings'];
+const VIEWS = ['overview', 'compose', 'library', 'calendar', 'analytics', 'drafts', 'accounts', 'settings'];
 function route() {
   S.view = (location.hash || '#overview').slice(1);
   if (!VIEWS.includes(S.view)) S.view = 'overview';
@@ -134,6 +134,7 @@ function route() {
   if (signedIn && S.view === 'calendar') loadWeek();
   if (signedIn && S.view === 'drafts') loadDrafts();
   if (signedIn && S.view === 'analytics') loadStats();
+  if (signedIn && S.view === 'library') loadLibrary();
   S.anim = S.lastView !== S.view; S.lastView = S.view;
   render();
   window.scrollTo(0, 0);
@@ -147,6 +148,7 @@ const UI = {
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m14 6 4 4"/>',
   cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   draft: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -170,13 +172,13 @@ function wsBox() {
 }
 
 function menu() {
-  const items = [['overview', 'Overview', 'home'], ['compose', 'Create', 'edit'], ['calendar', 'Calendar', 'cal', S.counts.failed, 'bad'], ['analytics', 'Analytics', 'chart'],
+  const items = [['overview', 'Overview', 'home'], ['compose', 'Schedule', 'edit'], ['library', 'Library', 'image'], ['calendar', 'Calendar', 'cal', S.counts.failed, 'bad'], ['analytics', 'Analytics', 'chart'],
     ['drafts', 'Drafts', 'draft', S.counts.drafts], ...(can('admin') ? [['accounts', 'Accounts', 'users']] : [])];
   const email = S.me.user?.email || '';
   return `<a class="brand-row" href="#overview"><img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30"><b>ARCO Publisher</b></a>
     ${wsBox()}
     ${brandNav()}
-    <a class="create-side" href="#compose" title="Create post">${ui('plus', 16)}<span class="lb">Create post</span></a>
+    <a class="create-side" href="#compose" title="Schedule post">${ui('plus', 16)}<span class="lb">Schedule post</span></a>
     <nav class="nav" aria-label="Main">${items.map(([k, l, i, n, tone]) =>
       `<a href="#${k}" title="${l}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${ui(i)}<span class="lb">${l}</span>${n ? `<span class="n ${tone || ''}" title="${tone === 'bad' ? `${n} failed in the last 7 days` : `${n} waiting`}">${n}</span>` : ''}</a>`).join('')}</nav>
     <div class="grow"></div>
@@ -188,16 +190,17 @@ function menu() {
 function tabbar() {
   const t = (k, l, i) => `<a href="#${k}" class="${S.view === k ? 'on' : ''}">${ui(i, 20)}${l}</a>`;
   return t('overview', 'Overview', 'home') + t('calendar', 'Calendar', 'cal') +
-    `<a href="#compose" aria-label="Create post"><span class="plus">${ui('plus', 22)}</span></a>` +
+    `<a href="#compose" aria-label="Schedule post"><span class="plus">${ui('plus', 22)}</span></a>` +
     t('drafts', 'Drafts', 'draft') + (can('admin') ? t('accounts', 'Accounts', 'users') : t('settings', 'Settings', 'gear'));
 }
 
 const HEADS = {
-  compose: () => ['Create post', S.targets.length ? `Goes to ${S.targets.length} account${S.targets.length === 1 ? '' : 's'}.` : 'Choose accounts, add photos, write the caption.'],
+  compose: () => ['Schedule post', S.targets.length ? `Goes to ${S.targets.length} account${S.targets.length === 1 ? '' : 's'}.` : 'Pick a brand, add photos, write the caption.'],
+  library: () => ['Library', 'Upload photos ahead of time, filed by brand. Pick from them when you schedule.'],
   calendar: () => ['Calendar', `Everything scheduled and published, in ${tz().replace(/_/g, ' ')} time.`, `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
   analytics: () => ['Analytics', 'How your posts do, from the numbers each platform shares.'],
   drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.', `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
-  accounts: () => ['Accounts', 'Connect accounts and group them into brands.'],
+  accounts: () => ['Brands & accounts', 'Each brand holds its accounts, posting times and voice. Pick a brand when you schedule and its accounts come with it.'],
   settings: () => ['Settings', 'Workspace, people and your account.'],
 };
 // Grey shapes in the layout of what is coming, instead of the word Loading.
@@ -262,12 +265,12 @@ function render() {
   $('mtop').innerHTML = `<img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30">${wsBox()}`;
   $('tabbar').innerHTML = tabbar();
   $('tabbar').classList.toggle('flat', S.view === 'compose');
-  const views = { analytics: analyticsView, overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
+  const views = { library: libraryView, analytics: analyticsView, overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
   const head = S.view === 'overview' ? '' : pageHead(...HEADS[S.view]());
   const hadDetail = !!$('overlay'), opener = S.detail && !hadDetail ? document.activeElement?.closest?.('[data-open]')?.dataset.open : null;
   if (S.anim) { $('app').classList.remove('in'); void $('app').offsetWidth; $('app').classList.add('in'); S.anim = false;
     clearTimeout(S.animT); S.animT = setTimeout(() => $('app').classList.remove('in'), 400); }
-  $('app').innerHTML = head + (['calendar', 'analytics', 'drafts', 'compose'].includes(S.view) ? brandChips('phone') : '') + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '') + resultView();
+  $('app').innerHTML = head + (['calendar', 'analytics', 'drafts', 'library'].includes(S.view) ? brandChips('phone') : '') + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '') + resultView();
   bind();
   if (S.detail && !hadDetail) { S.opener = opener; $('closedetail')?.focus(); }
   if (!S.detail && hadDetail && S.opener) { document.querySelector(`[data-open="${S.opener}"]`)?.focus(); S.opener = null; }
@@ -323,8 +326,10 @@ function setBrand(k) {
   S.brand = k; try { localStorage.setItem(BRAND_KEY, k); } catch {}
   S.fAcct = 'all'; S.pq = '';
   if (k !== 'all') {
-    for (const id of [...S.targets]) if (!inBrand(acct(id), k)) toggleTarget(id, false, false);
-    if (!S.targets.length && !S.replaces && !S.fromDraft) for (const a of brandAccounts(k)) if (!a.needs_reconnect) toggleTarget(a.id, true, false);
+    if (!S.replaces && !S.fromDraft) {
+      for (const id of [...S.targets]) toggleTarget(id, false, false);
+      for (const a of brandAccounts(k)) if (!a.needs_reconnect) toggleTarget(a.id, true, false);
+    } else for (const id of [...S.targets]) if (!inBrand(acct(id), k)) toggleTarget(id, false, false);
   }
   if (S.view === 'analytics') { S.stats = null; loadStats(); }
   render();
@@ -332,7 +337,8 @@ function setBrand(k) {
 
 // The switch: a list in the menu, chips on a phone (where there is no menu).
 function brandNav() {
-  if (!S.me.brands.length) return '';
+  if (!S.me.brands.length) return can('admin') && S.me.accounts.length ? `<div class="bnav"><span class="bnh">Brands</span>
+    <a class="bnew" href="#accounts" title="New brand"><span class="bsq">${ui('plus', 14)}</span><span class="lb">New brand</span></a></div>` : '';
   const b = curBrand();
   return `<div class="bnav" role="group" aria-label="Brand"><span class="bnh">Brands</span>${brandOpts().map(([k, l, n]) =>
     `<button class="${b === k ? 'on' : ''}" data-brand="${k}" aria-pressed="${b === k}" title="${esc(l)}">
@@ -648,6 +654,7 @@ function composeView() {
   return `${banner ? `<div class="cbanner">${banner[0]}<button class="btn sec" id="stopedit">${banner[1]}</button></div>` : ''}
   <div class="composer ${S.busy ? 'busy' : ''}" ${S.busy ? 'aria-busy="true"' : ''}>
     <div class="cmain">
+      ${brandPickSection()}
       <section class="panel"><header><h2>Post to</h2>${S.targets.length ? `<span class="note">${S.targets.length} selected</span>` : ''}</header>
         <div class="csec">${accountPicker()}</div></section>
 
@@ -710,6 +717,18 @@ function composeView() {
   </div>`;
 }
 
+// The brand comes first: picking one picks all of its accounts.
+function brandPickSection() {
+  if (!S.me.brands.length) return can('admin') ? `<div class="bhint">${ui('users', 16)}<span>Group accounts into brands on the <a href="#accounts">Brands &amp; accounts</a> page, then pick a brand here to post to all of its accounts at once.</span></div>` : '';
+  const b = curBrand();
+  return `<section class="panel"><header><h2>Brand</h2><span class="note">${b === 'all' ? 'Pick one to choose its accounts' : `${brandAccounts(b).length} account${brandAccounts(b).length === 1 ? '' : 's'}`}</span></header>
+    <div class="csec"><div class="bpick" role="radiogroup" aria-label="Brand">${brandOpts().filter(([k]) => k !== 'all').map(([k, l, n]) =>
+      `<button type="button" role="radio" aria-checked="${b === k}" class="${b === k ? 'on' : ''}" data-brand="${k}">
+        <span class="bsq" style="background:${k === 'none' ? 'var(--soft)' : brandHue(k)}">${esc((l[0] || '?').toUpperCase())}</span>
+        <span class="nm"><b>${esc(l)}</b><span>${marks(brandAccounts(k))} ${n} account${n === 1 ? '' : 's'}</span></span></button>`).join('')}
+      ${b !== 'all' ? '<button type="button" class="link" data-brand="all">Pick accounts from any brand</button>' : ''}</div></div></section>`;
+}
+
 // "Post to" is a dropdown: the closed button shows who is chosen; the list
 // opens grouped by brand with a search box, like Business Suite's switcher.
 function accountPicker() {
@@ -749,18 +768,92 @@ function pickList() {
     <div class="ddfoot">${can('admin') ? '<a href="#accounts">Manage accounts</a>' : '<span></span>'}<button type="button" class="btn" id="closepick">Done</button></div></div>`;
 }
 
+// ---- library: photos uploaded ahead of time, filed by brand ---------------
+
+async function loadLibrary() {
+  try { S.lib = await api('/library'); } catch (e) { S.lib = { items: [], err: e.message }; }
+  render();
+}
+// A brand's own photos plus the shared ones (in no brand).
+const libShown = (b = curBrand()) => (S.lib?.items || []).filter(i => b === 'all' || (b === 'none' ? !i.brand_id : i.brand_id === b || !i.brand_id));
+const libTile = (i, sel, attr) => `<label class="mt lt ${sel ? 'sel' : ''}"><img src="${esc(i.url)}" alt="${esc(i.name || '')}" loading="lazy">
+  <input type="checkbox" ${attr}="${esc(i.key)}" ${sel ? 'checked' : ''} aria-label="Select ${esc(i.name || 'photo')}">
+  ${i.brand_id && brandName(i.brand_id) ? `<span class="ltb" style="background:${brandHue(i.brand_id)}" title="${esc(brandName(i.brand_id))}"></span>` : ''}</label>`;
+
+function libraryView() {
+  const b = curBrand(), items = libShown(b), sel = (S.libSel || []).filter(k => items.some(i => i.key === k));
+  const target = b === 'all' || b === 'none' ? (S.libBrand ?? '') : b;
+  const up = (S.libUp || []).map(u => `<div class="mt up"><img src="${esc(u.url)}" alt=""></div>`).join('');
+  const brandSel = (id, val, first) => `<select id="${id}" aria-label="Brand">${first}${S.me.brands.map(x => `<option value="${x.id}" ${val === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`;
+  const groups = b === 'all' ? [...S.me.brands.map(x => [x.id, x.name]), ['', 'Shared']] : [[b === 'none' ? '' : b, brandLabel(b)], ...(b === 'none' ? [] : [['', 'Shared']])];
+  const body = !S.lib ? `<div class="mgrid">${[...Array(8)].map(() => `<div class="mt">${sk('100%', 140)}</div>`).join('')}</div>`
+    : groups.map(([id, name]) => {
+        const list = items.filter(i => (i.brand_id || '') === id || (!id && i.brand_id && !brandName(i.brand_id)));
+        if (!list.length) return '';
+        return `<section class="panel"><header><h2>${id ? `<i class="hdot" style="background:${brandHue(id)}"></i>` : ''}${esc(name)}</h2><span class="note">${list.length} photo${list.length === 1 ? '' : 's'}${id ? '' : ' · every brand can use these'}</span></header>
+          <div class="mgrid lib">${list.map(i => libTile(i, sel.includes(i.key), 'data-lsel')).join('')}</div></section>`;
+      }).join('') || (up ? '' : `<section class="panel empty"><b>Nothing here yet.</b>Upload the photos you plan to post. When you schedule, pick them with "From library".</section>`);
+  return `<form class="panel libup" id="libdrop" onsubmit="return false">
+      <label class="libdz"><input type="file" id="libfiles" accept="image/jpeg,image/png" multiple>${ui('plus', 22)}<b>Upload photos</b><span>Drop JPG or PNG files here, or click to choose. Up to 5 MB each.</span></label>
+      ${S.me.brands.length ? `<div class="libto"><span class="note">File under</span>${brandSel('libbrand', target, '<option value="">Shared, every brand</option>')}</div>` : ''}
+      ${up ? `<div class="mgrid">${up}</div>` : ''}</form>
+    ${body}
+    ${sel.length ? `<div class="libbar"><b>${sel.length} selected</b>
+      <button class="btn" id="libsched">${ui('plus', 15)}Schedule</button>
+      ${S.me.brands.length ? `${brandSel('libmove', '', '<option value="" disabled selected>Move to…</option><option value="-">Shared</option>')}` : ''}
+      <button class="btn ghost danger" id="librm">Remove</button><button class="btn ghost" id="libclear">Clear</button></div>` : ''}`;
+}
+
+async function uploadToLibrary(files) {
+  const brand = $('libbrand')?.value || null;
+  S.libBrand = brand || '';
+  S.libUp = S.libUp || [];
+  for (const file of [...files].slice(0, 100)) {
+    const u = { url: URL.createObjectURL(file) };
+    S.libUp.push(u); render();
+    try {
+      const { blob, type } = await shrink(file);
+      const m = await api('/media', { method: 'POST', headers: { 'Content-Type': type }, body: blob });
+      S.lib = await send('/library', 'POST', { keys: [m.key], brand_id: brand, names: { [m.key]: file.name } });
+    } catch (e) { S.flash = { kind: 'err', text: `${file.name}: ${e.message}` }; }
+    S.libUp.splice(S.libUp.indexOf(u), 1); render();
+  }
+}
+
+// Scheduling uses copies: the library keeps the original.
+async function useFromLibrary(keys) {
+  keys = keys.slice(0, 35 - S.images.length);
+  if (!keys.length) return;
+  try {
+    const { media } = await send('/media/copy', 'POST', { keys });
+    for (const m of media) S.images.push({ key: m.key, url: m.url });
+  } catch (e) { S.status = { kind: 'err', text: e.message }; }
+}
+
+function libPicker() {
+  const items = libShown(), sel = S.libPickSel || [];
+  return `<div class="libpick"><div class="lph"><b>From library${curBrand() !== 'all' ? ` · ${esc(brandLabel(curBrand()))}` : ''}</b><span class="note">${sel.length ? `${sel.length} selected` : 'Click photos to choose them, in order'}</span></div>
+    ${!S.lib ? `<div class="mgrid">${[...Array(6)].map(() => `<div class="mt">${sk('100%', 120)}</div>`).join('')}</div>`
+      : items.length ? `<div class="mgrid lib">${items.map(i => libTile(i, sel.includes(i.key), 'data-lpick')).join('')}</div>`
+      : `<p class="note">The library is empty${curBrand() !== 'all' ? ' for this brand' : ''}. <a href="#library">Upload photos to it</a>.</p>`}
+    <div class="lpf"><button type="button" class="btn sec" id="libcancel">Cancel</button>
+      <button type="button" class="btn" id="libadd" ${sel.length ? '' : 'disabled'}>Add ${sel.length || ''} photo${sel.length === 1 ? '' : 's'}</button></div></div>`;
+}
+
 function mediaView() {
   const max = S.images.length >= 35;
   const add = `<label class="addtile ${S.images.length ? '' : 'big'}" id="drop">
       <input type="file" id="files" accept="image/jpeg,image/png" multiple ${max ? 'disabled' : ''}>
       ${ui('plus', S.images.length ? 20 : 24)}<b>${S.images.length ? 'Add' : 'Add photos'}</b>
       ${S.images.length ? '' : '<span>Drop JPG or PNG files here, or click to choose. Up to 5 MB each.</span>'}</label>`;
-  return `<div class="mgrid">${S.images.map((m, n) => `<div class="mt ${n === S.cover ? 'cover' : ''} ${m.uploading ? 'up' : ''}">
+  if (S.libPick) return libPicker();
+  const fromLib = `<button type="button" class="addtile lib ${S.images.length ? '' : 'big'}" id="fromlib" ${max ? 'disabled' : ''}>${ui('image', S.images.length ? 20 : 24)}<b>${S.images.length ? 'Library' : 'From library'}</b>${S.images.length ? '' : '<span>Photos you uploaded ahead of time.</span>'}</button>`;
+  return `<div class="mgrid ${S.images.length ? '' : 'two'}">${S.images.map((m, n) => `<div class="mt ${n === S.cover ? 'cover' : ''} ${m.uploading ? 'up' : ''}">
       <img src="${esc(m.url)}" alt="Photo ${n + 1}" data-cover="${n}" title="Make this the cover">
       <span class="mn">${n + 1}</span>${n === S.cover ? '<span class="badge">Cover</span>' : ''}
       <div class="ctl"><button data-mv="${n}:-1" aria-label="Move left">‹</button>
         <button data-rm="${n}" aria-label="Remove">×</button>
-        <button data-mv="${n}:1" aria-label="Move right">›</button></div></div>`).join('')}${add}</div>
+        <button data-mv="${n}:1" aria-label="Move right">›</button></div></div>`).join('')}${add}${fromLib}</div>
     ${S.images.length ? `<p class="note">Click a photo to make it the cover.${toInstagram() ? ' Tall photos are padded to 4:5 for Instagram, never cropped.' : ''}</p>` : ''}`;
 }
 
@@ -1471,6 +1564,8 @@ async function loadWeek() {
   render();
 }
 
+// Which brand a post is for, as a coloured dot, so brands stay apart on the calendar.
+const bdot = p => { const id = acct(p.account_id)?.brand_id; return id && brandName(id) ? `<i class="bdot" style="background:${brandHue(id)}" title="${esc(brandName(id))}"></i>` : ''; };
 function postCard(p, compact) {
   const time = fmt(p.scheduled_at, { hour: '2-digit', minute: '2-digit' });
   const drag = p.status === 'queued' ? `draggable="true" data-drag="${p.id}"` : '';
@@ -1478,7 +1573,7 @@ function postCard(p, compact) {
     const img = p.images[p.cover_index] || p.images[0];
     return `<div class="mp ${p.status}" ${drag} data-open="${p.id}" role="button" tabindex="0"
         title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.status}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
-      ${img ? `<img src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}<div><b>${icon(p.platform || 'tiktok', 11)}${at(p.scheduled_at)}</b><span>${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</span></div></div>`;
+      ${img ? `<img src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}<div><b>${icon(p.platform || 'tiktok', 11)}${at(p.scheduled_at)}</b><span>${bdot(p)}${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</span></div></div>`;
   }
   // Week view: a small row per post. Everything you can do with it is one
   // click away in the drawer.
@@ -1488,7 +1583,7 @@ function postCard(p, compact) {
       title="${esc(`${label}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
     ${img ? `<img src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}
     <div class="pt"><b>${icon(p.platform || 'tiktok', 12)}${at(p.scheduled_at)}</b>
-      <span>${who(p)}</span>
+      <span>${bdot(p)}${who(p)}</span>
       <em>${label}</em></div></div>`;
 }
 
@@ -1504,7 +1599,8 @@ function calendarView() {
   const days = [...Array(r.n)].map((_, i) => addDays(r.start, i));
   const now = dayKey(today()), offset = month ? S.month : S.week;
   const empty = !posts.length;
-  const filters = accts.length ? `<div class="chips">
+  const legend = S.me.brands.length && curBrand() === 'all' ? `<span class="legend">${S.me.brands.map(x => `<span><i style="background:${brandHue(x.id)}"></i>${esc(x.name)}</span>`).join('')}</span>` : '';
+  const filters = accts.length ? `<div class="chips">${legend}
       <button class="chip ${S.fPlat === 'all' ? 'on' : ''}" data-fp="all">All platforms</button>
       ${plats.map(pl => `<button class="chip ${S.fPlat === pl ? 'on' : ''}" data-fp="${pl}">${icon(pl, 13)}${PLATFORM[pl]}</button>`).join('')}
       ${shown.length > 1 ? `<select id="facct" style="width:auto;padding:5px 10px">
@@ -1647,27 +1743,36 @@ function accountCard(x) {
 }
 
 function accountsView() {
-  const a = S.me.accounts, cb = curBrand(), groups = brandGroups().sort((x, y) => (y.id === cb) - (x.id === cb));
+  const a = S.me.accounts, cb = curBrand(), groups = brandGroups().filter(g => g.id !== 'none' || g.accounts.length)
+    .sort((x, y) => (y.id === cb) - (x.id === cb));
+  const loose = a.filter(x => !brandName(x.brand_id));
   const hint = { tiktok: 'Photo posts with TikTok\'s own privacy and disclosure settings.',
     instagram: 'Business or Creator accounts. No Facebook Page needed.', facebook: 'Every Page you manage, in one go.' };
-  return `<section class="panel"><header><h2>Connect an account</h2><span class="note">${a.length} of ${S.me.limits.accounts} connected</span></header>
+  const brandCard = g => {
+    const b = S.me.brands.find(x => x.id === g.id);
+    if (!b) return `<section class="panel brand"><header><h2>${S.me.brands.length ? 'Not in a brand' : 'All accounts'}</h2><span class="note">${g.accounts.length} account${g.accounts.length === 1 ? '' : 's'}</span></header>
+      <div class="agrid">${g.accounts.map(accountCard).join('')}</div></section>`;
+    const others = a.filter(x => x.brand_id !== b.id);
+    return `<section class="panel brand" style="--bc:${brandHue(b.id)}">
+      <header><span class="bsq big" style="background:${brandHue(b.id)}">${esc((b.name[0] || '?').toUpperCase())}</span><h2>${esc(b.name)}</h2>
+        <span class="note">${marks(g.accounts)} ${g.accounts.length} account${g.accounts.length === 1 ? '' : 's'}</span>
+        <span class="hacts"><button class="btn ghost" data-rename="${b.id}">Rename</button><button class="btn ghost danger" data-delbrand="${b.id}">Delete</button></span></header>
+      <div class="agrid">${g.accounts.map(accountCard).join('') || '<p class="note">No accounts in this brand yet. Add one below.</p>'}</div>
+      <div class="badd">${others.length ? `<select data-addto="${b.id}" aria-label="Add an account to ${esc(b.name)}"><option value="">Add an existing account…</option>
+          ${others.map(x => `<option value="${x.id}">${PLATFORM[platformOf(x)]} · ${handle(x)}${x.brand_id && brandName(x.brand_id) ? ` (in ${esc(brandName(x.brand_id))})` : ''}</option>`).join('')}</select>` : ''}
+        <span class="note">or connect a new one:</span>${ORDER.filter(connectHref).map(pl => `<a class="btn sec sm" href="${connectHref(pl)}" data-cbrand="${b.id}">${appIcon(pl, 16)}${PLATFORM[pl]}</a>`).join('')}</div>
+      <div class="bmeta">${slotsEditor(b.id, b.slots, 'Posting times', S.me.workspace.slots)}${voiceLine(b.id)}</div></section>`;
+  };
+  return `<form id="newbrand" class="panel newbrand2"><span>${ui('plus', 16)}</span>
+      <input type="text" id="brandname" maxlength="60" placeholder="New brand, e.g. ARCO or Client Bakery" aria-label="New brand name">
+      <button class="btn">Create brand</button></form>
+    ${!S.me.brands.length && a.length ? `<div class="bhint">${ui('users', 16)}<span>Make a brand for each business you post for, then add its TikTok, Instagram and Facebook to it. Scheduling for a brand then picks all of them at once, and the calendar and numbers can show one brand at a time.</span></div>` : ''}
+    ${groups.map(brandCard).join('') || '<section class="panel empty"><b>No accounts yet.</b>Connect TikTok, Instagram or a Facebook Page below.</section>'}
+    <section class="panel"><header><h2>Connect an account</h2><span class="note">${a.length} of ${S.me.limits.accounts} connected${loose.length && S.me.brands.length ? ` · new ones land in ${cb !== 'all' && cb !== 'none' ? esc(brandName(cb)) : '"Not in a brand"'}` : ''}</span></header>
       <div class="connect">${ORDER.filter(connectHref).map(pl => `<a class="ccard" href="${connectHref(pl)}">
           ${appIcon(pl, 40)}<div><b>${PLATFORM[pl]}</b><span>${hint[pl]}</span></div><span class="go">${ui('plus', 16)}</span></a>`).join('')}</div>
       <details class="hints"><summary>Adding more than one account per platform</summary>
         ${ORDER.map(pl => `<p>${appIcon(pl, 16)}<span>${PLATFORM_HINT[pl]}</span></p>`).join('')}</details></section>
-
-    ${groups.map(g => {
-      const b = S.me.brands.find(x => x.id === g.id);
-      return `<section class="panel brand">
-        <header><h2>${esc(g.name)}</h2><span class="note">${g.accounts.length} account${g.accounts.length === 1 ? '' : 's'}</span>
-          ${b ? `<span class="hacts"><button class="btn ghost" data-rename="${g.id}">Rename</button><button class="btn ghost danger" data-delbrand="${g.id}">Delete</button></span>` : ''}</header>
-        ${b ? `<div class="bmeta">${slotsEditor(g.id, b.slots, 'Posting times', S.me.workspace.slots)}${voiceLine(g.id)}</div>` : ''}
-        <div class="agrid">${g.accounts.map(accountCard).join('') || '<p class="note">No accounts in this brand yet. Pick it in any account\'s brand menu.</p>'}</div></section>`;
-    }).join('') || '<section class="panel empty"><b>No accounts yet.</b>Connect TikTok, Instagram or a Facebook Page above.</section>'}
-
-    <form id="newbrand" class="panel newbrand2"><span>${ui('plus', 16)}</span>
-      <input type="text" id="brandname" maxlength="60" placeholder="New brand, e.g. Client Bakery" aria-label="New brand name">
-      <button class="btn">Create brand</button></form>
     <p class="foot-note">Disconnecting deletes the account's token and cancels its scheduled posts. Deleting a brand only ungroups its accounts.
       You can also revoke access in TikTok, Instagram or Facebook's own settings at any time.</p>`;
 }
@@ -1861,9 +1966,29 @@ function bind() {
   on('#openpick', 'click', () => { S.pickOpen = !S.pickOpen; render(); if (S.pickOpen) $('pq')?.focus(); });
   on('#closepick', 'click', () => { S.pickOpen = false; S.pickAll = false; render(); });
   on('#pickall', 'click', () => { S.pickAll = true; render(); });
+  on('#libfiles', 'change', e => uploadToLibrary(e.target.files));
+  on('#libdrop', 'dragover', e => { e.preventDefault(); e.currentTarget.classList.add('over'); });
+  on('#libdrop', 'dragleave', e => e.currentTarget.classList.remove('over'));
+  on('#libdrop', 'drop', e => { e.preventDefault(); e.currentTarget.classList.remove('over'); uploadToLibrary(e.dataTransfer.files); });
+  on('#libbrand', 'change', e => { S.libBrand = e.target.value; });
+  on('[data-lsel]', 'change', e => { const k = e.target.dataset.lsel; S.libSel = (S.libSel || []).filter(x => x !== k).concat(e.target.checked ? [k] : []); render(); });
+  on('#libclear', 'click', () => { S.libSel = []; render(); });
+  on('#libsched', 'click', async () => { const keys = S.libSel || []; S.libSel = []; await useFromLibrary(keys); location.hash = '#compose'; });
+  on('#librm', 'click', async () => { const keys = S.libSel || [];
+    if (!await ask({ title: `Remove ${keys.length} photo${keys.length === 1 ? '' : 's'} from the library?`, body: 'Posts already scheduled with them keep their own copies.', ok: 'Remove', danger: true, icon: ui('image', 22) })) return;
+    try { await send('/library/remove', 'POST', { keys }); S.libSel = []; } catch (e) { S.flash = { kind: 'err', text: e.message }; }
+    loadLibrary(); });
+  on('#libmove', 'change', async e => { const v = e.target.value;
+    try { await send('/library', 'PATCH', { keys: S.libSel || [], brand_id: v === '-' ? null : v }); S.libSel = []; } catch (er) { S.flash = { kind: 'err', text: er.message }; }
+    loadLibrary(); });
+  on('#fromlib', 'click', () => { S.libPick = true; S.libPickSel = []; render(); if (!S.lib) loadLibrary(); });
+  on('[data-lpick]', 'change', e => { const k = e.target.dataset.lpick; S.libPickSel = (S.libPickSel || []).filter(x => x !== k).concat(e.target.checked ? [k] : []); render(); });
+  on('#libcancel', 'click', () => { S.libPick = false; render(); });
+  on('#libadd', 'click', async () => { const keys = S.libPickSel || []; S.libPick = false; S.libPickSel = []; render(); await useFromLibrary(keys); render(); });
+  on('[data-addto]', 'change', e => { const id = e.target.value; if (id) brandAction(() => send(`/accounts/${id}`, 'PATCH', { brand_id: e.target.dataset.addto })); });
   // Connecting while a brand is chosen files the new account under it.
-  on('a[href*="/api/auth/"][href*="add=1"]', 'click', () => {
-    const b = curBrand();
+  on('a[href*="/api/auth/"][href*="add=1"]', 'click', e => {
+    const b = e.currentTarget.dataset.cbrand || curBrand();
     if (b === 'all' || b === 'none' || !can('admin')) return;
     try { localStorage.setItem(PENDING_BRAND, JSON.stringify({ brand: b, known: S.me.accounts.map(a => a.id), at: Date.now() })); } catch {}
   });

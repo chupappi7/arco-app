@@ -104,9 +104,13 @@ CREATE TABLE IF NOT EXISTS media (
   content_type TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   post_id TEXT,
-  delete_after INTEGER
+  delete_after INTEGER,
+  in_library INTEGER NOT NULL DEFAULT 0,   -- 1: kept in the library until removed
+  brand_id TEXT,                           -- library only: the brand it is filed under, or NULL (shared)
+  name TEXT                                -- library only: the file name it was uploaded as
 );
 CREATE INDEX IF NOT EXISTS media_ws ON media(workspace_id);
+CREATE INDEX IF NOT EXISTS media_library ON media(workspace_id, in_library);
 CREATE INDEX IF NOT EXISTS media_delete ON media(delete_after);
 
 CREATE TABLE IF NOT EXISTS posts (

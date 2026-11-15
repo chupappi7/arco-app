@@ -24,6 +24,7 @@ const me = {
   facebook_enabled: true, instagram_enabled: true, ai_enabled: true,
 };
 const acc = id => me.accounts.find(a => a.id === id);
+let lib = [];
 const mk = (id, a, st, h, cap, extra = {}) => ({ id, account_id: a, platform: acc(a).platform, username: acc(a).username, status: st, title: '', caption: cap,
   images: [`/fake/${id}.svg`, `/fake/${id}b.svg`], image_keys: ['k' + id], cover_index: 0, settings: {}, scheduled_at: H(h),
   post_url: st === 'published' ? 'https://example.com/p' : null, fail_reason: st === 'failed' ? 'Instagram could not process the images: aspect ratio not supported' : null,
@@ -61,6 +62,12 @@ http.createServer(async (q, r) => {
     posts.push(x); return j(x); }
   if (/^\/api\/v1\/posts\/\w+\/retry$/.test(p)) { const x = posts.find(y => y.id === p.split('/')[4]);
     if (x) Object.assign(x, { status: 'queued', fail: false, created: Date.now(), fail_reason: null }); return j(x || {}); }
+  if (p === '/api/v1/library' && q.method === 'GET') return j({ items: lib });
+  if (p === '/api/v1/library' && q.method === 'POST') { const o = await body(q);
+    for (const k of o.keys) lib.unshift({ key: k, url: '/media/' + k, brand_id: o.brand_id || null, name: (o.names || {})[k] || null, bytes: 1, created_at: now() });
+    return j({ items: lib }); }
+  if (p === '/api/v1/library' && q.method === 'PATCH') { const o = await body(q); for (const i of lib) if (o.keys.includes(i.key)) i.brand_id = o.brand_id; return j({ ok: true }); }
+  if (p === '/api/v1/library/remove') { const o = await body(q); lib = lib.filter(i => !o.keys.includes(i.key)); return j({ ok: true }); }
   if (p === '/api/v1/drafts') return j({ drafts: empty ? [] : posts.filter(x => x.status === 'draft') });
   if (p === '/api/v1/ai/usage') return j({ limit: 50, remaining: 47 });
   if (p === '/api/v1/members') return j({ members: [{ user_id: 'u1', email: 'thinh@arco.app', role: 'owner', brand_ids: null }, { user_id: 'u2', email: 'freelancer@studio.co', role: 'member', brand_ids: ['b2'] }], invites: [] });
