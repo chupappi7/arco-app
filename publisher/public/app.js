@@ -798,21 +798,26 @@ async function loadAi() {
 }
 const mcpUrl = () => `${location.origin}/mcp`;
 const copyBtn = (text, label = 'Copy') => `<button type="button" class="btn sec sm" data-copy="${esc(text)}">${label}</button>`;
-const codeBlock = text => `<div class="cblock"><pre><code>${esc(text)}</code></pre>${copyBtn(text)}</div>`;
+// Shown with the key masked; Copy takes the real thing.
+const codeBlock = (text, shown = text) => `<div class="cblock"><pre><code>${esc(shown)}</code></pre>${copyBtn(text)}</div>`;
+const maskKey = k => (k ? `${k.slice(0, 8)}••••••••${k.slice(-4)}` : k);
 const CLIENTS = [['code', 'Claude Code'], ['desktop', 'Claude Desktop'], ['other', 'Cursor and others'], ['web', 'claude.ai']];
 function clientSetup(key) {
   const k = key || 'apk_YOUR_KEY', url = mcpUrl(), c = S.aiClient || 'code';
+  const both = cfg => [JSON.stringify(cfg(k), null, 2), JSON.stringify(cfg(key ? maskKey(key) : k), null, 2)];
   const tabs = `<div class="seg ctabs2" role="tablist">${CLIENTS.map(([id, l]) => `<button role="tab" data-aiclient="${id}" class="${c === id ? 'on' : ''}" aria-selected="${c === id}">${l}</button>`).join('')}</div>`;
   const body = {
-    code: `<p>Run this once in a terminal. Then start <code>claude</code> and ask away; <code>/mcp</code> shows whether it is connected.</p>
-      ${codeBlock(`claude mcp add --transport http arco-publisher ${url} --header "Authorization: Bearer ${k}"`)}`,
+    code: `<p>Run this once in a terminal. It asks for the key, so the key never shows on screen or lands in your shell history. Then start <code>claude</code> and ask away; <code>/mcp</code> shows whether it is connected.</p>
+      ${codeBlock(`printf 'Paste your Publisher API key: '; read -rs ARCO_KEY; echo; claude mcp add --scope user --transport http arco-publisher ${url} --header "Authorization: Bearer $ARCO_KEY"; unset ARCO_KEY`)}
+      ${key ? `<p class="note">Paste the key from step 1 when it asks.</p>` : ''}`,
     desktop: `<p>In Claude Desktop open <b>Settings → Developer → Edit Config</b>, put this in <code>claude_desktop_config.json</code> and restart Claude. Needs Node.js.</p>
-      ${codeBlock(JSON.stringify({ mcpServers: { 'arco-publisher': { command: 'npx', args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${ARCO_AUTH}'], env: { ARCO_AUTH: `Bearer ${k}` } } } }, null, 2))}`,
+      ${codeBlock(...both(x => ({ mcpServers: { 'arco-publisher': { command: 'npx', args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${ARCO_AUTH}'], env: { ARCO_AUTH: `Bearer ${x}` } } } })))}`,
     other: `<p>Cursor, Windsurf, VS Code and other apps that take a remote MCP server with headers:</p>
-      ${codeBlock(JSON.stringify({ mcpServers: { 'arco-publisher': { url, headers: { Authorization: `Bearer ${k}` } } } }, null, 2))}`,
+      ${codeBlock(...both(x => ({ mcpServers: { 'arco-publisher': { url, headers: { Authorization: `Bearer ${x}` } } } })))}`,
     web: '<p>Custom connectors on claude.ai sign in with OAuth, which Publisher does not offer yet. Use Claude Desktop or Claude Code for now: same account, same chats.</p>',
   }[c];
-  return `${tabs}<div class="csetup">${body}${key ? '' : '<p class="note">Replace <code>apk_YOUR_KEY</code> with your key. Create one in step 1 to have it filled in here.</p>'}</div>`;
+  return `${tabs}<div class="csetup">${body}${c === 'code' || c === 'web' ? '' : key ? '<p class="note">The key is hidden here; Copy includes it. That file then holds the key, so keep it private.</p>'
+    : '<p class="note">Replace <code>apk_YOUR_KEY</code> with your key. Create one in step 1 to have it filled in when you copy.</p>'}</div>`;
 }
 
 function aiView() {
@@ -831,7 +836,7 @@ function aiView() {
   ];
   return `<div class="aigrid"><div class="aimain">
     ${step(1, keySet, 'Create an API key', 'The assistant signs in with it',
-      `${key ? `<div class="keybox"><code class="key">${esc(key)}</code>${copyBtn(key)}</div><p class="note warn">Copy it now; it will not be shown again. It is filled into step 2 until you leave this page.</p>` : ''}
+      `${key ? `<div class="keybox"><code class="key" id="keyshow">${esc(S.keyShown ? key : maskKey(key))}</code>${copyBtn(key)}<button type="button" class="btn ghost sm" id="keytoggle">${S.keyShown ? 'Hide' : 'Show'}</button></div><p class="note warn">Copy it now; it will not be shown again. Keep it out of chats, screenshots and shared documents.</p>` : ''}
        <p>${keySet ? 'This workspace has a key. Making a new one switches the old one off at once, so any assistant using it needs the new key.' : 'One key per workspace. It can do what an admin can: schedule, cancel and read stats for every brand. Treat it like a password.'}</p>
        ${owner ? `<button class="btn ${keySet ? 'sec' : ''}" id="apikey">${keySet ? 'Create a new key' : 'Create API key'}</button>` : '<p class="note">Only the workspace owner can create the key. Ask them for it.</p>'}`)}
     ${step(2, false, 'Connect your assistant', 'Pick the app you use',
@@ -2133,7 +2138,7 @@ function settingsView() {
   </section>`;
   if (tab === 'developer') body = `<section class="panel">
     ${srow('API key', 'For AI assistants and your own tools. It can do everything an admin can. A new key disables the old one.',
-      `${S.apiKey ? `<code class="key">${esc(S.apiKey)}</code><span class="note warn">Copy it now. It won't be shown again.</span>` : ''}<button class="btn sec" id="apikey">${S.me.api_key_set ? 'Create a new key' : 'Create key'}</button>`)}
+      `${S.apiKey ? `<code class="key">${esc(maskKey(S.apiKey))}</code>${copyBtn(S.apiKey)}<span class="note warn">Copy it now. It won't be shown again.</span>` : ''}<button class="btn sec" id="apikey">${S.me.api_key_set ? 'Create a new key' : 'Create key'}</button>`)}
     ${srow('Schedule with AI', 'Connect Claude or another assistant over MCP. It plans posts from your library folders.',
       '<a class="btn sec" href="#ai">Set up the AI assistant</a>')}
     ${srow('AI posts need approval', S.me.ai_review !== false ? 'On: posts an AI schedules wait in Drafts until someone approves them.' : 'Off: posts an AI schedules go straight onto the calendar.',
@@ -2469,6 +2474,7 @@ function bind() {
     try { await navigator.clipboard.writeText(b.dataset.copy); const t = b.textContent; b.textContent = 'Copied'; setTimeout(() => { b.textContent = t; }, 1400); }
     catch { toast('Copy did not work here. Select the text and copy it.', 'err'); } });
   on('[data-aiclient]', 'click', e => { S.aiClient = e.currentTarget.dataset.aiclient; render(); });
+  on('#keytoggle', 'click', () => { S.keyShown = !S.keyShown; render(); });
   on('#apikey', 'click', async () => {
     if (S.me.api_key_set && !await ask({ title: 'Make a new API key?', ok: 'Make a new key', danger: true, icon: ui('spark', 22),
       list: [[false, 'The current key stops working at once'], [false, 'Any assistant or tool using it needs the new key']] })) return;

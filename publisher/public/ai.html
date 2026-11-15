@@ -129,9 +129,10 @@ ARCO
   <button role="tab" aria-selected="false" data-tab="t-web">claude.ai</button>
 </div>
 <div class="tab on" id="t-code" role="tabpanel">
-  <p>Run this once in a terminal, with your key in place of <code>apk_…</code>:</p>
-  <pre><code>claude mcp add --transport http arco-publisher https://arco-publisher.vercel.app/mcp \
-  --header "Authorization: Bearer apk_…"</code></pre>
+  <p>Run this once in a terminal. It asks for your key, so the key never shows on screen or lands in your shell history:</p>
+  <pre><code>printf 'Paste your Publisher API key: '; read -rs ARCO_KEY; echo
+claude mcp add --scope user --transport http arco-publisher https://arco-publisher.vercel.app/mcp \
+  --header "Authorization: Bearer $ARCO_KEY"; unset ARCO_KEY</code></pre>
   <p class="muted">Then start <code>claude</code> and ask away. Type <code>/mcp</code> to check it shows as connected. Claude Code can also read photos from a folder on your computer and upload them for you.</p>
 </div>
 <div class="tab" id="t-desktop" role="tabpanel">
@@ -163,6 +164,7 @@ ARCO
   <p>Custom connectors on claude.ai sign in with OAuth, which Publisher doesn't offer yet. For now, use Claude Desktop or Claude Code. They use the same account and the same chats work.</p>
 </div>
 
+<p class="muted">For the config files above, put the key only in the file itself, never in a command you type, so it does not end up in your shell history.</p>
 <div class="callout warn"><b>Treat the key like a password.</b>It can do anything a workspace admin can: schedule, cancel and read stats for every brand. Don't paste it into shared documents or chats. If it leaks, create a new one in Settings → Developer, which switches the old one off immediately.</div>
 
 <h2 id="ask">What to ask</h2>
