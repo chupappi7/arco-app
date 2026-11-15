@@ -33,6 +33,8 @@ const hashtags = s => (String(s).match(/#[^\s#]+/g) || []).length;
 const S = {
   me: null, view: 'overview', flash: null, counts: { drafts: 0, failed: 0 }, ov: null,
   images: [], cover: 0, title: '', caption: '',
+  // A video post instead: one library video, { key, url, name, duration_ms }.
+  video: null,
   // Every account the post goes to, any platform. TikTok accounts each carry
   // their own creator info, privacy and comment choice in S.tt.
   targets: [], tt: {},
@@ -43,7 +45,7 @@ const S = {
   slotEdit: null, queuePosts: null, detail: null,
   ai: { open: false, brief: '', tone: 'friendly', length: 'medium', emoji: true, hashtags: true, cta: '', language: '', busy: false, err: '', remaining: null },
   voiceEdit: null,
-  set: { music: false, disclose: false, brand: false, branded: false },
+  set: { music: false, duet: false, stitch: false, disclose: false, brand: false, branded: false },
   when: 'now', at: '', busy: false, status: null,
   week: 0, month: 0, calMode: 'weeks', fPlat: 'all', fAcct: 'all', posts: [], apiKey: null,
   pq: '', pickOpen: false, capTab: 'all', prevTab: null,
@@ -144,6 +146,7 @@ function route() {
 
 // UI icons: one stroke weight everywhere.
 const UI = {
+  play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/>',
   home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m14 6 4 4"/>',
   cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
@@ -196,7 +199,7 @@ function tabbar() {
 
 const HEADS = {
   compose: () => ['Schedule post', S.targets.length ? `Goes to ${S.targets.length} account${S.targets.length === 1 ? '' : 's'}.` : 'Pick a brand, add photos, write the caption.'],
-  library: () => ['Library', 'Upload photos ahead of time, filed by brand. Pick from them when you schedule.'],
+  library: () => ['Library', 'Upload photos and videos ahead of time, filed by brand. Pick from them when you schedule.'],
   calendar: () => ['Calendar', `Everything scheduled and published, in ${tz().replace(/_/g, ' ')} time.`, `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
   analytics: () => ['Analytics', 'How your posts do, from the numbers each platform shares.'],
   drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.', `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
@@ -299,7 +302,12 @@ function greeting() {
   return h < 5 ? 'Good evening' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-const thumbOf = p => p.images?.[p.cover_index] || p.images?.[0];
+const thumbOf = p => p.images?.[p.cover_index] || p.images?.[0] || p.video;
+const isVid = u => /\.(mp4|mov)(#|$)/i.test(String(u || ''));
+// An image, or for a video its first frame.
+const pic = (u, attrs = 'alt=""') => isVid(u)
+  ? `<video src="${esc(u)}#t=0.1" preload="metadata" muted playsinline ${attrs.replace(/\balt="[^"]*"/, '')}></video>` : `<img src="${esc(u)}" ${attrs}>`;
+const mmss = ms => { const t = Math.round((ms || 0) / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 const at = (sec, o = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) => fmt(sec, o);
 
 // The brand the whole app is narrowed to: 'all', a brand id, or 'none' (in no
@@ -408,7 +416,7 @@ function overviewView() {
   const onDay = d => live.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((x, y) => x.scheduled_at - y.scheduled_at);
   const tile = p => { const st = next && p.id === next.id ? 'next' : p.status, a = all.find(x => x.id === p.account_id);
     return `<button class="opt ${st}" data-open="${p.id}" style="--bc:${brandHue(a?.brand_id)}" title="${esc(p.caption || p.title || 'No caption')}">
-      <span class="oth">${thumbOf(p) ? `<img src="${esc(thumbOf(p))}" alt="">` : ''}<span class="pb">${icon(p.platform || 'tiktok', 9)}</span></span>
+      <span class="oth">${thumbOf(p) ? pic(thumbOf(p)) : ''}<span class="pb">${icon(p.platform || 'tiktok', 9)}</span></span>
       <span class="tx"><b>${at(p.scheduled_at)}${st === 'failed' ? ' · failed' : st === 'next' ? ' · next' : ''}</b><span>${who(p)}</span><span>${esc(p.caption || p.title || 'No caption')}</span></span></button>`; };
   const nowLine = `<div class="nowl"><time>${at(now)}</time><i></i></div>`;
   const col = (d, i) => { const k = dayKey(d), list = onDay(d), isT = i === 0;
@@ -442,7 +450,7 @@ function overviewView() {
   // Best of the last 7 days by views (or engagement where views are not shared), else the latest.
   const scored = cur.filter(p => p.stats).sort((x, y) => (y.stats.views || 0) - (x.stats.views || 0) || engOf(y.stats) - engOf(x.stats));
   const top = (scored.length ? scored : pub.slice().sort((x, y) => y.scheduled_at - x.scheduled_at)).slice(0, 3);
-  const ttile = p => `<button class="tp" data-open="${p.id}"><span class="im">${thumbOf(p) ? `<img src="${esc(thumbOf(p))}" alt="">` : ''}<span class="pbadge">${appIcon(p.platform || 'tiktok', 20)}</span></span>
+  const ttile = p => `<button class="tp" data-open="${p.id}"><span class="im">${thumbOf(p) ? pic(thumbOf(p)) : ''}<span class="pbadge">${appIcon(p.platform || 'tiktok', 20)}</span></span>
     <b>${p.stats?.views != null ? `${num(p.stats.views)} views` : p.stats ? `${num(engOf(p.stats))} engagements` : fmt(p.scheduled_at, { month: 'short', day: 'numeric' })}</b>
     <span>${who(p)}</span></button>`;
   const topCard = `<section class="panel otop"><header><h2>${scored.length ? 'Top posts' : 'Recently published'}</h2><span class="note">${scored.length ? 'last 7 days' : ''}</span><a href="#analytics">See all</a></header>
@@ -527,7 +535,7 @@ function analyticsView() {
       <div class="bpv"><span>Views</span><b>${x.views == null ? '–' : num(x.views)}</b></div>
       <div class="bpv"><span>Likes</span><b>${x.likes == null ? '–' : num(x.likes)}</b></div>
       <div class="bpv"><span>Followers</span><b>${x.followers == null ? '–' : num(x.followers)}</b></div></div>`;
-  const row = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumbOf(p) ? `<img class="thumb" src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
+  const row = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumbOf(p) ? pic(thumbOf(p), 'class="thumb" alt=""') : '<span class="noimg"></span>'}
       <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>${statLine(p.stats)}</div>`;
   const acc = a => `<div class="arow">${icon(a.platform, 14)}<b>${who(a)}</b>
       <span class="fv">${a.limited && a.platform === 'tiktok' ? `<a class="rc" href="/api/auth/start?add=1">Reconnect</a>` : a.followers == null ? '<em>Reading…</em>' : num(a.followers)}</span>
@@ -658,12 +666,12 @@ function composeView() {
       <section class="panel"><header><h2>Post to</h2>${S.targets.length ? `<span class="note">${S.targets.length} selected</span>` : ''}</header>
         <div class="csec">${accountPicker()}</div></section>
 
-      <section class="panel"><header><h2>Photos</h2>${S.images.length ? `<span class="note">${S.images.length} of ${toInstagram() ? IG_MAX : 35}</span>` : ''}</header>
+      <section class="panel"><header><h2>${S.video ? 'Video' : S.images.length ? 'Photos' : 'Media'}</h2>${S.images.length ? `<span class="note">${S.images.length} of ${toInstagram() ? IG_MAX : 35}</span>` : ''}</header>
         <div class="csec">${mediaView()}</div></section>
 
       <section class="panel"><header><h2>Caption</h2>${S.me.ai_enabled && !S.ai.open ? aiPanel() : ''}</header>
         <div class="csec">
-          ${tts.length ? `<label class="f" for="title">TikTok title</label>
+          ${tts.length && !S.video ? `<label class="f" for="title">TikTok title</label>
             <input type="text" id="title" maxlength="200" value="${esc(S.title)}" placeholder="A short title for the photo post">
             <div class="count ${len(S.title) > 90 ? 'bad' : ''}">${len(S.title)} / 90</div>` : ''}
           ${S.me.ai_enabled && S.ai.open ? aiPanel() : ''}
@@ -680,15 +688,17 @@ function composeView() {
               ${Object.keys(PRIVACY_LABEL).filter(o => !(o === 'SELF_ONLY' && S.set.branded)).map(o => `<option value="${o}">${PRIVACY_LABEL[o]}</option>`).join('')}
             </select><span class="note">Accounts that do not offer that option keep their own choice.</span></div>` : ''}
           ${tts.map(ttCard).join('')}
-          ${row('Duet', 'Video posts only, not available for photo posts.', '<input type="checkbox" disabled>')}
-          ${row('Stitch', 'Video posts only, not available for photo posts.', '<input type="checkbox" disabled>')}
-          ${row('Add recommended music', 'Lets TikTok pick a track for the slideshow.', `<input type="checkbox" data-k="music" ${S.set.music ? 'checked' : ''}>`)}
+          ${S.video ? row('Allow Duet', '', `<input type="checkbox" data-k="duet" ${S.set.duet ? 'checked' : ''}>`)
+            : row('Duet', 'Video posts only, not available for photo posts.', '<input type="checkbox" disabled>')}
+          ${S.video ? row('Allow Stitch', '', `<input type="checkbox" data-k="stitch" ${S.set.stitch ? 'checked' : ''}>`)
+            : row('Stitch', 'Video posts only, not available for photo posts.', '<input type="checkbox" disabled>')}
+          ${S.video ? '' : row('Add recommended music', 'Lets TikTok pick a track for the slideshow.', `<input type="checkbox" data-k="music" ${S.set.music ? 'checked' : ''}>`)}
           ${row('Disclose post content', 'Turn on if this post promotes yourself, a brand, product or service.',
             `<input type="checkbox" data-k="disclose" ${S.set.disclose ? 'checked' : ''}>`)}
           ${S.set.disclose ? `<div class="disc">
             <label><input type="checkbox" data-k="brand" ${S.set.brand ? 'checked' : ''}> Your brand</label>
             <label><input type="checkbox" data-k="branded" ${S.set.branded ? 'checked' : ''}> Branded content</label>
-            <p class="note ${label ? 'warn' : ''}">${label ? `Your photo post will be labeled "${label}".` : 'You need to indicate if your content promotes yourself, a third party, or both.'}</p>
+            <p class="note ${label ? 'warn' : ''}">${label ? `Your ${S.video ? 'video' : 'photo post'} will be labeled "${label}".` : 'You need to indicate if your content promotes yourself, a third party, or both.'}</p>
           </div>` : ''}
           <p class="consent">By posting, you agree to TikTok's
             ${S.set.branded ? '<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">Branded Content Policy</a> and ' : ''}
@@ -776,25 +786,28 @@ async function loadLibrary() {
 }
 // A brand's own photos plus the shared ones (in no brand).
 const libShown = (b = curBrand()) => (S.lib?.items || []).filter(i => b === 'all' || (b === 'none' ? !i.brand_id : i.brand_id === b || !i.brand_id));
-const libTile = (i, sel, attr) => `<label class="mt lt ${sel ? 'sel' : ''}"><img src="${esc(i.url)}" alt="${esc(i.name || '')}" loading="lazy">
+const isVideoItem = i => /^video\//.test(i?.content_type || '') || isVid(i?.key);
+const libTile = (i, sel, attr) => `<label class="mt lt ${sel ? 'sel' : ''}">${isVideoItem(i)
+    ? `${pic(i.url)}<span class="vd">${ui('play', 11)}${i.duration_ms ? mmss(i.duration_ms) : 'Video'}</span>`
+    : `<img src="${esc(i.url)}" alt="${esc(i.name || '')}" loading="lazy">`}
   <input type="checkbox" ${attr}="${esc(i.key)}" ${sel ? 'checked' : ''} aria-label="Select ${esc(i.name || 'photo')}">
   ${i.brand_id && brandName(i.brand_id) ? `<span class="ltb" style="background:${brandHue(i.brand_id)}" title="${esc(brandName(i.brand_id))}"></span>` : ''}</label>`;
 
 function libraryView() {
   const b = curBrand(), items = libShown(b), sel = (S.libSel || []).filter(k => items.some(i => i.key === k));
   const target = b === 'all' || b === 'none' ? (S.libBrand ?? '') : b;
-  const up = (S.libUp || []).map(u => `<div class="mt up"><img src="${esc(u.url)}" alt=""></div>`).join('');
+  const up = (S.libUp || []).map(u => `<div class="mt up">${u.video ? `<video src="${esc(u.url)}" muted playsinline preload="metadata"></video>` : `<img src="${esc(u.url)}" alt="">`}</div>`).join('');
   const brandSel = (id, val, first) => `<select id="${id}" aria-label="Brand">${first}${S.me.brands.map(x => `<option value="${x.id}" ${val === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`;
   const groups = b === 'all' ? [...S.me.brands.map(x => [x.id, x.name]), ['', 'Shared']] : [[b === 'none' ? '' : b, brandLabel(b)], ...(b === 'none' ? [] : [['', 'Shared']])];
   const body = !S.lib ? `<div class="mgrid">${[...Array(8)].map(() => `<div class="mt">${sk('100%', 140)}</div>`).join('')}</div>`
     : groups.map(([id, name]) => {
         const list = items.filter(i => (i.brand_id || '') === id || (!id && i.brand_id && !brandName(i.brand_id)));
         if (!list.length) return '';
-        return `<section class="panel"><header><h2>${id ? `<i class="hdot" style="background:${brandHue(id)}"></i>` : ''}${esc(name)}</h2><span class="note">${list.length} photo${list.length === 1 ? '' : 's'}${id ? '' : ' · every brand can use these'}</span></header>
+        return `<section class="panel"><header><h2>${id ? `<i class="hdot" style="background:${brandHue(id)}"></i>` : ''}${esc(name)}</h2><span class="note">${libCount(list)}${id ? '' : ' · every brand can use these'}</span></header>
           <div class="mgrid lib">${list.map(i => libTile(i, sel.includes(i.key), 'data-lsel')).join('')}</div></section>`;
-      }).join('') || (up ? '' : `<section class="panel empty"><b>Nothing here yet.</b>Upload the photos you plan to post. When you schedule, pick them with "From library".</section>`);
+      }).join('') || (up ? '' : `<section class="panel empty"><b>Nothing here yet.</b>Upload the photos and videos you plan to post. When you schedule, pick them with "From library".</section>`);
   return `<form class="panel libup" id="libdrop" onsubmit="return false">
-      <label class="libdz"><input type="file" id="libfiles" accept="image/jpeg,image/png" multiple>${ui('plus', 22)}<b>Upload photos</b><span>Drop JPG or PNG files here, or click to choose. Up to 5 MB each.</span></label>
+      <label class="libdz"><input type="file" id="libfiles" accept="${ACCEPT}" multiple>${ui('plus', 22)}<b>Upload photos and videos</b><span>Drop files here, or click to choose. JPG or PNG photos up to 5 MB, MP4 or MOV videos up to ${videoMb()} MB.</span></label>
       ${S.me.brands.length ? `<div class="libto"><span class="note">File under</span>${brandSel('libbrand', target, '<option value="">Shared, every brand</option>')}</div>` : ''}
       ${up ? `<div class="mgrid">${up}</div>` : ''}</form>
     ${body}
@@ -804,14 +817,49 @@ function libraryView() {
       <button class="btn ghost danger" id="librm">Remove</button><button class="btn ghost" id="libclear">Clear</button></div>` : ''}`;
 }
 
+const ACCEPT = 'image/jpeg,image/png,video/mp4,video/quicktime';
+const videoMb = () => Math.round((S.me?.limits?.video_bytes || 100 * 1024 * 1024) / 1024 / 1024);
+const libCount = list => { const v = list.filter(isVideoItem).length, ph = list.length - v;
+  return [ph && `${ph} photo${ph === 1 ? '' : 's'}`, v && `${v} video${v === 1 ? '' : 's'}`].filter(Boolean).join(' · '); };
+const isVideoFile = f => /^video\//.test(f.type) || /\.(mp4|mov)$/i.test(f.name);
+
+// Length and size as the browser reads them; the platforms check the rest.
+function videoMeta(file) {
+  return new Promise(res => {
+    const v = document.createElement('video'), url = URL.createObjectURL(file);
+    const done = m => { URL.revokeObjectURL(url); res(m); };
+    v.preload = 'metadata'; v.muted = true;
+    v.onloadedmetadata = () => done({ duration_ms: Number.isFinite(v.duration) ? Math.round(v.duration * 1000) : null,
+      width: v.videoWidth || null, height: v.videoHeight || null });
+    v.onerror = () => done({});
+    v.src = url;
+  });
+}
+
+// Videos skip the site's proxy: a ticket from the API, then one PUT straight
+// to the Worker, which streams it into the library.
+async function uploadVideoFile(file, brand) {
+  const type = file.type === 'video/quicktime' || /\.mov$/i.test(file.name) ? 'video/quicktime' : 'video/mp4';
+  if (file.size > videoMb() * 1024 * 1024) throw new Error(`Each video must be ${videoMb()} MB or smaller`);
+  const meta = await videoMeta(file);
+  const t = await send('/media/video', 'POST', { content_type: type, bytes: file.size, name: file.name, brand_id: brand, ...meta });
+  let r;
+  try { r = await fetch(t.upload_url, { method: 'PUT', headers: { 'Content-Type': type }, body: file }); }
+  catch { throw new Error('The upload did not go through. Check the connection and try again.'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `Upload failed (${r.status})`);
+  return { key: j.key, url: j.url, name: file.name, content_type: type, ...meta };
+}
+
 async function uploadToLibrary(files) {
   const brand = $('libbrand')?.value || null;
   S.libBrand = brand || '';
   S.libUp = S.libUp || [];
   for (const file of [...files].slice(0, 100)) {
-    const u = { url: URL.createObjectURL(file) };
+    const u = { url: URL.createObjectURL(file), video: isVideoFile(file) };
     S.libUp.push(u); render();
     try {
+      if (u.video) { await uploadVideoFile(file, brand); S.lib = await api('/library'); S.libUp.splice(S.libUp.indexOf(u), 1); render(); continue; }
       const { blob, type } = await shrink(file);
       const m = await api('/media', { method: 'POST', headers: { 'Content-Type': type }, body: blob });
       S.lib = await send('/library', 'POST', { keys: [m.key], brand_id: brand, names: { [m.key]: file.name } });
@@ -820,8 +868,19 @@ async function uploadToLibrary(files) {
   }
 }
 
-// Scheduling uses copies: the library keeps the original.
+// Photos are scheduled as copies (the library keeps the original); a video
+// is used as it is, and takes the place of any photos.
 async function useFromLibrary(keys) {
+  const items = (S.lib?.items || []).filter(i => keys.includes(i.key));
+  const vids = items.filter(isVideoItem);
+  if (vids.length) {
+    if (keys.length > 1) { S.status = S.flash = { kind: 'err', text: 'A post can have photos or one video. Pick a single video.' }; return; }
+    const v = vids[0];
+    S.images = []; S.cover = 0;
+    S.video = { key: v.key, url: v.url, name: v.name, duration_ms: v.duration_ms };
+    return;
+  }
+  S.video = null;
   keys = keys.slice(0, 35 - S.images.length);
   if (!keys.length) return;
   try {
@@ -832,22 +891,28 @@ async function useFromLibrary(keys) {
 
 function libPicker() {
   const items = libShown(), sel = S.libPickSel || [];
-  return `<div class="libpick"><div class="lph"><b>From library${curBrand() !== 'all' ? ` · ${esc(brandLabel(curBrand()))}` : ''}</b><span class="note">${sel.length ? `${sel.length} selected` : 'Click photos to choose them, in order'}</span></div>
+  return `<div class="libpick"><div class="lph"><b>From library${curBrand() !== 'all' ? ` · ${esc(brandLabel(curBrand()))}` : ''}</b><span class="note">${sel.length ? `${sel.length} selected` : 'Pick photos in order, or one video'}</span></div>
     ${!S.lib ? `<div class="mgrid">${[...Array(6)].map(() => `<div class="mt">${sk('100%', 120)}</div>`).join('')}</div>`
       : items.length ? `<div class="mgrid lib">${items.map(i => libTile(i, sel.includes(i.key), 'data-lpick')).join('')}</div>`
-      : `<p class="note">The library is empty${curBrand() !== 'all' ? ' for this brand' : ''}. <a href="#library">Upload photos to it</a>.</p>`}
+      : `<p class="note">The library is empty${curBrand() !== 'all' ? ' for this brand' : ''}. <a href="#library">Upload photos or videos to it</a>.</p>`}
     <div class="lpf"><button type="button" class="btn sec" id="libcancel">Cancel</button>
-      <button type="button" class="btn" id="libadd" ${sel.length ? '' : 'disabled'}>Add ${sel.length || ''} photo${sel.length === 1 ? '' : 's'}</button></div></div>`;
+      <button type="button" class="btn" id="libadd" ${sel.length ? '' : 'disabled'}>Add ${sel.length > 1 ? sel.length : ''} ${sel.length === 1 && isVideoItem((S.lib?.items || []).find(i => i.key === sel[0])) ? 'video' : `photo${sel.length === 1 ? '' : 's'}`}</button></div></div>`;
 }
 
 function mediaView() {
+  if (S.libPick) return libPicker();
+  const v = S.video;
+  if (v) return `<div class="vpick ${v.uploading ? 'up' : ''}"><video src="${esc(v.url)}" ${v.uploading ? 'muted' : 'controls'} preload="metadata" playsinline></video>
+      <div class="vinfo"><b>${esc(v.name || 'Video')}</b><span class="note">${v.uploading ? 'Uploading to the library…' : `${v.duration_ms ? `${mmss(v.duration_ms)} · ` : ''}from the library`}</span>
+        <div class="vact"><button type="button" class="btn sec sm" id="fromlib" ${v.uploading ? 'disabled' : ''}>Replace</button>
+        <button type="button" class="btn ghost sm" id="rmvideo" ${v.uploading ? 'disabled' : ''}>Remove</button></div></div></div>
+    <p class="note">A post holds photos or one video. ${toInstagram() ? 'It goes to Instagram as a Reel. ' : ''}</p>`;
   const max = S.images.length >= 35;
   const add = `<label class="addtile ${S.images.length ? '' : 'big'}" id="drop">
-      <input type="file" id="files" accept="image/jpeg,image/png" multiple ${max ? 'disabled' : ''}>
-      ${ui('plus', S.images.length ? 20 : 24)}<b>${S.images.length ? 'Add' : 'Add photos'}</b>
-      ${S.images.length ? '' : '<span>Drop JPG or PNG files here, or click to choose. Up to 5 MB each.</span>'}</label>`;
-  if (S.libPick) return libPicker();
-  const fromLib = `<button type="button" class="addtile lib ${S.images.length ? '' : 'big'}" id="fromlib" ${max ? 'disabled' : ''}>${ui('image', S.images.length ? 20 : 24)}<b>${S.images.length ? 'Library' : 'From library'}</b>${S.images.length ? '' : '<span>Photos you uploaded ahead of time.</span>'}</button>`;
+      <input type="file" id="files" accept="${S.images.length ? 'image/jpeg,image/png' : ACCEPT}" multiple ${max ? 'disabled' : ''}>
+      ${ui('plus', S.images.length ? 20 : 24)}<b>${S.images.length ? 'Add' : 'Add photos or a video'}</b>
+      ${S.images.length ? '' : `<span>Drop JPG or PNG photos (up to 5 MB) or one MP4 or MOV video (up to ${videoMb()} MB).</span>`}</label>`;
+  const fromLib = `<button type="button" class="addtile lib ${S.images.length ? '' : 'big'}" id="fromlib" ${max ? 'disabled' : ''}>${ui('image', S.images.length ? 20 : 24)}<b>${S.images.length ? 'Library' : 'From library'}</b>${S.images.length ? '' : '<span>Photos and videos you uploaded ahead of time.</span>'}</button>`;
   return `<div class="mgrid ${S.images.length ? '' : 'two'}">${S.images.map((m, n) => `<div class="mt ${n === S.cover ? 'cover' : ''} ${m.uploading ? 'up' : ''}">
       <img src="${esc(m.url)}" alt="Photo ${n + 1}" data-cover="${n}" title="Make this the cover">
       <span class="mn">${n + 1}</span>${n === S.cover ? '<span class="badge">Cover</span>' : ''}
@@ -877,21 +942,22 @@ function previewView() {
   if (!pl) return `<div class="pv-empty">${ui('eye', 22)}<span>Choose an account to see how the post will look.</span></div>`;
   const a = acct(S.targets.find(id => platformOf(acct(id)) === pl));
   const name = a?.username || a?.display_name || PLATFORM[pl];
-  const imgs = S.images.map(m => m.url);
+  const imgs = S.video ? [S.video.url] : S.images.map(m => m.url);
   const cap = esc(captionFor(pl) || '');
+  const shot = u => S.video ? `<video src="${esc(u)}#t=0.1" muted playsinline preload="metadata"></video>` : `<img src="${esc(u)}" alt="">`;
   const av = withBadge(avatar(a?.avatar_url, name), pl);
   const ph = '<div class="pv-ph">' + ui('plus', 20) + '</div>';
   if (pl === 'instagram') return `<div class="pv ig"><div class="pv-h">${av}<b>${esc(name)}</b></div>
-      <div class="pv-media r45">${imgs[0] ? `<img src="${esc(imgs[0])}" alt="">` : ph}${imgs.length > 1 ? `<span class="pv-count">1/${imgs.length}</span>` : ''}</div>
+      <div class="pv-media ${S.video ? 'r916' : 'r45'}">${imgs[0] ? shot(imgs[0]) : ph}${imgs.length > 1 ? `<span class="pv-count">1/${imgs.length}</span>` : ''}</div>
       ${imgs.length > 1 ? `<div class="pv-dots">${imgs.slice(0, 10).map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}
       <div class="pv-acts">${ui('heart', 20)}${ui('comment', 20)}${ui('share', 20)}</div>
       <p class="pv-cap"><b>${esc(name)}</b> ${cap || '<span class="note">Your caption appears here.</span>'}</p></div>`;
   if (pl === 'facebook') return `<div class="pv fb"><div class="pv-h">${av}<div><b>${esc(name)}</b><small>Just now</small></div></div>
       <p class="pv-cap">${cap || '<span class="note">Your caption appears here.</span>'}</p>
-      <div class="pv-grid n${Math.min(imgs.length, 4)}">${imgs.slice(0, 4).map((u, i) => `<div><img src="${esc(u)}" alt="">${i === 3 && imgs.length > 4 ? `<span>+${imgs.length - 4}</span>` : ''}</div>`).join('') || ph}</div>
+      <div class="pv-grid n${Math.min(imgs.length, 4)}">${imgs.slice(0, 4).map((u, i) => `<div>${shot(u)}${i === 3 && imgs.length > 4 ? `<span>+${imgs.length - 4}</span>` : ''}</div>`).join('') || ph}</div>
       <div class="pv-acts fb">${ui('heart', 17)}<span>Like</span>${ui('comment', 17)}<span>Comment</span>${ui('share', 17)}<span>Share</span></div></div>`;
   const cover = imgs[S.cover] || imgs[0];
-  return `<div class="pv tt"><div class="pv-media r916">${cover ? `<img src="${esc(cover)}" alt="">` : ph}
+  return `<div class="pv tt"><div class="pv-media r916">${cover ? shot(cover) : ph}
       <div class="pv-side">${ui('heart', 22)}${ui('comment', 22)}${ui('share', 22)}</div>
       <div class="pv-over"><b>@${esc(name)}</b>${S.title ? `<span class="t">${esc(S.title)}</span>` : ''}<span>${cap}</span></div>
       ${imgs.length > 1 ? `<div class="pv-dots tt">${imgs.slice(0, 12).map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}</div></div>`;
@@ -956,13 +1022,15 @@ const ttTargets = () => S.targets.filter(id => platformOf(acct(id)) === 'tiktok'
 const toInstagram = () => S.targets.some(id => acct(id)?.platform === 'instagram');
 const chosenPlatforms = () => ORDER.filter(pl => S.targets.some(id => platformOf(acct(id)) === pl));
 const captionFor = pl => (S.over[pl] ?? S.caption);
+// A TikTok video's caption is its title, which holds 2,200 characters.
+const capMax = pl => (pl === 'tiktok' && S.video ? 2200 : CAPTION_MAX[pl]);
 
 // Each platform's count against its own limit, for whichever caption it will
 // actually get. Updated as you type, without re-rendering the page.
 function limitsLine() {
   return chosenPlatforms().map(pl => {
-    const c = captionFor(pl), n = len(c), over = n > CAPTION_MAX[pl] || (pl === 'instagram' && hashtags(c) > IG_HASHTAGS);
-    return `<span class="lim ${over ? 'bad' : ''}">${icon(pl, 12)} ${n.toLocaleString()} / ${CAPTION_MAX[pl].toLocaleString()}${
+    const c = captionFor(pl), n = len(c), over = n > capMax(pl) || (pl === 'instagram' && hashtags(c) > IG_HASHTAGS);
+    return `<span class="lim ${over ? 'bad' : ''}">${icon(pl, 12)} ${n.toLocaleString()} / ${capMax(pl).toLocaleString()}${
       pl === 'instagram' ? ` · ${hashtags(c)}/${IG_HASHTAGS} #` : ''}${S.over[pl] != null ? ' · custom' : ''}</span>`;
   }).join('') || `<span class="lim">${len(S.caption)} characters</span>`;
 }
@@ -975,14 +1043,17 @@ function goLabel() {
 
 function missing() {
   if (!S.targets.length) return 'Choose where to post';
-  if (!S.images.length) return 'Add at least one photo';
-  if (S.images.some(m => m.uploading)) return 'Waiting for uploads to finish';
+  if (!S.images.length && !S.video) return 'Add photos or a video';
+  if (S.images.some(m => m.uploading) || S.video?.uploading) return 'Waiting for uploads to finish';
+  const ms = S.video?.duration_ms;
+  if (ms && toInstagram() && (ms < 3000 || ms > 15 * 60e3)) return 'Instagram Reels must be 3 seconds to 15 minutes long';
+  if (ms && chosenPlatforms().includes('facebook') && ms > 20 * 60e3) return 'Facebook Page videos can be up to 20 minutes here';
   for (const pl of chosenPlatforms()) {
     const c = captionFor(pl);
-    if (len(c) > CAPTION_MAX[pl]) return `The ${PLATFORM[pl]} caption is too long (${len(c).toLocaleString()} / ${CAPTION_MAX[pl].toLocaleString()})`;
+    if (len(c) > capMax(pl)) return `The ${PLATFORM[pl]} caption is too long (${len(c).toLocaleString()} / ${capMax(pl).toLocaleString()})`;
     if (pl === 'instagram' && hashtags(c) > IG_HASHTAGS) return `Instagram allows at most ${IG_HASHTAGS} hashtags`;
   }
-  if (toInstagram() && S.images.length > IG_MAX) return `Instagram posts can have at most ${IG_MAX} photos`;
+  if (toInstagram() && !S.video && S.images.length > IG_MAX) return `Instagram posts can have at most ${IG_MAX} photos`;
   const tts = ttTargets();
   if (tts.length) {
     if (len(S.title) > 90) return 'The title is too long';
@@ -1056,7 +1127,29 @@ async function shrink(file) {
   return { blob, type: 'image/jpeg' };
 }
 
+// A video goes into the library (under the brand in view) and becomes the post's media.
+async function addVideo(file) {
+  const b = curBrand(), brand = b === 'all' || b === 'none' ? null : b;
+  S.images = []; S.cover = 0;
+  const slot = S.video = { url: URL.createObjectURL(file), name: file.name, uploading: true };
+  render();
+  try {
+    const v = await uploadVideoFile(file, brand);
+    if (S.video === slot) S.video = v;
+    S.lib = null;
+  } catch (e) {
+    if (S.video === slot) S.video = null;
+    S.status = { kind: 'err', text: `${file.name}: ${e.message}` };
+  }
+  render();
+}
+
 async function addFiles(files) {
+  const vid = [...files].find(isVideoFile);
+  if (vid) {
+    if (files.length > 1) S.status = { kind: 'err', text: 'A post can have photos or one video. Only the video was added.' };
+    return addVideo(vid);
+  }
   for (const file of [...files].slice(0, 35 - S.images.length)) {
     const slot = { url: URL.createObjectURL(file), uploading: true };
     S.images.push(slot); render();
@@ -1158,6 +1251,11 @@ async function keysFor(platforms, { raw = false } = {}) {
   return out;
 }
 
+// What a TikTok post sends: music for photos, duet and stitch for a video.
+const ttSettings = (t, privacy) => ({ privacy_level: privacy, disable_comment: !t.comment || !!t.info?.comment_disabled,
+  ...(S.video ? { disable_duet: !S.set.duet, disable_stitch: !S.set.stitch } : { auto_add_music: S.set.music }),
+  brand_organic: S.set.disclose && S.set.brand, branded_content: S.set.disclose && S.set.branded });
+
 async function submit() {
   if (missing() || S.busy) return;
   S.busy = true; S.status = { kind: '', text: 'Sending…' }; render();
@@ -1167,17 +1265,16 @@ async function submit() {
   const at = S.when === 'later' ? Math.floor(inputToMs(S.at) / 1000) : null;
   const made = [], errors = [];
   try {
-    if (toInstagram()) { S.status = { kind: '', text: 'Preparing photos for Instagram…' }; render(); }
-    const keys = await keysFor(jobs.map(j => j.platform));
+    if (toInstagram() && !S.video) { S.status = { kind: '', text: 'Preparing photos for Instagram…' }; render(); }
+    const keys = S.video ? jobs.map(() => []) : await keysFor(jobs.map(j => j.platform));
     for (const [n, j] of jobs.entries()) {
       if (jobs.length > 1) { S.status = { kind: '', text: `Sending ${n + 1} of ${jobs.length}…` }; render(); }
       const name = `${PLATFORM[j.platform]} ${handle(acct(j.id))}`;
       const t = S.tt[j.id] || {};
       try {
         made.push(await api('/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-          account_id: j.id, image_keys: keys[n], cover_index: S.cover, title: S.title, caption: captionFor(j.platform),
-          settings: j.platform !== 'tiktok' ? {} : { privacy_level: t.privacy, disable_comment: !t.comment || !!t.info?.comment_disabled,
-            auto_add_music: S.set.music, brand_organic: S.set.disclose && S.set.brand, branded_content: S.set.disclose && S.set.branded },
+          account_id: j.id, image_keys: keys[n], video_key: S.video?.key, cover_index: S.cover, title: S.video ? '' : S.title, caption: captionFor(j.platform),
+          settings: j.platform !== 'tiktok' ? {} : ttSettings(t, t.privacy),
           scheduled_at: plan ? plan[j.id] : at,
           // An edit replaces the one post it came from.
           replaces: S.replaces && S.replacesAccount === j.id ? S.replaces : undefined,
@@ -1249,10 +1346,10 @@ function resultView() {
 
 // Targets stay selected for the next post; privacy is chosen again each time.
 function resetComposer() {
-  Object.assign(S, { images: [], cover: 0, title: '', caption: '', when: 'now', at: '', status: null, replaces: null,
+  Object.assign(S, { images: [], video: null, cover: 0, title: '', caption: '', when: 'now', at: '', status: null, replaces: null,
     replacesAccount: null, over: {}, fromDraft: null, draftGroup: null });
   for (const t of Object.values(S.tt)) { t.privacy = ''; t.comment = false; }
-  S.set = { music: false, disclose: false, brand: false, branded: false };
+  S.set = { music: false, duet: false, stitch: false, disclose: false, brand: false, branded: false };
 }
 
 // ---- AI writing ------------------------------------------------------------
@@ -1426,8 +1523,8 @@ async function saveSlots(slots) {
 
 function draftBlocker() {
   if (!S.targets.length) return 'Choose where it will go';
-  if (!S.images.length) return 'Add at least one photo';
-  if (S.images.some(m => m.uploading)) return 'Waiting for uploads to finish';
+  if (!S.images.length && !S.video) return 'Add photos or a video';
+  if (S.images.some(m => m.uploading) || S.video?.uploading) return 'Waiting for uploads to finish';
   return '';
 }
 
@@ -1440,14 +1537,13 @@ async function saveDraft() {
   const jobs = S.targets.map(id => ({ id, platform: platformOf(acct(id)) }));
   const group = newGroup(), errors = [];
   try {
-    const keys = await keysFor(jobs.map(j => j.platform), { raw: true });
+    const keys = S.video ? jobs.map(() => []) : await keysFor(jobs.map(j => j.platform), { raw: true });
     for (const [n, j] of jobs.entries()) {
       const t = S.tt[j.id] || {};
       try {
-        await send('/posts', 'POST', { account_id: j.id, image_keys: keys[n], cover_index: S.cover, title: S.title,
+        await send('/posts', 'POST', { account_id: j.id, image_keys: keys[n], video_key: S.video?.key, cover_index: S.cover, title: S.video ? '' : S.title,
           caption: captionFor(j.platform), draft: true, group_id: group,
-          settings: j.platform !== 'tiktok' ? {} : { privacy_level: t.privacy || '', disable_comment: !t.comment,
-            auto_add_music: S.set.music, brand_organic: S.set.disclose && S.set.brand, branded_content: S.set.disclose && S.set.branded } });
+          settings: j.platform !== 'tiktok' ? {} : ttSettings(t, t.privacy || '') });
       } catch (e) { errors.push(`${handle(acct(j.id))}: ${e.message}`); }
     }
   } catch (e) { errors.push(e.message); }
@@ -1497,11 +1593,11 @@ function draftsView() {
   if (!groups.length) return `<section class="panel empty"><b>No drafts${b === 'all' ? '' : ` for ${esc(brandLabel(b))}`}.</b>Use "Save draft" while creating a post to keep it for later.
     <div><a class="btn" href="#compose">${ui('plus', 16)}Create post</a></div></section>`;
   return `<div class="panel"><div class="list drafts">${groups.map(g => {
-    const d = g[0], cover = d.images[d.cover_index] || d.images[0], key = esc(d.group_id || d.id);
+    const d = g[0], cover = thumbOf(d), key = esc(d.group_id || d.id);
     return `<div class="drow" data-opendraft="${key}" role="button" tabindex="0">
-      ${cover ? `<img class="thumb" src="${esc(cover)}" alt="">` : '<span class="noimg"></span>'}
+      ${cover ? pic(cover, 'class="thumb" alt=""') : '<span class="noimg"></span>'}
       <div class="wh"><b>${esc(d.caption || d.title || 'No caption yet')}</b>
-        <span>${g.length === 1 ? who(g[0]) : `${g.length} accounts`} · ${d.images.length} photo${d.images.length === 1 ? '' : 's'} · saved ${fmt(d.updated_at, { month: 'short', day: 'numeric' })}</span></div>
+        <span>${g.length === 1 ? who(g[0]) : `${g.length} accounts`} · ${d.video ? 'Video' : `${d.images.length} photo${d.images.length === 1 ? '' : 's'}`} · saved ${fmt(d.updated_at, { month: 'short', day: 'numeric' })}</span></div>
       <span class="dacc">${g.slice(0, 4).map(x => withBadge(avatar(acct(x.account_id)?.avatar_url, x.username), x.platform || 'tiktok')).join('')}</span>
       <button class="btn sec sm" data-opendraft="${key}">Open</button>
       <button class="btn ghost danger sm" data-deldraft="${key}" aria-label="Delete draft">${ui('x', 14)}</button></div>`;
@@ -1521,10 +1617,12 @@ function openDraft(key) {
   const main = [...g].sort((a, b) => (counts[b.caption] - counts[a.caption]) || (rank[a.platform] - rank[b.platform]))[0].caption;
   const tt = g.find(x => x.platform === 'tiktok');
   Object.assign(S, { images: src.image_keys.map((k, n) => ({ key: k, url: src.images[n] })), cover: src.cover_index,
-    caption: main, title: (tt || src).title || '', fromDraft: g.map(x => x.id), draftGroup: key, targets: [] });
+    caption: main, title: (tt || src).title || '', fromDraft: g.map(x => x.id), draftGroup: key, targets: [],
+    video: src.video_key ? { key: src.video_key, url: src.video } : null });
   for (const x of g) if (x.caption !== main) S.over[x.platform] = x.caption;
   const s = tt?.settings || {};
-  S.set = { music: !!s.auto_add_music, disclose: !!(s.brand_organic || s.branded_content), brand: !!s.brand_organic, branded: !!s.branded_content };
+  S.set = { music: !!s.auto_add_music, duet: s.disable_duet === false, stitch: s.disable_stitch === false,
+    disclose: !!(s.brand_organic || s.branded_content), brand: !!s.brand_organic, branded: !!s.branded_content };
   for (const x of g) {
     toggleTarget(x.account_id, true, false);
     if (x.platform === 'tiktok' && S.tt[x.account_id]) S.tt[x.account_id].comment = !x.settings?.disable_comment;
@@ -1570,18 +1668,18 @@ function postCard(p, compact) {
   const time = fmt(p.scheduled_at, { hour: '2-digit', minute: '2-digit' });
   const drag = p.status === 'queued' ? `draggable="true" data-drag="${p.id}"` : '';
   if (compact) {
-    const img = p.images[p.cover_index] || p.images[0];
+    const img = thumbOf(p);
     return `<div class="mp ${p.status}" ${drag} data-open="${p.id}" role="button" tabindex="0"
         title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.status}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
-      ${img ? `<img src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}<div><b>${icon(p.platform || 'tiktok', 11)}${at(p.scheduled_at)}</b><span>${bdot(p)}${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</span></div></div>`;
+      ${img ? pic(img) : '<span class="noimg"></span>'}<div><b>${icon(p.platform || 'tiktok', 11)}${at(p.scheduled_at)}</b><span>${bdot(p)}${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</span></div></div>`;
   }
   // Week view: a small row per post. Everything you can do with it is one
   // click away in the drawer.
-  const img = p.images[p.cover_index] || p.images[0];
+  const img = thumbOf(p);
   const label = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
   return `<div class="pc ${p.status}" ${drag} data-open="${p.id}" role="button" tabindex="0"
       title="${esc(`${label}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
-    ${img ? `<img src="${esc(img)}" alt="">` : '<span class="noimg"></span>'}
+    ${img ? pic(img) : '<span class="noimg"></span>'}
     <div class="pt"><b>${icon(p.platform || 'tiktok', 12)}${at(p.scheduled_at)}</b>
       <span>${bdot(p)}${who(p)}</span>
       <em>${label}</em></div></div>`;
@@ -1650,7 +1748,8 @@ function detailView() {
         <small>${esc(tz().replace(/_/g, ' '))}</small></div>
       ${p.fail_reason ? `<div class="dfail">${ui('x', 15)}<span>${esc(p.fail_reason)}</span></div>` : ''}
       ${p.stats ? `<div class="dstats">${STAT_KEYS.filter(k => p.stats[k] != null).map(k => `<div><b>${num(p.stats[k])}</b><span>${METRIC[k]}</span></div>`).join('')}</div>` : ''}
-      ${cover ? `<div class="dmedia"><img class="big" src="${esc(cover)}" alt="Cover">
+      ${p.video ? `<div class="dmedia"><video class="big" src="${esc(p.video)}" controls preload="metadata" playsinline></video></div>`
+        : cover ? `<div class="dmedia"><img class="big" src="${esc(cover)}" alt="Cover">
         ${p.images.length > 1 ? `<div class="dthumbs">${p.images.map((u, n) => `<img src="${esc(u)}" alt="Photo ${n + 1}" class="${n === p.cover_index ? 'cv' : ''}">`).join('')}</div>` : ''}</div>`
         : `<p class="note">${['published', 'failed', 'cancelled'].includes(p.status) ? 'The photos were deleted 7 days after the post finished.' : 'No photos.'}</p>`}
       ${p.title ? `<p class="dtitle">${esc(p.title)}</p>` : ''}
@@ -1693,16 +1792,17 @@ async function edit(id, again = false) {
   S.replacesAccount = p.account_id;
   const images = again ? [] : p.image_keys.map((k, n) => ({ key: k, url: p.images[n] }));
   Object.assign(S, { images, cover: again ? 0 : p.cover_index, title: p.title, caption: p.caption,
+    video: p.video_key ? { key: p.video_key, url: p.video } : null,
     when: again ? 'now' : 'later', at: localInput(Math.max(p.scheduled_at * 1000, Date.now() + 10 * 60e3)) });
   const s = p.settings || {};
-  S.set = { music: !!s.auto_add_music, disclose: !!(s.brand_organic || s.branded_content),
-            brand: !!s.brand_organic, branded: !!s.branded_content };
+  S.set = { music: !!s.auto_add_music, duet: s.disable_duet === false, stitch: s.disable_stitch === false,
+            disclose: !!(s.brand_organic || s.branded_content), brand: !!s.brand_organic, branded: !!s.branded_content };
   S.targets = [];
   toggleTarget(p.account_id, true, false);
   if (S.tt[p.account_id]) S.tt[p.account_id].comment = !s.disable_comment;
   location.hash = '#compose';
   render();
-  if (again) {
+  if (again && !p.video_key) {
     // Images live for 7 days after a post is done; copy them while they do.
     try {
       const { media } = await api('/media/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1884,6 +1984,7 @@ document.addEventListener('pointerdown', e => { if (S.pickOpen && !e.target.clos
 function bind() {
   const on = (sel, ev, fn) => document.querySelectorAll(sel).forEach(el => el.addEventListener(ev, fn));
   on('#files', 'change', e => addFiles(e.target.files));
+  on('#rmvideo', 'click', () => { S.video = null; render(); });
   on('#loginemail', 'submit', e => { e.preventDefault(); S.login.email = $('le').value.trim(); sendCode(); });
   on('#logincode', 'submit', e => { e.preventDefault(); S.login.code = $('lc').value.trim(); verifyCode(); });
   on('#lc', 'input', e => { S.login.code = e.target.value.replace(/\D/g, ''); if (S.login.code.length === 6) verifyCode(); });
@@ -1975,7 +2076,7 @@ function bind() {
   on('#libclear', 'click', () => { S.libSel = []; render(); });
   on('#libsched', 'click', async () => { const keys = S.libSel || []; S.libSel = []; await useFromLibrary(keys); location.hash = '#compose'; });
   on('#librm', 'click', async () => { const keys = S.libSel || [];
-    if (!await ask({ title: `Remove ${keys.length} photo${keys.length === 1 ? '' : 's'} from the library?`, body: 'Posts already scheduled with them keep their own copies.', ok: 'Remove', danger: true, icon: ui('image', 22) })) return;
+    if (!await ask({ title: `Remove ${keys.length} photo${keys.length === 1 ? '' : 's'} from the library?`, body: 'Scheduled photo posts keep their own copies. A video still used by a scheduled post stays until that post is done.', ok: 'Remove', danger: true, icon: ui('image', 22) })) return;
     try { await send('/library/remove', 'POST', { keys }); S.libSel = []; } catch (e) { S.flash = { kind: 'err', text: e.message }; }
     loadLibrary(); });
   on('#libmove', 'change', async e => { const v = e.target.value;

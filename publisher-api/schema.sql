@@ -107,7 +107,10 @@ CREATE TABLE IF NOT EXISTS media (
   delete_after INTEGER,
   in_library INTEGER NOT NULL DEFAULT 0,   -- 1: kept in the library until removed
   brand_id TEXT,                           -- library only: the brand it is filed under, or NULL (shared)
-  name TEXT                                -- library only: the file name it was uploaded as
+  name TEXT,                               -- library only: the file name it was uploaded as
+  duration_ms INTEGER,                     -- video only, as the browser read it
+  width INTEGER,
+  height INTEGER
 );
 CREATE INDEX IF NOT EXISTS media_ws ON media(workspace_id);
 CREATE INDEX IF NOT EXISTS media_library ON media(workspace_id, in_library);
@@ -120,7 +123,8 @@ CREATE TABLE IF NOT EXISTS posts (
   status TEXT NOT NULL,
   title TEXT NOT NULL DEFAULT '',
   caption TEXT NOT NULL DEFAULT '',
-  image_keys TEXT NOT NULL,
+  image_keys TEXT NOT NULL,               -- JSON list; [] for a video post
+  video_key TEXT,                          -- a video post: the library video it points at
   cover_index INTEGER NOT NULL DEFAULT 0,
   settings TEXT NOT NULL,
   scheduled_at INTEGER NOT NULL,
@@ -149,6 +153,7 @@ CREATE TABLE IF NOT EXISTS follower_history (
   PRIMARY KEY (account_id, day)
 );
 CREATE INDEX IF NOT EXISTS posts_ws ON posts(workspace_id, scheduled_at);
+CREATE INDEX IF NOT EXISTS posts_video ON posts(video_key);
 CREATE INDEX IF NOT EXISTS posts_drafts ON posts(workspace_id, status, updated_at);
 
 -- AI generations per workspace per UTC day, for the free quota.

@@ -1,6 +1,7 @@
 const OAUTH_TOKEN_URL = 'https://open.tiktokapis.com/v2/oauth/token/';
 const CREATOR_INFO_URL = 'https://open.tiktokapis.com/v2/post/publish/creator_info/query/';
 const CONTENT_INIT_URL = 'https://open.tiktokapis.com/v2/post/publish/content/init/';
+const VIDEO_INIT_URL = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
 const STATUS_URL = 'https://open.tiktokapis.com/v2/post/publish/status/fetch/';
 // Numbers: user.info.stats for the account, video.list for its posts.
 const USER_STATS_URL = 'https://open.tiktokapis.com/v2/user/info/?fields=follower_count,likes_count,video_count';
@@ -82,6 +83,7 @@ export function tiktok({ clientKey, clientSecret, fetch }) {
     refresh: refreshToken => oauth({ grant_type: 'refresh_token', refresh_token: refreshToken }, 'token refresh'),
     creatorInfo: accessToken => v2(CREATOR_INFO_URL, accessToken, undefined, 'creator info'),
     initPhoto: (accessToken, body) => v2(CONTENT_INIT_URL, accessToken, body, 'content init'),
+    initVideo: (accessToken, body) => v2(VIDEO_INIT_URL, accessToken, body, 'video init'),
     status: (accessToken, publishId) => v2(STATUS_URL, accessToken, { publish_id: publishId }, 'status fetch'),
     userStats: accessToken => v2(USER_STATS_URL, accessToken, undefined, 'tiktok account stats', 'GET').then(d => d.user || {}),
     // Up to 20 posts per call.
@@ -108,6 +110,22 @@ export function buildPhotoBody({ title, caption, imageUrls, coverIndex, settings
       brand_content_toggle: !!settings.branded_content,
     },
     source_info: { source: 'PULL_FROM_URL', photo_images: imageUrls, photo_cover_index: coverIndex },
+  };
+}
+
+// A video has one text field, title, which is its caption (2,200 characters).
+export function buildVideoBody({ title, caption, videoUrl, settings }) {
+  return {
+    post_info: {
+      title: caption || title,
+      privacy_level: settings.privacy_level,
+      disable_comment: !!settings.disable_comment,
+      disable_duet: !!settings.disable_duet,
+      disable_stitch: !!settings.disable_stitch,
+      brand_organic_toggle: !!settings.brand_organic,
+      brand_content_toggle: !!settings.branded_content,
+    },
+    source_info: { source: 'PULL_FROM_URL', video_url: videoUrl },
   };
 }
 

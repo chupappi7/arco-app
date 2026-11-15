@@ -4,7 +4,7 @@
 // Cookies: out=1 shows the sign-in page, empty=1 a workspace with nothing in it.
 // New posts publish after ~5 s; Instagram ones fail, to show the failure path.
 const http = require('http'), fs = require('fs'), path = require('path');
-const root = path.join(__dirname, '..', 'public'), PORT = 4777;
+const root = path.join(__dirname, '..', 'public'), PORT = Number(process.env.PORT) || 4777;
 const now = () => Math.floor(Date.now() / 1000), H = h => now() + Math.round(h * 3600);
 const me = {
   user: { id: 'u1', email: 'thinh@arco.app' }, needs_email: false,
@@ -43,7 +43,7 @@ const posts = [
 ];
 const svg = id => { const n = [...id].reduce((s, c) => s + c.charCodeAt(0), 0); const h = [[28, 12], [205, 225], [110, 95], [320, 295], [42, 30], [250, 265]][n % 6];
   return `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='500'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='hsl(${h[0]},60%,78%)'/><stop offset='1' stop-color='hsl(${h[1]},42%,42%)'/></linearGradient></defs><rect width='400' height='500' fill='url(#g)'/></svg>`; };
-const media = {};
+const media = {}, tickets = {};
 const body = q => new Promise(r => { let b = ''; q.on('data', d => b += d); q.on('end', () => { try { r(JSON.parse(b || '{}')); } catch { r({}); } }); });
 http.createServer(async (q, r) => {
   const u = new URL(q.url, 'http://x'), p = u.pathname, j = (o, s = 200) => { r.statusCode = s; r.setHeader('Content-Type', 'application/json'); r.end(JSON.stringify(o)); };
@@ -58,6 +58,7 @@ http.createServer(async (q, r) => {
   if (p === '/api/v1/posts' && q.method === 'GET') return j({ posts: empty ? [] : quiet ? posts.filter(x => x.status === 'published' || x.status === 'failed').slice(0, 3).map((x, i) => i === 1 ? { ...x, username: '' } : x) : posts.filter(x => x.status !== 'draft') });
   if (p === '/api/v1/posts' && q.method === 'POST') { const o = await body(q), id = 'n' + Math.random().toString(16).slice(2, 8);
     const x = { ...mk(id, o.account_id, 'queued', 0, o.caption || ''), scheduled_at: o.scheduled_at || now(), images: (o.image_keys || []).map(k => '/media/' + k),
+      image_keys: o.image_keys || [], video_key: o.video_key || null, video: o.video_key ? '/media/' + o.video_key : null, settings: o.settings || {},
       created: Date.now(), fail: acc(o.account_id).platform === 'instagram' };
     posts.push(x); return j(x); }
   if (/^\/api\/v1\/posts\/\w+\/retry$/.test(p)) { const x = posts.find(y => y.id === p.split('/')[4]);
@@ -84,10 +85,20 @@ http.createServer(async (q, r) => {
       accounts: accs.map(a => ({ id: a.id, username: a.username, platform: a.platform, avatar_url: '', followers: 300 + a.id.charCodeAt(1) * 7, change: a.id === 'a2' ? 12 : 0, limited: a.id === 'a5' })),
       top, tiktok_pending: false, tiktok_reconnect: true, facebook_limited: true }); }
   if (p.endsWith('/creator-info')) return j({ creator_username: 'arco.app', creator_nickname: 'ARCO', creator_avatar_url: '', comment_disabled: false, privacy_level_options: ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'SELF_ONLY'] });
+  // Videos: a ticket, then a PUT to the "Worker" (here, the same server).
+  if (p === '/api/v1/media/video' && q.method === 'POST') { const o = await body(q);
+    const key = 'ws1/' + Math.random().toString(16).slice(2) + (o.content_type === 'video/quicktime' ? '.mov' : '.mp4');
+    tickets[key] = o; return j({ key, upload_url: `http://localhost:${PORT}/upload/${encodeURIComponent(key)}`, expires_at: now() + 3600 }); }
+  if (p.startsWith('/upload/') && q.method === 'PUT') { const key = decodeURIComponent(p.slice(8)), o = tickets[key]; const ch = [];
+    q.on('data', d => ch.push(d)); return q.on('end', () => { if (!o) return j({ error: 'This upload link is not valid' }, 403);
+      media[key] = Buffer.concat(ch); delete tickets[key];
+      lib.unshift({ key, url: '/media/' + key, brand_id: o.brand_id || null, name: o.name || null, bytes: o.bytes, content_type: o.content_type,
+        duration_ms: o.duration_ms || null, width: o.width || null, height: o.height || null, created_at: now() });
+      j({ key, url: '/media/' + key }); }); }
   if (p === '/api/v1/media' && q.method === 'POST') { const ch = []; q.on('data', d => ch.push(d)); return q.on('end', () => { const key = 'ws1/' + Math.random().toString(16).slice(2) + '.jpg'; media[key] = Buffer.concat(ch); j({ key, url: '/media/' + key }); }); }
   if (p === '/api/v1/media/copy') { const o = await body(q);
     return j({ media: (o.keys || []).map(k => { const key = 'ws1/' + Math.random().toString(16).slice(2) + '.jpg'; media[key] = media[k]; return { key, url: '/media/' + key }; }) }); }
-  if (p.startsWith('/media/') && media[p.slice(7)]) { r.setHeader('Content-Type', 'image/jpeg'); return r.end(media[p.slice(7)]); }
+  if (p.startsWith('/media/') && media[p.slice(7)]) { r.setHeader('Content-Type', /\.mp4$/.test(p) ? 'video/mp4' : /\.mov$/.test(p) ? 'video/quicktime' : 'image/jpeg'); return r.end(media[p.slice(7)]); }
   if (p.startsWith('/api/')) { await body(q); return j({ ok: true }); }
   const f = path.join(root, p === '/' ? 'index.html' : p);
   if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { r.statusCode = 404; return r.end('not found'); }

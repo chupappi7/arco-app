@@ -7,6 +7,7 @@
 
 const GRAPH_FB = 'https://graph.facebook.com/v23.0';
 const GRAPH_IG = 'https://graph.instagram.com/v23.0';
+const GRAPH_FB_VIDEO = 'https://graph-video.facebook.com/v23.0';
 
 // Graph error codes that mean "try again", not "this will never work".
 const TRANSIENT_CODES = new Set([1, 2, 4, 17, 32, 341, 613]);
@@ -75,6 +76,9 @@ export function meta({ appId, appSecret, igAppId, igAppSecret, fetch }) {
       base: GRAPH_IG, method: 'POST', label: 'instagram image',
       params: { image_url: imageUrl, access_token: token,
         ...(carouselItem ? { is_carousel_item: 'true' } : {}), ...(caption ? { caption } : {}) } }),
+    igReel: (token, igId, videoUrl, caption) => call(`/${igId}/media`, {
+      base: GRAPH_IG, method: 'POST', label: 'instagram reel',
+      params: { media_type: 'REELS', video_url: videoUrl, access_token: token, ...(caption ? { caption } : {}) } }),
     igCarousel: (token, igId, children, caption) => call(`/${igId}/media`, {
       base: GRAPH_IG, method: 'POST', label: 'instagram carousel',
       params: { media_type: 'CAROUSEL', children: children.join(','), caption, access_token: token } }),
@@ -90,6 +94,10 @@ export function meta({ appId, appSecret, igAppId, igAppSecret, fetch }) {
       method: 'POST', label: 'facebook photo',
       params: { url, published: published ? 'true' : 'false', access_token: token,
         ...(caption ? { caption } : {}) } }),
+    // A Page video, fetched by Facebook from file_url and published at once.
+    fbVideo: (token, pageId, url, description) => call(`/${pageId}/videos`, {
+      base: GRAPH_FB_VIDEO, method: 'POST', label: 'facebook video',
+      params: { file_url: url, access_token: token, ...(description ? { description } : {}) } }),
     fbFeed: (token, pageId, message, photoIds) => call(`/${pageId}/feed`, {
       method: 'POST', label: 'facebook post',
       params: { message, access_token: token,

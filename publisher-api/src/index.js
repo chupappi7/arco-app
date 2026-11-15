@@ -6,7 +6,7 @@ import { startEmail, verifyEmail, callerFor, need, myWorkspaces, switchWorkspace
 import { metaFor, MetaError } from './meta.js';
 import { listAccounts, creatorInfoFor, disconnect, refreshInstagramTokens } from './accounts.js';
 import * as L from './limits.js';
-import { uploadMedia, serveMedia, copyMedia } from './media.js';
+import { uploadMedia, serveMedia, copyMedia, videoTicket, uploadVideo, uploadCors } from './media.js';
 import { listLibrary, addToLibrary, moveInLibrary, removeFromLibrary } from './library.js';
 import { createPost, listPosts, cancelPost, retryPost, listDrafts, updatePost } from './posts.js';
 import { tick, publishNow } from './publisher.js';
@@ -32,7 +32,8 @@ async function me(req, env, { who }) {
     api_key_set: !!row?.api_key_hash,
     limits: { accounts: L.MAX_ACCOUNTS, queued: L.MAX_QUEUED, images: L.MAX_IMAGES,
               image_bytes: L.MAX_IMAGE_BYTES, workspace_bytes: L.MAX_WORKSPACE_BYTES,
-              min_lead_seconds: L.MIN_LEAD_SECONDS, ig_images: L.IG_MAX_IMAGES, ig_caption: L.IG_MAX_CAPTION },
+              min_lead_seconds: L.MIN_LEAD_SECONDS, ig_images: L.IG_MAX_IMAGES, ig_caption: L.IG_MAX_CAPTION,
+              video_bytes: L.MAX_VIDEO_BYTES },
     facebook_enabled: !!(env.META_APP_ID && env.META_APP_SECRET),
     instagram_enabled: !!(env.IG_APP_ID && env.IG_APP_SECRET),
     ai_enabled: !!(env.ANTHROPIC_API_KEY || env.__ai),
@@ -87,7 +88,16 @@ export const ROUTES = [
   ['PATCH', '/v1/library', async (req, env, { who }) => json(await moveInLibrary(env, who, await body(req))), 'member'],
   ['POST', '/v1/library/remove', async (req, env, { who }) => json(await removeFromLibrary(env, who, await body(req))), 'member'],
   ['POST', '/v1/media/copy', async (req, env, { who }) => json(await copyMedia(env, who, (await body(req)).keys)), 'member'],
-  ['GET', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`), 'public'],
+  ['POST', '/v1/media/video', async (req, env, { who }) => json(await videoTicket(env, who, await body(req), req)), 'member'],
+  // The page PUTs a video here directly (cross-origin), with a ticket from above.
+  ['OPTIONS', '/upload/:token', async (req, env) => new Response(null, { status: 204, headers: uploadCors(env) }), 'public'],
+  ['PUT', '/upload/:token', async (req, env, { params }) => {
+    let res;
+    try { res = json(await uploadVideo(env, params.token, req)); } catch (err) { res = toResponse(err); }
+    for (const [k, v] of Object.entries(uploadCors(env))) res.headers.set(k, v);
+    return res;
+  }, 'public'],
+  ['GET', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`, 'GET', req), 'public'],
   // TikTok's fetcher, or a CDN in front of it, may check an image with HEAD first.
   ['HEAD', '/media/:ws/:file', async (req, env, { params }) => serveMedia(env, `${params.ws}/${params.file}`, 'HEAD'), 'public'],
   ['POST', '/v1/posts', async (req, env, { who, tk, ctx }) => {

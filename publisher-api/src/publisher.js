@@ -1,7 +1,7 @@
 import { now } from './http.js';
 import { accessTokenFor, forgetAccessToken, isMeta } from './accounts.js';
 import { metaFor } from './meta.js';
-import { buildPhotoBody } from './tiktok.js';
+import { buildPhotoBody, buildVideoBody } from './tiktok.js';
 import { mediaUrl } from './media.js';
 import { RETRY_DELAYS, PER_ACCOUNT_PER_TICK, KEEP_AFTER_DONE, PUBLISH_TIMEOUT,
   TICK_FETCH_BUDGET, POLL_RESERVE } from './limits.js';
@@ -91,12 +91,14 @@ async function requeueOrFail(env, post, t, err) {
 async function startMeta(env, post, account, access, t) {
   const mt = metaFor(env);
   const urls = JSON.parse(post.image_keys).map(k => mediaUrl(env, k));
+  const video = post.video_key ? mediaUrl(env, post.video_key) : null;
   const target = account.open_id.slice(3);   // strip 'ig:' / 'fb:'
   let sent = false;
   try {
     if (account.platform === 'instagram') {
       let container;
-      if (urls.length === 1) container = (await mt.igImage(access, target, urls[0], { caption: post.caption })).id;
+      if (video) container = (await mt.igReel(access, target, video, post.caption)).id;
+      else if (urls.length === 1) container = (await mt.igImage(access, target, urls[0], { caption: post.caption })).id;
       else {
         const children = [];
         for (const u of urls) children.push((await mt.igImage(access, target, u, { carouselItem: true })).id);
@@ -106,8 +108,17 @@ async function startMeta(env, post, account, access, t) {
         .bind(IG_WAIT + container, t, post.id).run();
       return 'started';
     }
-    // Facebook: upload unpublished photos (safe to repeat), then one post.
     const message = post.caption;
+    if (video) {
+      // One call that publishes: if the answer is lost, it may have posted.
+      await env.DB.prepare('UPDATE posts SET publish_id = ?, updated_at = ? WHERE id = ?').bind(IN_FLIGHT, t, post.id).run();
+      sent = true;
+      const out = await mt.fbVideo(access, target, video, message);
+      await finish(env, post.id, t, { status: 'published', publish_id: String(out.id), public_post_id: String(out.id),
+        post_url: `https://www.facebook.com/${target}/videos/${out.id}`, fail_reason: null });
+      return 'published';
+    }
+    // Facebook: upload unpublished photos (safe to repeat), then one post.
     let ids = [];
     if (urls.length > 1) for (const u of urls) ids.push((await mt.fbPhoto(access, target, u, { published: false })).id);
     await env.DB.prepare('UPDATE posts SET publish_id = ?, updated_at = ? WHERE id = ?').bind(IN_FLIGHT, t, post.id).run();
@@ -140,12 +151,12 @@ async function pollInstagram(env, post, access, t) {
     const s = await mt.igContainerStatus(access, container);
     if (s.status_code === 'ERROR' || s.status_code === 'EXPIRED') {
       await finish(env, post.id, t, { status: 'failed', publish_id: null,
-        fail_reason: `Instagram could not process the images: ${s.status || s.status_code}` });
+        fail_reason: `Instagram could not process the ${post.video_key ? 'video' : 'images'}: ${s.status || s.status_code}` });
       return 'failed';
     }
     if (s.status_code !== 'FINISHED') {
       if (t - post.updated_at > PUBLISH_TIMEOUT) {
-        await finish(env, post.id, t, { status: 'failed', publish_id: null, fail_reason: 'Instagram did not finish processing the images within an hour.' });
+        await finish(env, post.id, t, { status: 'failed', publish_id: null, fail_reason: `Instagram did not finish processing the ${post.video_key ? 'video' : 'images'} within an hour.` });
         return 'failed';
       }
       return 'pending';
@@ -193,10 +204,13 @@ async function start(env, tk, post, token, t) {
     }
     const keys = JSON.parse(post.image_keys);
     await env.DB.prepare('UPDATE posts SET publish_id = ?, updated_at = ? WHERE id = ?').bind(IN_FLIGHT, t, post.id).run();
-    const { publish_id } = await tk.initPhoto(access, buildPhotoBody({
-      title: post.title, caption: post.caption, coverIndex: post.cover_index, settings,
-      imageUrls: keys.map(k => mediaUrl(env, k)),
-    }));
+    const { publish_id } = post.video_key
+      ? await tk.initVideo(access, buildVideoBody({ title: post.title, caption: post.caption, settings,
+        videoUrl: mediaUrl(env, post.video_key) }))
+      : await tk.initPhoto(access, buildPhotoBody({
+        title: post.title, caption: post.caption, coverIndex: post.cover_index, settings,
+        imageUrls: keys.map(k => mediaUrl(env, k)),
+      }));
     await env.DB.prepare(`UPDATE posts SET publish_id = ?, fail_reason = NULL, updated_at = ? WHERE id = ?`)
       .bind(publish_id, t, post.id).run();
     return 'started';
@@ -273,6 +287,7 @@ async function poll(env, tk, post, token, t) {
 async function startCost(env, post, token) {
   const loaded = await token.load(post.account_id).catch(() => null);
   if (!loaded || !isMeta(loaded.account)) return 3;
+  if (post.video_key) return 1;
   const n = JSON.parse(post.image_keys).length;
   return n === 1 ? 1 : n + 1;
 }

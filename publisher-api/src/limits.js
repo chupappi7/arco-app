@@ -2,7 +2,7 @@ export const MAX_ACCOUNTS = 25;
 export const MAX_QUEUED = 200;
 export const MAX_IMAGES = 35;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-export const MAX_WORKSPACE_BYTES = 200 * 1024 * 1024;
+export const MAX_WORKSPACE_BYTES = 1024 * 1024 * 1024;
 export const MIN_LEAD_SECONDS = 5 * 60;
 export const KEEP_AFTER_DONE = 7 * 86400;
 export const KEEP_UNATTACHED = 86400;
@@ -29,3 +29,13 @@ export const FB_MAX_CAPTION = 63206;
 export const MAX_DRAFTS = 200;
 export const AI_DAILY_LIMIT = 50;
 export const MAX_LIBRARY = 500;
+
+// Video: one file per post, kept in the library and never copied. 100 MB is
+// the request body cap of the Workers free plan, and uploads go straight to
+// the Worker in one request.
+export const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+export const UPLOAD_TICKET_TTL = 3600;
+export const TIKTOK_VIDEO_CAPTION = 2200;
+export const IG_REEL_MIN_MS = 3000;
+export const IG_REEL_MAX_MS = 15 * 60 * 1000;
+export const FB_VIDEO_MAX_MS = 20 * 60 * 1000;

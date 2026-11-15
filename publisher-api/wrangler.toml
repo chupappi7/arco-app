@@ -5,6 +5,8 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 PUBLIC_ORIGIN = "https://arco-publisher.vercel.app"
+# Where the page uploads videos directly (they skip the site's proxy).
+API_ORIGIN = "https://arco-publisher-api.thinht7110.workers.dev"
 REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/callback"
 META_REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/meta/callback"
 IG_REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/instagram/callback"
