@@ -209,6 +209,26 @@ const typeOf = (f, header) => {
   return String(f.content_type || '').toLowerCase().replace('image/jpg', 'image/jpeg') || EXT[ext] || h;
 };
 
+// Only public https hosts by name: no IP literals, no local or internal
+// names, and every redirect is checked the same way (at most 3).
+const blockedHost = h => {
+  h = h.toLowerCase().replace(/\.$/, '');
+  return !h.includes('.') || /^[\d.]+$/.test(h) || h.startsWith('[') || h.includes(':')
+    || /(^|\.)(localhost|local|internal|intranet|lan|home|corp|arpa)$/.test(h);
+};
+export async function fetchPublic(url, hops = 3) {
+  let u;
+  try { u = new URL(url); } catch { throw new HttpError(400, 'That is not a valid URL'); }
+  if (u.protocol !== 'https:') throw new HttpError(400, 'Only https URLs');
+  if (u.username || u.password || blockedHost(u.hostname)) throw new HttpError(400, 'That URL host is not allowed');
+  const res = await fetch(u.toString(), { redirect: 'manual' });
+  if (res.status >= 300 && res.status < 400 && res.headers.get('Location')) {
+    if (!hops) throw new HttpError(400, 'Too many redirects');
+    return fetchPublic(new URL(res.headers.get('Location'), u).toString(), hops - 1);
+  }
+  return res;
+}
+
 async function uploadFiles(c, a) {
   const { env, who } = c, files = a.files;
   if (!Array.isArray(files) || !files.length || files.length > 10) throw new HttpError(400, 'files must be a list of 1 to 10 files');
@@ -223,9 +243,7 @@ async function uploadFiles(c, a) {
         const bin = atob(String(f.data_base64).replace(/^data:[^,]*,/, '').replace(/\s/g, ''));
         bytes = Uint8Array.from(bin, ch => ch.charCodeAt(0));
       } else if (f.url) {
-        const u = new URL(String(f.url));
-        if (u.protocol !== 'https:') throw new HttpError(400, 'Only https URLs');
-        const res = await fetch(u.toString(), { redirect: 'follow' });
+        const res = await fetchPublic(String(f.url));
         if (!res.ok) throw new HttpError(400, `Fetching it failed (${res.status})`);
         type = typeOf(f, res.headers.get('Content-Type'));
         if (type.startsWith('video/')) {

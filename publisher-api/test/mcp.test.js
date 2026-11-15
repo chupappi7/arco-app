@@ -98,6 +98,10 @@ describe('mcp tools', () => {
     expect(reordered.items.map(i => i.name)).toEqual(['3.jpg', '2.jpg', '1.jpg']);
     const bad = await tool(h, 'upload_to_folder', { folder_id: f.id, files: [{ url: 'http://example.com/a.jpg' }] });
     expect(bad.data.files[0]).toMatchObject({ ok: false, error: 'Only https URLs' });
+    for (const url of ['https://127.0.0.1/a.jpg', 'https://localhost/a.jpg', 'https://[::1]/a.jpg', 'https://169.254.169.254/x', 'https://db.internal/a.jpg']) {
+      const r = await tool(h, 'upload_to_folder', { folder_id: f.id, files: [{ url }] });
+      expect(r.data.files[0]).toMatchObject({ ok: false, error: 'That URL host is not allowed' });
+    }
     expect((await tool(h, 'create_folder', { name: 'X', brand: 'Nope' })).error).toMatch(/No brand called "Nope"/);
   });
 
