@@ -65,8 +65,9 @@ http.createServer(async (q, r) => {
   if (p === '/api/v1/ai/usage') return j({ limit: 50, remaining: 47 });
   if (p === '/api/v1/members') return j({ members: [{ user_id: 'u1', email: 'thinh@arco.app', role: 'owner', brand_ids: null }, { user_id: 'u2', email: 'freelancer@studio.co', role: 'member', brand_ids: ['b2'] }], invites: [] });
   if (p === '/api/v1/stats') { const d = Number(u.searchParams.get('days') || 30), plat = u.searchParams.get('platform') || 'all';
-    const accs = me.accounts.filter(a => plat === 'all' || a.platform === plat);
-    const top = posts.filter(x => x.stats && (plat === 'all' || x.platform === plat));
+    const br = u.searchParams.get('brand') || 'all', inB = a => br === 'all' || (br === 'none' ? !a.brand_id : a.brand_id === br);
+    const accs = me.accounts.filter(a => (plat === 'all' || a.platform === plat) && inB(a));
+    const top = posts.filter(x => x.stats && (plat === 'all' || x.platform === plat) && inB(acc(x.account_id)));
     const series = [...Array(d)].map((_, i) => { const day = new Date((now() - (d - 1 - i) * 86400) * 1000).toISOString().slice(0, 10);
       return { day, posts: i % 3 ? 0 : 1, views: i % 3 ? 0 : 800 + (i * 137) % 900, engagement: i % 3 ? 0 : 40 + (i * 53) % 120, followers: 1700 + Math.round(i * 140 / d) + (i % 5) }; });
     return j({ days: d, platform: plat, published: top.length, tracked: top.length, updated_at: now() - 5400,

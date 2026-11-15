@@ -179,15 +179,19 @@ const METRICS = ['views', 'reach', 'likes', 'comments', 'shares', 'saves'];
 // change over the period. Limited to the caller's brands like everything else.
 export const PERIODS = [7, 30, 90];
 const PLATFORMS = ['tiktok', 'instagram', 'facebook'];
-export async function getStats(env, w, days, t = now(), platform = 'all') {
+export async function getStats(env, w, days, t = now(), platform = 'all', brand = 'all') {
   if (!PERIODS.includes(days)) throw new HttpError(400, 'days must be 7, 30 or 90');
   if (platform !== 'all' && !PLATFORMS.includes(platform)) throw new HttpError(400, 'unknown platform');
   const from = t - days * DAY;
   const pf = platform === 'all' ? { sql: '', binds: [] } : { sql: ' AND a.platform = ?', binds: [platform] };
+  // One brand ('none' = accounts in no brand), on top of the caller's own scope.
+  const bf = col => brand === 'all' || !brand ? { sql: '', binds: [] }
+    : brand === 'none' ? { sql: ` AND ${col} IS NULL`, binds: [] } : { sql: ` AND ${col} = ?`, binds: [String(brand)] };
+  const bp = bf('a.brand_id');
   const sc = inScope(w, 'a.brand_id');
   const { results: rows } = await env.DB.prepare(`SELECT p.*, a.username, a.platform FROM posts p JOIN accounts a ON a.id = p.account_id
       WHERE p.workspace_id = ? AND p.status = 'published' AND p.scheduled_at >= ? AND p.scheduled_at <= ?${sc.sql}${pf.sql}
-      ORDER BY p.scheduled_at DESC`).bind(wsOf(w), from, t, ...sc.binds, ...pf.binds).all();
+      ${bp.sql} ORDER BY p.scheduled_at DESC`).bind(wsOf(w), from, t, ...sc.binds, ...pf.binds, ...bp.binds).all();
 
   // One entry per UTC day of the period, oldest first.
   const dayKeys = [...Array(days)].map((_, i) => utcDay(t - (days - 1 - i) * DAY));
@@ -215,14 +219,14 @@ export async function getStats(env, w, days, t = now(), platform = 'all') {
 
   // The period before this one, for "up 12% on the previous 30 days".
   const { results: prevRows } = await env.DB.prepare(`SELECT p.stats FROM posts p JOIN accounts a ON a.id = p.account_id
-      WHERE p.workspace_id = ? AND p.status = 'published' AND p.scheduled_at >= ? AND p.scheduled_at < ? AND p.stats IS NOT NULL${sc.sql}${pf.sql}`)
-    .bind(wsOf(w), from - days * DAY, from, ...sc.binds, ...pf.binds).all();
+      WHERE p.workspace_id = ? AND p.status = 'published' AND p.scheduled_at >= ? AND p.scheduled_at < ? AND p.stats IS NOT NULL${sc.sql}${pf.sql}${bp.sql}`)
+    .bind(wsOf(w), from - days * DAY, from, ...sc.binds, ...pf.binds, ...bp.binds).all();
   const prev = Object.fromEntries(METRICS.map(m => [m, 0]));
   for (const r of prevRows) { const ps = JSON.parse(r.stats); for (const m of METRICS) if (ps[m] !== undefined) prev[m] += ps[m]; }
 
-  const asc = inScope(w);
+  const asc = inScope(w), ab = bf('brand_id');
   const { results: all } = await env.DB.prepare(`SELECT id, username, platform, avatar_url, followers, stats_at, insights_denied_at FROM accounts
-      WHERE workspace_id = ?${asc.sql} ORDER BY platform, username`).bind(wsOf(w), ...asc.binds).all();
+      WHERE workspace_id = ?${asc.sql}${ab.sql} ORDER BY platform, username`).bind(wsOf(w), ...asc.binds, ...ab.binds).all();
   const startDay = dayKeys[0], today = dayKeys[days - 1];
   const accounts = [];
   for (const a of all) {

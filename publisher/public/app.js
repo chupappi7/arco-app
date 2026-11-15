@@ -45,7 +45,7 @@ const S = {
   voiceEdit: null,
   set: { music: false, disclose: false, brand: false, branded: false },
   when: 'now', at: '', busy: false, status: null,
-  week: 0, month: 0, calMode: 'weeks', fPlat: 'all', fAcct: 'all', fBrand: 'all', posts: [], apiKey: null,
+  week: 0, month: 0, calMode: 'weeks', fPlat: 'all', fAcct: 'all', posts: [], apiKey: null,
   pq: '', pickOpen: false, capTab: 'all', prevTab: null,
   login: { step: 'email', email: '', code: '', busy: false, err: '' }, members: null, invited: null,
 };
@@ -95,8 +95,12 @@ async function loadMe() {
       S.flash = { kind: 'ok', text: `You joined ${S.me.workspace.name}.` }; }
     catch (e) { S.flash = { kind: 'err', text: e.message }; }
   }
+  await fileNewAccounts();
   S.targets = []; S.tt = {};
   restoreTargets();
+  const b = curBrand();
+  if (b !== 'all') { S.targets = S.targets.filter(id => inBrand(acct(id), b));
+    if (!S.targets.length) for (const a of brandAccounts(b)) if (!a.needs_reconnect) S.targets.push(a.id); }
   refreshCounts();
 }
 
@@ -106,6 +110,18 @@ function restoreTargets() {
   let saved = [];
   try { saved = JSON.parse(localStorage.getItem(SAVED) || '[]'); } catch {}
   for (const id of saved) { const a = acct(id); if (a && !a.needs_reconnect) toggleTarget(id, true, false); }
+}
+// Back from connecting: accounts that are new and in no brand go into the
+// brand that was chosen when the connect started.
+const PENDING_BRAND = 'arco-publisher.connect-brand';
+async function fileNewAccounts() {
+  let p = null;
+  try { p = JSON.parse(localStorage.getItem(PENDING_BRAND) || 'null'); localStorage.removeItem(PENDING_BRAND); } catch {}
+  if (!p || Date.now() - p.at > 30 * 60e3 || !brandName(p.brand) || !can('admin')) return;
+  const fresh = S.me.accounts.filter(a => !p.known.includes(a.id) && !a.brand_id).map(a => a.id);
+  if (!fresh.length) return;
+  try { await send(`/brands/${p.brand}/accounts`, 'POST', { account_ids: fresh }); S.me = await api('/me');
+    S.flash = { kind: 'ok', text: `Added to ${brandName(p.brand)}.` }; } catch {}
 }
 function saveTargets() { try { localStorage.setItem(SAVED, JSON.stringify(S.targets)); } catch {} }
 
@@ -159,6 +175,7 @@ function menu() {
   const email = S.me.user?.email || '';
   return `<a class="brand-row" href="#overview"><img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30"><b>ARCO Publisher</b></a>
     ${wsBox()}
+    ${brandNav()}
     <a class="create-side" href="#compose" title="Create post">${ui('plus', 16)}<span class="lb">Create post</span></a>
     <nav class="nav" aria-label="Main">${items.map(([k, l, i, n, tone]) =>
       `<a href="#${k}" title="${l}" class="${S.view === k ? 'on' : ''}" ${S.view === k ? 'aria-current="page"' : ''}>${ui(i)}<span class="lb">${l}</span>${n ? `<span class="n ${tone || ''}" title="${tone === 'bad' ? `${n} failed in the last 7 days` : `${n} waiting`}">${n}</span>` : ''}</a>`).join('')}</nav>
@@ -250,7 +267,7 @@ function render() {
   const hadDetail = !!$('overlay'), opener = S.detail && !hadDetail ? document.activeElement?.closest?.('[data-open]')?.dataset.open : null;
   if (S.anim) { $('app').classList.remove('in'); void $('app').offsetWidth; $('app').classList.add('in'); S.anim = false;
     clearTimeout(S.animT); S.animT = setTimeout(() => $('app').classList.remove('in'), 400); }
-  $('app').innerHTML = head + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '') + resultView();
+  $('app').innerHTML = head + (['calendar', 'analytics', 'drafts', 'compose'].includes(S.view) ? brandChips('phone') : '') + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '') + resultView();
   bind();
   if (S.detail && !hadDetail) { S.opener = opener; $('closedetail')?.focus(); }
   if (!S.detail && hadDetail && S.opener) { document.querySelector(`[data-open="${S.opener}"]`)?.focus(); S.opener = null; }
@@ -269,7 +286,7 @@ async function loadOverview() {
     S.drafts = drafts.drafts;
     S.counts = { drafts: draftGroups().length, failed: S.posts.filter(p => p.status === 'failed' && p.scheduled_at > now - 7 * 86400).length };
     S.ov = { at: now };
-    api('/stats?days=7').then(st => { S.ovStats = st; if (S.view === 'overview') render(); }).catch(() => {});
+    api(`/stats?days=7&brand=${encodeURIComponent(curBrand())}`).then(st => { S.ovStats = st; if (S.view === 'overview') render(); }).catch(() => {});
   } catch (e) { S.flash = { kind: 'err', text: e.message }; S.ov = { at: now, err: true }; }
   if (S.view === 'overview') render();
 }
@@ -282,99 +299,155 @@ function greeting() {
 const thumbOf = p => p.images?.[p.cover_index] || p.images?.[0];
 const at = (sec, o = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) => fmt(sec, o);
 
+// The brand the whole app is narrowed to: 'all', a brand id, or 'none' (in no
+// brand). Overview, Calendar, Analytics, Drafts and Create all follow it.
+const BRAND_KEY = 'arco-publisher.brand';
+const BRAND_HUES = ['#6D5BD0', '#D9822B', '#0E9384', '#D4537E', '#3B5BDB', '#7A9A01'];
+const brandHue = id => { const i = S.me.brands.findIndex(b => b.id === id); return i < 0 ? 'var(--soft)' : BRAND_HUES[i % BRAND_HUES.length]; };
+function curBrand() {
+  if (S.brand === undefined) { try { S.brand = localStorage.getItem(BRAND_KEY) || 'all'; } catch { S.brand = 'all'; } }
+  if (!S.me?.brands.length) return 'all';
+  const ok = S.brand === 'all' || (S.brand === 'none' ? S.me.accounts.some(a => !brandName(a.brand_id)) : !!brandName(S.brand));
+  return ok ? S.brand : 'all';
+}
+const brandAccounts = (b = curBrand()) => S.me.accounts.filter(a => inBrand(a, b));
+const brandLabel = b => (b === 'all' ? 'All brands' : b === 'none' ? 'No brand' : brandName(b));
+// The choices: every brand, plus "No brand" while some account is in none.
+const brandOpts = () => [['all', 'All brands', S.me.accounts.length], ...S.me.brands.map(x => [x.id, x.name, brandAccounts(x.id).length]),
+  ...(S.me.accounts.some(a => !brandName(a.brand_id)) ? [['none', 'No brand', brandAccounts('none').length]] : [])];
+const brandDot = k => (k === 'all' ? '' : `<i style="background:${k === 'none' ? 'var(--soft)' : brandHue(k)}"></i>`);
+
+// Switching brand: the Create page picks that brand's accounts, and the
+// numbers on Analytics are read again for it.
+function setBrand(k) {
+  S.brand = k; try { localStorage.setItem(BRAND_KEY, k); } catch {}
+  S.fAcct = 'all'; S.pq = '';
+  if (k !== 'all') {
+    for (const id of [...S.targets]) if (!inBrand(acct(id), k)) toggleTarget(id, false, false);
+    if (!S.targets.length && !S.replaces && !S.fromDraft) for (const a of brandAccounts(k)) if (!a.needs_reconnect) toggleTarget(a.id, true, false);
+  }
+  if (S.view === 'analytics') { S.stats = null; loadStats(); }
+  render();
+}
+
+// The switch: a list in the menu, chips on a phone (where there is no menu).
+function brandNav() {
+  if (!S.me.brands.length) return '';
+  const b = curBrand();
+  return `<div class="bnav" role="group" aria-label="Brand"><span class="bnh">Brands</span>${brandOpts().map(([k, l, n]) =>
+    `<button class="${b === k ? 'on' : ''}" data-brand="${k}" aria-pressed="${b === k}" title="${esc(l)}">
+      <span class="bsq" style="${k === 'all' ? '' : `background:${k === 'none' ? 'var(--soft)' : brandHue(k)}`}">${k === 'all' ? ui('users', 14) : esc((l[0] || '?').toUpperCase())}</span>
+      <span class="lb">${esc(l)}</span><span class="bn">${n}</span></button>`).join('')}</div>`;
+}
+function brandChips(cls = '') {
+  if (!S.me.brands.length) return '';
+  const b = curBrand();
+  return `<div class="bchips ${cls}" role="group" aria-label="Brand">${brandOpts().map(([k, l]) =>
+    `<button class="bchip ${b === k ? 'on' : ''}" data-brand="${k}" aria-pressed="${b === k}">${brandDot(k)}${esc(l)}</button>`).join('')}</div>`;
+}
+const inBrand = (a, b) => b === 'all' || (b === 'none' ? !brandName(a?.brand_id) : a?.brand_id === b);
+const engOf = s => (s.likes || 0) + (s.comments || 0) + (s.shares || 0) + (s.saves || 0);
+
 function overviewView() {
-  const acc = S.me.accounts;
-  if (!acc.length) return firstRun();
-  if (!S.ov) return `<div class="ohead"><h1>${greeting()}</h1><p>${sk('42%', 14)}</p></div>${skKpis(4)}<div class="ogrid"><section class="panel ocard sched"><header><h2>Schedule</h2></header><div class="dtabs">${[...Array(7)].map(() => sk('100%', 62)).join('')}</div><div class="oscroll">${skRows(4)}</div></section><section class="panel ocard"><header><h2>To do</h2></header><div class="oscroll">${skRows(3)}</div></section></div>`;
-  const now = Math.floor(Date.now() / 1000), t0 = today(), todayKey = dayKey(t0);
-  const live = S.posts.filter(p => p.status !== 'cancelled');
-  const upcoming = live.filter(p => p.status === 'queued' && p.scheduled_at >= now).sort((a, b) => a.scheduled_at - b.scheduled_at);
+  const all = S.me.accounts;
+  if (!all.length) return firstRun();
+  const brands = S.me.brands, loose = all.some(a => !brandName(a.brand_id)), b = curBrand();
+  const chips = brandChips('phone');
+  if (!S.ov) return `<div class="ohead"><div><h1>${greeting()}</h1><p>${sk('260px', 14)}</p></div>${chips}</div>${skKpis(4)}
+    <section class="panel"><header><h2>This week</h2></header><div class="wk">${[...Array(7)].map(() => `<div class="owd">${sk('60%', 14)}${sk('100%', 50)}</div>`).join('')}</div></section>`;
+
+  const acc = all.filter(a => inBrand(a, b)), ids = new Set(acc.map(a => a.id));
+  const now = Math.floor(Date.now() / 1000), week = 7 * 86400, t0 = today(), todayKey = dayKey(t0);
+  const live = S.posts.filter(p => p.status !== 'cancelled' && ids.has(p.account_id));
+  const upcoming = live.filter(p => p.status === 'queued' && p.scheduled_at >= now).sort((x, y) => x.scheduled_at - y.scheduled_at);
   const next = upcoming[0];
   const leftToday = upcoming.filter(p => dayOf(p.scheduled_at) === todayKey).length;
   const sub = next
     ? `${leftToday ? `${leftToday} post${leftToday === 1 ? '' : 's'} left today · ` : ''}next at <b>${at(next.scheduled_at)}</b>${dayOf(next.scheduled_at) === todayKey ? '' : ` ${fmt(next.scheduled_at, { weekday: 'short' })}`} on ${who(next)}`
     : 'Nothing scheduled yet.';
 
-  // Numbers we already have; each one opens the screen that explains it.
-  const week = 7 * 86400;
+  // Problems only: failed posts and accounts that lost access.
   const failed = live.filter(p => p.status === 'failed' && p.scheduled_at > now - week);
   const reconnect = acc.filter(a => a.needs_reconnect);
+  const probs = [...failed.slice(0, 3).map(p => `<button class="aitem" data-open="${p.id}"><b>Failed on ${who(p)}</b><span title="${esc(p.fail_reason || '')}">${esc(p.fail_reason || 'Open it to see why')}</span></button>`),
+    ...(failed.length > 3 ? [`<a class="aitem" href="#calendar"><b>${failed.length - 3} more failed</b></a>`] : []),
+    ...reconnect.map(a => `<a class="aitem" href="#accounts"><b>Reconnect ${who(a)}</b><span>${PLATFORM[platformOf(a)]} access expired</span></a>`)];
+  const alert = probs.length ? `<div class="oalert" role="status"><span class="ic">${ui('x', 15)}</span><div class="aitems">${probs.join('')}</div></div>` : '';
+
+  // Results, from each published post's own numbers: last 7 days against the 7 before.
+  const pub = live.filter(p => p.status === 'published');
+  const cur = pub.filter(p => p.scheduled_at > now - week), prev = pub.filter(p => p.scheduled_at <= now - week && p.scheduled_at > now - 2 * week);
+  const sum = (list, f) => { const s = list.filter(p => p.stats); return s.length ? s.reduce((n, p) => n + f(p.stats), 0) : null; };
+  const hasViews = cur.some(p => p.stats?.views != null);
+  const views = hasViews ? sum(cur, s => s.views || 0) : null, pviews = sum(prev, s => s.views || 0);
+  const eng = sum(cur, engOf), peng = sum(prev, engOf);
+  const pct = (v, pv) => (v == null || !pv ? null : Math.round((v - pv) / pv * 100));
+  const trend = p => (p == null ? '' : `<span class="${p > 0 ? 'up' : p < 0 ? 'dn' : ''}">${p > 0 ? '↑' : p < 0 ? '↓' : '='} ${Math.abs(p)}%</span> vs previous 7 days`);
+  const days7 = [...Array(7)].map((_, i) => dayKey(addDays(t0, i - 6)));
+  const spark = f => { const v = days7.map(k => cur.filter(p => dayOf(p.scheduled_at) === k && p.stats).reduce((n, p) => n + f(p.stats), 0)), m = Math.max(...v);
+    return m ? `<span class="spark" aria-hidden="true">${v.map(x => `<i style="height:${Math.max(6, Math.round(x / m * 100))}%"></i>`).join('')}</span>` : ''; };
+  const sacc = (S.ovStats?.accounts || []).filter(a => ids.has(a.id));
+  const fchg = sacc.filter(a => a.change != null), ftot = sacc.filter(a => a.followers != null);
+  const followers = fchg.length ? fchg.reduce((n, a) => n + a.change, 0) : null;
+  const next7 = upcoming.filter(p => p.scheduled_at < now + week).length;
   const kpis = [
-    ['#calendar', 'Scheduled', upcoming.filter(p => p.scheduled_at < now + week).length, 'next 7 days', ''],
-    ['#calendar', 'Published', live.filter(p => p.status === 'published' && p.scheduled_at >= now - week).length, 'last 7 days', ''],
-    ['#calendar', 'Failed', failed.length, 'last 7 days', failed.length ? 'bad' : ''],
-    ['#accounts', 'Accounts', acc.length, reconnect.length ? `${reconnect.length} to reconnect` : 'all connected', reconnect.length ? 'warn' : ''],
+    ['#analytics', 'Views · 7 days', num(views), views == null ? (S.ovStats?.tiktok_reconnect ? 'Reconnect TikTok for views' : 'Shows once platforms share it') : trend(pct(views, pviews)) || `${cur.length} post${cur.length === 1 ? '' : 's'}`, spark(s => s.views || 0)],
+    ['#analytics', 'Engagement', num(eng), eng == null ? 'Likes, comments and shares' : trend(pct(eng, peng)) || (views ? `${(eng / views * 100).toFixed(1)}% of views` : 'likes, comments, shares'), spark(engOf)],
+    ['#analytics', 'New followers', followers == null ? '–' : signed(followers), ftot.length ? `${num(ftot.reduce((n, a) => n + a.followers, 0))} in total` : S.ovStats ? 'Shows after a day' : '', ''],
+    ['#calendar', 'Published · 7 days', String(cur.length), `${next7} scheduled next 7 days${failed.length ? ` · <span class="dn">${failed.length} failed</span>` : ''}`, ''],
   ];
 
-  // Schedule: seven day tabs from today; the list shows the chosen day.
+  // The week: today and the six days after, every post as a tile.
   const days = [...Array(7)].map((_, i) => addDays(t0, i));
-  const sel = days.find(d => dayKey(d) === S.ovDay) || days[0], selKey = dayKey(sel);
-  const onDay = d => live.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((a, b) => a.scheduled_at - b.scheduled_at);
-  const tab = (d, i) => { const n = onDay(d).length, k = dayKey(d);
-    return `<button class="dtab ${k === selKey ? 'on' : ''}" data-ovday="${k}"><span>${i === 0 ? 'Today' : i === 1 ? '<em class="lg">Tomorrow</em><em class="sm">Tmrw</em>' : dayLabel(d, { weekday: 'short' })}</span>
-      <b>${d.d}</b><i class="${n ? '' : 'z'}">${n || '–'}</i></button>`; };
-  const label = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting' };
-  const row = (p, later) => { const isNext = next && p.id === next.id, st = isNext ? 'next' : p.status;
-    return `<div class="srow2 ${st} ${later ? 'later' : ''}" data-open="${p.id}" role="button" tabindex="0">
-      <time>${later ? `<small>${fmt(p.scheduled_at, { weekday: 'short' })}</small>` : ''}${at(p.scheduled_at)}</time><i class="sdot"></i>
-      ${thumbOf(p) ? `<img src="${esc(thumbOf(p))}" alt="">` : '<span class="noimg"></span>'}
-      <div class="sx"><b>${icon(p.platform || 'tiktok', 13)}${who(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>
-      <span class="st ${st}">${isNext ? 'Next up' : label[p.status] || p.status}</span></div>`; };
-  const list = onDay(sel);
-  const isToday = selKey === todayKey;
-  const before = isToday ? list.filter(p => p.scheduled_at < now) : [], after = isToday ? list.filter(p => p.scheduled_at >= now) : list;
-  const endSel = Math.floor(zonedToMs(...Object.values(addDays(sel, 1))) / 1000);
-  const later = upcoming.filter(p => p.scheduled_at >= endSel).slice(0, Math.max(0, 4 - list.length));
-  const weekEmpty = !upcoming.length && days.every(d => !onDay(d).length);
-  const schedule = weekEmpty ? `<div class="splan"><span class="splan-ic">${ui('cal', 22)}</span><b>Nothing scheduled this week</b>
-      <span>Pick a day above to plan one, or set posting times and let "Add to queue" fill them for you.</span>
-      <div><button class="btn" data-newon="${selKey}">${ui('plus', 15)}Schedule a post</button>${!S.me.workspace.slots && can('admin') ? '<a class="btn sec" href="#settings">Set posting times</a>' : '<a class="btn sec" href="#calendar">Open calendar</a>'}</div></div>`
-    : `${list.length ? `${before.map(p => row(p)).join('')}${isToday ? `<div class="snow"><time>${at(now)}</time><i></i></div>` : ''}${after.map(p => row(p)).join('')}`
-      : `<div class="snone"><span>${isToday ? 'Nothing goes out today.' : `Nothing scheduled for ${dayLabel(sel, { weekday: 'long' })}.`}</span>
-        <button class="btn sec" data-newon="${selKey}">${ui('plus', 15)}Schedule a post</button></div>`}
-    ${later.length ? `<div class="slater">Coming up</div>${later.map(p => row(p, true)).join('')}` : ''}`;
+  const onDay = d => live.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((x, y) => x.scheduled_at - y.scheduled_at);
+  const tile = p => { const st = next && p.id === next.id ? 'next' : p.status, a = all.find(x => x.id === p.account_id);
+    return `<button class="opt ${st}" data-open="${p.id}" style="--bc:${brandHue(a?.brand_id)}" title="${esc(p.caption || p.title || 'No caption')}">
+      <span class="oth">${thumbOf(p) ? `<img src="${esc(thumbOf(p))}" alt="">` : ''}<span class="pb">${icon(p.platform || 'tiktok', 9)}</span></span>
+      <span class="tx"><b>${at(p.scheduled_at)}${st === 'failed' ? ' · failed' : st === 'next' ? ' · next' : ''}</b><span>${who(p)}</span><span>${esc(p.caption || p.title || 'No caption')}</span></span></button>`; };
+  const nowLine = `<div class="nowl"><time>${at(now)}</time><i></i></div>`;
+  const col = (d, i) => { const k = dayKey(d), list = onDay(d), isT = i === 0;
+    const before = isT ? list.filter(p => p.scheduled_at < now) : [], after = isT ? list.filter(p => p.scheduled_at >= now) : list;
+    return `<div class="owd ${isT ? 'today' : ''}"><div class="wdh"><span>${i === 0 ? 'Today' : dayLabel(d, { weekday: 'short' })} <b>${d.d}</b></span><em class="${list.length ? '' : 'z'}">${list.length || '–'}</em></div>
+      <div class="wdl">${before.map(tile).join('')}${isT && list.length ? nowLine : ''}${after.map(tile).join('')}</div>
+      <button class="wadd" data-newon="${k}" aria-label="Schedule a post on ${esc(dayLabel(d, { weekday: 'long' }))}">${ui('plus', 13)}<span>Schedule</span></button></div>`; };
+  const weekEmpty = days.every(d => !onDay(d).length);
+  const legend = brands.length && b === 'all' ? `<span class="legend">${brands.map(x => `<span><i style="background:${brandHue(x.id)}"></i>${esc(x.name)}</span>`).join('')}${loose ? '<span><i style="background:var(--soft)"></i>No brand</span>' : ''}</span>` : '';
+  const weekCard = `<section class="panel owk"><header><h2>This week</h2>${legend}<a href="#calendar">Open calendar</a></header>
+    ${weekEmpty ? `<div class="splan"><span class="splan-ic">${ui('cal', 22)}</span><b>Nothing scheduled this week</b>
+      <span>Plan a post for any day, or set posting times and let "Add to queue" fill them for you.</span>
+      <div><button class="btn" data-newon="${todayKey}">${ui('plus', 15)}Schedule a post</button>${!S.me.workspace.slots && can('admin') ? '<a class="btn sec" href="#settings">Set posting times</a>' : ''}</div></div>`
+      : `<div class="wk">${days.map(col).join('')}</div>`}</section>`;
 
-  // Needs attention: only what someone has to act on.
-  const attn = [
-    ...failed.map(p => `<div class="arow2" data-open="${p.id}" role="button" tabindex="0"><span class="ic bad">${ui('x', 15)}</span>
-      <div><b>Failed on ${who(p)}</b><span title="${esc(p.fail_reason || '')}">${esc(p.fail_reason || 'Open it to see why')}</span></div><em>Review</em></div>`),
-    ...reconnect.map(a => `<a class="arow2" href="#accounts"><span class="ic warn">${ui('retry', 15)}</span>
-      <div><b>Reconnect ${who(a)}</b><span>${PLATFORM[platformOf(a)]} access expired or was removed</span></div><em>Fix</em></a>`),
-  ];
-  const drafts = draftGroups();
-  const todo = [
-    ...drafts.slice(0, 4).map(g => `<div class="arow2" data-opendraft="${esc(g[0].group_id || g[0].id)}" role="button" tabindex="0"><span class="ic mute">${ui('draft', 15)}</span>
-      <div><b>Finish draft</b><span>${esc(g[0].caption || g[0].title || 'No caption yet')}</span></div><em>Open</em></div>`),
-    ...(S.ovStats?.tiktok_reconnect && can('admin') ? [`<a class="arow2" href="/api/auth/start?add=1"><span class="ic mute">${appIcon('tiktok', 18)}</span>
-      <div><b>Reconnect TikTok for stats</b><span>One reconnect lets TikTok share views, likes and followers</span></div><em>Reconnect</em></a>`] : []),
-    ...(!S.me.workspace.slots && can('admin') ? [`<a class="arow2" href="#settings"><span class="ic mute">${ui('cal', 15)}</span>
-      <div><b>Set your posting times</b><span>"Add to queue" then picks the next free time</span></div><em>Set</em></a>`] : []),
-  ];
-  const side = `<section class="panel ocard"><header><h2>To do</h2>${attn.length ? `<span class="count bad">${attn.length}</span>` : ''}</header>
-    <div class="oscroll">${attn.length || todo.length ? `${attn.join('')}${todo.join('')}`
-      : `<div class="allclear"><span class="ic ok">${ui('check', 18)}</span><b>All clear</b><span>No failed posts, no drafts, every account connected.</span></div>`}</div>
-    <div class="quick"><a class="btn" href="#compose">${ui('plus', 15)}New post</a>${can('admin') ? `<a class="btn sec" href="#accounts">${ui('users', 15)}Accounts</a>` : `<a class="btn sec" href="#calendar">${ui('cal', 15)}Calendar</a>`}</div></section>`;
+  // Each account: what it has coming, what went out, and how it did.
+  const rows = brandGroups(acc).flatMap(g => g.accounts).map(a => {
+    const mine = live.filter(p => p.account_id === a.id), sa = sacc.find(x => x.id === a.id);
+    const sched = mine.filter(p => p.status === 'queued' && p.scheduled_at >= now && p.scheduled_at < now + week).length;
+    const out = mine.filter(p => p.status === 'published' && p.scheduled_at > now - week);
+    const v = out.some(p => p.stats?.views != null) ? out.reduce((n, p) => n + (p.stats?.views || 0), 0) : null;
+    const fails = mine.filter(p => p.status === 'failed' && p.scheduled_at > now - week).length;
+    return `<tr><td><span class="acc"><i style="background:${brandHue(a.brand_id)}"></i>${withBadge(avatar(a.avatar_url, a.username || a.display_name), platformOf(a))}
+        <span class="an"><b>${handle(a)}</b><small>${PLATFORM[platformOf(a)]}</small></span>
+        ${a.needs_reconnect ? '<a class="tag warn" href="#accounts">Reconnect</a>' : fails ? `<span class="tag bad">${fails} failed</span>` : ''}</span></td>
+      <td class="n ${sched || a.needs_reconnect ? '' : 'z'}" title="${sched ? '' : 'Nothing scheduled in the next 7 days'}">${sched}</td><td class="n">${out.length}</td>
+      <td class="n">${num(v)}</td><td class="n ${sa?.change > 0 ? 'up' : sa?.change < 0 ? 'dn' : ''}">${sa?.change == null ? '–' : signed(sa.change)}</td></tr>`; }).join('');
+  const accCard = `<section class="panel oacc"><header><h2>By account</h2><span class="note">next and last 7 days</span><a href="#analytics">Analytics</a></header>
+    <table class="atab"><thead><tr><th>Account</th><th class="n">Scheduled</th><th class="n">Published</th><th class="n">Views</th><th class="n">Followers</th></tr></thead><tbody>${rows}</tbody></table></section>`;
 
-  // Recently published: four tiles, always four, so the row never looks half empty.
-  const pub = live.filter(p => p.status === 'published').sort((a, b) => b.scheduled_at - a.scheduled_at).slice(0, 4);
-  const tile = p => `<div class="ptile" data-open="${p.id}" role="button" tabindex="0">
-      <div class="pimg">${thumbOf(p) ? `<img src="${esc(thumbOf(p))}" alt="">` : ''}<span class="pbadge">${appIcon(p.platform || 'tiktok', 20)}</span></div>
-      <b>${who(p)}</b><span>${p.stats ? statLine(p.stats) : fmt(p.scheduled_at, { month: 'short', day: 'numeric' })}</span></div>`;
-  const ghost = `<a class="ptile ghost" href="#compose"><div class="pimg">${ui('plus', 22)}</div><b>Create post</b><span>Your next one goes here</span></a>`;
+  // Best of the last 7 days by views (or engagement where views are not shared), else the latest.
+  const scored = cur.filter(p => p.stats).sort((x, y) => (y.stats.views || 0) - (x.stats.views || 0) || engOf(y.stats) - engOf(x.stats));
+  const top = (scored.length ? scored : pub.slice().sort((x, y) => y.scheduled_at - x.scheduled_at)).slice(0, 3);
+  const ttile = p => `<button class="tp" data-open="${p.id}"><span class="im">${thumbOf(p) ? `<img src="${esc(thumbOf(p))}" alt="">` : ''}<span class="pbadge">${appIcon(p.platform || 'tiktok', 20)}</span></span>
+    <b>${p.stats?.views != null ? `${num(p.stats.views)} views` : p.stats ? `${num(engOf(p.stats))} engagements` : fmt(p.scheduled_at, { month: 'short', day: 'numeric' })}</b>
+    <span>${who(p)}</span></button>`;
+  const topCard = `<section class="panel otop"><header><h2>${scored.length ? 'Top posts' : 'Recently published'}</h2><span class="note">${scored.length ? 'last 7 days' : ''}</span><a href="#analytics">See all</a></header>
+    ${top.length ? `<div class="tops">${top.map(ttile).join('')}</div>`
+      : `<div class="snone"><span>Published posts show here with their numbers.</span><a class="btn sec" href="#compose">${ui('plus', 15)}Create post</a></div>`}</section>`;
 
-  return `<div class="ohead"><div><h1>${greeting()}</h1><p>${sub}</p></div></div>
-  <div class="kpis">${kpis.map(([href, l, n, note, tone]) => `<a href="${href}" class="kpi ${tone}"><span>${l}</span><b>${n}</b><small>${note}</small></a>`).join('')}</div>
-  <div class="ogrid"><div class="ocol">
-    <section class="panel ocard sched"><header><h2>Schedule</h2><a href="#calendar">Open calendar</a></header>
-      <div class="dtabs">${days.map(tab).join('')}</div>
-      <div class="oscroll">${schedule}</div></section>
-    <section class="panel ocard"><header><h2>Recently published</h2><a href="#calendar">See all</a></header>
-      ${pub.length ? `<div class="ptiles">${pub.map(tile).join('')}${pub.length < 4 ? ghost : ''}</div>`
-        : `<div class="snone"><span>Published posts show here with their numbers.</span><a class="btn sec" href="#compose">${ui('plus', 15)}Create post</a></div>`}</section>
-  </div><div class="ocol side">
-    ${side}
-    ${perfCard()}
-  </div></div>`;
+  return `<div class="ohead"><div><h1>${greeting()}</h1><p>${sub}</p></div>${chips}</div>
+  ${alert}
+  <div class="kpis">${kpis.map(([href, l, v, note, sp]) => `<a href="${href}" class="kpi"><span>${l}</span><b>${v}</b><small>${note}</small>${sp}</a>`).join('')}</div>
+  ${weekCard}
+  <div class="obot">${accCard}${topCard}</div>`;
 }
 
 // ---- stats ---------------------------------------------------------------
@@ -393,7 +466,7 @@ const ago = sec => { const m = Math.round((Date.now() / 1000 - sec) / 60);
 
 async function loadStats(days = S.statsDays || 30, plat = S.statsPlat || 'all') {
   S.statsDays = days; S.statsPlat = plat;
-  try { S.stats = await api(`/stats?days=${days}&platform=${plat}`); } catch (e) { S.stats = { err: e.message }; }
+  try { S.stats = await api(`/stats?days=${days}&platform=${plat}&brand=${encodeURIComponent(curBrand())}`); } catch (e) { S.stats = { err: e.message }; }
   if (S.view === 'analytics') render();
 }
 
@@ -426,22 +499,9 @@ function chart(series, key, { kind = 'bar', label, fmtv = num } = {}) {
       <i class="cx"></i><div class="ctip" role="status"></div><div class="xax">${ticks}</div></div></div>`;
 }
 
-function perfCard() {
-  const st = S.ovStats;
-  const head = '<header><h2>Performance</h2><a href="#analytics">Last 7 days</a></header>';
-  if (!st) return `<section class="panel ocard perf">${head}<div class="pgrid">${[...Array(4)].map(() => `<div>${sk('50%', 12)}${sk('40%', 24)}</div>`).join('')}</div></section>`;
-  const keys = ['views', 'likes', 'comments', 'shares'].filter(k => st.totals[k] != null);
-  const cells = [...(keys.length ? keys : ['likes', 'comments', 'shares']).slice(0, 3).map(k => [METRIC[k], num(st.totals[k] ?? null), '']),
-    ['New followers', st.followers.change == null ? '–' : signed(st.followers.change), st.followers.change > 0 ? 'up' : '']];
-  const note = `${st.updated_at ? `Updated ${ago(st.updated_at)}` : 'Read every few hours'}${st.tiktok_reconnect ? ' · reconnect TikTok for its numbers' : ''}`;
-  return `<section class="panel ocard perf">${head}
-    <div class="pgrid">${cells.map(([l, v, c]) => `<div><span>${l}</span><b class="${c}">${v}</b></div>`).join('')}</div>
-    <p class="pnote" title="${esc(note)}">${note}</p></section>`;
-}
-
 function analyticsView() {
   const st = S.stats, days = S.statsDays || 30, plat = S.statsPlat || 'all';
-  const plats = st?.platforms || ORDER.filter(pl => S.me.accounts.some(a => platformOf(a) === pl));
+  const plats = ORDER.filter(pl => brandAccounts().some(a => platformOf(a) === pl));
   const filters = `<div class="afilters">
     <div class="pchips" role="group" aria-label="Platform">${[['all', 'All platforms'], ...plats.map(pl => [pl, PLATFORM[pl]])].map(([k, l]) =>
       `<button class="pchip ${plat === k ? 'on' : ''}" data-aplat="${k}" aria-pressed="${plat === k}">${k === 'all' ? '' : appIcon(k, 18)}${l}</button>`).join('')}</div>
@@ -669,7 +729,9 @@ function pickList() {
   const q = S.pq.trim().toLowerCase();
   const hit = a => !q || [a.username, a.display_name, PLATFORM[platformOf(a)], brandName(a.brand_id)]
     .some(v => String(v || '').toLowerCase().includes(q));
-  const groups = brandGroups(S.me.accounts.filter(hit)).filter(g => g.accounts.length);
+  const b = curBrand(), mine = S.me.accounts.filter(a => inBrand(a, b) || S.targets.includes(a.id) || (S.pickAll && b !== 'all'));
+  const groups = brandGroups(mine.filter(hit)).filter(g => g.accounts.length);
+  const more = b !== 'all' && !S.pickAll && S.me.accounts.length > mine.length;
   return `<div class="ddpop" role="listbox" aria-multiselectable="true">
     ${S.me.accounts.length > 6 ? `<input type="text" id="pq" class="pq" placeholder="Search accounts or brands" value="${esc(S.pq)}" autocomplete="off">` : ''}
     <div class="ddlist">${groups.map(g => {
@@ -683,6 +745,7 @@ function pickList() {
           ${withBadge(avatar(a.avatar_url, a.username || a.display_name), platformOf(a))}
           <span class="nm"><b>${handle(a)}</b><span>${PLATFORM[platformOf(a)]}${a.needs_reconnect ? ' · reconnect needed' : ''}</span></span></label>`).join('')}</div>`;
     }).join('') || '<p class="note" style="padding:10px">No account matches.</p>'}</div>
+    ${more ? `<button type="button" class="link ddmore" id="pickall">Show accounts from other brands</button>` : ''}
     <div class="ddfoot">${can('admin') ? '<a href="#accounts">Manage accounts</a>' : '<span></span>'}<button type="button" class="btn" id="closepick">Done</button></div></div>`;
 }
 
@@ -1337,8 +1400,8 @@ function draftGroups() {
 }
 
 function draftsView() {
-  const groups = draftGroups();
-  if (!groups.length) return `<section class="panel empty"><b>No drafts.</b>Use "Save draft" while creating a post to keep it for later.
+  const b = curBrand(), groups = draftGroups().filter(g => g.some(d => inBrand(acct(d.account_id), b)));
+  if (!groups.length) return `<section class="panel empty"><b>No drafts${b === 'all' ? '' : ` for ${esc(brandLabel(b))}`}.</b>Use "Save draft" while creating a post to keep it for later.
     <div><a class="btn" href="#compose">${ui('plus', 16)}Create post</a></div></section>`;
   return `<div class="panel"><div class="list drafts">${groups.map(g => {
     const d = g[0], cover = d.images[d.cover_index] || d.images[0], key = esc(d.group_id || d.id);
@@ -1435,17 +1498,13 @@ function calendarView() {
   const plats = ORDER.filter(pl => accts.some(a => platformOf(a) === pl));
   const posts = S.posts.filter(p => (S.fPlat === 'all' || (p.platform || 'tiktok') === S.fPlat)
     && (S.fAcct === 'all' || p.account_id === S.fAcct)
-    && (S.fBrand === 'all' || acct(p.account_id)?.brand_id === S.fBrand));
+    && inBrand(acct(p.account_id), curBrand()));
   const shown = accts.filter(a => (S.fPlat === 'all' || platformOf(a) === S.fPlat)
-    && (S.fBrand === 'all' || a.brand_id === S.fBrand));
+    && inBrand(a, curBrand()));
   const days = [...Array(r.n)].map((_, i) => addDays(r.start, i));
   const now = dayKey(today()), offset = month ? S.month : S.week;
   const empty = !posts.length;
   const filters = accts.length ? `<div class="chips">
-      ${S.me.brands.length ? `<select id="fbrand" style="width:auto;padding:5px 10px">
-        <option value="all">All brands</option>
-        ${S.me.brands.map(b => `<option value="${b.id}" ${S.fBrand === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
-      </select>` : ''}
       <button class="chip ${S.fPlat === 'all' ? 'on' : ''}" data-fp="all">All platforms</button>
       ${plats.map(pl => `<button class="chip ${S.fPlat === pl ? 'on' : ''}" data-fp="${pl}">${icon(pl, 13)}${PLATFORM[pl]}</button>`).join('')}
       ${shown.length > 1 ? `<select id="facct" style="width:auto;padding:5px 10px">
@@ -1588,7 +1647,7 @@ function accountCard(x) {
 }
 
 function accountsView() {
-  const a = S.me.accounts, groups = brandGroups();
+  const a = S.me.accounts, cb = curBrand(), groups = brandGroups().sort((x, y) => (y.id === cb) - (x.id === cb));
   const hint = { tiktok: 'Photo posts with TikTok\'s own privacy and disclosure settings.',
     instagram: 'Business or Creator accounts. No Facebook Page needed.', facebook: 'Every Page you manage, in one go.' };
   return `<section class="panel"><header><h2>Connect an account</h2><span class="note">${a.length} of ${S.me.limits.accounts} connected</span></header>
@@ -1800,12 +1859,18 @@ function bind() {
   on('#caption', 'change', render);
   on('[data-t]', 'change', e => toggleTarget(e.target.dataset.t, e.target.checked));
   on('#openpick', 'click', () => { S.pickOpen = !S.pickOpen; render(); if (S.pickOpen) $('pq')?.focus(); });
-  on('#closepick', 'click', () => { S.pickOpen = false; render(); });
+  on('#closepick', 'click', () => { S.pickOpen = false; S.pickAll = false; render(); });
+  on('#pickall', 'click', () => { S.pickAll = true; render(); });
+  // Connecting while a brand is chosen files the new account under it.
+  on('a[href*="/api/auth/"][href*="add=1"]', 'click', () => {
+    const b = curBrand();
+    if (b === 'all' || b === 'none' || !can('admin')) return;
+    try { localStorage.setItem(PENDING_BRAND, JSON.stringify({ brand: b, known: S.me.accounts.map(a => a.id), at: Date.now() })); } catch {}
+  });
   on('[data-bg]', 'change', e => pickGroup(e.target.dataset.bg, e.target.checked));
   document.querySelectorAll('[data-state=some]').forEach(el => { el.indeterminate = true; });
   on('#pq', 'input', e => { S.pq = e.target.value; const at = e.target.selectionStart; render();
     const el = $('pq'); if (el) { el.focus(); el.setSelectionRange(at, at); } });
-  on('#fbrand', 'change', e => { S.fBrand = e.target.value; S.fAcct = 'all'; render(); });
   on('#newbrand', 'submit', e => { e.preventDefault(); const name = $('brandname').value;
     brandAction(() => send('/brands', 'POST', { name })); });
   on('[data-move]', 'change', e => brandAction(() => send(`/accounts/${e.target.dataset.move}`, 'PATCH', { brand_id: e.target.value || null })));
@@ -1865,7 +1930,7 @@ function bind() {
     if (h > 23) return;
     resetComposer(); S.when = 'later'; S.at = `${y}-${pad(m)}-${pad(d)}T${pad(h)}:00`; location.hash = '#compose';
   });
-  on('[data-ovday]', 'click', e => { S.ovDay = e.currentTarget.dataset.ovday; render(); });
+  on('[data-brand]', 'click', e => setBrand(e.currentTarget.dataset.brand));
   on('[data-newon]', 'click', e => { const [y, m, d] = e.currentTarget.dataset.newon.split('-').map(Number);
     const n = zoned(Date.now()), isToday = n.y === y && n.m === m && n.d === d, h = isToday ? Math.max(9, n.h + 1) : 9;
     resetComposer(); if (h <= 23) { S.when = 'later'; S.at = `${y}-${pad(m)}-${pad(d)}T${pad(h)}:00`; } location.hash = '#compose'; });

@@ -132,6 +132,21 @@ describe('getStats', () => {
     expect(member.accounts.map(a => a.id)).toEqual(['ig1']);
     await expect(getStats(env, 'ws1', 9, T)).rejects.toThrow('days');
   });
+
+  it('narrows to one brand, or to accounts in no brand, inside the caller\'s scope', async () => {
+    await account('ig1', 'instagram', 'ws1', { brand: 'b1' }); await account('ig2', 'instagram', 'ws1', { brand: 'b2' });
+    await account('ig3', 'instagram');
+    await post('a', 'ig1', T - 3600, { stats: { likes: 1 }, statsAt: T });
+    await post('b', 'ig2', T - 3600, { stats: { likes: 10 }, statsAt: T });
+    await post('c', 'ig3', T - 3600, { stats: { likes: 100 }, statsAt: T });
+    const b2 = await getStats(env, 'ws1', 7, T, 'all', 'b2');
+    expect(b2.totals.likes).toBe(10);
+    expect(b2.accounts.map(a => a.id)).toEqual(['ig2']);
+    expect((await getStats(env, 'ws1', 7, T, 'all', 'none')).totals.likes).toBe(100);
+    const outside = await getStats(env, { ws: 'ws1', scope: ['b1'] }, 7, T, 'all', 'b2');
+    expect(outside.published).toBe(0);
+    expect(outside.accounts).toEqual([]);
+  });
 });
 
 describe('Facebook without pages_read_user_content', () => {
