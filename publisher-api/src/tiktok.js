@@ -19,8 +19,11 @@ export class TikTokError extends Error {
   }
 }
 
+// Post ids are 19-digit numbers, past what a JavaScript number holds exactly,
+// and the status endpoint sends them unquoted. Quote any such number before
+// parsing so it arrives as the exact string.
 async function readBody(res) {
-  const text = await res.text();
+  const text = (await res.text()).replace(/([:\[,]\s*)(-?\d{16,})(?=\s*[,\]}])/g, '$1"$2"');
   try { return JSON.parse(text); } catch { return {}; }
 }
 

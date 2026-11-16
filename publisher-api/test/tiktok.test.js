@@ -88,3 +88,11 @@ describe('tiktok client', () => {
     expect(f.calls[0].init.signal).toBeInstanceOf(AbortSignal);
   });
 });
+
+describe('big post ids', () => {
+  it('keeps a 19-digit post id exact', async () => {
+    const f = async () => new Response('{"data":{"status":"PUBLISH_COMPLETE","publicaly_available_post_id":[7708722665300807123]},"error":{"code":"ok"}}');
+    const tk = tiktok({ clientKey: 'ck', clientSecret: 'cs', fetch: f });
+    expect((await tk.status('at', 'p1')).publicaly_available_post_id).toEqual(['7708722665300807123']);
+  });
+});
