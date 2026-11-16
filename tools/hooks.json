@@ -2347,6 +2347,19 @@
     "06.jpg"
    ],
    "_note": "built 2026-11-14 by gen-screen-time-under-3.py. ARCO-UI post (Thinh: more eyes on the UI), big-screen design, new claude hook. Added on top of frequency test week 1 for 2026-11-20."
+  },
+  {
+   "topic": "blow-my-mind",
+   "title": "apps for iphone that blow my mind",
+   "caption": "apps for iphone that blow my mind. arco: plan your day as timed blocks, with tasks and habits inline. start a focus timer on any block, and it locks tiktok and instagram during the hours you set, every day. claude: talk a problem through out loud in voice mode, then ask for the result as a real file, a doc, a deck or a spreadsheet you can send. superwhisper: talk instead of typing in any app. its keyboard turns speech into clean text with punctuation, so a two-minute ramble becomes a message ready to send. endel: soundscapes that adapt to the time of day and your heart rate. start focus with a timer and it ends with the session, no playlist to pick. #iphoneapps #apps #productivity #focus #creatorsearchinsights",
+   "slides": [
+    "01.jpg",
+    "02.jpg",
+    "03.jpg",
+    "04.jpg",
+    "05.jpg"
+   ],
+   "_note": "built 2026-11-16 by gen-blow-my-mind.py, store-card layout (3:4) copied from a post Thinh sent. tools pillar, theme planning. Roster ARCO, Claude, Superwhisper, Endel; Claude the one LLM. No CTA. Hook photo is a library stand-in (bg-h01): Higgsfield had no credits; Thinh approved as is."
   }
  ]
 }

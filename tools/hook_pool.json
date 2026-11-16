@@ -588,6 +588,18 @@
    "origin": "claude",
    "added": "2026-11-14",
    "used": true
+  },
+  {
+   "lines": [
+    "Apps for iPhone",
+    "That blow my mind"
+   ],
+   "pillar": "tools",
+   "theme": "planning",
+   "lens": "an iPhone app that does something the viewer did not know a phone could do",
+   "added": "2026-11-16",
+   "used": true,
+   "_note": "Thinh's pick, from a store-card post he sent; store-card layout (_store_cards)."
   }
  ]
 }
