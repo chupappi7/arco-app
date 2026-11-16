@@ -18,6 +18,8 @@ const YOUNG = 3 * DAY;
 const YOUNG_EVERY = 3 * 3600;
 const ACCOUNT_EVERY = 6 * 3600;
 const INSIGHTS_RETRY = 7 * DAY;
+const ID_EVERY = 15 * 60;
+const ID_MATCH = 3600;
 export const STATS_PER_TICK = 6;
 
 const utcDay = t => new Date(t * 1000).toISOString().slice(0, 10);
@@ -71,15 +73,64 @@ async function readInstagram(env, mt, token, post, account, t) {
 async function readFacebook(env, mt, token, post, account, t) {
   if (account.insights_denied_at && account.insights_denied_at > t - INSIGHTS_RETRY) return null;
   let r;
-  try { r = await mt.fbPostStats(token, post.public_post_id); }
+  try { r = await mt.fbPostStats(token, post.public_post_id, { insights: true }); }
   catch (err) {
     if (!denied(err)) throw err;
-    await env.DB.prepare('UPDATE accounts SET insights_denied_at = ? WHERE id = ?').bind(t, account.id).run();
-    account.insights_denied_at = t;
-    return null;
+    // Pages connected before read_insights still give the basic counts.
+    try { r = await mt.fbPostStats(token, post.public_post_id); }
+    catch (err2) {
+      if (!denied(err2)) throw err2;
+      await env.DB.prepare('UPDATE accounts SET insights_denied_at = ? WHERE id = ?').bind(t, account.id).run();
+      account.insights_denied_at = t;
+      return null;
+    }
   }
-  return { likes: count(r.reactions?.summary?.total_count), comments: count(r.comments?.summary?.total_count),
+  const s = { likes: count(r.reactions?.summary?.total_count), comments: count(r.comments?.summary?.total_count),
     shares: count(r.shares?.count) };
+  for (const m of r.insights?.data || []) {
+    const key = { post_media_view: 'views', post_total_media_view_unique: 'reach' }[m.name];
+    if (key) s[key] = count(m.values?.[0]?.value);
+  }
+  return s;
+}
+
+// TikTok hands over a public post's id only once its moderation is done,
+// often after publishing has finished, and without the id the post's numbers
+// cannot be read. So ask again (every 15 minutes, for as long as the post is
+// followed), and when TikTok's status no longer knows the post, find it in the
+// account's own recent posts by the time it went out: one unclaimed post
+// within the hour, nearest first. Returns the calls spent.
+async function findTikTokIds(env, tk, load, t, budget) {
+  const { results } = await env.DB.prepare(`SELECT p.id, p.account_id, p.publish_id, p.scheduled_at FROM posts p
+      JOIN accounts a ON a.id = p.account_id
+      WHERE p.status = 'published' AND a.platform = 'tiktok' AND a.needs_reconnect = 0 AND p.public_post_id IS NULL
+        AND p.scheduled_at > ? AND (p.stats_at IS NULL OR p.stats_at < ?)
+      ORDER BY COALESCE(p.stats_at, 0) LIMIT ?`).bind(t - FOLLOW_FOR, t - ID_EVERY, budget).all();
+  let spent = 0;
+  const lists = new Map();
+  for (const p of results) {
+    let id = null;
+    try {
+      const { token } = await load(p.account_id);
+      if (p.publish_id) {
+        spent++;
+        try { id = (await tk.status(token, p.publish_id)).publicaly_available_post_id?.[0] ?? null; } catch {}
+      }
+      if (!id) {
+        if (!lists.has(p.account_id)) { spent++; lists.set(p.account_id, await tk.listVideos(token).catch(() => [])); }
+        const { results: taken } = await env.DB.prepare(`SELECT public_post_id FROM posts WHERE account_id = ? AND public_post_id IS NOT NULL`)
+          .bind(p.account_id).all();
+        const claimed = new Set(taken.map(r => String(r.public_post_id)));
+        const near = lists.get(p.account_id).filter(v => v.create_time && !claimed.has(String(v.id))
+            && Math.abs(v.create_time - p.scheduled_at) <= ID_MATCH)
+          .sort((a, b) => Math.abs(a.create_time - p.scheduled_at) - Math.abs(b.create_time - p.scheduled_at));
+        if (near.length) id = near[0].id;
+      }
+    } catch (err) { console.error('tiktok id', p.id, err.message); }
+    if (id) await env.DB.prepare('UPDATE posts SET public_post_id = ?, stats_at = NULL WHERE id = ?').bind(String(id), p.id).run();
+    else await env.DB.prepare('UPDATE posts SET stats_at = ? WHERE id = ?').bind(t, p.id).run();
+  }
+  return spent;
 }
 
 export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TICK) {
@@ -127,6 +178,8 @@ export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TI
     }
   }
 
+  if (budget <= 0) return done;
+  budget -= await findTikTokIds(env, tk, load, t, Math.max(1, Math.floor(budget / 3)));
   if (budget <= 0) return done;
   const { results: posts } = await env.DB.prepare(`SELECT p.id, p.account_id, p.public_post_id, p.scheduled_at, a.platform
       FROM posts p JOIN accounts a ON a.id = p.account_id

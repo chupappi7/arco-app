@@ -22,6 +22,7 @@ export function fakeTk(overrides = {}) {
       comment_disabled: false }),
     initPhoto: async () => ({ publish_id: 'pub-1' }),
     status: async () => ({ status: 'PUBLISH_COMPLETE', publicaly_available_post_id: ['7500000000000000001'] }),
+    listVideos: async () => [],
     ...overrides,
   };
 }

@@ -8,7 +8,7 @@ import { b64url, clearCookie, env, originOf, setCookie } from '../../_lib.js';
 export const META_DIALOG = 'https://www.facebook.com/v23.0/dialog/oauth';
 // business_management makes Pages owned through a Business portfolio show up.
 export const META_SCOPE = ['pages_show_list', 'pages_read_engagement', 'pages_read_user_content', 'pages_manage_posts',
-  'business_management'].join(',');
+  'read_insights', 'business_management'].join(',');
 export const metaRedirectUri = req => `${originOf(req)}/api/auth/meta/callback`;
 
 export default function handler(req, res) {

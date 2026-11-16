@@ -150,6 +150,23 @@ describe('getStats', () => {
   });
 });
 
+describe('Facebook post views', () => {
+  beforeEach(() => resetDb(env));
+  it('reads views and reach with read_insights, and the basic counts without it', async () => {
+    await account('fb1', 'facebook'); await account('fb2', 'facebook');
+    await post('p1', 'fb1', T - 3600); await post('p2', 'fb2', T - 3600);
+    const mt = fakeMeta({ fbPostStats: async (tok, id, o = {}) => {
+      if (o.insights && tok.includes('fb2')) { const e = new MetaError('no read_insights'); e.code = 200; throw e; }
+      return { reactions: { summary: { total_count: 7 } }, comments: { summary: { total_count: 2 } }, shares: { count: 1 },
+        ...(o.insights ? { insights: { data: [{ name: 'post_media_view', values: [{ value: 640 }] }, { name: 'post_total_media_view_unique', values: [{ value: 410 }] }] } } : {}) }; } });
+    await refreshStats(env, mt, fakeTk(), T, 6);
+    const s1 = JSON.parse((await env.DB.prepare("SELECT stats FROM posts WHERE id = 'p1'").first()).stats);
+    const s2 = JSON.parse((await env.DB.prepare("SELECT stats FROM posts WHERE id = 'p2'").first()).stats);
+    expect(s1).toEqual({ likes: 7, comments: 2, shares: 1, views: 640, reach: 410 });
+    expect(s2).toEqual({ likes: 7, comments: 2, shares: 1 });
+  });
+});
+
 describe('Facebook without pages_read_user_content', () => {
   beforeEach(() => resetDb(env));
   it('stops asking for a week and says so in the stats', async () => {
@@ -157,7 +174,8 @@ describe('Facebook without pages_read_user_content', () => {
     const mt = fakeMeta({ fbPostStats: async (tok, id) => { mt.calls.push(['fb', id]);
       throw new MetaError('facebook stats: (#10) This endpoint requires the pages_read_user_content permission', { code: '10' }); } });
     await refreshStats(env, mt, fakeTk(), T, 6);
-    expect(mt.calls.filter(c => c[0] === 'fb').length).toBe(1);
+    // One post, asked with views and then without; the second post is not asked.
+    expect(mt.calls.filter(c => c[0] === 'fb').map(c => c[1])).toEqual(['m-p1', 'm-p1']);
     const s = await getStats(env, 'ws1', 7, T);
     expect(s.facebook_limited).toBe(true);
     expect(s.tracked).toBe(0);
@@ -187,6 +205,41 @@ describe('TikTok numbers', () => {
     const st = await getStats(env, 'ws1', 7, T2);
     expect(st.totals.views).toBe(3000);
     expect(st.tiktok_pending).toBe(false);
+  });
+
+  it('asks TikTok again for a post id held back by moderation, then reads its numbers', async () => {
+    await account('tt1', 'tiktok');
+    await post('a', 'tt1', T2 - 3600, { remote: null });
+    await env.DB.prepare("UPDATE posts SET publish_id = 'pub-a' WHERE id = 'a'").run();
+    let ready = false;
+    const tk = fakeTk({
+      userStats: async () => ({ follower_count: 10 }),
+      status: async () => ({ status: 'PUBLISH_COMPLETE', publicaly_available_post_id: ready ? ['7501'] : [] }),
+      videoStats: async (tok, ids) => ids.map(id => ({ id, view_count: 321, like_count: 5, comment_count: 1, share_count: 0 })),
+    });
+    await refreshStats(env, fakeMeta(), tk, T2, 6);
+    expect((await env.DB.prepare("SELECT public_post_id FROM posts WHERE id = 'a'").first()).public_post_id).toBe(null);
+    ready = true;
+    await refreshStats(env, fakeMeta(), tk, T2 + 300, 6);
+    expect((await env.DB.prepare("SELECT public_post_id FROM posts WHERE id = 'a'").first()).public_post_id).toBe(null);
+    await refreshStats(env, fakeMeta(), tk, T2 + 1000, 6);
+    const row = await env.DB.prepare("SELECT public_post_id, stats FROM posts WHERE id = 'a'").first();
+    expect(row.public_post_id).toBe('7501');
+    expect(JSON.parse(row.stats).views).toBe(321);
+  });
+
+  it('finds a post TikTok status forgot in the account\'s own list, by time, never one already taken', async () => {
+    await account('tt1', 'tiktok');
+    await post('a', 'tt1', T2 - 3600, { remote: null });
+    await post('b', 'tt1', T2 - 3600 - 120, { remote: '7600' });
+    const tk = fakeTk({
+      userStats: async () => ({ follower_count: 10 }),
+      status: async () => { throw new TikTokError('status fetch: not found', { code: 'invalid_params' }); },
+      listVideos: async () => [{ id: '7600', create_time: T2 - 3600 - 100 }, { id: '7700', create_time: T2 - 3600 + 40 }, { id: '7800', create_time: T2 - 9 * 3600 }],
+      videoStats: async (tok, ids) => ids.map(id => ({ id, view_count: 50 })),
+    });
+    await refreshStats(env, fakeMeta(), tk, T2, 6);
+    expect((await env.DB.prepare("SELECT public_post_id FROM posts WHERE id = 'a'").first()).public_post_id).toBe('7700');
   });
 
   it('an account connected before the stats scopes is left alone and asked to reconnect', async () => {
