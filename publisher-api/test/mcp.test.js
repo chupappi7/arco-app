@@ -204,3 +204,47 @@ describe('mcp tools', () => {
   });
 });
 
+describe('upload links (files on the person\'s computer)', () => {
+  beforeEach(() => resetDb(env));
+  const JPEG = Uint8Array.from(atob(JPEG_B64), ch => ch.charCodeAt(0));
+  const MP4 = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 1, 2, 3, 4]);
+  const put = (url, bytes, type) => callWorker(new URL(url).pathname, { method: 'PUT',
+    headers: { 'Content-Type': type, 'Content-Length': String(bytes.length) }, body: bytes });
+
+  it('puts photos into the folder in the asked order, each link once, with a curl command', async () => {
+    const { h } = await workspace();
+    const f = (await tool(h, 'create_folder', { name: 'Slides', brand: 'bakery' })).data;
+    const r = await tool(h, 'get_upload_links', { folder_id: f.id, files: [1, 2, 3].map(i => ({ filename: `slide-${i}.jpg`, content_type: 'image/jpeg', bytes: JPEG.length })) });
+    expect(r.data.links).toHaveLength(3);
+    expect(r.data.links[0].curl).toContain("-H 'Content-Type: image/jpeg'");
+    // Uploaded out of order, they still land in the order asked for.
+    for (const i of [2, 0, 1]) expect((await put(r.data.links[i].upload_url, JPEG, 'image/jpeg')).status).toBe(200);
+    expect((await put(r.data.links[0].upload_url, JPEG, 'image/jpeg')).status).toBe(409);
+    const [folder] = (await tool(h, 'list_folders', {})).data.folders;
+    expect(folder.items.map(x => x.name)).toEqual(['slide-1.jpg', 'slide-2.jpg', 'slide-3.jpg']);
+  });
+
+  it('refuses a different size, type or content than the link was made for', async () => {
+    const { h } = await workspace();
+    const f = (await tool(h, 'create_folder', { name: 'Slides', brand: 'bakery' })).data;
+    const [a, b, c] = (await tool(h, 'get_upload_links', { folder_id: f.id, files: [1, 2, 3].map(i => ({ filename: `${i}.jpg`, content_type: 'image/jpeg', bytes: JPEG.length })) })).data.links;
+    expect((await put(a.upload_url, new Uint8Array([...JPEG, 9]), 'image/jpeg')).status).toBe(400);
+    expect((await put(b.upload_url, JPEG, 'image/png')).status).toBe(400);
+    expect((await put(c.upload_url, new Uint8Array(JPEG.length).fill(7), 'image/jpeg')).status).toBe(400);
+    expect((await put(a.upload_url.replace(/.$/, 'x'), JPEG, 'image/jpeg')).status).toBe(403);
+    expect((await tool(h, 'list_folders', {})).data.folders[0].items).toEqual([]);
+  });
+
+  it('keeps photos and a video apart, and checks the limits up front', async () => {
+    const { h } = await workspace();
+    const f = (await tool(h, 'create_folder', { name: 'Clip', brand: 'bakery' })).data;
+    expect((await tool(h, 'get_upload_links', { folder_id: f.id, files: [{ filename: 'a.mp4', content_type: 'video/mp4', bytes: 10 }, { filename: 'b.jpg', content_type: 'image/jpeg', bytes: 10 }] })).error).toMatch(/one video/);
+    const big = (await tool(h, 'get_upload_links', { folder_id: f.id, files: [{ filename: 'huge.jpg', content_type: 'image/jpeg', bytes: 50 * 1048576 }] })).data.links[0];
+    expect(big.ok).toBe(false);
+    const v = (await tool(h, 'get_upload_links', { folder_id: f.id, files: [{ filename: 'clip.mp4', content_type: 'video/mp4', bytes: MP4.length }] })).data.links[0];
+    expect((await put(v.upload_url, MP4, 'video/mp4')).status).toBe(200);
+    const late = (await tool(h, 'get_upload_links', { folder_id: f.id, files: [{ filename: 'x.jpg', content_type: 'image/jpeg', bytes: JPEG.length }] })).data.links[0];
+    expect(late.ok).toBe(false);
+    expect((await tool(h, 'get_upload_links', { folder_id: 'fld_nope', files: [{ filename: 'x.jpg', content_type: 'image/jpeg', bytes: 4 }] })).error).toMatch(/not found/i);
+  });
+});

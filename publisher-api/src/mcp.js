@@ -3,7 +3,8 @@ import { listAccounts } from './accounts.js';
 import { listBrands } from './brands.js';
 import { listFolders, createFolder, updateFolder, deleteFolder, STATUSES } from './folders.js';
 import { addToLibrary } from './library.js';
-import { uploadMedia, videoTicket, uploadVideo } from './media.js';
+import { uploadMedia, videoTicket, uploadVideo, photoTicket } from './media.js';
+import { getFolder } from './folders.js';
 import { getStats, PERIODS } from './stats.js';
 import { cancelPost, retryPost } from './posts.js';
 import { workspaceInfo, resolveBrand, freeSlots, schedulePlan, undoBatch, editPost, findPosts, when, parseWhen, MAX_PLAN } from './planner.js';
@@ -25,9 +26,11 @@ How to work:
 4. Always call schedule_posts with confirm: false first, show the person the plan (time, accounts, caption per post), and only confirm after they agree, unless they told you to go ahead without checking.
 5. Times are in the workspace's time zone unless they carry an offset. Leave "at" out to use the brand's next free posting slot.
 6. If the workspace has approval on, confirmed posts wait as drafts until a person approves them in Publisher. Say so.
-7. Each confirmed run returns a batch_id; undo_batch cancels everything in it that has not been published.`;
+7. Each confirmed run returns a batch_id; undo_batch cancels everything in it that has not been published.
+8. Files: if they are online, give their links to upload_to_folder. If they are on the person's own computer and you can run commands there, call get_upload_links, then upload each file to its link (one command each, in order). Upload only the files the person named, never others from their computer.`;
 
 const str = (description, extra = {}) => ({ type: 'string', description, ...extra });
+const UPLOAD_LINK_TTL = 15 * 60;
 const brandArg = str('Brand name or id. "none" means accounts in no brand.');
 
 const TOOLS = [
@@ -73,11 +76,20 @@ const TOOLS = [
   },
   {
     name: 'upload_to_folder',
-    description: `Add files to a folder, in order. Each file is a public https URL, or base64 data for a photo. Photos: JPG or PNG up to ${MAX_IMAGE_BYTES / 1048576} MB (Instagram needs JPG). Video: one MP4 or MOV per folder, up to ${MAX_VIDEO_BYTES / 1048576} MB, by URL only.`,
+    description: `Add files to a folder, in order, from public https URLs (or a photo as base64). For files on the person's own computer use get_upload_links instead. Photos: JPG or PNG up to ${MAX_IMAGE_BYTES / 1048576} MB (Instagram needs JPG). Video: one MP4 or MOV per folder, up to ${MAX_VIDEO_BYTES / 1048576} MB, by URL only.`,
     inputSchema: { type: 'object', required: ['folder_id', 'files'], properties: { folder_id: str('Folder id'),
       files: { type: 'array', maxItems: 10, items: { type: 'object', properties: { url: str('https URL of the file'),
         data_base64: str('The photo, base64'), filename: str('File name, e.g. 01.jpg'), content_type: str('image/jpeg, image/png, video/mp4 or video/quicktime') } } } } },
     run: uploadFiles,
+  },
+  {
+    name: 'get_upload_links',
+    description: `For files on the person's own computer, when you can run commands there: one-time links that put each file into a folder. Give each file's name, type and exact size in bytes (e.g. from \`stat\`). Each link takes one PUT of exactly that file, works once, and expires in ${UPLOAD_LINK_TTL / 60} minutes; a ready curl command comes with it. Photos: JPG or PNG up to ${MAX_IMAGE_BYTES / 1048576} MB, up to 35 in order. Video: one MP4 or MOV up to ${MAX_VIDEO_BYTES / 1048576} MB, into an empty folder. Only for files the person named.`,
+    inputSchema: { type: 'object', required: ['folder_id', 'files'], properties: { folder_id: str('Folder id'),
+      files: { type: 'array', minItems: 1, maxItems: 35, items: { type: 'object', required: ['filename', 'content_type', 'bytes'], properties: {
+        filename: str('File name, e.g. slide-1.jpg'), content_type: str('image/jpeg, image/png, video/mp4 or video/quicktime'),
+        bytes: { type: 'integer', description: 'Exact file size in bytes' } } } } } },
+    run: uploadLinks,
   },
   {
     name: 'find_slots',
@@ -227,6 +239,33 @@ export async function fetchPublic(url, hops = 3) {
     return fetchPublic(new URL(res.headers.get('Location'), u).toString(), hops - 1);
   }
   return res;
+}
+
+// Links, not bytes: the file goes from the person's computer straight to
+// storage, and each link allows only that one file, once, briefly.
+const shq = s => `'${String(s).replace(/'/g, `'\\''`)}'`;
+async function uploadLinks(c, a) {
+  const { env, who } = c, files = a.files;
+  if (!Array.isArray(files) || !files.length || files.length > 35) throw new HttpError(400, 'files must be a list of 1 to 35 files');
+  const folder = await getFolder(env, who, a.folder_id);
+  const videos = files.filter(f => String(f.content_type || '').toLowerCase().startsWith('video/'));
+  if (videos.length && files.length > 1) throw new HttpError(400, 'A folder holds photos or one video, not both: ask for one video on its own');
+  const { p } = await env.DB.prepare('SELECT MAX(position) AS p FROM media WHERE folder_id = ? AND in_library = 1').bind(folder.id).first();
+  const req = new Request(env.API_ORIGIN || 'https://api.internal/');
+  const out = [];
+  for (const [i, f] of files.entries()) {
+    const name = String(f.filename || `file-${i + 1}`).split('/').pop().slice(0, 120);
+    const type = String(f.content_type || '').toLowerCase();
+    try {
+      const t = type.startsWith('video/')
+        ? await videoTicket(env, who, { content_type: type, bytes: f.bytes, name, folder_id: folder.id }, req, { ttl: UPLOAD_LINK_TTL })
+        : await photoTicket(env, who, { content_type: type, bytes: f.bytes, name, folder_id: folder.id }, req, { ttl: UPLOAD_LINK_TTL, position: (p ?? -1) + 1 + i });
+      out.push({ filename: name, ok: true, method: 'PUT', content_type: type, bytes: f.bytes, upload_url: t.upload_url, expires_at: t.expires_at,
+        curl: `curl -sS --fail-with-body -T <path to ${name}> -H ${shq(`Content-Type: ${type}`)} ${shq(t.upload_url)}` });
+    } catch (e) { out.push({ filename: name, ok: false, error: e.message }); }
+  }
+  return { folder: { id: folder.id, name: folder.name }, links: out,
+    next: 'PUT each file to its link with its exact Content-Type (curl -T sends the right length). Then list_folders shows them in the folder, and schedule_posts can post it.' };
 }
 
 async function uploadFiles(c, a) {

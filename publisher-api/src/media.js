@@ -140,7 +140,38 @@ const hmacKey = env => crypto.subtle.importKey('raw', enc.encode('upload:' + env
 
 const int = (v, max) => { const n = Number(v); return Number.isInteger(n) && n > 0 && n <= max ? n : null; };
 
-export async function videoTicket(env, w, body, req) {
+const signTicket = async (env, claims, req) => {
+  const payload = b64u(enc.encode(JSON.stringify(claims)));
+  const sig = b64u(new Uint8Array(await crypto.subtle.sign('HMAC', await hmacKey(env), enc.encode(payload))));
+  const origin = env.API_ORIGIN || new URL(req.url).origin;
+  return { key: claims.key, upload_url: `${origin}/upload/${payload}.${sig}`, expires_at: claims.exp };
+};
+
+// A photo by ticket, for AI clients that hold the file on the person's own
+// computer: the same signed permission for one key, exact size and type, put
+// into one folder at a set place in its order.
+export async function photoTicket(env, w, body, req, { ttl = UPLOAD_TICKET_TTL, position = null } = {}) {
+  const ws = wsOf(w), b = body || {}, type = String(b.content_type || '').toLowerCase();
+  if (!TYPES[type]) throw new HttpError(400, 'Photos must be JPG or PNG');
+  const bytes = Number(b.bytes);
+  if (!Number.isInteger(bytes) || bytes < 1) throw new HttpError(400, 'The photo is empty');
+  if (bytes > MAX_IMAGE_BYTES) throw new HttpError(400, `Each photo must be ${MAX_IMAGE_BYTES / 1024 / 1024} MB or smaller`);
+  const folder = b.folder_id ? await getFolder(env, w, b.folder_id) : null;
+  if (folder) {
+    const { n: vids } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM media WHERE folder_id = ? AND in_library = 1 AND content_type LIKE 'video/%'`).bind(folder.id).first();
+    if (vids) throw new HttpError(400, 'A folder holds photos or one video, not both. Make a new folder for these photos.');
+  }
+  const brandId = folder ? folder.brand_id : await brandFor(env, w, b.brand_id);
+  const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM media WHERE workspace_id = ? AND in_library = 1').bind(ws).first();
+  if (n >= MAX_LIBRARY) throw new HttpError(409, `The library holds up to ${MAX_LIBRARY} items`);
+  if ((await workspaceBytes(env, ws)) + bytes > MAX_WORKSPACE_BYTES) throw new HttpError(409, FULL);
+  return signTicket(env, {
+    key: `${ws}/${randomToken('', 16)}.${TYPES[type].ext}`, ws, bytes, type, brand: brandId, folder: folder ? folder.id : null,
+    name: String(b.name ?? '').slice(0, 120) || null, pos: Number.isInteger(position) ? position : null, exp: now() + ttl,
+  }, req);
+}
+
+export async function videoTicket(env, w, body, req, { ttl = UPLOAD_TICKET_TTL } = {}) {
   const ws = wsOf(w), b = body || {};
   const ext = VIDEO_TYPES[String(b.content_type || '').toLowerCase()];
   if (!ext) throw new HttpError(400, 'Upload MP4 or MOV videos only');
@@ -160,12 +191,9 @@ export async function videoTicket(env, w, body, req) {
     key: `${ws}/${randomToken('', 16)}.${ext}`, ws, bytes, type: String(b.content_type).toLowerCase(),
     brand: brandId, folder: folder ? folder.id : null, name: String(b.name ?? '').slice(0, 120) || null,
     dur: int(b.duration_ms, 24 * 3600 * 1000), w: int(b.width, 20000), h: int(b.height, 20000),
-    exp: now() + UPLOAD_TICKET_TTL,
+    exp: now() + ttl,
   };
-  const payload = b64u(enc.encode(JSON.stringify(claims)));
-  const sig = b64u(new Uint8Array(await crypto.subtle.sign('HMAC', await hmacKey(env), enc.encode(payload))));
-  const origin = env.API_ORIGIN || new URL(req.url).origin;
-  return { key: claims.key, upload_url: `${origin}/upload/${payload}.${sig}`, expires_at: claims.exp };
+  return signTicket(env, claims, req);
 }
 
 export const uploadCors = env => ({
@@ -190,7 +218,8 @@ const isVideo = head => head.length >= 8 && String.fromCharCode(...head.slice(4,
 export async function uploadVideo(env, token, req) {
   const c = await readTicket(env, token);
   if (!c) throw new HttpError(403, 'This upload link is not valid');
-  if (c.exp < now()) throw new HttpError(403, 'This upload link has expired. Upload the video again.');
+  const photo = String(c.type).startsWith('image/');
+  if (c.exp < now()) throw new HttpError(403, `This upload link has expired. Ask for a new one.`);
   const declared = Number(req.headers.get('Content-Length') || -1);
   if (declared !== c.bytes) throw new HttpError(400, 'The file size does not match what was announced');
   const contentType = (req.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
@@ -200,7 +229,11 @@ export async function uploadVideo(env, token, req) {
   if (!ws) throw new HttpError(403, 'This upload link is not valid');
   if ((await workspaceBytes(env, c.ws)) + c.bytes > MAX_WORKSPACE_BYTES) throw new HttpError(409, FULL);
 
-  if (!req.body) throw new HttpError(400, 'The video is empty');
+  if (photo && c.folder) {
+    const { n: vids } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM media WHERE folder_id = ? AND in_library = 1 AND content_type LIKE 'video/%'`).bind(c.folder).first();
+    if (vids) throw new HttpError(400, 'A folder holds photos or one video, not both');
+  }
+  if (!req.body) throw new HttpError(400, 'The file is empty');
   // A fixed length lets R2 take the stream as it arrives, and fails it if
   // the body runs short or long.
   try {
@@ -212,13 +245,16 @@ export async function uploadVideo(env, token, req) {
   const head = await env.MEDIA.get(c.key, { range: { offset: 0, length: 12 } });
   const first = head ? new Uint8Array(await head.arrayBuffer()) : new Uint8Array();
   const stored = await env.MEDIA.head(c.key);
-  if (!isVideo(first) || stored?.size !== c.bytes) {
+  const real = photo ? TYPES[c.type].magic.every((x, i) => first[i] === x) : isVideo(first);
+  if (!real || stored?.size !== c.bytes) {
     await env.MEDIA.delete(c.key);
-    throw new HttpError(400, 'That file is not a valid MP4 or MOV video');
+    throw new HttpError(400, photo ? 'That file is not a valid JPG or PNG photo' : 'That file is not a valid MP4 or MOV video');
   }
+  let pos = c.folder ? 0 : null;
+  if (photo && c.folder) pos = c.pos ?? ((await env.DB.prepare('SELECT MAX(position) AS p FROM media WHERE folder_id = ? AND in_library = 1').bind(c.folder).first())?.p ?? -1) + 1;
   const t = now();
   await env.DB.prepare(`INSERT INTO media (key, workspace_id, bytes, content_type, created_at, delete_after,
       in_library, brand_id, name, duration_ms, width, height, folder_id, position) VALUES (?, ?, ?, ?, ?, NULL, 1, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(c.key, c.ws, c.bytes, c.type, t, c.brand, c.name, c.dur, c.w, c.h, c.folder ?? null, c.folder ? 0 : null).run();
+    .bind(c.key, c.ws, c.bytes, c.type, t, c.brand, c.name, c.dur ?? null, c.w ?? null, c.h ?? null, c.folder ?? null, pos).run();
   return { key: c.key, url: mediaUrl(env, c.key), bytes: c.bytes, content_type: c.type };
 }
