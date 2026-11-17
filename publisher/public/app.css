@@ -1176,3 +1176,21 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .aistep>header{justify-content:flex-start}.aistep>header h2{margin:0}
 .kpi .ksplit{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px}
 .kpi .ksplit span{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:var(--soft-ink, var(--mute));font-variant-numeric:tabular-nums}
+
+/* The post opens as a window: preview on the left, everything else beside it. */
+.overlay:has(.drawer){justify-content:center;align-items:center;padding:24px}
+.overlay .drawer{width:min(780px,100%);height:auto;max-height:min(880px,100%);border-radius:16px;box-shadow:0 24px 70px rgba(17,21,29,.35);overflow:hidden;animation:popin .16s ease-out}
+@keyframes popin{from{transform:scale(.97);opacity:.6}}
+.overlay .drawer .dscroll{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:repeat(7,auto) 1fr;column-gap:22px;align-content:start}
+.overlay .drawer .dscroll>*{grid-column:2}
+.overlay .drawer .dscroll>.dmedia{grid-column:1;grid-row:1/-1;flex-direction:column;margin:0}
+.overlay .drawer .dmedia .big{width:300px}
+.overlay .drawer .dthumbs{max-width:300px}
+@media (max-width:719px){
+  .overlay:has(.drawer){padding:0;align-items:flex-end}
+  .overlay .drawer{max-height:92dvh;border-radius:16px 16px 0 0}
+  .overlay .drawer .dscroll{display:block}
+  .overlay .drawer .dmedia{margin-bottom:14px}
+  .overlay .drawer .dmedia .big{width:100%;max-width:340px;margin:0 auto}
+  .overlay .drawer .dthumbs{max-width:none}
+}

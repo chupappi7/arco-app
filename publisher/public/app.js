@@ -430,9 +430,9 @@ function overviewView() {
   const days = [...Array(7)].map((_, i) => addDays(t0, i));
   const onDay = d => live.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((x, y) => x.scheduled_at - y.scheduled_at);
   const tile = p => { const st = next && p.id === next.id ? 'next' : p.status, a = all.find(x => x.id === p.account_id);
-    return `<button class="opt ${st}" data-open="${p.id}" style="--bc:${brandHue(a?.brand_id)}" title="${esc(p.caption || p.title || 'No caption')}">
+    return `<button class="opt ${st}" data-open="${p.id}" style="--bc:${brandHue(a?.brand_id)}" title="Open post">
       <span class="oth">${thumbOf(p) ? pic(thumbOf(p)) : ''}<span class="pb">${icon(p.platform || 'tiktok', 9)}</span></span>
-      <span class="tx"><b>${at(p.scheduled_at)}${st === 'failed' ? ' · failed' : st === 'next' ? ' · next' : ''}</b><span>${who(p)}</span><span>${esc(p.caption || p.title || 'No caption')}</span></span></button>`; };
+      <span class="tx"><b>${at(p.scheduled_at)}${st === 'failed' ? ' · failed' : st === 'next' ? ' · next' : ''}</b><span>${who(p)}</span></span></button>`; };
   const nowLine = `<div class="nowl"><time>${at(now)}</time><i></i></div>`;
   const col = (d, i) => { const k = dayKey(d), list = onDay(d), isT = i === 0;
     const before = isT ? list.filter(p => p.scheduled_at < now) : [], after = isT ? list.filter(p => p.scheduled_at >= now) : list;
@@ -1933,7 +1933,7 @@ function detailView() {
   const a = acct(p.account_id), editable = p.status === 'queued', pl = p.platform || 'tiktok';
   const label = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
   const cover = p.images[p.cover_index] || p.images[0];
-  return `<div class="overlay" id="overlay"><aside class="drawer" role="dialog" aria-modal="true" aria-label="Post details">
+  return `<div class="overlay" id="overlay"><aside class="drawer" role="dialog" aria-modal="true" aria-label="Post">
     <header class="dh">${withBadge(avatar(a?.avatar_url, p.username), pl)}
       <div><b>${pl === 'facebook' ? '' : '@'}${esc(p.username)}</b><span>${PLATFORM[pl]}</span></div>
       <button class="xbtn" id="closedetail" aria-label="Close">${ui('x', 18)}</button></header>
@@ -2433,7 +2433,7 @@ function bind() {
   on('#facct', 'change', e => { S.fAcct = e.target.value; render(); });
   on('[data-again]', 'click', e => { S.detail = null; edit(e.target.dataset.again, true); });
   on('[data-wk]', 'click', e => { const d = Number(e.currentTarget.dataset.wk); if (S.calMode === 'month') S.month += d; else S.week += d * (S.calMode === 'weeks' ? 4 : 1); loadWeek(); });
-  on('[data-open]', 'click', e => { if (e.target.closest('button,a')) return; S.detail = e.currentTarget.dataset.open; render(); });
+  on('[data-open]', 'click', e => { if (e.target.closest('button,a') !== e.currentTarget && e.target.closest('button,a')) return; S.detail = e.currentTarget.dataset.open; render(); });
   on('#closedetail', 'click', () => { S.detail = null; render(); });
   on('#overlay', 'click', e => { if (e.target.id === 'overlay') { S.detail = null; render(); } });
   on('#savecap', 'click', async () => {
