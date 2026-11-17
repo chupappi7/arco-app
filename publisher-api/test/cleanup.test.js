@@ -24,6 +24,14 @@ describe('cleanup', () => {
     expect(await env.MEDIA.head('ws_1/queued.jpg')).not.toBeNull();
   });
 
+  it('takes a video\'s still with it', async () => {
+    await img('ws_1/clip.mp4', { deleteAfter: T - 1 });
+    await env.MEDIA.put('ws_1/clip.mp4.jpg', new Uint8Array([0xff, 0xd8, 0xff]));
+    await runCleanup(env, T);
+    expect(await env.MEDIA.head('ws_1/clip.mp4')).toBeNull();
+    expect(await env.MEDIA.head('ws_1/clip.mp4.jpg')).toBeNull();
+  });
+
   it('removes expired sessions', async () => {
     await env.DB.prepare('INSERT INTO sessions (id_hash, workspace_id, expires_at) VALUES (?, ?, ?)').bind('h1', 'ws_1', T - 1).run();
     await env.DB.prepare('INSERT INTO sessions (id_hash, workspace_id, expires_at) VALUES (?, ?, ?)').bind('h2', 'ws_1', T + 1).run();

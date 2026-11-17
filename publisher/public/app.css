@@ -1194,3 +1194,14 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
   .overlay .drawer .dmedia .big{width:100%;max-width:340px;margin:0 auto}
   .overlay .drawer .dthumbs{max-width:none}
 }
+
+/* Folders: compact cards, a heading per brand. */
+.fgrid{grid-template-columns:repeat(auto-fill,minmax(clamp(120px,9vw,150px),1fr));gap:10px}
+.fthumbs{aspect-ratio:4/5;overflow:hidden}
+.fbody{padding:8px 10px 10px}
+.fbody b{font-size:13.5px}
+.fnote{-webkit-line-clamp:1}
+.fgh{display:flex;align-items:center;gap:7px;margin:4px 18px 10px;font-size:12px;font-weight:650;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
+.fgh span{font-weight:500;color:var(--soft)}
+.fnone{padding:0 18px 18px}
+@media (max-width:639px){.fgh{margin:4px 12px 8px}.fgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}

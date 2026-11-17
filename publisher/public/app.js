@@ -320,8 +320,9 @@ const thumb = (p, attrs = 'alt=""') => {
 };
 const isVid = u => /\.(mp4|mov)(#|$)/i.test(String(u || ''));
 // An image, or for a video its first frame.
-const pic = (u, attrs = 'alt=""') => isVid(u)
-  ? `<video src="${esc(u)}#t=0.1" preload="metadata" muted playsinline ${attrs.replace(/\balt="[^"]*"/, '')}></video>` : `<img src="${esc(u)}" ${attrs}>`;
+const pic = (u, attrs = 'alt=""', still = true) => !isVid(u) ? `<img src="${esc(u)}" ${attrs}>`
+  : still ? `<img src="${esc(u)}.jpg" data-fb="${esc(u)}" data-vid="1" ${attrs}>`
+  : `<video src="${esc(u)}#t=0.1" preload="metadata" muted playsinline ${attrs.replace(/\balt="[^"]*"/, '')}></video>`;
 const mmss = ms => { const t = Math.round((ms || 0) / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 const at = (sec, o = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) => fmt(sec, o);
 
@@ -890,7 +891,7 @@ const folderStatus = f => (f.status === 'scheduled' && f.next_at ? `Scheduled ${
   : f.status === 'posted' && f.posted_at ? `Posted ${fmt(f.posted_at, { day: 'numeric', month: 'short' })}` : FSTATUS[f.status]);
 const foldersShown = (b = curBrand()) => (S.folders || []).filter(f => b === 'all' || (b === 'none' ? !f.brand_id : f.brand_id === b || !f.brand_id));
 const folderOf = id => (S.folders || []).find(f => f.id === id);
-const itemPic = (i, attrs = '') => (i.kind === 'video' || isVideoItem(i)) ? `<video src="${esc(i.url)}" muted playsinline preload="metadata" ${attrs}></video>` : `<img src="${esc(i.url)}" alt="" loading="lazy" ${attrs}>`;
+const itemPic = (i, attrs = '') => (i.kind === 'video' || isVideoItem(i)) ? pic(i.url, `alt="" loading="lazy" ${attrs}`) : `<img src="${esc(i.url)}" alt="" loading="lazy" ${attrs}>`;
 
 function folderCard(f) {
   const n = f.items.length, kind = f.kind === 'video' ? 'Video' : `${n} photo${n === 1 ? '' : 's'}`;
@@ -954,20 +955,25 @@ function libraryView() {
   const b = curBrand(), items = libShown(b).filter(i => !i.folder_id), sel = (S.libSel || []).filter(k => items.some(i => i.key === k));
   const folders = foldersShown(b), fsel = S.fFilter || 'all';
   const fshown = folders.filter(f => fsel === 'all' || f.status === fsel);
+  const groups = b === 'all' ? [...S.me.brands.map(x => [x.id, x.name]), ['', 'Shared']] : [[b === 'none' ? '' : b, brandLabel(b)], ...(b === 'none' ? [] : [['', 'Shared']])];
+  const inGroup = (x, id) => (x.brand_id || '') === id || (!id && x.brand_id && !brandName(x.brand_id));
+  // Each brand's folders under its own heading, so one brand's posts are not lost among another's.
+  const fgroups = groups.map(([id, name]) => { const list = fshown.filter(f => inGroup(f, id));
+    return list.length ? `${groups.filter(([gid]) => fshown.some(f => inGroup(f, gid))).length > 1 ? `<h3 class="fgh">${id ? `<i class="hdot" style="background:${brandHue(id)}"></i>` : ''}${esc(name)}<span>${list.length}</span></h3>` : ''}
+      <div class="fgrid">${list.map(folderCard).join('')}</div>` : ''; }).join('');
   const folderSec = !S.folders ? '' : `<section class="panel"><header><h2>Posts ready to go</h2><span class="note">${folders.length ? `${folders.length} folder${folders.length === 1 ? '' : 's'} · one folder is one post` : 'One folder is one post: its photos in order, or one video, with a note'}</span>
       <span class="hacts"><button class="btn sec" id="fnew">${ui('plus', 15)}New folder</button></span></header>
     ${S.newFolder ? `<form class="fnewform" id="fnewform"><input type="text" id="fnewname" maxlength="80" placeholder="Folder name, e.g. Black Friday promo" aria-label="Folder name" required>
       <input type="text" id="fnewnote" maxlength="2000" placeholder="Note for the caption (optional)" aria-label="Note">
       <button class="btn">Create</button><button type="button" class="btn ghost" id="fnewcancel">Cancel</button></form>` : ''}
     ${folders.length ? `<div class="chips fchips">${[['all', 'All'], ...Object.entries(FSTATUS)].map(([k, l]) => `<button class="chip ${fsel === k ? 'on' : ''}" data-ffilter="${k}">${l}${k === 'all' ? '' : ` · ${folders.filter(f => f.status === k).length}`}</button>`).join('')}</div>
-      <div class="fgrid">${fshown.map(folderCard).join('') || '<p class="note">No folders with that status.</p>'}</div>` : ''}</section>`;
+      ${fgroups || '<p class="note fnone">No folders with that status.</p>'}` : ''}</section>`;
   const target = b === 'all' || b === 'none' ? (S.libBrand ?? '') : b;
   const up = (S.libUp || []).map(u => `<div class="mt up">${u.video ? `<video src="${esc(u.url)}" muted playsinline preload="metadata"></video>` : `<img src="${esc(u.url)}" alt="">`}</div>`).join('');
   const brandSel = (id, val, first) => `<select id="${id}" aria-label="Brand">${first}${S.me.brands.map(x => `<option value="${x.id}" ${val === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`;
-  const groups = b === 'all' ? [...S.me.brands.map(x => [x.id, x.name]), ['', 'Shared']] : [[b === 'none' ? '' : b, brandLabel(b)], ...(b === 'none' ? [] : [['', 'Shared']])];
   const body = !S.lib ? `<div class="mgrid">${[...Array(8)].map(() => `<div class="mt">${sk('100%', 140)}</div>`).join('')}</div>`
     : groups.map(([id, name]) => {
-        const list = items.filter(i => (i.brand_id || '') === id || (!id && i.brand_id && !brandName(i.brand_id)));
+        const list = items.filter(i => inGroup(i, id));
         if (!list.length) return '';
         return `<section class="panel"><header><h2>${id ? `<i class="hdot" style="background:${brandHue(id)}"></i>` : ''}${esc(name)}</h2><span class="note">${libCount(list)}${id ? '' : ' · every brand can use these'}</span></header>
           <div class="mgrid lib">${list.map(i => libTile(i, sel.includes(i.key), 'data-lsel')).join('')}</div></section>`;
@@ -1003,6 +1009,26 @@ function videoMeta(file) {
   });
 }
 
+// One frame of the video as a small JPG, the still pages show instead of the video.
+function videoStill(src) {
+  return new Promise(res => {
+    const v = document.createElement('video'), url = typeof src === 'string' ? src : URL.createObjectURL(src);
+    const done = b => { if (typeof src !== 'string') URL.revokeObjectURL(url); v.removeAttribute('src'); v.load(); res(b); };
+    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous';
+    v.onloadeddata = () => { v.currentTime = Math.min(0.1, (v.duration || 1) / 2); };
+    v.onseeked = () => {
+      const w = Math.min(540, v.videoWidth || 540), c = document.createElement('canvas');
+      c.width = w; c.height = Math.round(w * (v.videoHeight || 960) / (v.videoWidth || 540));
+      try { c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); c.toBlob(b => done(b), 'image/jpeg', 0.8); } catch { done(null); }
+    };
+    v.onerror = () => done(null);
+    setTimeout(() => done(null), 20000);
+    v.src = url;
+  });
+}
+const putStill = async (key, src) => { const b = await videoStill(src);
+  if (b) await api(`/media/poster?key=${encodeURIComponent(key)}`, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: b }); };
+
 // Videos skip the site's proxy: a ticket from the API, then one PUT straight
 // to the Worker, which streams it into the library.
 async function uploadVideoFile(file, brand, folderId) {
@@ -1015,6 +1041,7 @@ async function uploadVideoFile(file, brand, folderId) {
   catch { throw new Error('The upload did not go through. Check the connection and try again.'); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `Upload failed (${r.status})`);
+  await putStill(j.key, file).catch(() => {});
   return { key: j.key, url: j.url, name: file.name, content_type: type, ...meta };
 }
 
@@ -1073,7 +1100,7 @@ function libPicker() {
 function mediaView() {
   if (S.libPick) return libPicker();
   const v = S.video;
-  if (v) return `<div class="vpick ${v.uploading ? 'up' : ''}"><video src="${esc(v.url)}" ${v.uploading ? 'muted' : 'controls'} preload="metadata" playsinline></video>
+  if (v) return `<div class="vpick ${v.uploading ? 'up' : ''}"><video src="${esc(v.url)}" ${v.uploading ? 'muted' : 'controls'} ${/^blob:/.test(v.url) ? 'preload="metadata"' : `poster="${esc(v.url)}.jpg" preload="none"`} playsinline></video>
       <div class="vinfo"><b>${esc(v.name || 'Video')}</b><span class="note">${v.uploading ? 'Uploading to the library…' : `${v.duration_ms ? `${mmss(v.duration_ms)} · ` : ''}from the library`}</span>
         <div class="vact"><button type="button" class="btn sec sm" id="fromlib" ${v.uploading ? 'disabled' : ''}>Replace</button>
         <button type="button" class="btn ghost sm" id="rmvideo" ${v.uploading ? 'disabled' : ''}>Remove</button></div></div></div>
@@ -1115,7 +1142,7 @@ function previewView() {
   const name = a?.username || a?.display_name || PLATFORM[pl];
   const imgs = S.video ? [S.video.url] : S.images.map(m => m.url);
   const cap = esc(captionFor(pl) || '');
-  const shot = u => S.video ? `<video src="${esc(u)}#t=0.1" muted playsinline preload="metadata"></video>` : `<img src="${esc(u)}" alt="">`;
+  const shot = u => S.video && !/^blob:/.test(u) ? pic(u) : S.video ? `<video src="${esc(u)}#t=0.1" muted playsinline preload="metadata"></video>` : `<img src="${esc(u)}" alt="">`;
   const av = withBadge(avatar(a?.avatar_url, name), pl);
   const ph = '<div class="pv-ph">' + ui('plus', 20) + '</div>';
   if (pl === 'instagram') return `<div class="pv ig"><div class="pv-h">${av}<b>${esc(name)}</b></div>
@@ -1946,7 +1973,7 @@ function detailView() {
         <small>${esc(tz().replace(/_/g, ' '))}</small></div>
       ${p.fail_reason ? `<div class="dfail">${ui('x', 15)}<span>${esc(p.fail_reason)}</span></div>` : ''}
       ${p.stats ? `<div class="dstats">${STAT_KEYS.filter(k => p.stats[k] != null).map(k => `<div><b>${num(p.stats[k])}</b><span>${METRIC[k]}</span></div>`).join('')}</div>` : ''}
-      ${p.video ? `<div class="dmedia"><video class="big" src="${esc(p.video)}" controls preload="metadata" playsinline></video></div>`
+      ${p.video ? `<div class="dmedia"><video class="big" src="${esc(p.video)}" poster="${esc(p.video)}.jpg" controls preload="none" playsinline></video></div>`
         : cover ? `<div class="dmedia"><img class="big" src="${esc(cover)}" alt="Cover">
         ${p.images.length > 1 ? `<div class="dthumbs">${p.images.map((u, n) => `<img src="${esc(u)}" alt="Photo ${n + 1}" class="${n === p.cover_index ? 'cv' : ''}">`).join('')}</div>` : ''}</div>`
         : `<p class="note">${['published', 'failed', 'cancelled'].includes(p.status) ? 'The photos were deleted 7 days after the post finished.' : 'No photos.'}</p>`}
@@ -2196,10 +2223,10 @@ async function brandAction(fn) {
 
 // ---- events ------------------------------------------------------------
 
-// An expired TikTok cover falls back to the post's own photo or video frame.
+// An expired TikTok cover falls back to the post's own photo or video still; a missing still to the video.
 document.addEventListener('error', e => {
   const el = e.target, fb = el?.dataset?.fb;
-  if (el?.tagName === 'IMG' && fb) el.outerHTML = pic(fb, [...el.attributes].filter(x => !['src', 'data-fb'].includes(x.name)).map(x => `${x.name}="${esc(x.value)}"`).join(' '));
+  if (el?.tagName === 'IMG' && fb) el.outerHTML = pic(fb, [...el.attributes].filter(x => !['src', 'data-fb', 'data-vid'].includes(x.name)).map(x => `${x.name}="${esc(x.value)}"`).join(' '), !el.dataset.vid);
 }, true);
 document.addEventListener('keydown', e => {
   // C opens Create from anywhere, unless you are typing.
@@ -2310,7 +2337,7 @@ function bind() {
   on('#fnewcancel', 'click', () => { S.newFolder = false; render(); });
   on('#fnewform', 'submit', async e => { e.preventDefault();
     const b = curBrand(), name = $('fnewname').value.trim(), note = $('fnewnote').value.trim();
-    try { const f = await send('/folders', 'POST', { name, note: note || undefined, brand_id: b === 'all' || b === 'none' ? (S.libBrand || null) : b });
+    try { const f = await send('/folders', 'POST', { name, note: note || undefined, brand_id: b === 'all' || b === 'none' ? ($('libbrand')?.value ?? S.libBrand) || null : b });
       S.newFolder = false; await reloadLibrary(); S.folderOpen = f.id; } catch (er) { S.flash = { kind: 'err', text: er.message }; }
     render(); });
   on('#fsave', 'click', async () => { const f = folderOf(S.folderOpen); if (!f) return;

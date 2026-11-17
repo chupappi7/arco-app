@@ -7,6 +7,7 @@ import { now } from './http.js';
 const CHUNK = 500;
 
 async function deleteObjects(env, keys) {
+  keys = keys.flatMap(k => /\.(mp4|mov)$/.test(k) ? [k, `${k}.jpg`] : [k]);
   for (let i = 0; i < keys.length; i += CHUNK) await env.MEDIA.delete(keys.slice(i, i + CHUNK));
 }
 

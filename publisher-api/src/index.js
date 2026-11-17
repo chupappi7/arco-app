@@ -6,7 +6,7 @@ import { startEmail, verifyEmail, callerFor, need, myWorkspaces, switchWorkspace
 import { metaFor, MetaError } from './meta.js';
 import { listAccounts, creatorInfoFor, disconnect, refreshInstagramTokens } from './accounts.js';
 import * as L from './limits.js';
-import { uploadMedia, serveMedia, copyMedia, videoTicket, uploadVideo, uploadCors } from './media.js';
+import { uploadMedia, serveMedia, copyMedia, videoTicket, uploadVideo, uploadCors, putPoster } from './media.js';
 import { listLibrary, addToLibrary, moveInLibrary, removeFromLibrary } from './library.js';
 import { listFolders, createFolder, updateFolder, deleteFolder } from './folders.js';
 import { freeSlots, schedulePlan, undoBatch, approvePost, findPosts, resolveBrand, workspaceInfo, parseWhen } from './planner.js';
@@ -111,6 +111,7 @@ export const ROUTES = [
   ['GET', '/mcp', async () => new Response('ARCO Publisher MCP: POST JSON-RPC here.', { status: 405, headers: { Allow: 'POST' } }), 'public'],
   ['POST', '/v1/media/copy', async (req, env, { who }) => json(await copyMedia(env, who, (await body(req)).keys)), 'member'],
   ['POST', '/v1/media/video', async (req, env, { who }) => json(await videoTicket(env, who, await body(req), req)), 'member'],
+  ['PUT', '/v1/media/poster', async (req, env, { who, url }) => json(await putPoster(env, who, url.searchParams.get('key'), req)), 'member'],
   // The page PUTs a video here directly (cross-origin), with a ticket from above.
   ['OPTIONS', '/upload/:token', async (req, env) => new Response(null, { status: 204, headers: uploadCors(env) }), 'public'],
   ['PUT', '/upload/:token', async (req, env, { params }) => {

@@ -63,6 +63,22 @@ describe('video upload', () => {
     expect(new TextDecoder().decode(await part.arrayBuffer())).toBe('ftyp');
   });
 
+  it('keeps a still next to a video, served as <key>.jpg', async () => {
+    const h = await session(), key = await uploadVideo(h);
+    const JPG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+    const poster = (k, bytes = JPG, type = 'image/jpeg', hh = h) => callWorker(`/v1/media/poster?key=${encodeURIComponent(k)}`,
+      { method: 'PUT', headers: { ...hh, 'Content-Type': type }, body: bytes });
+    expect((await poster(key)).status).toBe(200);
+    const got = await callWorker(`/media/${key}.jpg`);
+    expect(got.status).toBe(200);
+    expect(got.headers.get('Content-Type')).toBe('image/jpeg');
+    expect(new Uint8Array(await got.arrayBuffer())).toEqual(JPG);
+    expect((await poster(key, new Uint8Array([1, 2, 3]))).status).toBe(400);
+    expect((await poster(key, JPG, 'image/png')).status).toBe(400);
+    expect((await poster(key.replace(/\.mp4$/, '.jpg'))).status).toBe(400);
+    expect((await poster(key, JPG, 'image/jpeg', {})).status).toBe(401);
+  });
+
   it('turns away the wrong type, too large, tampered, reused, mismatched or non-video uploads', async () => {
     const h = await session();
     expect((await ticket(h, { content_type: 'video/webm' })).status).toBe(400);

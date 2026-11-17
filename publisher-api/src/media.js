@@ -13,6 +13,22 @@ const TYPES = {
 const FULL = `Storage is full (${MAX_WORKSPACE_BYTES / 1024 / 1024 / 1024} GB). Images are freed 7 days after their post is done; remove videos you no longer need from the library.`;
 
 export const mediaUrl = (env, key) => `${env.PUBLIC_ORIGIN}/media/${key}`;
+// A video's still sits next to it as <key>.jpg, so pages need not download the video to show it.
+export const posterKey = key => `${key}.jpg`;
+const MAX_POSTER_BYTES = 512 * 1024;
+
+export async function putPoster(env, w, key, req) {
+  const ws = wsOf(w), sc = inScope(w, 'brand_id');
+  if (!/\.(mp4|mov)$/.test(String(key))) throw new HttpError(400, 'key must be a video');
+  const row = await env.DB.prepare(`SELECT 1 FROM media WHERE workspace_id = ? AND key = ?${sc.sql}`).bind(ws, String(key), ...sc.binds).first();
+  if (!row) throw new HttpError(404, 'No such video');
+  if ((req.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase() !== 'image/jpeg') throw new HttpError(400, 'The still must be a JPG');
+  const bytes = new Uint8Array(await req.arrayBuffer());
+  if (!bytes.length || bytes.length > MAX_POSTER_BYTES) throw new HttpError(400, 'The still must be 512 KB or smaller');
+  if (!TYPES['image/jpeg'].magic.every((b, i) => bytes[i] === b)) throw new HttpError(400, 'That file is not a valid JPG');
+  await env.MEDIA.put(posterKey(String(key)), bytes, { httpMetadata: { contentType: 'image/jpeg' } });
+  return { ok: true, url: mediaUrl(env, posterKey(String(key))) };
+}
 
 export async function workspaceBytes(env, ws) {
   const row = await env.DB.prepare('SELECT COALESCE(SUM(bytes), 0) AS b FROM media WHERE workspace_id = ?').bind(ws).first();
