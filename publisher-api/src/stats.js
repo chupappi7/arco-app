@@ -201,7 +201,7 @@ export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TI
       const byId = new Map(videos.map(v => [String(v.id), v]));
       for (const p of list) {
         const v = byId.get(String(p.public_post_id));
-        await save(p.id, v ? { views: count(v.view_count), likes: count(v.like_count), comments: count(v.comment_count), shares: count(v.share_count) } : null);
+        await save(p.id, v ? { views: count(v.view_count), likes: count(v.like_count), comments: count(v.comment_count), shares: count(v.share_count), cover: v.cover_image_url || undefined } : null);
         if (v) done.posts++;
       }
     } catch (err) {

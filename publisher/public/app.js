@@ -313,6 +313,11 @@ function greeting() {
 }
 
 const thumbOf = p => p.images?.[p.cover_index] || p.images?.[0] || p.video;
+// TikTok's own cover once stats are in; its link expires, so the post's media stays behind it.
+const thumb = (p, attrs = 'alt=""') => {
+  const own = thumbOf(p), cover = p.stats?.cover;
+  return cover ? `<img src="${esc(cover)}" ${own ? `data-fb="${esc(own)}"` : ''} ${attrs}>` : own ? pic(own, attrs) : '';
+};
 const isVid = u => /\.(mp4|mov)(#|$)/i.test(String(u || ''));
 // An image, or for a video its first frame.
 const pic = (u, attrs = 'alt=""') => isVid(u)
@@ -431,7 +436,7 @@ function overviewView() {
   const onDay = d => live.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((x, y) => x.scheduled_at - y.scheduled_at);
   const tile = p => { const st = next && p.id === next.id ? 'next' : p.status, a = all.find(x => x.id === p.account_id);
     return `<button class="opt ${st}" data-open="${p.id}" style="--bc:${brandHue(a?.brand_id)}" title="Open post">
-      <span class="oth">${thumbOf(p) ? pic(thumbOf(p)) : ''}<span class="pb">${icon(p.platform || 'tiktok', 9)}</span></span>
+      <span class="oth">${thumb(p)}<span class="pb">${icon(p.platform || 'tiktok', 9)}</span></span>
       <span class="tx"><b>${at(p.scheduled_at)}${st === 'failed' ? ' · failed' : st === 'next' ? ' · next' : ''}</b><span>${who(p)}</span></span></button>`; };
   const nowLine = `<div class="nowl"><time>${at(now)}</time><i></i></div>`;
   const col = (d, i) => { const k = dayKey(d), list = onDay(d), isT = i === 0;
@@ -465,7 +470,7 @@ function overviewView() {
   // Best of the last 7 days by views (or engagement where views are not shared), else the latest.
   const scored = cur.filter(p => p.stats).sort((x, y) => (y.stats.views || 0) - (x.stats.views || 0) || engOf(y.stats) - engOf(x.stats));
   const top = (scored.length ? scored : pub.slice().sort((x, y) => y.scheduled_at - x.scheduled_at)).slice(0, 3);
-  const ttile = p => `<button class="tp" data-open="${p.id}"><span class="im">${thumbOf(p) ? pic(thumbOf(p)) : ''}<span class="pbadge">${appIcon(p.platform || 'tiktok', 20)}</span></span>
+  const ttile = p => `<button class="tp" data-open="${p.id}"><span class="im">${thumb(p)}<span class="pbadge">${appIcon(p.platform || 'tiktok', 20)}</span></span>
     <b>${p.stats?.views != null ? `${num(p.stats.views)} views` : p.stats ? `${num(engOf(p.stats))} engagements` : fmt(p.scheduled_at, { month: 'short', day: 'numeric' })}</b>
     <span>${who(p)}</span></button>`;
   const topCard = `<section class="panel otop"><header><h2>${scored.length ? 'Top posts' : 'Recently published'}</h2><span class="note">${scored.length ? 'last 7 days' : ''}</span><a href="#analytics">See all</a></header>
@@ -555,7 +560,7 @@ function analyticsView() {
       <div class="bpv"><span>Views</span><b>${x.views == null ? '–' : num(x.views)}</b></div>
       <div class="bpv"><span>Likes</span><b>${x.likes == null ? '–' : num(x.likes)}</b></div>
       <div class="bpv"><span>Followers</span><b>${x.followers == null ? '–' : num(x.followers)}</b></div></div>`;
-  const row = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumbOf(p) ? pic(thumbOf(p), 'class="thumb" alt=""') : '<span class="noimg"></span>'}
+  const row = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumb(p, 'class="thumb" alt=""') || '<span class="noimg"></span>'}
       <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>${statLine(p.stats)}</div>`;
   const acc = a => `<div class="arow">${icon(a.platform, 14)}<b>${who(a)}</b>
       <span class="fv">${a.limited && a.platform === 'tiktok' ? `<a class="rc" href="/api/auth/start?add=1">Reconnect</a>` : a.followers == null ? '<em>Reading…</em>' : num(a.followers)}</span>
@@ -1863,18 +1868,16 @@ function postCard(p, compact) {
   const time = fmt(p.scheduled_at, { hour: '2-digit', minute: '2-digit' });
   const drag = p.status === 'queued' ? `draggable="true" data-drag="${p.id}"` : '';
   if (compact) {
-    const img = thumbOf(p);
     return `<div class="mp ${p.status}" ${drag} data-open="${p.id}" role="button" tabindex="0"
         title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.status}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
-      ${img ? pic(img) : '<span class="noimg"></span>'}<div><b>${icon(p.platform || 'tiktok', 11)}${at(p.scheduled_at)}</b><span>${bdot(p)}${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</span></div></div>`;
+      ${thumb(p) || '<span class="noimg"></span>'}<div><b>${icon(p.platform || 'tiktok', 11)}${at(p.scheduled_at)}</b><span>${bdot(p)}${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</span></div></div>`;
   }
   // Week view: a small row per post. Everything you can do with it is one
   // click away in the drawer.
-  const img = thumbOf(p);
   const label = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
   return `<div class="pc ${p.status}" ${drag} data-open="${p.id}" role="button" tabindex="0"
       title="${esc(`${label}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
-    ${img ? pic(img) : '<span class="noimg"></span>'}
+    ${thumb(p) || '<span class="noimg"></span>'}
     <div class="pt"><b>${icon(p.platform || 'tiktok', 12)}${at(p.scheduled_at)}</b>
       <span>${bdot(p)}${who(p)}</span>
       <em>${label}</em></div></div>`;
@@ -2193,6 +2196,11 @@ async function brandAction(fn) {
 
 // ---- events ------------------------------------------------------------
 
+// An expired TikTok cover falls back to the post's own photo or video frame.
+document.addEventListener('error', e => {
+  const el = e.target, fb = el?.dataset?.fb;
+  if (el?.tagName === 'IMG' && fb) el.outerHTML = pic(fb, [...el.attributes].filter(x => !['src', 'data-fb'].includes(x.name)).map(x => `${x.name}="${esc(x.value)}"`).join(' '));
+}, true);
 document.addEventListener('keydown', e => {
   // C opens Create from anywhere, unless you are typing.
   if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.target.closest('input,textarea,select,[contenteditable]') && S.me && !S.me.needs_email && !$('overlay') && !$('dialogs').firstChild) { location.hash = '#compose'; return; }

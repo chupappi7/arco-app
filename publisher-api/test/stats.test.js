@@ -215,7 +215,7 @@ describe('TikTok numbers', () => {
     const tk = fakeTk({
       userStats: async () => ({ follower_count: 10 }),
       status: async () => ({ status: 'PUBLISH_COMPLETE', publicaly_available_post_id: ready ? ['7501'] : [] }),
-      videoStats: async (tok, ids) => ids.map(id => ({ id, view_count: 321, like_count: 5, comment_count: 1, share_count: 0 })),
+      videoStats: async (tok, ids) => ids.map(id => ({ id, view_count: 321, like_count: 5, comment_count: 1, share_count: 0, cover_image_url: 'https://cdn/cover.jpg' })),
     });
     await refreshStats(env, fakeMeta(), tk, T2, 6);
     expect((await env.DB.prepare("SELECT public_post_id FROM posts WHERE id = 'a'").first()).public_post_id).toBe(null);
@@ -226,6 +226,7 @@ describe('TikTok numbers', () => {
     const row = await env.DB.prepare("SELECT public_post_id, stats FROM posts WHERE id = 'a'").first();
     expect(row.public_post_id).toBe('7501');
     expect(JSON.parse(row.stats).views).toBe(321);
+    expect(JSON.parse(row.stats).cover).toBe('https://cdn/cover.jpg');
   });
 
   it('finds a post TikTok status forgot in the account\'s own list, by time, never one already taken', async () => {
