@@ -121,7 +121,14 @@ async function fileNewAccounts() {
   try { p = JSON.parse(localStorage.getItem(PENDING_BRAND) || 'null'); localStorage.removeItem(PENDING_BRAND); } catch {}
   if (!p || Date.now() - p.at > 30 * 60e3 || !brandName(p.brand) || !can('admin')) return;
   const fresh = S.me.accounts.filter(a => !p.known.includes(a.id) && !a.brand_id).map(a => a.id);
-  if (!fresh.length) return;
+  // Nothing new: the platform connected an account that was already here
+  // (TikTok picks whoever is signed in on tiktok.com).
+  if (!fresh.length) {
+    if (p.pl) S.flash = { kind: 'err', text: `${PLATFORM[p.pl]} connected an account that is already here, so nothing was added to ${brandName(p.brand)}. `
+      + (p.pl === 'tiktok' ? 'To add a different TikTok account, choose "Switch account" on TikTok\'s screen, or sign out of tiktok.com first, then try again.'
+        : 'To add a different one, log in with it on the platform\'s screen.') };
+    return;
+  }
   try { await send(`/brands/${p.brand}/accounts`, 'POST', { account_ids: fresh }); S.me = await api('/me');
     S.flash = { kind: 'ok', text: `Added to ${brandName(p.brand)}.` }; } catch {}
 }
@@ -2367,7 +2374,7 @@ function bind() {
   on('[data-settab-link]', 'click', e => { S.setTab = e.currentTarget.dataset.settabLink; });
   on('[data-addpl]', 'change', e => { const v = e.target.value, brand = e.target.dataset.addpl; if (!v) return;
     if (v.startsWith('new:')) {
-      try { localStorage.setItem(PENDING_BRAND, JSON.stringify({ brand, known: S.me.accounts.map(a => a.id), at: Date.now() })); } catch {}
+      try { localStorage.setItem(PENDING_BRAND, JSON.stringify({ brand, pl: v.slice(4), known: S.me.accounts.map(a => a.id), at: Date.now() })); } catch {}
       location.href = connectHref(v.slice(4)); return;
     }
     brandAction(() => send(`/accounts/${v}`, 'PATCH', { brand_id: brand })); });
@@ -2376,7 +2383,8 @@ function bind() {
   on('a[href*="/api/auth/"][href*="add=1"]', 'click', e => {
     const b = e.currentTarget.dataset.cbrand || curBrand();
     if (b === 'all' || b === 'none' || !can('admin')) return;
-    try { localStorage.setItem(PENDING_BRAND, JSON.stringify({ brand: b, known: S.me.accounts.map(a => a.id), at: Date.now() })); } catch {}
+    const href = e.currentTarget.getAttribute('href'), pl = href.includes('/meta/') ? 'facebook' : href.includes('/instagram/') ? 'instagram' : 'tiktok';
+    try { localStorage.setItem(PENDING_BRAND, JSON.stringify({ brand: b, pl, known: S.me.accounts.map(a => a.id), at: Date.now() })); } catch {}
   });
   on('[data-bg]', 'change', e => pickGroup(e.target.dataset.bg, e.target.checked));
   document.querySelectorAll('[data-state=some]').forEach(el => { el.indeterminate = true; });

@@ -30,6 +30,9 @@ export default function handler(req, res) {
   u.searchParams.set('state', state);
   u.searchParams.set('code_challenge', challenge);
   u.searchParams.set('code_challenge_method', 'S256');
+  // Adding an account: always show TikTok's screen, so whoever is signed in on
+  // tiktok.com is not connected again silently and there is a chance to switch.
+  if (add) u.searchParams.set('disable_auto_auth', '1');
 
   res.redirect(302, u.toString());
 }
