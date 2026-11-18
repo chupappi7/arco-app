@@ -158,6 +158,8 @@ const UI = {
   spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m14 6 4 4"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',
+  warn: '<path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17.5v.01"/>',
   more: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
   cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   draft: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/>',
@@ -186,7 +188,7 @@ function wsBox() {
 
 function menu() {
   const items = [['overview', 'Overview', 'home'], ['compose', 'Schedule', 'edit'], ['library', 'Library', 'image'], ['calendar', 'Calendar', 'cal', S.counts.failed, 'bad'], ['analytics', 'Analytics', 'chart'],
-    ['drafts', 'Drafts', 'draft', S.counts.drafts], ...(can('admin') ? [['accounts', 'Accounts', 'users']] : []), ['ai', 'AI assistant', 'spark']];
+    ['drafts', 'Drafts', 'draft', S.counts.drafts], ...(can('admin') ? [['accounts', 'Accounts', 'users']] : []), ['ai', 'MCP', 'spark']];
   const email = S.me.user?.email || '';
   return `<a class="brand-row" href="#overview"><img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30"><b>ARCO Publisher</b></a>
     ${wsBox()}
@@ -215,7 +217,7 @@ const HEADS = {
   drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.', `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
   accounts: () => ['Brands & accounts', 'Each brand holds its TikTok, Instagram and Facebook accounts. Pick a brand when you schedule and its accounts come with it.'],
   settings: () => ['Settings', 'Workspace, people and your account.'],
-  ai: () => ['AI assistant', 'Let Claude, or any assistant that speaks MCP, plan and schedule posts from your library. You check the plan; nothing goes out unseen.', '<a class="btn sec" href="/ai.html" target="_blank" rel="noopener">Full guide</a>'],
+  ai: () => ['MCP', 'Plan and schedule posts by chatting with your AI.', ''],
 };
 // Grey shapes in the layout of what is coming, instead of the word Loading.
 const sk = (w = '100%', h = 14, cls = '') => `<span class="sk ${cls}" style="width:${w};height:${h}px"></span>`;
@@ -866,65 +868,77 @@ const copyBtn = (text, label = 'Copy') => `<button type="button" class="btn sec 
 // Shown with the key masked; Copy takes the real thing.
 const codeBlock = (text, shown = text) => `<div class="cblock"><pre><code>${esc(shown)}</code></pre>${copyBtn(text)}</div>`;
 const maskKey = k => (k ? `${k.slice(0, 8)}••••••••${k.slice(-4)}` : k);
-const CLIENTS = [['code', 'Claude Code'], ['desktop', 'Claude Desktop'], ['other', 'Cursor and others'], ['web', 'claude.ai']];
+// The apps that can connect, as small app tiles.
+const APP_TILE = {
+  code: ['#1b1b1b', '<path d="M7 9l3 3-3 3" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.5 15.5h4.5" stroke="#D97757" stroke-width="2" stroke-linecap="round"/>'],
+  desktop: ['#D97757', '<g stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M12 5v14M5 12h14M7.1 7.1l9.8 9.8M16.9 7.1l-9.8 9.8"/></g>'],
+  cursor: ['#0f0f0f', '<g fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"><path d="M12 4l7 4v8l-7 4-7-4V8z"/><path d="M5 8l7 4 7-4M12 12v8"/></g>'],
+  other: ['#3b4252', '<g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M9 4v4M15 4v4M7 8h10v3a5 5 0 0 1-10 0zM12 16v4"/></g>'],
+};
+const appTile = (id, s = 36) => `<svg class="apptile" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="${APP_TILE[id][0]}"/>${APP_TILE[id][1]}</svg>`;
+const CLIENTS = [['code', 'Claude Code'], ['desktop', 'Claude Desktop'], ['cursor', 'Cursor'], ['other', 'VS Code & others']];
+
+// What to copy for each app, and the one line that says where it goes.
 function clientSetup(key) {
-  const k = key || 'apk_YOUR_KEY', url = mcpUrl(), c = S.aiClient || 'code';
-  const both = cfg => [JSON.stringify(cfg(k), null, 2), JSON.stringify(cfg(key ? maskKey(key) : k), null, 2)];
-  const tabs = `<div class="seg ctabs2" role="tablist">${CLIENTS.map(([id, l]) => `<button role="tab" data-aiclient="${id}" class="${c === id ? 'on' : ''}" aria-selected="${c === id}">${l}</button>`).join('')}</div>`;
-  const body = {
-    code: `<p>Run this once in a terminal. It asks for the key, so the key never shows on screen or lands in your shell history. Then start <code>claude</code> and ask away; <code>/mcp</code> shows whether it is connected.</p>
-      ${codeBlock(`printf 'Paste your Publisher API key: '; read -rs ARCO_KEY; echo; claude mcp add --scope user --transport http arco-publisher ${url} --header "Authorization: Bearer $ARCO_KEY"; unset ARCO_KEY`)}
-      ${key ? `<p class="note">Paste the key from step 1 when it asks.</p>` : ''}`,
-    desktop: `<p>In Claude Desktop open <b>Settings → Developer → Edit Config</b>, put this in <code>claude_desktop_config.json</code> and restart Claude. Needs Node.js.</p>
-      ${codeBlock(...both(x => ({ mcpServers: { 'arco-publisher': { command: 'npx', args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${ARCO_AUTH}'], env: { ARCO_AUTH: `Bearer ${x}` } } } })))}`,
-    other: `<p>Cursor, Windsurf, VS Code and other apps that take a remote MCP server with headers:</p>
-      ${codeBlock(...both(x => ({ mcpServers: { 'arco-publisher': { url, headers: { Authorization: `Bearer ${x}` } } } })))}`,
-    web: '<p>Custom connectors on claude.ai sign in with OAuth, which Publisher does not offer yet. Use Claude Desktop or Claude Code for now: same account, same chats.</p>',
+  const k = key || 'apk_YOUR_KEY', url = mcpUrl(), c = CLIENTS.some(x => x[0] === S.aiClient) ? S.aiClient : 'code';
+  const json = cfg => JSON.stringify(cfg, null, 2);
+  const remote = { mcpServers: { 'arco-publisher': { url, headers: { Authorization: `Bearer ${k}` } } } };
+  const [how, text, label] = {
+    code: ['Paste it into Terminal and press Return. It asks for your key, then you start <code>claude</code>.',
+      `printf 'Paste your Publisher API key: '; read -rs ARCO_KEY; echo; claude mcp add --scope user --transport http arco-publisher ${url} --header "Authorization: Bearer $ARCO_KEY"; unset ARCO_KEY`, 'Copy command'],
+    desktop: ['In Claude Desktop: <b>Settings → Developer → Edit Config</b>. Paste, save, restart Claude. Needs Node.js.',
+      json({ mcpServers: { 'arco-publisher': { command: 'npx', args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${ARCO_AUTH}'], env: { ARCO_AUTH: `Bearer ${k}` } } } }), 'Copy config'],
+    cursor: ['In Cursor: <b>Settings → MCP → Add new server</b>. Paste into <code>mcp.json</code> and save.', json(remote), 'Copy config'],
+    other: ['VS Code, Windsurf and other apps that take a remote MCP server: paste into their MCP settings.', json(remote), 'Copy config'],
   }[c];
-  return `${tabs}<div class="csetup">${body}${c === 'code' || c === 'web' ? '' : key ? '<p class="note">The key is hidden here; Copy includes it. That file then holds the key, so keep it private.</p>'
-    : '<p class="note">Replace <code>apk_YOUR_KEY</code> with your key. Create one in step 1 to have it filled in when you copy.</p>'}</div>`;
+  return `<div class="mapps" role="tablist">${CLIENTS.map(([id, l]) => `<button role="tab" class="mapp ${c === id ? 'on' : ''}" data-aiclient="${id}" aria-selected="${c === id}">${appTile(id, 30)}<span>${l}</span></button>`).join('')}</div>
+    <div class="howto"><p>${how}</p>
+      <div class="howrow">${copyBtn(text, `${ui('copy', 14)}${label}`).replace('btn sec sm', 'btn')}<span class="note">${c === 'code' ? 'Your key never shows on screen.' : key ? 'Your key is filled in. Keep that file private.' : 'Create your key first, then copy: it gets filled in.'}</span></div></div>`;
 }
 
 function aiView() {
   const owner = can('owner'), admin = can('admin'), keySet = !!S.me.api_key_set, key = S.apiKey;
-  const brand = S.me.brands[0]?.name || 'my brand', other = S.me.brands[1]?.name;
+  const brand = S.me.brands[0]?.name || 'my brand';
   const unused = (S.folders || []).filter(f => f.status === 'unused' && f.items.length).length;
   const waiting = (S.drafts || []).filter(d => d.source === 'ai').length;
-  const step = (n, done, title, desc, body) => `<section class="panel aistep ${done ? 'done' : ''}"><header><span class="stepn">${done ? ui('check', 14) : n}</span><h2>${title}</h2>${desc ? `<span class="note">${desc}</span>` : ''}</header><div class="aibody">${body}</div></section>`;
+  const review = S.me.ai_review !== false;
   const prompts = [
-    `Schedule everything new in ${brand} for next week, one post a day at the usual times. Show me the plan first.`,
-    `What's unused in the library, per brand?`,
-    `Post the newest ${brand} folder tomorrow at 18:00 on TikTok and Instagram. Keep the caption short and funny.`,
-    `How did ${other || brand} do in the last 30 days? What do the best posts have in common? Plan next week using that.`,
-    'Something failed yesterday. Find out why and retry it.',
-    'Undo what you just scheduled.',
+    ['cal', 'Plan', `Schedule the new ${brand} posts for next week, one a day. Show me the plan first.`],
+    ['edit', 'Write', `Write a short, funny caption for the newest ${brand} post.`],
+    ['chart', 'Learn', 'Which posts did best this month, and why?'],
+    ['image', 'Check', "What's in the library that isn't scheduled yet?"],
+    ['warn', 'Fix', 'Something failed yesterday. Find out why and retry it.'],
+    ['x', 'Undo', 'Undo what you just scheduled.'],
   ];
-  return `<div class="aigrid"><div class="aimain">
-    ${step(1, keySet, 'Create an API key', 'The assistant signs in with it',
-      `${key ? `<div class="keybox"><code class="key" id="keyshow">${esc(S.keyShown ? key : maskKey(key))}</code>${copyBtn(key)}<button type="button" class="btn ghost sm" id="keytoggle">${S.keyShown ? 'Hide' : 'Show'}</button></div><p class="note warn">Copy it now; it will not be shown again. Keep it out of chats, screenshots and shared documents.</p>` : ''}
-       <p>${keySet ? 'This workspace has a key. Making a new one switches the old one off at once, so any assistant using it needs the new key.' : 'One key per workspace. It can do what an admin can: schedule, cancel and read stats for every brand. Treat it like a password.'}</p>
-       ${owner ? `<button class="btn ${keySet ? 'sec' : ''}" id="apikey">${keySet ? 'Create a new key' : 'Create API key'}</button>` : '<p class="note">Only the workspace owner can create the key. Ask them for it.</p>'}`)}
-    ${step(2, false, 'Connect your assistant', 'Pick the app you use',
-      `<div class="kv"><span>Server address</span><code>${esc(mcpUrl())}</code>${copyBtn(mcpUrl())}</div>${clientSetup(key)}`)}
-    ${step(3, unused > 0, 'Fill the library', unused ? `${unused} post${unused === 1 ? '' : 's'} ready` : 'Nothing ready yet',
-      `<p><b>One folder is one post:</b> its photos in order, or one video, filed under a brand. Add a note with what the caption should say: the offer, a code, "not before Friday". The assistant writes the caption from the photos, the note and the brand voice.</p>
-       <a class="btn sec" href="#library">Open the library</a>`)}
-    <section class="panel"><header><h2>Try asking</h2><span class="note">Talk in brands, folders, days and tone</span></header>
-      <div class="aiprompts">${prompts.map(p => `<div class="aiprompt"><span>${esc(p)}</span>${copyBtn(p)}</div>`).join('')}</div></section>
-  </div>
-  <aside class="aiside">
-    <section class="panel"><header><h2>Approval</h2></header><div class="aibody">
-      <div class="aisw"><div><b>AI posts need approval</b><span class="note">${S.me.ai_review !== false ? 'Posts the assistant schedules wait in Drafts until someone approves them.' : 'Posts the assistant schedules go straight onto the calendar.'}</span></div>
-        ${admin ? `<label class="sw"><input type="checkbox" id="aireview" ${S.me.ai_review !== false ? 'checked' : ''} aria-label="AI posts need approval"><span></span></label>` : ''}</div>
-      ${waiting ? `<a class="btn" href="#drafts">Review ${waiting} AI post${waiting === 1 ? '' : 's'}</a>` : '<p class="note">No AI posts waiting.</p>'}</div></section>
-    <section class="panel"><header><h2>How a request runs</h2></header><div class="aibody"><ol class="aiflow">
-      <li>It reads your brands, accounts, posting times, voice and library.</li>
-      <li>It plans: captions, times (your free posting slots unless you name one), and checks every platform rule.</li>
-      <li>It shows you the plan. Change anything, or say "go".</li>
-      <li>It schedules them as one batch. "Undo that" cancels the batch.</li></ol></div></section>
-    <section class="panel"><header><h2>It can't</h2></header><div class="aibody"><p class="note">Connect or disconnect accounts, invite or remove people, change the API key or delete brands. Those stay here.</p>
-      <a href="/ai.html#help" target="_blank" rel="noopener">Troubleshooting</a></div></section>
-  </aside></div>`;
+  const stepCard = (n, done, title, body) => `<div class="mstep ${done ? 'done' : ''}"><span class="stepn">${done ? ui('check', 14) : n}</span><div class="mbody"><b>${title}</b>${body}</div></div>`;
+  return `<section class="panel mhero">
+      <div class="mintro"><span class="eyebrow">MCP</span>
+        <h2>Schedule posts by asking your AI</h2>
+        <p>Connect Claude or Cursor to ARCO Publisher. Ask in plain words, and it plans captions and times from your library, then schedules them once you say go.</p>
+        <ul class="mperks"><li>${ui('edit', 15)}Writes captions from your photos, notes and brand voice</li><li>${ui('cal', 15)}Fills your free posting times</li><li>${ui('check', 15)}Nothing goes out without your OK</li></ul></div>
+      <div class="mchat" aria-label="Example conversation">
+        <div class="bub me">Schedule the new ${esc(brand)} videos for next week.</div>
+        <div class="bub ai"><b>5 posts</b>, Mon to Fri at 18:00 on TikTok and Instagram. Captions are drafted from each video's note. Go?</div>
+        <div class="bub me">Go</div>
+        <div class="bub ai">${ui('check', 13)} Scheduled. ${review ? 'They wait in Drafts for your approval.' : 'They are on the calendar.'}</div></div>
+    </section>
+    <section class="panel"><header><h2>Set it up</h2><span class="note">Takes about two minutes</span></header>
+      <div class="msteps">
+        ${stepCard(1, keySet, 'Create your key', `<span class="note">Your AI signs in with it. Treat it like a password.</span>
+          ${key ? `<div class="keybox"><code class="key" id="keyshow">${esc(S.keyShown ? key : maskKey(key))}</code>${copyBtn(key)}<button type="button" class="btn ghost sm" id="keytoggle">${S.keyShown ? 'Hide' : 'Show'}</button></div><p class="note warn">Copy it now: it is shown only once.</p>` : ''}
+          ${owner ? `<button class="btn ${keySet ? 'ghost sm' : ''}" id="apikey">${keySet ? 'Make a new key' : 'Create key'}</button>` : '<span class="note">Only the workspace owner can create it.</span>'}`)}
+        ${stepCard(2, false, 'Connect your app', '<span class="note">Pick it below, copy, paste where it says.</span>')}
+        ${stepCard(3, false, 'Ask', `<span class="note">Try one of the examples. It uses the posts in your <a href="#library">Library</a>${unused ? ` (${unused} ready)` : ''}.</span>`)}
+      </div>
+      <div class="msetup">${clientSetup(key)}</div></section>
+    <section class="panel"><header><h2>Things to ask</h2><span class="note">Copy one into your AI</span></header>
+      <div class="mprompts">${prompts.map(([ic, tag, p]) => `<button type="button" class="mprompt" data-copy="${esc(p)}" title="Copy">
+          <span class="mtag">${ui(ic, 13)}${tag}</span><span class="mpt">${esc(p)}</span><span class="mcopy">${ui('copy', 14)}</span></button>`).join('')}</div></section>
+    <div class="mfoot">
+      <div class="aisw"><div><b>AI posts need my approval</b><span class="note">${review ? 'They wait in Drafts until someone approves them.' : 'They go straight onto the calendar.'}</span></div>
+        ${admin ? `<label class="sw"><input type="checkbox" id="aireview" ${review ? 'checked' : ''} aria-label="AI posts need approval"><span></span></label>` : ''}
+        ${waiting ? `<a class="btn sm" href="#drafts">Review ${waiting}</a>` : ''}</div>
+      <p class="note">It can't connect accounts, invite people or delete brands; those stay here. <a href="/ai.html" target="_blank" rel="noopener">Full guide</a> · <a href="/ai.html#help" target="_blank" rel="noopener">Troubleshooting</a></p></div>`;
 }
 
 // ---- library folders: one folder = one post, ready to schedule -------------
@@ -2620,7 +2634,9 @@ function bind() {
     else if (v.startsWith('b:')) brandAction(() => send(`/accounts/${id}`, 'PATCH', { brand_id: v.slice(2) })); });
   on('[data-settab]', 'click', e => { S.setTab = e.currentTarget.dataset.settab; render(); });
   on('[data-copy]', 'click', async e => { const b = e.currentTarget;
-    try { await navigator.clipboard.writeText(b.dataset.copy); const t = b.textContent; b.textContent = 'Copied'; setTimeout(() => { b.textContent = t; }, 1400); }
+    try { await navigator.clipboard.writeText(b.dataset.copy); if (b.classList.contains('copied')) return; const t = b.innerHTML;
+      if (b.classList.contains('mprompt')) b.classList.add('copied'); else b.textContent = 'Copied';
+      setTimeout(() => { b.innerHTML = t; b.classList.remove('copied'); }, 1400); }
     catch { toast('Copy did not work here. Select the text and copy it.', 'err'); } });
   on('[data-aiclient]', 'click', e => { S.aiClient = e.currentTarget.dataset.aiclient; render(); });
   on('#keytoggle', 'click', () => { S.keyShown = !S.keyShown; render(); });
