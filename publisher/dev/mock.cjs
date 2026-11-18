@@ -117,7 +117,8 @@ http.createServer(async (q, r) => {
       by_platform: ['tiktok', 'instagram', 'facebook'].filter(pl => plat === 'all' || pl === plat).map((pl, i) => ({ platform: pl, posts: 3 - i, views: pl === 'facebook' ? null : 9000 - i * 3000, likes: pl === 'facebook' ? null : 700 - i * 200, comments: null, shares: null, followers: [412, 650, 780][i] })),
       platforms: ['tiktok', 'instagram', 'facebook'],
       accounts: accs.map(a => ({ id: a.id, username: a.username, platform: a.platform, avatar_url: '', followers: 300 + a.id.charCodeAt(1) * 7, change: a.id === 'a2' ? 12 : 0, limited: a.id === 'a5' })),
-      top, tiktok_pending: false, tiktok_reconnect: true, facebook_limited: true }); }
+      top, posts: [...top, ...[...Array(14)].map((_, i) => ({ ...top[i % top.length], id: `m${i}`, scheduled_at: now() - (i + 1) * 86400 * 1.7 - (i * 5 % 14) * 3600,
+        stats: { views: 300 + (i * 977) % 4000, likes: 10 + (i * 131) % 300, comments: (i * 7) % 30, shares: (i * 3) % 12 } }))].filter(Boolean), tiktok_pending: false, tiktok_reconnect: true, facebook_limited: true }); }
   if (p.endsWith('/creator-info')) return j({ creator_username: 'arco.app', creator_nickname: 'ARCO', creator_avatar_url: '', comment_disabled: false, privacy_level_options: ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'SELF_ONLY'] });
   // Videos: a ticket, then a PUT to the "Worker" (here, the same server).
   if (p === '/api/v1/media/video' && q.method === 'POST') { const o = await body(q);

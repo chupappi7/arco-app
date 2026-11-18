@@ -552,7 +552,7 @@ function analyticsView() {
     <div class="pchips" role="group" aria-label="Platform">${[['all', 'All platforms'], ...plats.map(pl => [pl, PLATFORM[pl]])].map(([k, l]) =>
       `<button class="pchip ${plat === k ? 'on' : ''}" data-aplat="${k}" aria-pressed="${plat === k}">${k === 'all' ? '' : appIcon(k, 18)}${l}</button>`).join('')}</div>
     <div class="seg" role="group" aria-label="Period">${[7, 30, 90].map(d => `<button data-days="${d}" class="${d === days ? 'on' : ''}" aria-pressed="${d === days}">${d} days</button>`).join('')}</div></div>`;
-  if (!st) return `${filters}${skKpis(5)}<div class="angrid"><section class="panel ocard"><header><h2>Followers</h2></header><div class="chart">${sk('100%', 180)}</div></section><section class="panel ocard"><header><h2>By platform</h2></header><div class="oscroll">${skRows(3)}</div></section></div>`;
+  if (!st) return `${filters}${skKpis(5)}<section class="panel atrend"><div class="chart">${sk('100%', 160)}</div></section><div class="an2"><section class="panel aposts"><header><h2>Posts</h2></header><div class="oscroll">${skRows(6)}</div></section><div class="aside"><section class="panel ocard"><header><h2>Followers</h2></header><div class="oscroll">${skRows(3)}</div></section></div></div>`;
   if (st.err) return `${filters}<div class="panel empty"><b>Couldn't load the numbers.</b>${esc(st.err)}</div>`;
 
   const T = st.totals, F = st.followers;
@@ -561,16 +561,42 @@ function analyticsView() {
     const pct = Math.round((v - pv) / pv * 100); return [`${pct > 0 ? '↑' : pct < 0 ? '↓' : '='} ${Math.abs(pct)}%<span class="vs"> vs previous ${days} days</span>`, pct > 0 ? 'up' : pct < 0 ? 'down' : '']; };
   const kpis = [['Views', T.views], ['Likes', T.likes], ['Comments', T.comments], ['Shares', T.shares]]
     .map(([l, v]) => [l, v == null ? '–' : num(v), ...delta(v, P[l.toLowerCase()])])
-    .map(k => [...k, plat === 'all' && st.by_platform.length > 1 ? ksplit(st.by_platform.map(x => [x.platform, x[k[0].toLowerCase()]])) : ''])
-    .concat([['Followers', F.total == null ? '–' : num(F.total), F.change == null ? 'change shows after a day' : `${signed(F.change)} in ${days} days`, F.change > 0 ? 'up' : F.change < 0 ? 'down' : '']]);
+    .map(k => [...k, plat === 'all' && st.by_platform.length > 1 ? ksplit(st.by_platform.map(x => [x.platform, x[k[0].toLowerCase()]])) : '']);
+  const rate = t => t.views ? engOf(t) / t.views * 100 : null;
+  const er = rate(T), per = rate(P);
+  kpis.push(['Engagement rate', er == null ? '–' : `${er.toFixed(1)}%`,
+    er == null ? 'needs views' : per == null ? 'likes, comments, shares per view' : `${er >= per ? '↑' : '↓'} ${Math.abs(er - per).toFixed(1)} pts<span class="vs"> vs previous ${days} days</span>`,
+    er == null || per == null || er === per ? '' : er > per ? 'up' : 'down']);
 
-  const prow = x => `<div class="bprow">${appIcon(x.platform, 26)}<div class="bpn"><b>${PLATFORM[x.platform]}</b><span>${x.posts} post${x.posts === 1 ? '' : 's'}</span></div>
-      <div class="bpv"><span>Views</span><b>${x.views == null ? '–' : num(x.views)}</b></div>
-      <div class="bpv"><span>Likes</span><b>${x.likes == null ? '–' : num(x.likes)}</b></div>
-      <div class="bpv"><span>Followers</span><b>${x.followers == null ? '–' : num(x.followers)}</b></div></div>`;
+  // Which weekdays and times of day get the most views per post.
+  const scored = (st.posts || []).filter(p => p.stats);
+  const useViews = scored.some(p => p.stats.views != null);
+  const val = p => useViews ? p.stats.views || 0 : engOf(p.stats);
+  const avgBy = (keys, keyOf) => { const m = new Map(keys.map(k => [k, []])); for (const p of scored) m.get(keyOf(p))?.push(val(p));
+    return keys.map(k => [k, m.get(k).length ? m.get(k).reduce((a, b) => a + b, 0) / m.get(k).length : null, m.get(k).length]); };
+  const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const byDay = avgBy(WD, p => new Intl.DateTimeFormat('en-US', { timeZone: tz(), weekday: 'short' }).format(new Date(p.scheduled_at * 1000)));
+  const hourOf = p => Number(new Intl.DateTimeFormat('en-GB', { timeZone: tz(), hour: '2-digit', hourCycle: 'h23' }).format(new Date(p.scheduled_at * 1000)));
+  const TOD = [['Morning', '5–12'], ['Afternoon', '12–17'], ['Evening', '17–22'], ['Night', '22–5']];
+  const byTod = avgBy(TOD.map(t => t[0]), p => { const h = hourOf(p); return h >= 5 && h < 12 ? 'Morning' : h >= 12 && h < 17 ? 'Afternoon' : h >= 17 && h < 22 ? 'Evening' : 'Night'; });
+  const bars = (rows, sub = () => '') => { const hi = Math.max(0, ...rows.map(r => r[1] || 0)) || 1, best = rows.reduce((b, r) => r[1] != null && (b == null || r[1] > b[1]) ? r : b, null);
+    return rows.map(r => `<div class="brow ${best && r[0] === best[0] ? 'best' : ''}"><span>${r[0]}${sub(r)}</span><i><em style="width:${r[1] == null ? 0 : Math.max(2, r[1] / hi * 100).toFixed(1)}%"></em></i><b>${r[1] == null ? '–' : num(Math.round(r[1]))}</b></div>`).join(''); };
+  const bestDay = byDay.reduce((b, r) => r[1] != null && (!b || r[1] > b[1]) ? r : b, null), bestTod = byTod.reduce((b, r) => r[1] != null && (!b || r[1] > b[1]) ? r : b, null);
+  const when = scored.length < 3 ? '<div class="cempty2">Shows once a few posts have numbers.</div>'
+    : `<p class="wbest">Best: <b>${bestDay[0]}</b>, <b>${bestTod[0].toLowerCase()}</b></p>
+      <div class="bars">${bars(byDay)}</div><div class="bars">${bars(byTod, r => ` <small>${TOD.find(t => t[0] === r[0])[1]}</small>`)}</div>`;
+
+  const TRENDS = [['views', 'Views'], ['engagement', 'Engagement'], ['posts', 'Posts']];
+  const trend = S.statsTrend || 'views';
+
   const row = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumb(p, 'class="thumb" alt=""') || '<span class="noimg"></span>'}
       <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${fmt(p.scheduled_at, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>
-      <span class="scols">${['views', 'likes', 'comments', 'shares'].map(k => `<span title="${METRIC[k]}">${ui(STAT_ICON[k], 12)}${p.stats?.[k] == null ? '–' : num(p.stats[k])}</span>`).join('')}</span></div>`;
+      <span class="scols">${['views', 'likes', 'comments', 'shares'].map(k => `<span>${p.stats?.[k] == null ? '–' : num(p.stats[k])}</span>`).join('')}</span></div>`;
+  const sort = S.statsSort || 'new';
+  const SORTS = [['new', 'Newest'], ['views', 'Most views'], ['eng', 'Engagement']];
+  const posts = [...(st.posts || st.top || [])].sort(sort === 'new' ? (a, b) => b.scheduled_at - a.scheduled_at
+    : sort === 'views' ? (a, b) => (b.stats?.views ?? -1) - (a.stats?.views ?? -1) || b.scheduled_at - a.scheduled_at
+    : (a, b) => (b.stats ? engOf(b.stats) : -1) - (a.stats ? engOf(a.stats) : -1) || b.scheduled_at - a.scheduled_at);
   const acc = a => `<div class="arow">${icon(a.platform, 14)}<b>${who(a)}</b>
       <span class="fv">${a.limited && a.platform === 'tiktok' ? `<a class="rc" href="/api/auth/start?add=1">Reconnect</a>` : a.followers == null ? '<em>Reading…</em>' : num(a.followers)}</span>
       <span class="fc ${a.change > 0 ? 'up' : a.change < 0 ? 'down' : ''}">${a.change == null || a.change === 0 ? '' : signed(a.change)}</span></div>`;
@@ -579,19 +605,26 @@ function analyticsView() {
     st.facebook_limited && (plat === 'all' || plat === 'facebook') && `Facebook Pages connected before post numbers were added need one reconnect.${can('admin') ? ' <a href="/api/auth/meta/start?add=1">Reconnect Facebook</a>' : ''}`,
   ].filter(Boolean);
 
+  const fch = F.change == null ? '' : `<small class="${F.change > 0 ? 'up' : F.change < 0 ? 'down' : ''}">${signed(F.change)} in ${days} days</small>`;
   return `${filters}
     <div class="kpis five">${kpis.map(([l, v, n, c, parts = '']) => `<div class="kpi"><span>${l}</span><b>${v}</b><small class="${c}">${n}</small>${parts}</div>`).join('')}</div>
-    <div class="angrid">
-      <section class="panel ocard"><header><h2>Followers</h2><span class="note">total, ${days} days</span></header>${chart(st.series, 'followers', { kind: 'line', label: 'Followers' })}</section>
-      ${plat === 'all' ? `<section class="panel ocard"><header><h2>By platform</h2></header><div class="bplist">${st.by_platform.map(prow).join('') || '<div class="cempty2">No accounts yet.</div>'}</div></section>`
-        : `<section class="panel ocard"><header><h2>${appIcon(plat, 18)} ${PLATFORM[plat]} accounts</h2><span class="note">${st.accounts.length}</span></header>
-          <div class="oscroll"><div class="alist">${st.accounts.map(acc).join('') || '<div class="cempty2">No accounts on this platform.</div>'}</div></div></section>`}
-      <section class="panel ocard"><header><h2>Top posts</h2><span class="note">${st.published} published</span></header>
-        <div class="oscroll">${st.top.length ? `<div class="list">${st.top.map(row).join('')}</div>` : '<div class="cempty2">Numbers show a few hours after a post goes out.</div>'}</div></section>
-      <section class="panel ocard"><header><h2>Engagement</h2><span class="note">by publish day</span></header>${chart(st.series, 'engagement', { label: 'Interactions' })}</section>
+    <section class="panel atrend"><header><h2>Trend</h2><span class="note">by publish day</span>
+        <div class="seg" role="group" aria-label="Chart">${TRENDS.map(([k, l]) => `<button data-atrend="${k}" class="${k === trend ? 'on' : ''}" aria-pressed="${k === trend}">${l}</button>`).join('')}</div></header>
+      ${chart(st.series, trend, { label: TRENDS.find(t => t[0] === trend)[1] })}</section>
+    <div class="an2">
+      <section class="panel aposts"><header><h2>Posts</h2><span class="note">${st.published} published</span>
+        <div class="seg" role="group" aria-label="Sort posts">${SORTS.map(([k, l]) => `<button data-asort="${k}" class="${k === sort ? 'on' : ''}" aria-pressed="${k === sort}">${l}</button>`).join('')}</div></header>
+        ${posts.length ? `<div class="phead"><span>Post</span><span class="scols">${['views', 'likes', 'comments', 'shares'].map(k => `<span title="${METRIC[k]}">${ui(STAT_ICON[k], 13)}</span>`).join('')}</span></div>
+          <div class="list">${posts.map(row).join('')}</div>` : `<div class="cempty2">No posts published in the last ${days} days.</div>`}
+        ${posts.length && !st.tracked ? '<p class="note pnote">Numbers show a few hours after a post goes out.</p>' : ''}</section>
+      <div class="aside">
+        <section class="panel ocard"><header><h2>Followers</h2><span class="note">${st.updated_at ? `updated ${ago(st.updated_at)}` : ''}</span></header>
+          <div class="ftot"><b>${F.total == null ? '–' : num(F.total)}</b>${fch}</div>
+          <div class="fspark">${chart(st.series, 'followers', { kind: 'line', label: 'Followers' })}</div>
+          <div class="alist">${st.accounts.map(acc).join('') || '<div class="cempty2">Connect an account to see followers.</div>'}</div></section>
+        <section class="panel ocard"><header><h2>When posts do best</h2><span class="note">${useViews ? 'avg views' : 'avg interactions'} per post</span></header>${when}</section>
+      </div>
     </div>
-    <section class="panel"><header><h2>Accounts</h2><span class="note">followers · change in ${days} days${st.updated_at ? ` · updated ${ago(st.updated_at)}` : ''}</span></header>
-      <div class="alist cols">${st.accounts.map(acc).join('') || '<div class="cempty2">Connect an account to see followers.</div>'}</div></section>
     ${notes.length ? `<div class="snotes">${notes.map(n => `<p>${n}</p>`).join('')}</div>` : ''}
     ${S.detail ? detailView() : ''}`;
 }
@@ -1966,7 +1999,7 @@ function calendarView() {
 // happened, and what can still be done. A post that has not started can have
 // its caption fixed right here.
 function detailView() {
-  const p = S.posts.find(x => x.id === S.detail) || S.stats?.top?.find(x => x.id === S.detail);
+  const p = S.posts.find(x => x.id === S.detail) || (S.stats?.posts || S.stats?.top)?.find(x => x.id === S.detail);
   if (!p) return '';
   const a = acct(p.account_id), editable = p.status === 'queued', pl = p.platform || 'tiktok';
   const label = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
@@ -2461,6 +2494,8 @@ function bind() {
   on('#go', 'click', submit);
   on('#savedraft', 'click', saveDraft);
   on('[data-days]', 'click', e => loadStats(Number(e.currentTarget.dataset.days)));
+  on('[data-atrend]', 'click', e => { S.statsTrend = e.currentTarget.dataset.atrend; render(); });
+  on('[data-asort]', 'click', e => { S.statsSort = e.currentTarget.dataset.asort; render(); });
   on('[data-aplat]', 'click', e => loadStats(undefined, e.currentTarget.dataset.aplat));
   on('.chart .hit', 'mouseenter', e => { const pl = e.target.closest('.plot'), tip = pl.querySelector('.ctip'), cx = pl.querySelector('.cx'), x = e.target.dataset.x;
     tip.textContent = e.target.dataset.tip; tip.style.left = `${x}%`; tip.classList.add('on'); cx.style.left = `${x}%`; cx.classList.add('on'); });

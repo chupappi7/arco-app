@@ -1208,3 +1208,45 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .rpost>.scols{display:grid;grid-template-columns:repeat(4,58px);flex:none;margin-left:auto;color:var(--mute);font-size:12.5px;font-variant-numeric:tabular-nums}
 .rpost>.scols span{display:inline-flex;align-items:center;justify-content:flex-end;gap:3px;white-space:nowrap}
 @media (max-width:719px){.rpost>.scols{grid-template-columns:repeat(4,44px)}}
+/* analytics: posts first, followers and engagement beside them */
+.an2{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start;margin-bottom:16px}
+.an2 .aside{display:flex;flex-direction:column;gap:16px;min-width:0}
+.an2 .aside .ocard{height:auto}
+.an2 .aside .chart{height:150px;flex:none}
+.aposts{margin:0!important;min-width:0}
+.aposts>header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.aposts>header .seg{margin-left:auto}
+.aposts .list{padding:0 10px 10px}
+.phead{display:flex;align-items:center;padding:0 20px 6px 20px;color:var(--mute);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line-2);margin-bottom:4px}
+.phead>span:first-child{flex:1}
+.phead .scols{display:grid;grid-template-columns:repeat(4,58px);justify-items:end}.phead .scols span{display:inline-flex}
+.aposts .rpost>.scols{color:var(--graphite);font-weight:600;font-size:13px}
+.pnote{padding:0 20px 14px}
+.ftot{display:flex;align-items:baseline;gap:10px;padding:0 18px}
+.ftot b{font:700 28px/1.1 var(--display)}
+.ftot small{font-size:12.5px;color:var(--mute)}.ftot small.up{color:var(--success);font-weight:600}.ftot small.down{color:var(--danger)}
+.fspark .chart{height:110px!important;padding-bottom:26px}
+@media (max-width:1099px){.an2{grid-template-columns:1fr}}
+@media (max-width:719px){.phead .scols{grid-template-columns:repeat(4,44px)}.phead .scols span{font-size:0}.aposts>header .seg{margin-left:0;width:100%}.aposts>header .seg button{flex:1}}
+/* analytics balance: trend across the top, posts as tall as the side column */
+.atrend{margin:0 0 16px!important}
+.atrend>header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.atrend>header .seg{margin-left:auto}
+.atrend .chart{height:190px;flex:none}
+.an2{align-items:stretch}
+.aposts{display:flex;flex-direction:column;contain:size;min-height:420px}
+.aposts .list{flex:1;min-height:0;overflow-y:auto}
+.aposts .cempty2{flex:1}
+.wbest{padding:0 18px 4px;margin:0;color:var(--mute);font-size:13px}.wbest b{color:var(--graphite)}
+.bars{padding:6px 18px 10px;display:grid;gap:5px}
+.bars+.bars{border-top:1px solid var(--line-2);padding-top:10px;padding-bottom:16px}
+.brow{display:grid;grid-template-columns:118px minmax(0,1fr) 48px;align-items:center;gap:10px;font-size:12.5px;color:var(--mute)}
+.brow small{font-size:11px;opacity:.75;white-space:nowrap}
+.brow i{height:8px;border-radius:4px;background:var(--canvas);overflow:hidden}
+.brow em{display:block;height:100%;border-radius:4px;background:var(--chart);opacity:.35}
+.brow.best em{opacity:1}
+.brow b{text-align:right;font-variant-numeric:tabular-nums;color:var(--graphite);font-weight:600}
+.brow.best span{color:var(--graphite);font-weight:600}
+@media (max-width:1099px){.aposts{contain:none;min-height:0}.aposts .list{max-height:560px}}
+@media (max-width:719px){.atrend>header .seg{margin-left:0;width:100%}.atrend>header .seg button{flex:1}.atrend .chart{height:160px}}
+@media (max-width:719px){.aposts .scols{grid-template-columns:repeat(2,52px)!important}.aposts .scols span:nth-child(n+3){display:none!important}}

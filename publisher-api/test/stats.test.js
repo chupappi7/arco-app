@@ -116,6 +116,7 @@ describe('getStats', () => {
     expect(s.totals).toEqual({ views: 500, likes: 13, comments: 3, shares: 2 });
     expect(s.top.map(p => p.id)).toEqual(['a', 'b']);
     expect(s.top[0].stats.views).toBe(500);
+    expect(s.posts.length).toBe(s.published);
     expect(s.followers).toEqual({ total: 1500, change: 50 });
     expect(s.tiktok_pending).toBe(true);
     expect((await getStats(env, 'ws1', 30, T)).totals.likes).toBe(112);

@@ -323,7 +323,7 @@ export async function getStats(env, w, days, t = now(), platform = 'all', brand 
     series: [...perDay.values()],
     by_platform: PLATFORMS.map(pl => byPlatform[pl]).filter(x => all.some(a => (a.platform || 'tiktok') === x.platform)),
     platforms: PLATFORMS.filter(pl => all.some(a => (a.platform || 'tiktok') === pl)),
-    accounts, top,
+    accounts, top, posts: rows.slice(0, 300).map(r => postJson(env, r)),
     tiktok_pending: flagsFrom.some(a => a.platform === 'tiktok' && a.followers === null && !a.limited),
     tiktok_reconnect: flagsFrom.some(a => a.platform === 'tiktok' && a.limited),
     facebook_limited: flagsFrom.some(a => a.platform === 'facebook' && a.limited),
