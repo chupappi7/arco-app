@@ -28,6 +28,7 @@ describe('library', () => {
     await runCleanup(env, Math.floor(Date.now() / 1000) + 8 * 86400);
     const lr = await (await call(h, '/v1/library')).json();
     const all = lr.items;
+    expect(lr.storage).toEqual({ used: JPEG.length * 2, library: JPEG.length * 2, limit: 5 * 1024 * 1024 * 1024 });
     expect(all.map(i => i.key).sort()).toEqual([m1.key, m2.key].sort());
     const mine = (await (await call(h, `/v1/library?brand=${b.id}`)).json()).items;
     expect(mine).toMatchObject([{ key: m1.key, brand_id: b.id, name: 'cake.jpg' }]);

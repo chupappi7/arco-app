@@ -1078,6 +1078,34 @@ function libCard(f, tab) {
       : `<span class="lwhen ${f.status}">${f.status === 'scheduled' ? ui('cal', 12) : ''}${when || FSTATUS[f.status]}</span>`}</div>`;
 }
 
+const fmtBytes = b => b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(b >= 10 * 1024 ** 3 ? 0 : 1)} GB` : b >= 1024 ** 2 ? `${Math.max(1, Math.round(b / 1024 ** 2))} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
+
+// How full the workspace's storage is; opens "Free up space".
+function storageMeter() {
+  const st = S.lib?.storage;
+  if (!st) return '';
+  const pct = Math.min(100, st.used / st.limit * 100), lvl = pct >= 95 ? 'bad' : pct >= 80 ? 'warn' : '';
+  return `<button type="button" class="lstore ${lvl}" id="libfree" aria-expanded="${!!S.libFree}" title="Storage: what your library and scheduled posts take up">
+    <span class="lsl"><b>${fmtBytes(st.used)}</b> of ${fmtBytes(st.limit)}</span><i><em style="width:${Math.max(pct, st.used ? 1 : 0).toFixed(1)}%"></em></i>
+    <span class="lsa">${S.libFree ? 'Close' : 'Free up space'}</span></button>`;
+}
+
+// The library's files, biggest first, to pick some and remove them.
+function freeSpace() {
+  const st = S.lib.storage, sel = S.freeSel || [];
+  const items = [...(S.lib.items || [])].sort((a, b) => (b.bytes || 0) - (a.bytes || 0));
+  const picked = items.filter(i => sel.includes(i.key)).reduce((n, i) => n + (i.bytes || 0), 0);
+  const copies = Math.max(0, st.used - st.library);
+  return `<section class="panel lfree"><header><h2>Free up space</h2><span class="note">${fmtBytes(st.library)} in the library${copies ? ` · ${fmtBytes(copies)} in photos attached to posts, freed 7 days after each post is done` : ''}</span>
+      <span class="hacts"><button class="btn danger sm" id="freerm" ${sel.length ? '' : 'disabled'}>Remove ${sel.length ? `${sel.length} · ${fmtBytes(picked)}` : 'selected'}</button></span></header>
+    <div class="flist">${items.map(i => { const f = i.folder_id && folderOf(i.folder_id);
+      return `<label class="frow ${sel.includes(i.key) ? 'sel' : ''}"><input type="checkbox" data-freesel="${esc(i.key)}" ${sel.includes(i.key) ? 'checked' : ''} aria-label="Select ${esc(i.name || 'file')}">
+        <span class="fth">${itemPic(i)}</span>
+        <span class="fnm"><b>${esc(i.name || (isVideoItem(i) ? 'Video' : 'Photo'))}</b><span class="note">${i.brand_id && brandName(i.brand_id) ? esc(brandName(i.brand_id)) : 'Shared'}${f ? ` · in "${esc(f.name)}"` : ' · not in a post'}</span></span>
+        <span class="fsz">${fmtBytes(i.bytes || 0)}</span></label>`; }).join('') || '<p class="note">The library is empty.</p>'}</div>
+    <p class="note fnote2">Removing frees the space within a few minutes. Posts already scheduled keep their own photo copies; a video stays until any scheduled post using it is done.</p></section>`;
+}
+
 function libraryView() {
   const open = S.folderOpen && folderOf(S.folderOpen);
   const b = curBrand(), items = libShown(b).filter(i => !i.folder_id), sel = (S.libSel || []).filter(k => items.some(i => i.key === k));
@@ -1092,7 +1120,8 @@ function libraryView() {
 
   const all = foldersShown(b), tab = S.libTab || 'todo', test = LTABS.find(t => t[0] === tab)[2];
   const tabs = `<div class="ltop"><div class="seg" role="group" aria-label="Show">${LTABS.map(([k, l, fn]) => `<button data-ltab="${k}" class="${k === tab ? 'on' : ''}" aria-pressed="${k === tab}">${l}<span class="lc">${all.filter(fn).length}</span></button>`).join('')}</div>
-    <span class="note">One post is its photos in order, or one video. Drop files on a brand to make a new post.</span></div>`;
+    <span class="note">One post is its photos in order, or one video. Drop files on a brand to make a new post.</span>${storageMeter()}</div>
+    ${S.libFree && S.lib ? freeSpace() : ''}`;
   if (!S.lib || !S.folders) return `${tabs}<div class="lboard">${[0, 1, 2].map(() => `<section class="lcol">${skRows(4)}</section>`).join('')}</div>`;
 
   const cols = groups.map(([id, name]) => {
@@ -2067,8 +2096,12 @@ function calendarView() {
   const days = [...Array(r.n)].map((_, i) => addDays(r.start, i));
   const now = dayKey(today()), offset = month ? S.month : S.week;
   const empty = !posts.length;
-  const legend = S.me.brands.length && curBrand() === 'all' ? `<span class="legend">${S.me.brands.map(x => `<span><i style="background:${brandHue(x.id)}"></i>${esc(x.name)}</span>`).join('')}</span>` : '';
-  const filters = accts.length ? `<div class="chips">${legend}
+  // Each brand's colour, on its own line so it can wrap; a click shows only that brand.
+  const loose = S.me.accounts.some(a => !brandName(a.brand_id));
+  const legend = S.me.brands.length && curBrand() === 'all' ? `<div class="clegend" aria-label="Brand colours">${S.me.brands.map(x =>
+      `<button type="button" data-brand="${x.id}" title="Show only ${esc(x.name)}"><i style="background:${brandHue(x.id)}"></i>${esc(x.name)}</button>`).join('')}
+    ${loose ? '<button type="button" data-brand="none" title="Show only Personal"><i style="background:var(--soft)"></i>Personal</button>' : ''}</div>` : '';
+  const filters = accts.length ? `<div class="chips">
       <button class="chip ${S.fPlat === 'all' ? 'on' : ''}" data-fp="all">All platforms</button>
       ${plats.map(pl => `<button class="chip ${S.fPlat === pl ? 'on' : ''}" data-fp="${pl}">${icon(pl, 13)}${PLATFORM[pl]}</button>`).join('')}
       ${shown.length > 1 ? `<select id="facct" style="width:auto;padding:5px 10px">
@@ -2086,6 +2119,7 @@ function calendarView() {
         `<button class="${S.calMode === k ? 'on' : ''}" data-mode="${k}">${l}</button>`).join('')}</span>
       <span class="note">${esc(tz().replace(/_/g, ' '))}</span>
     </div>
+    ${legend}
     ${empty ? `<div class="calempty">${ui('cal', 18)}<span>Nothing scheduled here yet. Click a day to create a post for it.</span></div>` : ''}
     ${grid ? `<div class="monthhead">${days.slice(0, 7).map(d => `<span>${dayLabel(d, { weekday: 'short' })}</span>`).join('')}</div>` : ''}
     <div class="${grid ? 'month' : 'week'}">${days.map((d, i) => {
@@ -2484,6 +2518,13 @@ function bind() {
   on('[data-folder]', 'click', e => { if (e.target.closest('button')) return; S.folderOpen = e.currentTarget.dataset.folder; S.libSel = []; render(); window.scrollTo(0, 0); });
   on('[data-folder]', 'keydown', e => { if (e.key === 'Enter') e.currentTarget.click(); });
   on('#fback', 'click', () => { S.folderOpen = null; render(); });
+  on('#libfree', 'click', () => { S.libFree = !S.libFree; S.freeSel = []; render(); });
+  on('[data-freesel]', 'change', e => { const k = e.target.dataset.freesel, sel = S.freeSel || []; S.freeSel = e.target.checked ? [...sel, k] : sel.filter(x => x !== k); render(); });
+  on('#freerm', 'click', async () => { const keys = S.freeSel || [];
+    const bytes = (S.lib?.items || []).filter(i => keys.includes(i.key)).reduce((n, i) => n + (i.bytes || 0), 0);
+    if (!keys.length || !await ask({ title: `Remove ${keys.length} file${keys.length === 1 ? '' : 's'}?`, body: `Frees about ${fmtBytes(bytes)}. They leave the library and any post folder they are in.`, ok: 'Remove', danger: true, icon: ui('image', 22) })) return;
+    try { await send('/library/remove', 'POST', { keys }); S.freeSel = []; toast(`Removed. About ${fmtBytes(bytes)} is freed in a few minutes.`); } catch (e) { S.flash = { kind: 'err', text: e.message }; }
+    loadLibrary(); });
   on('[data-ltab]', 'click', e => { S.libTab = e.currentTarget.dataset.ltab; S.libSel = []; render(); });
   on('[data-lloose]', 'click', e => { const id = e.currentTarget.dataset.lloose, m = S.libLoose || []; S.libLoose = m.includes(id) ? m.filter(x => x !== id) : [...m, id]; render(); });
   on('[data-colup]', 'change', e => newPostsFrom(e.target.files, e.currentTarget.dataset.colup));

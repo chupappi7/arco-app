@@ -26,7 +26,7 @@ const me = {
 const acc = id => me.accounts.find(a => a.id === id);
 // Library: a few photos already filed in folders, plus loose ones.
 let lib = ['f1a', 'f1b', 'f1c', 'f2a', 'f2b', 'l1', 'l2'].map((k, i) => ({ key: 'ws1/' + k, url: `/fake/${k}.svg`, brand_id: i < 3 ? 'b2' : i < 5 ? 'b1' : null,
-  name: `${k}.jpg`, bytes: 1, content_type: 'image/jpeg', folder_id: i < 3 ? 'fld1' : i < 5 ? 'fld2' : null, position: i < 3 ? i : i - 3, created_at: 1 }));
+  name: `${k}.jpg`, bytes: (i + 1) * 1.3e6, content_type: 'image/jpeg', folder_id: i < 3 ? 'fld1' : i < 5 ? 'fld2' : null, position: i < 3 ? i : i - 3, created_at: 1 }));
 let folders = [{ id: 'fld1', name: 'Black Friday promo', brand_id: 'b2', note: '20% off with code BF20. Not before Friday.', created_at: 2 },
   { id: 'fld2', name: 'Focus mode explained', brand_id: 'b1', note: 'Link in bio', created_at: 1 }, { id: 'fld3', name: 'Croissants, behind the scenes', brand_id: 'b2', note: null, created_at: 3 }];
 me.ai_review = true;
@@ -79,7 +79,8 @@ http.createServer(async (q, r) => {
     posts.push(x); return j(x); }
   if (/^\/api\/v1\/posts\/\w+\/retry$/.test(p)) { const x = posts.find(y => y.id === p.split('/')[4]);
     if (x) Object.assign(x, { status: 'queued', fail: false, created: Date.now(), fail_reason: null }); return j(x || {}); }
-  if (p === '/api/v1/library' && q.method === 'GET') return j({ items: lib });
+  const libStore = () => { const l = lib.reduce((n, i) => n + (i.bytes || 0), 0); return { used: l + 640e6, library: l, limit: 5 * 1024 ** 3 }; };
+  if (p === '/api/v1/library' && q.method === 'GET') return j({ items: lib, storage: libStore() });
   if (p === '/api/v1/folders' && q.method === 'GET') return j({ folders: folders.map(folderJson).sort((a, b) => b.created_at - a.created_at) });
   if (p === '/api/v1/folders' && q.method === 'POST') { const o = await body(q), f = { id: 'fld' + Math.random().toString(16).slice(2, 7), name: o.name, brand_id: o.brand_id || null, note: o.note || null, created_at: now() };
     folders.push(f); return j(folderJson(f)); }
@@ -101,7 +102,7 @@ http.createServer(async (q, r) => {
     const f = folders.find(x => x.id === o.folder_id);
     for (const k of o.keys) lib.unshift({ key: k, url: '/media/' + k, brand_id: f ? f.brand_id : o.brand_id || null, name: (o.names || {})[k] || null, bytes: 1, created_at: now(),
       folder_id: f ? f.id : null, position: f ? lib.filter(i => i.folder_id === f.id).length : null });
-    return j({ items: lib }); }
+    return j({ items: lib, storage: libStore() }); }
   if (p === '/api/v1/library' && q.method === 'PATCH') { const o = await body(q), f = folders.find(x => x.id === o.folder_id);
     for (const i of lib) if (o.keys.includes(i.key)) { if (f) Object.assign(i, { folder_id: f.id, brand_id: f.brand_id, position: 99 }); else Object.assign(i, { brand_id: o.brand_id, folder_id: null }); }
     return j({ ok: true }); }

@@ -1,5 +1,5 @@
 import { HttpError, now } from './http.js';
-import { MAX_LIBRARY } from './limits.js';
+import { MAX_LIBRARY, MAX_WORKSPACE_BYTES } from './limits.js';
 import { mediaUrl } from './media.js';
 import { wsOf, scopeOf, inScope } from './scope.js';
 import { fileInto, getFolder } from './folders.js';
@@ -39,7 +39,12 @@ export async function listLibrary(env, w, brand = 'all') {
   const { results } = await env.DB.prepare(`SELECT key, brand_id, name, bytes, content_type, duration_ms, width, height, folder_id, position, created_at FROM media
       WHERE workspace_id = ? AND in_library = 1${sc.sql}${bf.sql} ORDER BY created_at DESC, key LIMIT ${MAX_LIBRARY}`)
     .bind(wsOf(w), ...sc.binds, ...bf.binds).all();
-  return { items: results.map(r => ({ ...r, url: mediaUrl(env, r.key) })) };
+  // Storage counts every file the workspace holds, as the upload limit does:
+  // the library, plus photo copies attached to posts until they are freed.
+  const st = await env.DB.prepare(`SELECT COALESCE(SUM(bytes), 0) AS used, COALESCE(SUM(CASE WHEN in_library = 1 THEN bytes END), 0) AS library
+      FROM media WHERE workspace_id = ?`).bind(wsOf(w)).first();
+  return { items: results.map(r => ({ ...r, url: mediaUrl(env, r.key) })),
+    storage: { used: st.used, library: st.library, limit: MAX_WORKSPACE_BYTES } };
 }
 
 // Fresh uploads (POST /v1/media) are moved into the library.
