@@ -215,7 +215,7 @@ const HEADS = {
   calendar: () => ['Calendar', `Everything scheduled and published, in ${tz().replace(/_/g, ' ')} time.`, `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
   analytics: () => ['Analytics', 'How your posts do, from the numbers each platform shares.'],
   drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.', `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
-  accounts: () => ['Brands & accounts', 'Each brand holds its TikTok, Instagram and Facebook accounts. Pick a brand when you schedule and its accounts come with it.'],
+  accounts: () => ['Brands & accounts', 'Each brand holds its TikTok, Instagram and Facebook accounts. Pick a brand when you schedule and its accounts come with it.', `<button class="btn" id="newbrandbtn">${ui('plus', 15)}New brand</button>`],
   settings: () => ['Settings', 'Workspace, people and your account.'],
   ai: () => ['MCP', 'Plan and schedule posts by chatting with your AI.', ''],
 };
@@ -2171,15 +2171,11 @@ function acctRow(x, brandId) {
       ${brandId ? '<option value="out">Remove from brand</option>' : ''}<option value="disc">Disconnect…</option></select></label></div>`;
 }
 
-// One add menu per brand: an account from elsewhere, or connect a new one into it.
-function addMenu(brandId) {
-  const groups = ORDER.map(pl => {
-    const others = S.me.accounts.filter(x => platformOf(x) === pl && x.brand_id !== brandId);
-    const opts = others.map(x => `<option value="${x.id}">${handle(x)}${x.brand_id && brandName(x.brand_id) ? ` (from ${esc(brandName(x.brand_id))})` : ''}</option>`).join('')
-      + (connectHref(pl) ? `<option value="new:${pl}">Connect a new ${PLATFORM[pl]} account</option>` : '');
-    return opts ? `<optgroup label="${PLATFORM[pl]}">${opts}</optgroup>` : '';
-  }).join('');
-  return groups ? `<label class="badd">${ui('plus', 15)}<span>Add account</span><select data-addpl="${brandId}" aria-label="Add an account"><option value="" selected disabled hidden></option>${groups}</select></label>` : '';
+// Add buttons per brand: one app icon per platform, each connects a new
+// account straight into that brand. Moving an existing one is in its own menu.
+function addButtons(brandId) {
+  const pls = ORDER.filter(connectHref);
+  return pls.length ? `<div class="badds"><span class="note">Add</span>${pls.map(pl => `<a class="bplat" href="${connectHref(pl)}" data-cbrand="${brandId || 'none'}" title="Connect a ${PLATFORM[pl]} account${brandId ? ` to ${esc(brandName(brandId))}` : ''}" aria-label="Connect a ${PLATFORM[pl]} account">${appIcon(pl, 26)}<span class="bplus">${ui('plus', 10)}</span></a>`).join('')}</div>` : '';
 }
 
 async function renameBrand(id) {
@@ -2220,22 +2216,24 @@ function accountsView() {
         <div class="bt"><h2>${esc(b.name)}</h2><span class="note">${list.length ? `${list.length} account${list.length === 1 ? '' : 's'}` : 'No accounts yet'}</span></div>${mix(list)}
         <label class="amenu" title="Brand options">${ui('more', 16)}<select data-bmenu="${b.id}" aria-label="Options for ${esc(b.name)}"><option value="" selected disabled hidden></option><option value="rename">Rename</option><option value="delete">Delete brand…</option></select></label></header>
       <div class="blist">${list.map(x => acctRow(x, b.id)).join('') || '<p class="bnone">Add its TikTok, Instagram or Facebook below. Scheduling for this brand then picks them all at once.</p>'}</div>
-      <footer>${addMenu(b.id)}</footer></section>`;
+      <footer>${addButtons(b.id)}</footer></section>`;
   };
   return `${!S.me.brands.length && a.length ? `<div class="bhint">${ui('users', 16)}<span>Make a brand for each business you post for, then add its TikTok, Instagram and Facebook to it. Scheduling for a brand then picks all of them at once.</span></div>` : ''}
-    <div class="bgrid">
+    <div class="acc2"><div class="bgrid">
       ${brands.map(card).join('')}
       ${loose.length ? `<section class="bcard loose"><header><span class="bsq big none">${ui('users', 16)}</span><div class="bt"><h2>${S.me.brands.length ? 'Personal' : 'Your accounts'}</h2><span class="note">${S.me.brands.length ? 'In no brand yet' : `${loose.length} account${loose.length === 1 ? '' : 's'}`}</span></div>${mix(loose)}</header>
-        <div class="blist">${byPl(loose).map(x => acctRow(x, null)).join('')}</div></section>` : ''}
-      <form id="newbrand" class="bcard bnew"><span class="bsq big none">${ui('plus', 16)}</span><b>New brand</b><span class="note">One per business you post for</span>
-        <div class="bnewrow"><input type="text" id="brandname" maxlength="60" placeholder="e.g. Client Bakery" aria-label="New brand name"><button class="btn">Create</button></div></form>
+        <div class="blist">${byPl(loose).map(x => acctRow(x, null)).join('')}</div>
+        <footer>${addButtons(null)}</footer></section>` : ''}
     </div>
-    ${!a.length ? '<section class="panel empty"><b>No accounts yet.</b>Connect TikTok, Instagram or a Facebook Page below.</section>' : ''}
-    <section class="panel"><header><h2>Connect an account</h2><span class="note">${a.length} of ${S.me.limits.accounts} connected${S.me.brands.length ? ' · to connect straight into a brand, use its Add account' : ''}</span></header>
-      <div class="connect">${ORDER.filter(connectHref).map(pl => `<a class="ccard" href="${connectHref(pl)}">
-          ${appIcon(pl, 40)}<div><b>${PLATFORM[pl]}</b><span>${hint[pl]}</span></div><span class="go">${ui('plus', 16)}</span></a>`).join('')}</div>
-      <details class="hints"><summary>Adding more than one account per platform</summary>
-        ${ORDER.map(pl => `<p>${appIcon(pl, 16)}<span>${PLATFORM_HINT[pl]}</span></p>`).join('')}</details></section>
+    <aside class="arail">
+      <section class="panel"><header><h2>Connect</h2><span class="note">${a.length} of ${S.me.limits.accounts}</span></header>
+        <div class="ameter"><i style="width:${Math.min(100, a.length / S.me.limits.accounts * 100).toFixed(1)}%"></i></div>
+        <div class="rconnect">${ORDER.filter(connectHref).map(pl => `<a class="rcard" href="${connectHref(pl)}" data-cbrand="none">${appIcon(pl, 34)}<div><b>${PLATFORM[pl]}</b><span>${hint[pl]}</span></div><span class="go">${ui('plus', 15)}</span></a>`).join('')}</div>
+        <p class="note rnote">Connects into Personal. To connect straight into a brand, use the icons on its card.</p>
+        <details class="hints"><summary>More than one account per platform</summary>
+          ${ORDER.map(pl => `<p>${appIcon(pl, 16)}<span>${PLATFORM_HINT[pl]}</span></p>`).join('')}</details></section>
+    </aside></div>
+    ${!a.length ? '<section class="panel empty"><b>No accounts yet.</b>Connect TikTok, Instagram or a Facebook Page on the right.</section>' : ''}
     <p class="foot-note">Posting times and brand voice are in <a href="#settings" data-settab-link="brands">Settings → Brands</a>. Disconnecting deletes the account's token and cancels its scheduled posts. Deleting a brand only ungroups its accounts.</p>`;
 }
 
@@ -2545,8 +2543,9 @@ function bind() {
   document.querySelectorAll('[data-state=some]').forEach(el => { el.indeterminate = true; });
   on('#pq', 'input', e => { S.pq = e.target.value; const at = e.target.selectionStart; render();
     const el = $('pq'); if (el) { el.focus(); el.setSelectionRange(at, at); } });
-  on('#newbrand', 'submit', e => { e.preventDefault(); const name = $('brandname').value;
-    brandAction(() => send('/brands', 'POST', { name })); });
+  on('#newbrandbtn', 'click', async () => {
+    const name = await ask({ title: 'New brand', ok: 'Create brand', body: 'One per business you post for. Add its accounts after.', input: { value: '', label: 'Brand name, e.g. Client Bakery' } });
+    if (name?.trim()) brandAction(() => send('/brands', 'POST', { name: name.trim() })); });
   on('[data-move]', 'change', e => brandAction(() => send(`/accounts/${e.target.dataset.move}`, 'PATCH', { brand_id: e.target.value || null })));
   on('[data-bmenu]', 'change', e => { const id = e.target.dataset.bmenu, v = e.target.value; e.target.value = ''; (v === 'rename' ? renameBrand : deleteBrand)(id); });
   on('[data-rename]', 'click', e => renameBrand(e.currentTarget.dataset.rename));
