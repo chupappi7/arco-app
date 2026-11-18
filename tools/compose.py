@@ -988,6 +988,9 @@ def assert_roster_allowed(out):
 
 
 APP_NAME = 'ARCO Focus'
+# The App Store name, word for word. Every closing card carries it (Thinh,
+# 2026-11-18: "why do you never write the correct app name in cta?").
+STORE_NAME = 'App Blocker & Focus: ARCO'
 
 
 def assert_app_name(icon, title):
@@ -1353,13 +1356,16 @@ def cta_slide(bg, out, subtitle='Planner and app blocker in one.',
         name_f, sub_f = font(58, 'Bold'), font(42, 'Semibold')
         store_f = font(36, 'Medium')
         subs = [subtitle] if isinstance(subtitle, str) else list(subtitle)
-        items = [(540, 940, 'ARCO Focus', name_f, 'ma', (255, 255, 255))]
+        items = [(540, 940, STORE_NAME, name_f, 'ma', (255, 255, 255))]
         y = 1035
         for ln in subs:
             items.append((540, y, ln, sub_f, 'ma', (235, 235, 235)))
             y += 62
-        if store_line:
-            items.append((540, y + 18, store_line, store_f, 'ma', (255, 214, 10)))
+        # Apple's badge, not the words: the mark people already recognise.
+        if store_line and not promo:
+            bdg = Image.open(f'{ICONS}/appstore-badge.png').convert('RGBA')
+            bdg = bdg.resize((400, round(bdg.height * 400 / bdg.width)), Image.LANCZOS)
+            im.paste(bdg, (540 - 200, y + 30), bdg)
         if promo:
             py_, promo_f = y + 30, font(40, 'Bold')
             for ln in promo:
@@ -1419,7 +1425,7 @@ def cta_slide(bg, out, subtitle='Planner and app blocker in one.',
 
     INK, SUB = st['ink'], st['sub']
     ny = Y0 + 132 + ics
-    items = [(cx, ny, 'ARCO Focus',
+    items = [(cx, ny, STORE_NAME,
               font(st['name_size'], 'Semi Condensed Bold'), anch, INK)]
     y = ny + st.get('name_gap', 108)
     subs = [subtitle] if isinstance(subtitle, str) else list(subtitle)

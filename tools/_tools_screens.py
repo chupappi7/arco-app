@@ -21,17 +21,22 @@ from compose import (hook_slide, phone_slide, cta_slide, preflight,
                      record_post_tools, record_post_bgs)
 from _veiled_screens import SHOTS, STYLE, KICKER, CARD_OUTLINE, veiled
 
-PROMO = ['Search “arco focus” on the App Store.']
+# Thinh, 2026-11-18: the closing card names the app by its App Store name,
+# "App Blocker & Focus: ARCO", over Apple's badge (compose.STORE_NAME). That
+# replaces the "arco focus" search line, so these no longer repeat one.
+PROMO = []
 # Thinh, 2026-10-27: every post that shows screenshots gates a comment on the
 # card. The word is "ARCO" rather than "app" because the comment section is
 # read by people who have not seen the post -- a wall of the brand name is
 # recall and a search term, a wall of "app" is noise. The payoff is the setup
 # the slides just showed, which is the one thing commenting gets you that
 # searching the store does not, and it is answerable with one pasted reply.
-PROMO_COMMENT = ['Comment “ARCO” and I’ll send my setup.',
-                 'Search “arco focus” on the App Store.']
-# Thinh, 2026-10-30: the app is "ARCO Focus" on every slide, nothing else.
-PROMO_STORE_NAME = ['Search “arco focus”', 'on the App Store.']
+# Thinh, 2026-11-18: one ask per card. Comment plus download was too much, so
+# the card keeps only the App Store badge.
+PROMO_COMMENT = []
+# Thinh, 2026-10-30: "ARCO Focus" on every slide. Superseded on the closing
+# card by the store name (2026-11-18); the app slide titles keep "ARCO Focus".
+PROMO_STORE_NAME = []
 
 TOOL = {'x': 72, 'w': 936, 'icon': 220, 'icon_y': 560, 'title_size': 76,
         'body_size': 44, 'app_size': 34}

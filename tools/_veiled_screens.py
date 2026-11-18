@@ -74,9 +74,11 @@ KICKER = 'here is why'
 # search term for a post that has already asked for enough. A promo code
 # needs an offer code minted in App Store Connect first, so there is no
 # constant for one here yet.
-CTA_COMMENT = ['Comment \u201cARCO\u201d and I\u2019ll send my setup.',
-               'Search \u201carco focus\u201d on the App Store.']
-CTA_STORE = ['Search \u201carco focus\u201d', 'on the App Store.']
+# The card above these lines already shows the App Store name and Apple's
+# badge (2026-11-18), so the lines no longer repeat a search term.
+# Thinh, 2026-11-18: one ask per card; the badge is it.
+CTA_COMMENT = []
+CTA_STORE = []
 CARD_OUTLINE = {'icon_outline': 3, 'badge_outline': 3}
 
 # Design variants of the step slide, 2026-10-17. The posted look is
