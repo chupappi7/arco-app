@@ -981,9 +981,11 @@ function aiView() {
             <span class="note">${S.me.api_key_at ? fmt(S.me.api_key_at, { day: 'numeric', month: 'short', year: 'numeric' }) : '–'}</span>
             <span class="kacts">${owner ? `<label class="amenu" title="Key options">${ui('more', 16)}<select id="keymenu" aria-label="Key options"><option value="" selected disabled hidden></option>
                 ${copyable ? '<option value="copy">Copy the key only</option>' : ''}<option value="rename">Rename</option><option value="new">Make a new key</option><option value="delete">Delete key…</option></select></label>` : ''}</span></div></div>
-        ${!owner ? '' : copyable ? `<div class="kget"><div><b>${KGET[app][0]}</b><span class="note">${KGET[app][1]}</span></div>
+        ${!owner ? '' : copyable ? `<div class="kget"><div><b>${KGET[app][0]}</b><span class="note">${KGET[app][1]}</span>
+              <pre class="kshow"><code>${esc(linkText(KGET[app][2], `apk_••••••••${S.me.api_key_hint || '••••'}`))}</code></pre></div>
             <button type="button" class="btn" data-keycopy="${KGET[app][2]}">${ui('copy', 14)}${KGET[app][3]}</button></div>`
-          : `<div class="kget warn"><div><b>Make a new key to continue</b><span class="note">This key was made before keys could be copied here. The new one replaces it, and the old one stops working.</span></div>
+          : `<div class="kget warn"><div><b>${KGET[app][0]}</b><span class="note">Your current key was made before keys could be copied here, so make a new one to copy this. The new key replaces the old one, which stops working.</span>
+              <pre class="kshow"><code>${esc(linkText(KGET[app][2], 'apk_••••••••••••'))}</code></pre></div>
             <button type="button" class="btn" data-newkey>${ui('plus', 14)}Make a new key</button></div>`}`
       : `<div class="kempty"><span>${ui('spark', 18)}</span><div><b>No API key yet</b><span class="note">Create one, then copy it for ${esc(CLIENTS.find(c => c[0] === app)[1])} right here.</span></div>
           ${owner ? `<button class="btn" id="apikey">${ui('plus', 14)}Create API key</button>` : ''}</div>`}

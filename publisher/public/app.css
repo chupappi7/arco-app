@@ -1505,3 +1505,16 @@ kbd{font:600 12px/1 var(--mono,ui-monospace,monospace);background:var(--surface)
 .kget.warn{border-color:color-mix(in srgb,var(--saffron) 55%,var(--line))}
 .mnum .howto{margin-top:0}
 @media (max-width:719px){.kget{flex-direction:column;align-items:stretch}}
+/* setup steps: bigger, roomier */
+.howto{padding:20px 22px}
+.hsteps{gap:18px}
+.hsteps li{font-size:15.5px;line-height:1.65;padding-left:40px}
+.hsteps li::before{width:26px;height:26px;font-size:13px;top:0}
+.hsteps kbd{font-size:13px;padding:3px 7px}
+.howhead{margin-bottom:18px}
+.hnote{margin-top:18px;padding-left:40px;font-size:13px}
+.howto .hnote{margin:20px 0 0}
+.kget{align-items:flex-start}
+.kget .btn{margin-top:2px}
+.kshow{margin:8px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 12px;max-width:100%;overflow-x:auto;scrollbar-width:thin}
+.kshow code{font-size:12.5px;color:var(--graphite);white-space:pre}
