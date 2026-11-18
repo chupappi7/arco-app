@@ -29,9 +29,13 @@ export async function sessionWorkspace(env, sessionId) {
 
 export async function rotateApiKey(env, workspaceId) {
   const key = randomToken('apk_');
-  await env.DB.prepare('UPDATE workspaces SET api_key_hash = ? WHERE id = ?')
-    .bind(await sha256Hex(key), workspaceId).run();
+  await env.DB.prepare('UPDATE workspaces SET api_key_hash = ?, api_key_hint = ? WHERE id = ?')
+    .bind(await sha256Hex(key), key.slice(-4), workspaceId).run();
   return key;
+}
+
+export async function revokeApiKey(env, workspaceId) {
+  await env.DB.prepare('UPDATE workspaces SET api_key_hash = NULL, api_key_hint = NULL WHERE id = ?').bind(workspaceId).run();
 }
 
 export async function logout(env, req) {

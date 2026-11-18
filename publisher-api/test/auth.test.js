@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDb, fakeTk, signUp } from './helpers.js';
-import { oauthIntake, rotateApiKey } from '../src/auth.js';
+import { oauthIntake, rotateApiKey, revokeApiKey } from '../src/auth.js';
 import { callerFor } from '../src/users.js';
 import { accessTokenFor } from '../src/accounts.js';
 import { decrypt } from '../src/crypto.js';
@@ -86,6 +86,18 @@ describe('api keys', () => {
     const req = k => new Request('https://x', { headers: { Authorization: `Key ${k}` } });
     expect(await callerFor(env, req(k2))).toMatchObject({ ws: workspace_id, via: 'key', role: 'admin' });
     expect(await callerFor(env, req(k1))).toBeNull();
+  });
+
+  it('keeps the last four characters as a hint, and a deleted key stops working', async () => {
+    const { workspace_id } = await intake(fakeTk());
+    const k = await rotateApiKey(env, workspace_id);
+    const row = await env.DB.prepare('SELECT api_key_hint FROM workspaces WHERE id = ?').bind(workspace_id).first();
+    expect(row.api_key_hint).toBe(k.slice(-4));
+    await revokeApiKey(env, workspace_id);
+    const req = new Request('https://x', { headers: { Authorization: `Key ${k}` } });
+    expect(await callerFor(env, req)).toBeNull();
+    const after = await env.DB.prepare('SELECT api_key_hash, api_key_hint FROM workspaces WHERE id = ?').bind(workspace_id).first();
+    expect(after).toEqual({ api_key_hash: null, api_key_hint: null });
   });
 });
 

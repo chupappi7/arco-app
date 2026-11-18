@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   slots TEXT,                              -- default posting times, JSON {days, times}
   created_at INTEGER NOT NULL,
   api_key_hash TEXT,
+  api_key_hint TEXT,
   ai_review INTEGER NOT NULL DEFAULT 1      -- 1: posts an AI agent makes wait as drafts for approval
 );
 CREATE UNIQUE INDEX IF NOT EXISTS workspaces_api_key ON workspaces(api_key_hash);

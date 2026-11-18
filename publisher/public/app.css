@@ -1423,3 +1423,21 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .hsteps a{color:var(--link)}
 kbd{font:600 12px/1 var(--mono,ui-monospace,monospace);background:var(--surface);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:3px 6px;white-space:nowrap}
 .hsteps li{display:block}.hsteps li .btn{margin:2px 4px 2px 2px}
+/* MCP: three numbered sections */
+.mnum{padding-bottom:4px}
+.mnum>header{display:flex;align-items:flex-start;gap:12px}
+.mnum>header .stepn{margin-top:2px}
+.mnum>header h2{margin:0}
+.mnum>header .note{display:block;margin-top:3px}
+.mnum.done>header .stepn{background:var(--success);color:#fff}
+.mnum .msetup{border-top:0;padding-top:0}
+.kbody{padding:0 18px 18px;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.krow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--canvas);border:1px solid var(--line);border-radius:10px;padding:8px 10px 8px 14px;max-width:100%}
+.krow code{font-size:13.5px;letter-spacing:.02em;overflow-wrap:anywhere}
+.krow.fresh{border-color:var(--saffron)}
+.kstate{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:var(--success)}
+.krow .btn{display:inline-flex;align-items:center;gap:6px}
+.kacts{display:flex;gap:8px;flex-wrap:wrap}
+.kacts .btn{display:inline-flex;align-items:center;gap:6px}
+.mnum>header{justify-content:flex-start;text-align:left}.mnum>header>div{flex:1;min-width:0}
+.krow{flex-wrap:nowrap}.krow code{flex:0 1 auto;min-width:0}.krow>*{flex-shrink:0}.krow>code{flex-shrink:1}

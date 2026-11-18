@@ -1,6 +1,6 @@
 import { json, HttpError, match, readJson, now } from './http.js';
 import { tkFor, TikTokError } from './tiktok.js';
-import { oauthIntake, metaIntake, igIntake, rotateApiKey, logout } from './auth.js';
+import { oauthIntake, metaIntake, igIntake, rotateApiKey, revokeApiKey, logout } from './auth.js';
 import { startEmail, verifyEmail, callerFor, need, myWorkspaces, switchWorkspace, addWorkspace, updateWorkspace,
   logoutEverywhere, transferOwnership, listMembers, invite, cancelInvite, acceptInvite, updateMember, removeMember } from './users.js';
 import { metaFor, MetaError } from './meta.js';
@@ -21,7 +21,7 @@ import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './bra
 
 async function me(req, env, { who }) {
   const ws = who.ws;
-  const row = await env.DB.prepare('SELECT name, timezone, slots, api_key_hash, ai_review FROM workspaces WHERE id = ?').bind(ws).first();
+  const row = await env.DB.prepare('SELECT name, timezone, slots, api_key_hash, api_key_hint, ai_review FROM workspaces WHERE id = ?').bind(ws).first();
   const user = who.userId ? await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(who.userId).first() : null;
   return json({
     user: user ? { id: who.userId, email: user.email } : null,
@@ -33,6 +33,7 @@ async function me(req, env, { who }) {
     accounts: await listAccounts(env, who),
     brands: await listBrands(env, who),
     api_key_set: !!row?.api_key_hash,
+    api_key_hint: row?.api_key_hash ? row.api_key_hint || null : null,
     ai_review: row ? !!row.ai_review : true,
     limits: { accounts: L.MAX_ACCOUNTS, queued: L.MAX_QUEUED, images: L.MAX_IMAGES,
               image_bytes: L.MAX_IMAGE_BYTES, workspace_bytes: L.MAX_WORKSPACE_BYTES,
@@ -62,6 +63,7 @@ export const ROUTES = [
   ['POST', '/v1/logout', async (req, env) => { await logout(env, req); return json({ ok: true }); }, 'member'],
   ['POST', '/v1/logout-all', async (req, env, { who }) => json(await logoutEverywhere(env, who)), 'member'],
   ['POST', '/v1/api-key', async (req, env, { who }) => json({ api_key: await rotateApiKey(env, who.ws) }), 'owner'],
+  ['DELETE', '/v1/api-key', async (req, env, { who }) => { await revokeApiKey(env, who.ws); return json({ ok: true }); }, 'owner'],
 
   ['POST', '/v1/workspaces', async (req, env, { who }) => json(await addWorkspace(env, who, await body(req))), 'member'],
   ['POST', '/v1/session/workspace', async (req, env, { who }) => json(await switchWorkspace(env, who, await body(req))), 'member'],

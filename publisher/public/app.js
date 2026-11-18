@@ -949,7 +949,7 @@ function aiView() {
     ['warn', 'Fix', 'Something failed yesterday. Find out why and retry it.'],
     ['x', 'Undo', 'Undo what you just scheduled.'],
   ];
-  const stepCard = (n, done, title, body) => `<div class="mstep ${done ? 'done' : ''}"><span class="stepn">${done ? ui('check', 14) : n}</span><div class="mbody"><b>${title}</b>${body}</div></div>`;
+  const numbered = (n, done, title, sub, body) => `<section class="panel mnum ${done ? 'done' : ''}"><header><span class="stepn">${done ? ui('check', 14) : n}</span><div><h2>${title}</h2><span class="note">${sub}</span></div></header>${body}</section>`;
   return `<section class="panel mhero">
       <div class="mintro"><span class="eyebrow">MCP</span>
         <h2>Schedule posts by asking your AI</h2>
@@ -961,18 +961,19 @@ function aiView() {
         <div class="bub me">Go</div>
         <div class="bub ai">${ui('check', 13)} Scheduled. ${review ? 'They wait in Drafts for your approval.' : 'They are on the calendar.'}</div></div>
     </section>
-    <section class="panel"><header><h2>Set it up</h2><span class="note">Takes about two minutes</span></header>
-      <div class="msteps">
-        ${stepCard(1, keySet, 'Create your key', `<span class="note">Your AI signs in with it. Treat it like a password.</span>
-          ${key ? `<div class="keybox"><code class="key" id="keyshow">${esc(S.keyShown ? key : maskKey(key))}</code>${copyBtn(key)}<button type="button" class="btn ghost sm" id="keytoggle">${S.keyShown ? 'Hide' : 'Show'}</button></div><p class="note warn">Copy it now: it is shown only once.</p>` : ''}
-          ${owner ? `<button class="btn ${keySet ? 'ghost sm' : ''}" id="apikey">${keySet ? 'Make a new key' : 'Create key'}</button>` : '<span class="note">Only the workspace owner can create it.</span>'}`)}
-        ${stepCard(2, false, 'Connect your app', '<span class="note">Pick it below, copy, paste where it says.</span>')}
-        ${stepCard(3, false, 'Ask', `<span class="note">Try one of the examples. It uses the posts in your <a href="#library">Library</a>${unused ? ` (${unused} ready)` : ''}.</span>`)}
-      </div>
-      <div class="msetup">${clientSetup(key)}</div></section>
-    <section class="panel"><header><h2>Things to ask</h2><span class="note">Copy one into your AI</span></header>
-      <div class="mprompts">${prompts.map(([ic, tag, p]) => `<button type="button" class="mprompt" data-copy="${esc(p)}" title="Copy">
-          <span class="mtag">${ui(ic, 13)}${tag}</span><span class="mpt">${esc(p)}</span><span class="mcopy">${ui('copy', 14)}</span></button>`).join('')}</div></section>
+    ${numbered(1, keySet, 'Create your API key', 'Your AI signs in with it. Treat it like a password.', `<div class="kbody">
+      ${key ? `<div class="krow fresh"><code class="key" id="keyshow">${esc(S.keyShown ? key : maskKey(key))}</code>
+          <button type="button" class="btn ghost sm" id="keytoggle">${S.keyShown ? 'Hide' : 'Show'}</button>${copyBtn(key, `${ui('copy', 14)}Copy`).replace('btn sec sm', 'btn sm')}</div>
+        <p class="note warn">Copy it now. For your safety it can't be shown again once you leave this page.</p>`
+      : keySet ? `<div class="krow"><code class="key">apk_••••••••••••${esc(S.me.api_key_hint || '')}</code><span class="kstate">${ui('check', 13)}Active</span></div>
+        <p class="note">The full key was shown once when it was made. Lost it? Make a new one; the old one then stops working.</p>`
+      : '<p class="note">No key yet.</p>'}
+      ${owner ? `<div class="kacts"><button class="btn ${keySet ? 'sec' : ''} sm" id="apikey">${ui('plus', 14)}${keySet ? 'Make a new key' : 'Create API key'}</button>
+          ${keySet ? `<button class="btn ghost danger sm" id="apikeydel">Delete key</button>` : ''}</div>` : '<p class="note">Only the workspace owner can create or delete it.</p>'}</div>`)}
+    ${numbered(2, false, 'Connect your app', 'Pick the app you use and follow the steps.', `<div class="msetup">${clientSetup(key)}</div>`)}
+    ${numbered(3, false, 'Ask', `Copy one into your AI. It uses the posts in your <a href="#library">Library</a>${unused ? ` (${unused} ready)` : ''}.`,
+      `<div class="mprompts">${prompts.map(([ic, tag, p]) => `<button type="button" class="mprompt" data-copy="${esc(p)}" title="Copy">
+          <span class="mtag">${ui(ic, 13)}${tag}</span><span class="mpt">${esc(p)}</span><span class="mcopy">${ui('copy', 14)}</span></button>`).join('')}</div>`)}
     <div class="mfoot">
       <div class="aisw"><div><b>AI posts need my approval</b><span class="note">${review ? 'They wait in Drafts until someone approves them.' : 'They go straight onto the calendar.'}</span></div>
         ${admin ? `<label class="sw"><input type="checkbox" id="aireview" ${review ? 'checked' : ''} aria-label="AI posts need approval"><span></span></label>` : ''}
@@ -2667,10 +2668,15 @@ function bind() {
   on('[data-aiclient]', 'click', e => { S.aiClient = e.currentTarget.dataset.aiclient; render(); });
   on('[data-aios]', 'click', e => { S.aiOS = e.currentTarget.dataset.aios; render(); });
   on('#keytoggle', 'click', () => { S.keyShown = !S.keyShown; render(); });
+  on('#apikeydel', 'click', async () => {
+    if (!await ask({ title: 'Delete the API key?', ok: 'Delete key', danger: true, icon: ui('spark', 22),
+      list: [[false, 'Any AI app using it stops working at once'], [true, 'Posts already scheduled still go out'], [true, 'You can create a new key any time']] })) return;
+    try { await api('/api-key', { method: 'DELETE' }); S.me.api_key_set = false; S.me.api_key_hint = null; S.apiKey = null; } catch (e) { S.flash = { kind: 'err', text: e.message }; }
+    render(); });
   on('#apikey', 'click', async () => {
     if (S.me.api_key_set && !await ask({ title: 'Make a new API key?', ok: 'Make a new key', danger: true, icon: ui('spark', 22),
       list: [[false, 'The current key stops working at once'], [false, 'Any assistant or tool using it needs the new key']] })) return;
-    try { S.apiKey = (await api('/api-key', { method: 'POST' })).api_key; S.me.api_key_set = true; } catch (e) { S.flash = { kind: 'err', text: e.message }; }
+    try { S.apiKey = (await api('/api-key', { method: 'POST' })).api_key; S.me.api_key_set = true; S.me.api_key_hint = S.apiKey.slice(-4); } catch (e) { S.flash = { kind: 'err', text: e.message }; }
     render(); });
   on('#delws', 'click', async () => {
     if (!await ask({ title: `Delete ${esc(S.me.workspace.name)}?`, ok: 'Delete workspace', danger: true, icon: ui('x', 22), type: S.me.workspace.name,
