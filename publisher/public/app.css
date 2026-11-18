@@ -1205,3 +1205,6 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .fgh span{font-weight:500;color:var(--soft)}
 .fnone{padding:0 18px 18px}
 @media (max-width:639px){.fgh{margin:4px 12px 8px}.fgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.rpost>.scols{display:grid;grid-template-columns:repeat(4,58px);flex:none;margin-left:auto;color:var(--mute);font-size:12.5px;font-variant-numeric:tabular-nums}
+.rpost>.scols span{display:inline-flex;align-items:center;justify-content:flex-end;gap:3px;white-space:nowrap}
+@media (max-width:719px){.rpost>.scols{grid-template-columns:repeat(4,44px)}}

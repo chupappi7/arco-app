@@ -499,9 +499,16 @@ const statLine = st => `<span class="sline">${['views', 'likes', 'comments', 'sh
 const ago = sec => { const m = Math.round((Date.now() / 1000 - sec) / 60);
   return m < 60 ? `${Math.max(1, m)} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
 
+const statsCache = new Map();
 async function loadStats(days = S.statsDays || 30, plat = S.statsPlat || 'all') {
   S.statsDays = days; S.statsPlat = plat;
-  try { S.stats = await api(`/stats?days=${days}&platform=${plat}&brand=${encodeURIComponent(curBrand())}`); } catch (e) { S.stats = { err: e.message }; }
+  const key = `${days}|${plat}|${curBrand()}`;
+  S.stats = statsCache.get(key) || null;
+  if (S.view === 'analytics') render();
+  let st;
+  try { st = await api(`/stats?days=${days}&platform=${plat}&brand=${encodeURIComponent(curBrand())}`); statsCache.set(key, st); } catch (e) { st = statsCache.get(key) || { err: e.message }; }
+  if (key !== `${S.statsDays}|${S.statsPlat}|${curBrand()}`) return;
+  S.stats = st;
   if (S.view === 'analytics') render();
 }
 
@@ -562,7 +569,8 @@ function analyticsView() {
       <div class="bpv"><span>Likes</span><b>${x.likes == null ? '–' : num(x.likes)}</b></div>
       <div class="bpv"><span>Followers</span><b>${x.followers == null ? '–' : num(x.followers)}</b></div></div>`;
   const row = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumb(p, 'class="thumb" alt=""') || '<span class="noimg"></span>'}
-      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${esc(p.caption || p.title || 'No caption')}</span></div>${statLine(p.stats)}</div>`;
+      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${fmt(p.scheduled_at, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>
+      <span class="scols">${['views', 'likes', 'comments', 'shares'].map(k => `<span title="${METRIC[k]}">${ui(STAT_ICON[k], 12)}${p.stats?.[k] == null ? '–' : num(p.stats[k])}</span>`).join('')}</span></div>`;
   const acc = a => `<div class="arow">${icon(a.platform, 14)}<b>${who(a)}</b>
       <span class="fv">${a.limited && a.platform === 'tiktok' ? `<a class="rc" href="/api/auth/start?add=1">Reconnect</a>` : a.followers == null ? '<em>Reading…</em>' : num(a.followers)}</span>
       <span class="fc ${a.change > 0 ? 'up' : a.change < 0 ? 'down' : ''}">${a.change == null || a.change === 0 ? '' : signed(a.change)}</span></div>`;
