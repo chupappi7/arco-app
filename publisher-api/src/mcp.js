@@ -8,7 +8,7 @@ import { getFolder } from './folders.js';
 import { getStats, PERIODS } from './stats.js';
 import { cancelPost, retryPost } from './posts.js';
 import { workspaceInfo, resolveBrand, freeSlots, schedulePlan, undoBatch, editPost, findPosts, when, parseWhen, MAX_PLAN } from './planner.js';
-import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, IG_MAX_IMAGES, IG_MAX_CAPTION, IG_MAX_HASHTAGS, MIN_LEAD_SECONDS } from './limits.js';
+import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, IG_MAX_IMAGES, IG_MAX_CAPTION, IG_MAX_HASHTAGS, MIN_LEAD_SECONDS, YT_MAX_TITLE } from './limits.js';
 import { wsOf } from './scope.js';
 
 // ARCO Publisher as an MCP server (Streamable HTTP, stateless, JSON replies).
@@ -18,7 +18,7 @@ import { wsOf } from './scope.js';
 
 const VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
-const INSTRUCTIONS = `ARCO Publisher schedules photo and video posts to TikTok, Instagram and Facebook for one workspace.
+const INSTRUCTIONS = `ARCO Publisher schedules photo and video posts to TikTok, Instagram, Facebook and YouTube for one workspace.
 How to work:
 1. Start with get_overview: brands, their accounts, posting times, brand voice, library folders and free slots.
 2. Content lives in library folders. One folder = one post (its photos in order, or one video) plus a note from the person. Use list_folders with status "unused" for "the new ones".
@@ -27,7 +27,8 @@ How to work:
 5. Times are in the workspace's time zone unless they carry an offset. Leave "at" out to use the brand's next free posting slot.
 6. If the workspace has approval on, confirmed posts wait as drafts until a person approves them in Publisher. Say so.
 7. Each confirmed run returns a batch_id; undo_batch cancels everything in it that has not been published.
-8. Files: if they are online, give their links to upload_to_folder. If they are on the person's own computer and you can run commands there, call get_upload_links, then upload each file to its link (one command each, in order). Upload only the files the person named, never others from their computer.`;
+8. YouTube takes videos only, with a title (youtube.title) and the caption as its description; for photo posts a brand's YouTube channel is skipped.
+9. Files: if they are online, give their links to upload_to_folder. If they are on the person's own computer and you can run commands there, call get_upload_links, then upload each file to its link (one command each, in order). Upload only the files the person named, never others from their computer.`;
 
 const str = (description, extra = {}) => ({ type: 'string', description, ...extra });
 const UPLOAD_LINK_TTL = 15 * 60;
@@ -113,7 +114,7 @@ const TOOLS = [
           folder_id: str('Library folder to post'),
           library_keys: { type: 'array', items: { type: 'string' }, description: 'Instead of a folder: library item keys, in order' },
           brand: str("Brand name or id. Default: the folder's brand. Posts go to all of the brand's connected accounts."),
-          platforms: { type: 'array', items: { type: 'string', enum: ['tiktok', 'instagram', 'facebook'] }, description: 'Only these platforms' },
+          platforms: { type: 'array', items: { type: 'string', enum: ['tiktok', 'instagram', 'facebook', 'youtube'] }, description: 'Only these platforms' },
           account_ids: { type: 'array', items: { type: 'string' }, description: 'Exactly these accounts instead of the brand' },
           at: str('When, e.g. 2026-11-20T18:00 (workspace time). Leave out for the next free slot.'),
           after: str('With no "at": take the first free slot after this time'),
@@ -124,6 +125,9 @@ const TOOLS = [
             privacy_level: str('Who can view', { enum: ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'] }),
             disable_comment: { type: 'boolean' }, auto_add_music: { type: 'boolean' }, disable_duet: { type: 'boolean' }, disable_stitch: { type: 'boolean' },
             brand_organic: { type: 'boolean', description: 'Promotes your own brand' }, branded_content: { type: 'boolean', description: 'Paid partnership' } } },
+          youtube: { type: 'object', description: 'YouTube settings (videos only). The caption becomes the description.', properties: {
+            privacy: str('Who can see it', { enum: ['public', 'unlisted', 'private'] }),
+            title: str(`Video title, up to ${YT_MAX_TITLE} characters. Default: the post title, else the caption's first line.`) } },
         } } },
       },
     },
@@ -167,7 +171,7 @@ const TOOLS = [
     name: 'get_stats',
     description: 'Results for a period: totals against the previous period, per platform, followers per account, and the top posts. Use it to see what works.',
     inputSchema: { type: 'object', properties: { brand: brandArg, days: { type: 'integer', enum: PERIODS },
-      platform: str('Platform', { enum: ['all', 'tiktok', 'instagram', 'facebook'] }) } },
+      platform: str('Platform', { enum: ['all', 'tiktok', 'instagram', 'facebook', 'youtube'] }) } },
     annotations: { readOnlyHint: true },
     run: async (c, a) => {
       const b = await resolveBrand(c.env, c.who, a.brand);
@@ -208,6 +212,7 @@ async function overview(c) {
       instagram: `JPG photos only, at most ${IG_MAX_IMAGES} per post, captions up to ${IG_MAX_CAPTION} characters and ${IG_MAX_HASHTAGS} hashtags; videos post as Reels (3 s to 15 min)`,
       tiktok: 'Photo posts up to 35 photos with an optional title (90 characters); videos up to the account limit. Privacy is chosen per post.',
       facebook: 'Page posts, photos or one video.',
+      youtube: `Videos only (a vertical video up to 3 minutes is a Short); a title up to ${YT_MAX_TITLE} characters and the caption as the description. A brand's channel sits out photo posts. Until Google approves ARCO Publisher, YouTube keeps uploads private.`,
       folders: 'One folder = one post: photos in order (cover first) or one video.',
     },
   };

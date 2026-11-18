@@ -2,7 +2,7 @@ import { HttpError, now } from './http.js';
 import { randomToken } from './crypto.js';
 import { MIN_LEAD_SECONDS, MAX_QUEUED, IG_MAX_IMAGES } from './limits.js';
 import { wsOf, inScope } from './scope.js';
-import { listAccounts, getAccount, accessTokenFor, isMeta } from './accounts.js';
+import { listAccounts, getAccount, accessTokenFor, isTikTok } from './accounts.js';
 import { listBrands } from './brands.js';
 import { parseSlots } from './slots.js';
 import { listFolders } from './folders.js';
@@ -16,7 +16,7 @@ import { createPost, cancelPost, updatePost, validatePost, checkLength, loadPost
 // drafts at their planned time until a person approves them.
 
 const bad = msg => { throw new HttpError(400, msg); };
-const PLATFORMS = ['tiktok', 'instagram', 'facebook'];
+const PLATFORMS = ['tiktok', 'instagram', 'facebook', 'youtube'];
 export const MAX_PLAN = 30;
 
 // ---- time, in the workspace's zone ------------------------------------------
@@ -155,7 +155,12 @@ async function draftEntry(env, w, item, n, ctx) {
     if (!item.platforms.every(p => PLATFORMS.includes(p))) return fail(`platforms can be ${PLATFORMS.join(', ')}`);
     targets = targets.filter(a => item.platforms.includes(a.platform));
   }
-  const skipped = targets.filter(a => a.needs_reconnect).map(a => ({ account_id: a.id, handle: handle(a), platform: a.platform, reason: 'needs reconnecting in Publisher' }));
+  // A brand's YouTube channel sits out photo posts, unless YouTube was asked for by name.
+  const askedYouTube = Array.isArray(item.platforms) && item.platforms.includes('youtube');
+  const noVideo = !video && !askedYouTube ? targets.filter(a => a.platform === 'youtube') : [];
+  targets = targets.filter(a => !noVideo.includes(a));
+  const skipped = noVideo.map(a => ({ account_id: a.id, handle: handle(a), platform: a.platform, reason: 'YouTube takes videos only' }))
+    .concat(targets.filter(a => a.needs_reconnect).map(a => ({ account_id: a.id, handle: handle(a), platform: a.platform, reason: 'needs reconnecting in Publisher' })));
   targets = targets.filter(a => !a.needs_reconnect);
   if (!targets.length) return { index: n, ok: false, folder: folder && { id: folder.id, name: folder.name }, skipped,
     errors: [brand ? `Brand "${brand.name}" has no connected accounts${item.platforms ? ' on those platforms' : ''}` : 'No accounts to post to. Give brand or account_ids.'] };
@@ -176,12 +181,14 @@ async function draftEntry(env, w, item, n, ctx) {
   if (typeof item.caption !== 'string') return fail('caption is required (it can be "" for no caption)');
   const captions = item.captions && typeof item.captions === 'object' ? item.captions : {};
   const tt = item.tiktok && typeof item.tiktok === 'object' ? item.tiktok : {};
+  const yt = item.youtube && typeof item.youtube === 'object' ? item.youtube : {};
   const posts = targets.map(a => {
     const input = { account_id: a.id, caption: typeof captions[a.platform] === 'string' ? captions[a.platform] : item.caption,
       title: String(item.title ?? ''), image_keys: video ? [] : media.map(m => m.key), video_key: video ? video.key : null, cover_index: 0,
       settings: a.platform === 'tiktok' ? { privacy_level: tt.privacy_level || '', disable_comment: !!tt.disable_comment,
         auto_add_music: !!tt.auto_add_music, disable_duet: !!tt.disable_duet, disable_stitch: !!tt.disable_stitch,
-        brand_organic: !!tt.brand_organic, branded_content: !!tt.branded_content } : {},
+        brand_organic: !!tt.brand_organic, branded_content: !!tt.branded_content }
+        : a.platform === 'youtube' ? { yt_privacy: yt.privacy || 'public', yt_title: yt.title || '' } : {},
       scheduled_at: Math.max(at, now() + MIN_LEAD_SECONDS) };
     const out = { account_id: a.id, handle: handle(a), platform: a.platform, caption: input.caption, input, error: null };
     try {
@@ -290,7 +297,7 @@ export async function approvePost(env, tk, w, id, body = {}) {
   if (account.platform === 'tiktok' && body.privacy_level) settings.privacy_level = body.privacy_level;
   const p = validatePost({ account_id: row.account_id, image_keys: JSON.parse(row.image_keys), video_key: row.video_key,
     cover_index: row.cover_index, title: row.title, caption: row.caption, settings, scheduled_at: at }, now(), account.platform);
-  if (!isMeta(account)) {
+  if (isTikTok(account)) {
     const info2 = await tk.creatorInfo(await accessTokenFor(env, tk, account));
     if (!(info2.privacy_level_options || []).includes(p.settings.privacy_level)) bad('That privacy level is not available for this account right now');
   }

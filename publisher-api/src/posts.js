@@ -1,11 +1,11 @@
 import { HttpError, now } from './http.js';
 import { randomToken } from './crypto.js';
-import { getAccount, accessTokenFor, isMeta } from './accounts.js';
+import { getAccount, accessTokenFor, isTikTok } from './accounts.js';
 import { wsOf, inScope } from './scope.js';
 import { mediaUrl } from './media.js';
 import { MAX_IMAGES, MAX_QUEUED, MAX_DRAFTS, MIN_LEAD_SECONDS, KEEP_AFTER_DONE, PRIVACY,
   IG_MAX_IMAGES, IG_MAX_CAPTION, IG_MAX_HASHTAGS, FB_MAX_CAPTION, TIKTOK_VIDEO_CAPTION,
-  IG_REEL_MIN_MS, IG_REEL_MAX_MS, FB_VIDEO_MAX_MS } from './limits.js';
+  IG_REEL_MIN_MS, IG_REEL_MAX_MS, FB_VIDEO_MAX_MS, YT_MAX_TITLE, YT_MAX_DESCRIPTION, YT_VIDEO_MAX_MS, YT_PRIVACY } from './limits.js';
 
 const len = s => [...String(s ?? '')].length;
 const bad = msg => { throw new HttpError(400, msg); };
@@ -21,6 +21,8 @@ export function validatePost(input, t = now(), platform = 'tiktok', { draft = fa
   const keys = Array.isArray(i.image_keys) ? i.image_keys : [];
   if (video) {
     if (keys.length) bad('A post can have photos or a video, not both');
+  } else if (platform === 'youtube') {
+    bad('YouTube takes videos only. Pick a video for this post, or leave YouTube out.');
   } else {
     if (keys.length < 1) bad('Add at least one image or a video');
     if (keys.length > MAX_IMAGES) bad(`A photo post can have at most ${MAX_IMAGES} images`);
@@ -31,7 +33,8 @@ export function validatePost(input, t = now(), platform = 'tiktok', { draft = fa
   if (!video && (!Number.isInteger(cover) || cover < 0 || cover >= keys.length)) bad('The cover must be one of the images');
   const title = String(i.title ?? ''), caption = String(i.caption ?? '');
   if (len(title) > 90) bad('The title can be at most 90 characters');
-  const capMax = platform === 'facebook' ? FB_MAX_CAPTION : video && platform === 'tiktok' ? TIKTOK_VIDEO_CAPTION : 4000;
+  const capMax = platform === 'facebook' ? FB_MAX_CAPTION : platform === 'youtube' ? YT_MAX_DESCRIPTION
+    : video && platform === 'tiktok' ? TIKTOK_VIDEO_CAPTION : 4000;
   if (len(caption) > capMax) bad(`The caption can be at most ${capMax} characters`);
   if (platform === 'instagram') {
     if (len(caption) > IG_MAX_CAPTION) bad(`An Instagram caption can be at most ${IG_MAX_CAPTION} characters`);
@@ -41,6 +44,7 @@ export function validatePost(input, t = now(), platform = 'tiktok', { draft = fa
   const base = { account_id: i.account_id, title, caption, image_keys: keys, video_key: video, cover_index: cover, scheduled_at: at };
   // Privacy, music and the disclosure toggles are TikTok's; Instagram and
   // Facebook posts are public on a public profile.
+  if (platform === 'youtube') return { ...base, settings: youtubeSettings(i.settings, title, caption) };
   if (platform !== 'tiktok') return { ...base, settings: {} };
   const s = i.settings || {};
   const toggles = {
@@ -59,12 +63,28 @@ export function validatePost(input, t = now(), platform = 'tiktok', { draft = fa
   return { ...base, settings };
 }
 
+// YouTube needs a title; without one, the post's title or the caption's first line.
+export const defaultYouTubeTitle = (title, caption) =>
+  [...(String(title || '').trim() || String(caption || '').split('\n').map(l => l.trim()).find(Boolean) || 'New video')]
+    .slice(0, YT_MAX_TITLE).join('');
+function youtubeSettings(s = {}, title, caption) {
+  const privacy = s.yt_privacy ?? 'public';
+  if (!YT_PRIVACY.includes(privacy)) bad('YouTube visibility can be public, unlisted or private');
+  const ytTitle = String(s.yt_title ?? '').trim() || defaultYouTubeTitle(title, caption);
+  if (len(ytTitle) > YT_MAX_TITLE) bad(`A YouTube title can be at most ${YT_MAX_TITLE} characters`);
+  if (/[<>]/.test(ytTitle)) bad('A YouTube title cannot contain < or >');
+  return { yt_privacy: privacy, yt_title: ytTitle, made_for_kids: false };
+}
+
 const fmtLength = ms => { const s = Math.round(ms / 1000); return s < 60 ? `${s} s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} min`; };
 
 // TikTok's limit comes from the account itself (creator info), at createPost.
 export function checkLength(platform, ms) {
   if (platform === 'instagram' && (ms < IG_REEL_MIN_MS || ms > IG_REEL_MAX_MS)) {
     bad(`Instagram Reels must be ${fmtLength(IG_REEL_MIN_MS)} to ${fmtLength(IG_REEL_MAX_MS)} long; this video is ${fmtLength(ms)}`);
+  }
+  if (platform === 'youtube' && ms > YT_VIDEO_MAX_MS) {
+    bad(`YouTube videos can be up to ${fmtLength(YT_VIDEO_MAX_MS)} here; this one is ${fmtLength(ms)}`);
   }
   if (platform === 'facebook' && ms > FB_VIDEO_MAX_MS) {
     bad(`Facebook Page videos can be up to ${fmtLength(FB_VIDEO_MAX_MS)} here; this one is ${fmtLength(ms)}`);
@@ -80,7 +100,7 @@ function scheduledAt(i, t) {
 }
 
 function tiktokUrl(row) {
-  return row.public_post_id && row.username
+  return (row.platform ?? 'tiktok') === 'tiktok' && row.public_post_id && row.username
     ? `https://www.tiktok.com/@${row.username}/${row.video_key ? 'video' : 'photo'}/${row.public_post_id}` : null;
 }
 
@@ -165,7 +185,7 @@ export async function createPost(env, tk, w, input) {
 
   // The panel already limits privacy to what TikTok offers; check again here
   // because the API can be called without the panel.
-  if (!isMeta(account) && !draft) {
+  if (isTikTok(account) && !draft) {
     const info = await tk.creatorInfo(await accessTokenFor(env, tk, account));
     if (!(info.privacy_level_options || []).includes(p.settings.privacy_level)) {
       bad('That privacy level is not available for this account right now');

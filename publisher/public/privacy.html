@@ -169,8 +169,8 @@ body{background:radial-gradient(1200px 600px at 20% -10%,rgba(2,132,199,.06),tra
   </header>
   <article class="doc">
     <h2>Privacy Policy</h2>
-    <div class="date">Effective 1 October 2026</div>
-    <p>ARCO Publisher is a free web tool for scheduling photo posts to TikTok, Instagram and Facebook Pages, operated by the maker of ARCO: Day Planner &amp; Focus
+    <div class="date">Effective 18 November 2026</div>
+    <p>ARCO Publisher is a free web tool for scheduling photo and video posts to TikTok, Instagram, Facebook Pages and YouTube, operated by the maker of ARCO: Day Planner &amp; Focus
       ("we"). This policy explains what we store when you use it and for how long.</p>
     <h3>What we store</h3>
     <ul>
@@ -182,6 +182,10 @@ body{background:radial-gradient(1200px 600px at 20% -10%,rgba(2,132,199,.06),tra
       <li><b>For each connected Facebook Page</b> (connected with Facebook Login): the Page id, name and picture link,
         the id of the Facebook user who connected it, and the Page access token that lets us publish the posts you
         schedule. The token is encrypted. We do not store your Facebook password or your personal Facebook profile.</li>
+      <li><b>For each connected YouTube channel</b> (connected with Google sign-in): the channel id, name, handle,
+        picture link and subscriber count, and the tokens Google gives us to upload the videos you schedule and to read
+        their numbers. The tokens are encrypted. We do not store your Google password, email or anything else from your
+        Google account.</li>
       <li><b>For each post:</b> the photos you uploaded, the title, caption, settings you chose, the scheduled time, and
         the platform's result (publish id, status, the public post id and link, or the failure reason).</li>
       <li><b>Your account:</b> your email address, which workspaces you belong to and your role in each. Sign-in codes
@@ -194,7 +198,8 @@ body{background:radial-gradient(1200px 600px at 20% -10%,rgba(2,132,199,.06),tra
     </ul>
     <h3>What we do not do</h3>
     <ul>
-      <li>We do not read your other posts, followers, messages or statistics.</li>
+      <li>We read numbers (views, likes, comments, shares, followers or subscribers) only for the accounts you connect and
+        the posts made through ARCO Publisher, to show them back to you. We do not read your other posts or your messages.</li>
       <li>We do not sell or share your data, and we do not run advertising or analytics trackers.</li>
       <li>We never edit your photos beyond resizing large images and, for Instagram, padding tall images to 4:5 so nothing is cropped. We never add watermarks.</li>
     </ul>
@@ -209,12 +214,31 @@ body{background:radial-gradient(1200px 600px at 20% -10%,rgba(2,132,199,.06),tra
     <p><b>Disconnect</b> an account in Settings to delete its token and cancel its scheduled posts. <b>Delete workspace</b>
       removes all of your accounts, posts and photos immediately. You can also revoke access in TikTok under Settings and
       privacy › Security &amp; permissions › Apps and services, in Facebook under Settings › Business integrations,
-      and in Instagram under Settings › Website permissions › Apps and websites.</p>
+      in Instagram under Settings › Website permissions › Apps and websites, and for YouTube on
+      <a href="https://security.google.com/settings/security/permissions" target="_blank" rel="noopener">Google's third-party access page</a>.</p>
     <h3 id="data-deletion">Deleting your data</h3>
     <p>Sign in and choose <b>Delete workspace</b> in Settings: your accounts, tokens, posts and photos are deleted
       immediately. If you can no longer sign in, email <a href="mailto:thinht7110@gmail.com?subject=ARCO%20Publisher%20data%20deletion">thinht7110@gmail.com</a>
-      with the TikTok username, Instagram username or Facebook Page name, and we delete everything connected to it
+      with the TikTok username, Instagram username, Facebook Page name or YouTube channel name, and we delete everything connected to it
       within 7 days. Removing ARCO Publisher in Facebook's Business integrations or Instagram's Apps and websites stops that access straight away.</p>
+    <h3 id="youtube">YouTube and Google</h3>
+    <p>ARCO Publisher uses the YouTube API Services. By connecting a YouTube channel you agree to the
+      <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener">YouTube Terms of Service</a>, and Google's handling
+      of your data is covered by the <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>.</p>
+    <ul>
+      <li><b>What we access:</b> with the permissions to upload videos and to view your YouTube account, we read your
+        channel's id, name, handle, picture and subscriber count, upload the videos you schedule with the title,
+        description and visibility you chose, and read views, likes and comments for those videos.</li>
+      <li><b>What we do with it:</b> only show it back to you in ARCO Publisher and publish what you scheduled. We do not
+        use it for advertising, do not sell or transfer it, and do not let anyone read it except as needed to run the
+        service or as required by law. ARCO Publisher's use of information received from Google APIs adheres to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API
+        Services User Data Policy</a>, including the Limited Use requirements.</li>
+      <li><b>Revoking access:</b> remove ARCO Publisher at
+        <a href="https://security.google.com/settings/security/permissions" target="_blank" rel="noopener">Google's third-party
+        access page</a> at any time. Disconnecting the channel in ARCO Publisher deletes its tokens at once; its channel data
+        and numbers are deleted with it, and everything is gone within 7 days of a request by email.</li>
+    </ul>
     <h3>Where it runs</h3>
     <p>The website runs on Vercel and the posting service on Cloudflare. Both keep standard request logs (IP address, time,
       path) for a short period for security and operations.</p>

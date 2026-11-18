@@ -9,7 +9,7 @@ import { AI_DAILY_LIMIT, IG_MAX_CAPTION, IG_MAX_HASHTAGS, FB_MAX_CAPTION } from 
 // result in the composer before anything is posted.
 
 const MODEL = 'claude-opus-5-5';
-const PLATFORMS = ['tiktok', 'instagram', 'facebook'];
+const PLATFORMS = ['tiktok', 'instagram', 'facebook', 'youtube'];
 const TONES = ['friendly', 'professional', 'playful', 'bold', 'inspirational', 'educational'];
 const LENGTHS = { short: 'one or two sentences', medium: 'a short paragraph', long: 'a few short paragraphs' };
 const REWRITES = {
@@ -20,7 +20,7 @@ const REWRITES = {
   grammar: 'Fix spelling, grammar and punctuation only; change nothing else.',
   hashtags: 'Add a few relevant hashtags at the end (no more than 8).',
 };
-const CAPTION_MAX = { tiktok: 4000, instagram: IG_MAX_CAPTION, facebook: FB_MAX_CAPTION };
+const CAPTION_MAX = { tiktok: 4000, instagram: IG_MAX_CAPTION, facebook: FB_MAX_CAPTION, youtube: 5000 };
 const MAX_IMAGES_TO_READ = 6;
 
 const SYSTEM = `You write social media posts for creators and small businesses.

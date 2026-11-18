@@ -1,11 +1,12 @@
 const PRIVACY_LABEL = { PUBLIC_TO_EVERYONE: 'Everyone', MUTUAL_FOLLOW_FRIENDS: 'Friends',
   FOLLOWER_OF_CREATOR: 'Followers', SELF_ONLY: 'Only me' };
 const MAX_SIDE_W = 1080, MAX_SIDE_H = 1920;
-const PLATFORM = { tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook' };
+const PLATFORM = { tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube' };
 // Platform marks (Simple Icons, CC0), inlined so the page loads nothing from a third party.
 const MARK = {
   tiktok: 'M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z',
   instagram: 'M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077',
+  youtube: 'M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z',
   facebook: 'M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z',
 };
 const icon = (pl, size = 16, cls = '') => `<svg class="pi ${pl} ${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><path d="${MARK[pl]}"/></svg>`;
@@ -16,6 +17,7 @@ const appIcon = (pl, size = 32) => {
   const inner = pl === 'tiktok'
     ? `<g transform="translate(5.6 5.4) scale(.53)"><g fill="#25F4EE" transform="translate(-.9 -.9)">${g}</g><g fill="#FE2C55" transform="translate(.9 .9)">${g}</g><g fill="#fff">${g}</g></g>`
     : pl === 'instagram' ? `<g fill="#fff" transform="translate(5.5 5.5) scale(.54)">${g}</g>`
+    : pl === 'youtube' ? `<g fill="#FF0000" transform="translate(3.6 3.6) scale(.7)">${g}</g>`
     : `<circle cx="12" cy="12" r="9.2" fill="#fff"/><g fill="#0866FF" transform="translate(1.5 1.5) scale(.875)">${g}</g>`;
   const bg = pl === 'tiktok' ? '<rect width="24" height="24" rx="6" fill="#000"/>'
     : pl === 'instagram' ? `<defs><radialGradient id="igg${size}" cx="30%" cy="107%" r="150%"><stop offset="0" stop-color="#fdf497"/><stop offset=".05" stop-color="#fdf497"/><stop offset=".45" stop-color="#fd5949"/><stop offset=".6" stop-color="#d6249f"/><stop offset=".9" stop-color="#285AEB"/></radialGradient></defs><rect width="24" height="24" rx="6" fill="url(#igg${size})"/>`
@@ -26,7 +28,10 @@ const appIcon = (pl, size = 32) => {
 const withBadge = (av, pl) => `<span class="avw">${av}<span class="badge-pl ${pl}">${icon(pl, 10)}</span></span>`;
 // Instagram takes JPEG between 4:5 (portrait) and 1.91:1 (landscape), 10 per post.
 const IG_MIN_RATIO = 4 / 5, IG_MAX_RATIO = 1.91, IG_MAX = 10, IG_CAPTION = 2200;
-const CAPTION_MAX = { tiktok: 4000, instagram: IG_CAPTION, facebook: 63206 };
+const CAPTION_MAX = { tiktok: 4000, instagram: IG_CAPTION, facebook: 63206, youtube: 5000 };
+const YT_TITLE = 100;
+const YT_VIS = { public: 'Public', unlisted: 'Unlisted', private: 'Private' };
+const YT_PENDING = 'Until Google approves ARCO Publisher, YouTube keeps uploads private; switch them to public in YouTube Studio.';
 const IG_HASHTAGS = 30;
 const hashtags = s => (String(s).match(/#[^\s#]+/g) || []).length;
 
@@ -38,6 +43,8 @@ const S = {
   // Every account the post goes to, any platform. TikTok accounts each carry
   // their own creator info, privacy and comment choice in S.tt.
   targets: [], tt: {},
+  // YouTube's own title and visibility, shared by every chosen channel.
+  yt: { title: '', privacy: 'public' },
   // A caption per platform, when it should differ from the main one. Absent
   // means "same as the main caption".
   over: {},
@@ -51,7 +58,7 @@ const S = {
   pq: '', pickOpen: false, capTab: 'all', prevTab: null,
   login: { step: 'email', email: '', code: '', busy: false, err: '' }, members: null, invited: null,
 };
-const ORDER = ['tiktok', 'instagram', 'facebook'];
+const ORDER = ['tiktok', 'instagram', 'facebook', 'youtube'];
 const platformOf = a => a?.platform || 'tiktok';
 const SAVED = 'arco-publisher.targets';
 const INVITE = 'arco-publisher.invite';
@@ -226,7 +233,7 @@ const HEADS = {
   calendar: () => ['Calendar', `Everything scheduled and published, in ${tz().replace(/_/g, ' ')} time.`, `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
   analytics: () => ['Analytics', 'How your posts do, from the numbers each platform shares.'],
   drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.', `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
-  accounts: () => ['Brands & accounts', `Each brand holds its TikTok, Instagram and Facebook accounts. Pick a brand when you schedule and its accounts come with it. ${S.me.accounts.length} of ${S.me.limits.accounts} accounts connected.`, `<button class="btn" id="newbrandbtn">${ui('plus', 15)}New brand</button>`],
+  accounts: () => ['Brands & accounts', `Each brand holds its TikTok, Instagram, Facebook and YouTube accounts. Pick a brand when you schedule and its accounts come with it. ${S.me.accounts.length} of ${S.me.limits.accounts} accounts connected.`, `<button class="btn" id="newbrandbtn">${ui('plus', 15)}New brand</button>`],
   settings: () => ['Settings', 'Workspace, people and your account.'],
   ai: () => ['AI connect', 'Plan and schedule posts by chatting with your AI. It connects over MCP, the standard most AI apps use.', ''],
 };
@@ -796,6 +803,7 @@ function composeView() {
             .map(([k, l]) => `<button type="button" class="chip" data-rewrite="${k}" ${S.ai.busy ? 'disabled' : ''}>${l}</button>`).join('')}</div>` : ''}
         </div></section>
 
+      ${ytSection()}
       ${tts.length ? `<section class="panel"><header><h2>${icon('tiktok', 15)} TikTok settings</h2><span class="note">${tts.length} account${tts.length === 1 ? '' : 's'}</span></header>
         <div class="csec">
           ${tts.length > 1 ? `<div class="bulk"><label class="f" for="bulkpriv">Set who can view for every TikTok account</label>
@@ -1405,6 +1413,10 @@ function previewView() {
       <p class="pv-cap">${cap || '<span class="note">Your caption appears here.</span>'}</p>
       <div class="pv-grid n${Math.min(imgs.length, 4)}">${imgs.slice(0, 4).map((u, i) => `<div>${shot(u)}${i === 3 && imgs.length > 4 ? `<span>+${imgs.length - 4}</span>` : ''}</div>`).join('') || ph}</div>
       <div class="pv-acts fb">${ui('heart', 17)}<span>Like</span>${ui('comment', 17)}<span>Comment</span>${ui('share', 17)}<span>Share</span></div></div>`;
+  if (pl === 'youtube') return `<div class="pv yt"><div class="pv-media r916">${imgs[0] && S.video ? shot(imgs[0]) : `<div class="pv-ph">${S.video ? ui('plus', 20) : 'Videos only'}</div>`}
+      <div class="pv-side">${ui('heart', 22)}${ui('comment', 22)}${ui('share', 22)}</div>
+      <div class="pv-over"><b>@${esc(name)}</b><span class="t">${esc(S.yt.title || ytAutoTitle() || 'Video title')}</span></div>
+      <span class="pv-badge">${icon('youtube', 12)} Shorts</span></div></div>`;
   const cover = imgs[S.cover] || imgs[0];
   return `<div class="pv tt"><div class="pv-media r916">${cover ? shot(cover) : ph}
       <div class="pv-side">${ui('heart', 22)}${ui('comment', 22)}${ui('share', 22)}</div>
@@ -1467,6 +1479,30 @@ function ttCard(id) {
 const row = (t, d, control) => `<div class="row"><span class="txt"><span class="t">${t}</span>${d ? `<span class="d">${d}</span>` : ''}</span>${control}</div>`;
 
 const acct = id => S.me.accounts.find(a => a.id === id);
+const ytTargets = () => S.targets.filter(id => platformOf(acct(id)) === 'youtube');
+const ytFrom = s => ({ title: s?.yt_title || '', privacy: s?.yt_privacy || 'public' });
+// The title YouTube gets when none is typed: the caption's first line.
+const ytAutoTitle = () => [...(String(captionFor('youtube') || '').split('\n').map(l => l.trim()).find(Boolean) || '')].slice(0, YT_TITLE).join('');
+const ytSettings = () => ({ yt_title: S.yt.title.trim(), yt_privacy: S.yt.privacy });
+const settingsFor = (j, t, draft) => j.platform === 'tiktok' ? ttSettings(t, draft ? t.privacy || '' : t.privacy)
+  : j.platform === 'youtube' ? ytSettings() : {};
+
+function ytSection() {
+  const yts = ytTargets();
+  if (!yts.length) return '';
+  const auto = ytAutoTitle();
+  return `<section class="panel"><header><h2>${icon('youtube', 15)} YouTube settings</h2><span class="note">${yts.length} channel${yts.length === 1 ? '' : 's'}</span></header>
+    <div class="csec">
+      ${S.video ? '' : '<p class="note warn">YouTube takes videos only. Pick a video, or leave the YouTube channel out of this post.</p>'}
+      <label class="f" for="yttitle">Title</label>
+      <input type="text" id="yttitle" maxlength="${YT_TITLE}" value="${esc(S.yt.title)}" placeholder="${esc(auto || 'A title for the video')}">
+      <div class="count ${len(S.yt.title) > YT_TITLE ? 'bad' : ''}">${S.yt.title ? `${len(S.yt.title)} / ${YT_TITLE}` : auto ? 'Empty: the caption\'s first line is used' : `0 / ${YT_TITLE}`}</div>
+      <label class="f" for="ytvis">Visibility</label>
+      <select id="ytvis">${Object.entries(YT_VIS).map(([k, l]) => `<option value="${k}" ${S.yt.privacy === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <p class="note">The caption becomes the video's description. A vertical video up to 3 minutes goes up as a Short.</p>
+      ${S.me.youtube_audited ? '' : `<p class="note">${YT_PENDING}</p>`}
+    </div></section>`;
+}
 const ttTargets = () => S.targets.filter(id => platformOf(acct(id)) === 'tiktok');
 const toInstagram = () => S.targets.some(id => acct(id)?.platform === 'instagram');
 const chosenPlatforms = () => ORDER.filter(pl => S.targets.some(id => platformOf(acct(id)) === pl));
@@ -1503,6 +1539,13 @@ function missing() {
     if (pl === 'instagram' && hashtags(c) > IG_HASHTAGS) return `Instagram allows at most ${IG_HASHTAGS} hashtags`;
   }
   if (toInstagram() && !S.video && S.images.length > IG_MAX) return `Instagram posts can have at most ${IG_MAX} photos`;
+  if (ytTargets().length) {
+    if (!S.video) return 'YouTube takes videos only: pick a video, or leave the YouTube channel out';
+    if (len(S.yt.title) > YT_TITLE) return `The YouTube title can be at most ${YT_TITLE} characters`;
+    if (/[<>]/.test(S.yt.title)) return 'A YouTube title cannot contain < or >';
+    if (!S.yt.title.trim() && !ytAutoTitle()) return 'Give the YouTube video a title';
+    if (ms && ms > 15 * 60e3) return 'YouTube videos can be up to 15 minutes here';
+  }
   const tts = ttTargets();
   if (tts.length) {
     if (len(S.title) > 90) return 'The title is too long';
@@ -1723,7 +1766,7 @@ async function submit() {
       try {
         made.push(await api('/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
           account_id: j.id, image_keys: keys[n], video_key: S.video?.key, cover_index: S.cover, title: S.video ? '' : S.title, caption: captionFor(j.platform),
-          settings: j.platform !== 'tiktok' ? {} : ttSettings(t, t.privacy),
+          settings: settingsFor(j, t, false),
           scheduled_at: plan ? plan[j.id] : at, folder_id: S.fromFolder || undefined,
           // An edit replaces the one post it came from.
           replaces: S.replaces && S.replacesAccount === j.id ? S.replaces : undefined,
@@ -1799,6 +1842,7 @@ function resetComposer() {
     replacesAccount: null, over: {}, fromDraft: null, draftGroup: null, fromFolder: null });
   for (const t of Object.values(S.tt)) { t.privacy = ''; t.comment = false; }
   S.set = { music: false, duet: false, stitch: false, disclose: false, brand: false, branded: false };
+  S.yt = { title: '', privacy: 'public' };
 }
 
 // ---- AI writing ------------------------------------------------------------
@@ -1992,7 +2036,7 @@ async function saveDraft() {
       try {
         await send('/posts', 'POST', { account_id: j.id, image_keys: keys[n], video_key: S.video?.key, cover_index: S.cover, title: S.video ? '' : S.title,
           caption: captionFor(j.platform), draft: true, group_id: group, folder_id: S.fromFolder || undefined,
-          settings: j.platform !== 'tiktok' ? {} : ttSettings(t, t.privacy || '') });
+          settings: settingsFor(j, t, true) });
       } catch (e) { errors.push(`${handle(acct(j.id))}: ${e.message}`); }
     }
   } catch (e) { errors.push(e.message); }
@@ -2101,6 +2145,7 @@ function openDraft(key) {
   const s = tt?.settings || {};
   S.set = { music: !!s.auto_add_music, duet: s.disable_duet === false, stitch: s.disable_stitch === false,
     disclose: !!(s.brand_organic || s.branded_content), brand: !!s.brand_organic, branded: !!s.branded_content };
+  S.yt = ytFrom(g.find(x => x.platform === 'youtube')?.settings);
   for (const x of g) {
     toggleTarget(x.account_id, true, false);
     if (x.platform === 'tiktok' && S.tt[x.account_id]) S.tt[x.account_id].comment = !x.settings?.disable_comment;
@@ -2294,6 +2339,7 @@ async function edit(id, again = false) {
   const s = p.settings || {};
   S.set = { music: !!s.auto_add_music, duet: s.disable_duet === false, stitch: s.disable_stitch === false,
             disclose: !!(s.brand_organic || s.branded_content), brand: !!s.brand_organic, branded: !!s.branded_content };
+  S.yt = ytFrom(p.platform === 'youtube' ? s : null);
   S.targets = [];
   toggleTarget(p.account_id, true, false);
   if (S.tt[p.account_id]) S.tt[p.account_id].comment = !s.disable_comment;
@@ -2318,9 +2364,11 @@ const PLATFORM_HINT = {
   tiktok: 'TikTok connects the account signed in on tiktok.com. For another one, switch accounts on TikTok\'s screen or sign out of tiktok.com first.',
   instagram: 'Any professional (Business or Creator) account, no Facebook Page needed. Instagram asks for the login each time, so you can add accounts one after another.',
   facebook: 'Pick every Page you manage on Facebook\'s screen. Pages connected before stay connected.',
+  youtube: 'Google asks which account to use each time, so you can add channels one after another. ' + YT_PENDING,
 };
 const connectHref = pl => pl === 'tiktok' ? '/api/auth/start?add=1'
   : pl === 'instagram' ? (S.me.instagram_enabled ? '/api/auth/instagram/start?add=1' : '')
+  : pl === 'youtube' ? (S.me.youtube_enabled ? '/api/auth/youtube/start?add=1' : '')
   : (S.me.facebook_enabled ? '/api/auth/meta/start?add=1' : '');
 
 function accountCard(x) {
@@ -2572,6 +2620,9 @@ function bind() {
     render();
   });
   on('#title', 'input', e => { S.title = e.target.value; refreshPreview(); });
+  on('#yttitle', 'input', e => { S.yt.title = e.target.value; refreshPreview(); const c = e.target.nextElementSibling; if (c) c.textContent = `${len(S.yt.title)} / ${YT_TITLE}`; });
+  on('#yttitle', 'change', render);
+  on('#ytvis', 'change', e => { S.yt.privacy = e.target.value; });
   on('#title', 'change', render);
   on('#caption', 'input', e => { S.caption = e.target.value; refreshLimits(); refreshPreview(); });
   on('#aiopen', 'click', async () => { S.ai.open = true; render(); $('aibrief')?.focus();

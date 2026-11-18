@@ -2,6 +2,7 @@ import { decrypt, encrypt } from './crypto.js';
 import { HttpError, now } from './http.js';
 import { KEEP_AFTER_DONE } from './limits.js';
 import { wsOf, inScope } from './scope.js';
+import { ytFor } from './youtube.js';
 
 export async function listAccounts(env, w) {
   const sc = inScope(w);
@@ -24,8 +25,26 @@ export async function getAccount(env, w, id) {
 const EARLY = 300;
 
 export const isMeta = account => account.platform === 'instagram' || account.platform === 'facebook';
+export const isYouTube = account => account.platform === 'youtube';
+export const isTikTok = account => (account.platform || 'tiktok') === 'tiktok';
+
+// Google access tokens last an hour; the refresh token stays the same.
+async function youtubeToken(env, account) {
+  const t = now();
+  if (account.access_token_enc && account.access_expires_at > t + EARLY) return decrypt(account.access_token_enc, env.TOKEN_KEY);
+  let tokens;
+  try { tokens = await ytFor(env).refresh(await decrypt(account.refresh_token_enc, env.TOKEN_KEY)); }
+  catch (err) {
+    if (err.code === 'needs_reconnect') await env.DB.prepare('UPDATE accounts SET needs_reconnect = 1 WHERE id = ?').bind(account.id).run();
+    throw err;
+  }
+  await env.DB.prepare('UPDATE accounts SET access_token_enc = ?, access_expires_at = ?, token_updated_at = ? WHERE id = ?')
+    .bind(await encrypt(tokens.access_token, env.TOKEN_KEY), t + Number(tokens.expires_in || 3600), t, account.id).run();
+  return tokens.access_token;
+}
 
 export async function accessTokenFor(env, tk, account, retried = false) {
+  if (isYouTube(account)) return youtubeToken(env, account);
   // A Page token does not expire; an Instagram token is renewed by the cron
   // (refreshInstagramTokens) long before its 60 days run out.
   if (isMeta(account)) {
@@ -70,7 +89,7 @@ export async function forgetAccessToken(env, accountId) {
 
 export async function creatorInfoFor(env, tk, w, id) {
   const account = await getAccount(env, w, id);
-  if (isMeta(account)) throw new HttpError(400, 'Creator info is a TikTok setting');
+  if (!isTikTok(account)) throw new HttpError(400, 'Creator info is a TikTok setting');
   return tk.creatorInfo(await accessTokenFor(env, tk, account));
 }
 

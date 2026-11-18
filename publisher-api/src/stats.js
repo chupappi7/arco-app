@@ -11,6 +11,7 @@ import { now, HttpError } from './http.js';
 import { accessTokenFor } from './accounts.js';
 import { wsOf, inScope } from './scope.js';
 import { postJson } from './posts.js';
+import { ytFor } from './youtube.js';
 
 const DAY = 86400;
 export const FOLLOW_FOR = 30 * DAY;
@@ -161,8 +162,11 @@ export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TI
       if (a.platform === 'tiktok') {
         try { r = await tk.userStats(token); }
         catch (err) { if (!denied(err)) throw err; await rest(env, a, t); continue; }
+      } else if (a.platform === 'youtube') {
+        const ch = await ytFor(env).myChannel(token);
+        r = { subscribers: ch.subscribers, avatar_url: ch.avatar_url };
       } else r = a.platform === 'instagram' ? await mt.igAccountStats(token) : await mt.fbPageStats(token, a.open_id.slice(3));
-      const followers = count(r.follower_count ?? r.followers_count ?? r.fan_count);
+      const followers = count(r.follower_count ?? r.followers_count ?? r.fan_count ?? r.subscribers);
       await env.DB.batch([
         // Platform photo links expire within weeks, so take a fresh one each read.
         env.DB.prepare('UPDATE accounts SET followers = ?, stats_at = ?, avatar_url = COALESCE(?, avatar_url) WHERE id = ?')
@@ -209,7 +213,25 @@ export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TI
       else { console.error('stats tiktok', accountId, err.message); for (const p of list) await save(p.id, null); }
     }
   }
-  for (const p of posts.filter(x => x.platform !== 'tiktok')) {
+  // YouTube: like TikTok, every due video of a channel in one call.
+  const ytByAccount = new Map();
+  for (const p of posts.filter(x => x.platform === 'youtube')) ytByAccount.set(p.account_id, [...(ytByAccount.get(p.account_id) || []), p]);
+  for (const [accountId, list] of ytByAccount) {
+    try {
+      const { token } = await load(accountId);
+      const videos = await ytFor(env).videoStats(token, list.map(p => p.public_post_id));
+      const byId = new Map(videos.map(v => [String(v.id), v.statistics || {}]));
+      for (const p of list) {
+        const v = byId.get(String(p.public_post_id));
+        await save(p.id, v ? { views: count(v.viewCount), likes: count(v.likeCount), comments: count(v.commentCount) } : null);
+        if (v) done.posts++;
+      }
+    } catch (err) {
+      if (err.code === 'needs_reconnect') await markReconnect(env, accountId);
+      else { console.error('stats youtube', accountId, err.message); for (const p of list) await save(p.id, null); }
+    }
+  }
+  for (const p of posts.filter(x => x.platform !== 'tiktok' && x.platform !== 'youtube')) {
     try {
       const { account, token } = await load(p.account_id);
       const s = account.platform === 'instagram' ? await readInstagram(env, mt, token, p, account, t) : await readFacebook(env, mt, token, p, account, t);
@@ -233,7 +255,7 @@ const METRICS = ['views', 'reach', 'likes', 'comments', 'shares', 'saves'];
 // breakdown per platform, the top posts, and followers per account with the
 // change over the period. Limited to the caller's brands like everything else.
 export const PERIODS = [7, 30, 90];
-const PLATFORMS = ['tiktok', 'instagram', 'facebook'];
+const PLATFORMS = ['tiktok', 'instagram', 'facebook', 'youtube'];
 export async function getStats(env, w, days, t = now(), platform = 'all', brand = 'all', account = null) {
   if (!PERIODS.includes(days)) throw new HttpError(400, 'days must be 7, 30 or 90');
   if (platform !== 'all' && !PLATFORMS.includes(platform)) throw new HttpError(400, 'unknown platform');

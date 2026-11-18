@@ -1,6 +1,7 @@
 import { json, HttpError, match, readJson, now } from './http.js';
 import { tkFor, TikTokError } from './tiktok.js';
-import { oauthIntake, metaIntake, igIntake, rotateApiKey, revokeApiKey, revealApiKey, renameApiKey, logout } from './auth.js';
+import { oauthIntake, metaIntake, igIntake, ytIntake, rotateApiKey, revokeApiKey, revealApiKey, renameApiKey, logout } from './auth.js';
+import { ytFor } from './youtube.js';
 import { startEmail, verifyEmail, callerFor, need, myWorkspaces, switchWorkspace, addWorkspace, updateWorkspace,
   logoutEverywhere, transferOwnership, listMembers, invite, cancelInvite, acceptInvite, updateMember, removeMember } from './users.js';
 import { metaFor, MetaError } from './meta.js';
@@ -45,6 +46,7 @@ async function me(req, env, { who }) {
               video_bytes: L.MAX_VIDEO_BYTES },
     facebook_enabled: !!(env.META_APP_ID && env.META_APP_SECRET),
     instagram_enabled: !!(env.IG_APP_ID && env.IG_APP_SECRET),
+    youtube_enabled: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
     ai_enabled: !!(env.ANTHROPIC_API_KEY || env.__ai),
   });
 }
@@ -59,6 +61,7 @@ export const ROUTES = [
   ['POST', '/internal/oauth', async (req, env, { tk }) => json(await oauthIntake(env, tk, await body(req))), 'internal'],
   ['POST', '/internal/meta-oauth', async (req, env) => json(await metaIntake(env, metaFor(env), await body(req))), 'internal'],
   ['POST', '/internal/ig-oauth', async (req, env) => json(await igIntake(env, metaFor(env), await body(req))), 'internal'],
+  ['POST', '/internal/yt-oauth', async (req, env) => json(await ytIntake(env, ytFor(env), await body(req))), 'internal'],
   ['POST', '/internal/email-verify', async (req, env) => json(await verifyEmail(env, await body(req))), 'internal'],
   ['POST', '/v1/auth/email/start', async (req, env) => json(await startEmail(env, await body(req))), 'public'],
 

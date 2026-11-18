@@ -1,5 +1,8 @@
 import { now } from './http.js';
-import { accessTokenFor, forgetAccessToken, isMeta } from './accounts.js';
+import { accessTokenFor, forgetAccessToken, isMeta, isYouTube } from './accounts.js';
+import { ytFor } from './youtube.js';
+import { defaultYouTubeTitle } from './posts.js';
+import { YT_SHORTS_MAX_MS } from './limits.js';
 import { metaFor } from './meta.js';
 import { buildPhotoBody, buildVideoBody } from './tiktok.js';
 import { mediaUrl } from './media.js';
@@ -184,6 +187,43 @@ async function pollInstagram(env, post, access, t) {
   return 'published';
 }
 
+// ---- YouTube --------------------------------------------------------------
+//
+// Opening the upload session is safe to repeat (nothing exists yet); sending
+// the bytes creates the video, so from then on a lost answer is UNKNOWN.
+
+export const FORCED_PRIVATE = "YouTube kept this private: the app is waiting for Google's audit. Make it public in YouTube Studio.";
+
+async function startYouTube(env, post, account, access, t) {
+  const yt = ytFor(env);
+  const settings = JSON.parse(post.settings || '{}');
+  const privacy = settings.yt_privacy || 'public';
+  const media = await env.DB.prepare('SELECT bytes, content_type, duration_ms FROM media WHERE key = ?').bind(post.video_key).first();
+  if (!post.video_key || !media) { await fail(env, post.id, t, 'YouTube takes videos only'); return 'failed'; }
+  let sent = false, obj = null;
+  try {
+    const location = await yt.startUpload(access, { title: settings.yt_title || defaultYouTubeTitle(post.title, post.caption),
+      description: post.caption, privacy, madeForKids: false, bytes: media.bytes, contentType: media.content_type });
+    obj = await env.MEDIA.get(post.video_key);
+    if (!obj) { await fail(env, post.id, t, 'The video is no longer in the library'); return 'failed'; }
+    await env.DB.prepare('UPDATE posts SET publish_id = ?, updated_at = ? WHERE id = ?').bind(IN_FLIGHT, t, post.id).run();
+    sent = true;
+    const video = await yt.putUpload(location, obj.body, obj.size ?? media.bytes, media.content_type);
+    const short = media.duration_ms && media.duration_ms <= YT_SHORTS_MAX_MS;
+    const kept = video.status?.privacyStatus === 'private' && privacy !== 'private';
+    await finish(env, post.id, t, { status: 'published', publish_id: String(video.id), public_post_id: String(video.id),
+      post_url: short ? `https://www.youtube.com/shorts/${video.id}` : `https://youtu.be/${video.id}`,
+      fail_reason: kept ? FORCED_PRIVATE : null });
+    return 'published';
+  } catch (err) {
+    if (obj?.body && !obj.body.locked) await obj.body.cancel().catch(() => {});
+    if (err.code === 'needs_reconnect') return metaLost(env, post, t);
+    if (sent && (err.code === 'network' || err.transient)) { await fail(env, post.id, t, UNKNOWN); return 'failed'; }
+    if (sent) { await finish(env, post.id, t, { status: 'failed', publish_id: null, fail_reason: err.message }); return 'failed'; }
+    return requeueOrFail(env, post, t, err);
+  }
+}
+
 async function start(env, tk, post, token, t) {
   const settings = JSON.parse(post.settings);
   await env.DB.prepare('UPDATE posts SET attempts = attempts + 1, updated_at = ? WHERE id = ?').bind(t, post.id).run();
@@ -191,6 +231,17 @@ async function start(env, tk, post, token, t) {
   // the same cached error, and the TikTok path knows what each one means.
   const loaded = await token.load(post.account_id).catch(() => null);
   if (loaded && isMeta(loaded.account)) return startMeta(env, post, loaded.account, loaded.access, t);
+  if (loaded && isYouTube(loaded.account)) return startYouTube(env, post, loaded.account, loaded.access, t);
+  if (!loaded) {
+    const row = await env.DB.prepare('SELECT platform FROM accounts WHERE id = ?').bind(post.account_id).first();
+    if (row?.platform === 'youtube') {
+      try { await token(post.account_id); }
+      catch (err) {
+        if (err.code === 'needs_reconnect') return metaLost(env, post, t);
+        return requeueOrFail(env, post, t, err);
+      }
+    }
+  }
   try {
     const access = await token(post.account_id);
     const info = await tk.creatorInfo(access);
@@ -286,7 +337,7 @@ async function poll(env, tk, post, token, t) {
 // Instagram and Facebook one per image plus the carousel or the post.
 async function startCost(env, post, token) {
   const loaded = await token.load(post.account_id).catch(() => null);
-  if (!loaded || !isMeta(loaded.account)) return 3;
+  if (!loaded || !isMeta(loaded.account)) return 3;   // TikTok, and YouTube: token + session + upload
   if (post.video_key) return 1;
   const n = JSON.parse(post.image_keys).length;
   return n === 1 ? 1 : n + 1;

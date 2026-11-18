@@ -14,6 +14,7 @@ const me = {
     { id: 'a1', platform: 'tiktok', username: 'arco.app', display_name: 'ARCO', avatar_url: '', brand_id: 'b1', needs_reconnect: 0 },
     { id: 'a2', platform: 'instagram', username: 'arco.app', display_name: 'ARCO', avatar_url: '', brand_id: 'b1', needs_reconnect: 0 },
     { id: 'a3', platform: 'facebook', username: 'ARCO Page', display_name: 'ARCO Page', avatar_url: '', brand_id: 'b1', needs_reconnect: 0 },
+    { id: 'a7', platform: 'youtube', username: 'arcoapp', display_name: 'ARCO', avatar_url: '', brand_id: 'b1', needs_reconnect: 0 },
     { id: 'a4', platform: 'facebook', username: 'Client Bakery', display_name: 'Client Bakery', avatar_url: '', brand_id: 'b2', needs_reconnect: 0 },
     { id: 'a5', platform: 'tiktok', username: 'emilia', display_name: 'Emilia', avatar_url: '', brand_id: null, needs_reconnect: 1 },
     { id: 'a6', platform: 'instagram', username: 'arco.focus', display_name: 'ARCO Focus', avatar_url: '', brand_id: null, needs_reconnect: 0 },
@@ -21,7 +22,7 @@ const me = {
   brands: [{ id: 'b1', name: 'ARCO', slots: null, voice: '' }, { id: 'b2', name: 'Client Bakery', slots: null, voice: '' }],
   api_key_set: false,
   limits: { accounts: 25, queued: 200, images: 35, image_bytes: 5242880, workspace_bytes: 209715200, min_lead_seconds: 300, ig_images: 10, ig_caption: 2200 },
-  facebook_enabled: true, instagram_enabled: true, ai_enabled: true,
+  facebook_enabled: true, instagram_enabled: true, youtube_enabled: true, ai_enabled: true,
 };
 const acc = id => me.accounts.find(a => a.id === id);
 // Library: a few photos already filed in folders, plus loose ones.

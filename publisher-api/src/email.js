@@ -39,7 +39,7 @@ export const inviteMail = ({ workspace, inviter, link }) => ({
     <p style="color:#71717A">The invite expires in 7 days and only works for this email address.</p>`),
 });
 
-const PLATFORM = { tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook' };
+const PLATFORM = { tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube' };
 export function failureMail(posts, link) {
   const when = p => new Intl.DateTimeFormat('en', { timeZone: p.timezone, dateStyle: 'medium', timeStyle: 'short' })
     .format(new Date(p.scheduled_at * 1000));

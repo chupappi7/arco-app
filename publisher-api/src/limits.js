@@ -40,3 +40,11 @@ export const IG_REEL_MIN_MS = 3000;
 export const IG_REEL_MAX_MS = 15 * 60 * 1000;
 export const FB_VIDEO_MAX_MS = 20 * 60 * 1000;
 export const MAX_FOLDERS = 300;
+// YouTube: a title up to 100 characters, a description up to 5000; a vertical
+// video up to 3 minutes is a Short. Channels that are not verified with a
+// phone number can upload up to 15 minutes.
+export const YT_MAX_TITLE = 100;
+export const YT_MAX_DESCRIPTION = 5000;
+export const YT_SHORTS_MAX_MS = 180_000;
+export const YT_VIDEO_MAX_MS = 15 * 60_000;
+export const YT_PRIVACY = ['public', 'unlisted', 'private'];

@@ -98,11 +98,13 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:v
 
 <h2 id="setup">Set up Publisher</h2>
 <ol class="steps">
-  <li><b>Group accounts into brands.</b> Go to <b>Accounts</b>, make a brand (for example "Bakery") and add its TikTok, Instagram and Facebook accounts. If you only have one brand, the AI simply uses all your accounts.</li>
+  <li><b>Group accounts into brands.</b> Go to <b>Accounts</b>, make a brand (for example "Bakery") and add its TikTok, Instagram, Facebook and YouTube accounts. If you only have one brand, the AI simply uses all your accounts.</li>
   <li><b>Set posting times.</b> On each brand, set the days and times you like to post, such as Mon to Fri at 12:30 and 18:00. When you don't name a time, the AI fills these slots. Also check the workspace <b>time zone</b> in <b>Settings → Workspace</b>.</li>
   <li><b>Write a brand voice</b> (optional, but it pays off). A few lines on how the brand sounds, plus two or three example captions. The AI reads it before writing anything.</li>
   <li><b>Create an API key.</b> In <b>Settings → Developer</b>, the workspace owner presses <b>Create API key</b>. Copy it somewhere safe: it is shown only once, and it starts with <code>apk_</code>.</li>
 </ol>
+
+<div class="callout" id="youtube"><b>Connecting YouTube</b>In <b>Accounts</b>, use a brand's YouTube <b>+ Add</b> (or <b>Connect an account → YouTube</b>), pick the Google account that owns the channel and allow both permissions. Google asks each time, so you can add channels one after another. YouTube takes videos only: a vertical video up to 3 minutes goes up as a Short, and the caption becomes its description. Until Google approves ARCO Publisher, YouTube keeps uploads private; switch them to public in YouTube Studio.</div>
 
 <h2 id="library">Organise the library</h2>
 <p><b>One folder is one post.</b> Each folder holds a post's photos in order (the first one is the cover), or one video. It belongs to a brand and can carry a note.</p>
@@ -272,6 +274,7 @@ claude mcp add --scope user --transport http arco-publisher https://arco-publish
   <li><b>Library:</b> up to 300 folders and 500 items, and 5 GB of storage per workspace.</li>
   <li><b>Platform rules</b> are checked on every post, exactly as in the app: Instagram's 10 photos, JPG only, 2,200 characters and 30 hashtags; TikTok's privacy options for each account; Reels length; and so on.</li>
   <li><b>Scope:</b> the AI only sees and touches the workspace its key belongs to.</li>
+  <li><b>YouTube:</b> videos only, with a title of up to 100 characters (or the caption's first line) and the caption as the description. A vertical video up to 3 minutes is a Short. For photo posts, a brand's YouTube channel is left out. Until Google approves ARCO Publisher, YouTube keeps uploads private; switch them to public in YouTube Studio.</li>
   <li><b>Upload links:</b> one file each, of the size and type asked for, into one folder, once, for 15 minutes. Photos up to 5 MB (35 per folder), one video up to 100 MB. The contents are checked, and storage and library limits apply before a link is even made.</li>
 </ul>
 

@@ -209,3 +209,41 @@ export async function igIntake(env, mt, { code, redirect_uri, session_id }) {
   }
   return { session_id, workspace_id: ws, account_ids: [id] };
 }
+
+// Google sign-in for YouTube: the channel of the signed-in Google account.
+// The refresh token only comes with a fresh consent, which the start page
+// asks for every time.
+export async function ytIntake(env, yt, { code, redirect_uri, session_id }) {
+  if (!code) throw new HttpError(400, 'code is required');
+  if (redirect_uri !== env.YT_REDIRECT_URI) throw new HttpError(400, 'unexpected redirect_uri');
+  await connector(env, session_id);
+
+  const tokens = await yt.exchangeCode({ code, redirectUri: redirect_uri });
+  const ch = await yt.myChannel(tokens.access_token);
+  const openId = `yt:${ch.id}`;
+  const { ws, byOpenId } = await metaWorkspace(env, { sessionId: session_id, openIds: [openId] });
+  const old = byOpenId.get(openId);
+  if (!tokens.refresh_token && !old) {
+    throw new HttpError(400, 'Google did not give Publisher lasting access to this channel. Remove ARCO Publisher at ' +
+      'myaccount.google.com/permissions, then connect YouTube again.');
+  }
+
+  const t = now();
+  const access = await encrypt(tokens.access_token, env.TOKEN_KEY);
+  const expires = t + Number(tokens.expires_in || 3600);
+  const profile = [ch.custom_url || ch.title, ch.title, ch.avatar_url];
+  const id = old?.id || 'acc_' + randomToken('', 8);
+  if (old) {
+    const refresh = tokens.refresh_token ? await encrypt(tokens.refresh_token, env.TOKEN_KEY) : null;
+    await env.DB.prepare(`UPDATE accounts SET refresh_token_enc = COALESCE(?, refresh_token_enc), access_token_enc = ?, access_expires_at = ?,
+        needs_reconnect = 0, insights_denied_at = NULL, username = ?, display_name = ?, avatar_url = ?, token_updated_at = ? WHERE id = ?`)
+      .bind(refresh, access, expires, ...profile, t, id).run();
+  } else {
+    await env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, platform, username, display_name, avatar_url,
+        refresh_token_enc, access_token_enc, access_expires_at, connected_at, token_updated_at, can_sign_in, followers)
+        VALUES (?, ?, ?, 'youtube', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`)
+      .bind(id, ws, openId, ...profile, await encrypt(tokens.refresh_token, env.TOKEN_KEY), access, expires, t, t,
+        Number.isFinite(ch.subscribers) ? ch.subscribers : null).run();
+  }
+  return { session_id, workspace_id: ws, account_ids: [id] };
+}
