@@ -21,7 +21,7 @@ import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './bra
 
 async function me(req, env, { who }) {
   const ws = who.ws;
-  const row = await env.DB.prepare('SELECT name, timezone, slots, api_key_hash, api_key_hint, api_key_name, api_key_at, api_key_enc IS NOT NULL AS api_key_copyable, ai_review FROM workspaces WHERE id = ?').bind(ws).first();
+  const row = await env.DB.prepare('SELECT name, timezone, slots, api_key_hash, api_key_hint, api_key_name, api_key_at, api_key_used_at, api_key_enc IS NOT NULL AS api_key_copyable, ai_review FROM workspaces WHERE id = ?').bind(ws).first();
   const user = who.userId ? await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(who.userId).first() : null;
   return json({
     user: user ? { id: who.userId, email: user.email } : null,
@@ -36,6 +36,7 @@ async function me(req, env, { who }) {
     api_key_hint: row?.api_key_hash ? row.api_key_hint || null : null,
     api_key_name: row?.api_key_hash ? row.api_key_name || 'Main key' : null,
     api_key_at: row?.api_key_hash ? row.api_key_at || null : null,
+    api_key_used_at: row?.api_key_hash ? row.api_key_used_at || null : null,
     api_key_copyable: !!row?.api_key_copyable,
     ai_review: row ? !!row.ai_review : true,
     limits: { accounts: L.MAX_ACCOUNTS, queued: L.MAX_QUEUED, images: L.MAX_IMAGES,

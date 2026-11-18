@@ -188,7 +188,7 @@ function wsBox() {
 
 function menu() {
   const items = [['overview', 'Overview', 'home'], ['compose', 'Schedule', 'edit'], ['library', 'Library', 'image'], ['calendar', 'Calendar', 'cal', S.counts.failed, 'bad'], ['analytics', 'Analytics', 'chart'],
-    ['drafts', 'Drafts', 'draft', S.counts.drafts], ...(can('admin') ? [['accounts', 'Accounts', 'users']] : []), ['ai', 'MCP', 'spark']];
+    ['drafts', 'Drafts', 'draft', S.counts.drafts], ...(can('admin') ? [['accounts', 'Accounts', 'users']] : []), ['ai', 'AI connect', 'spark']];
   const email = S.me.user?.email || '';
   return `<a class="brand-row" href="#overview"><img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30"><b>ARCO Publisher</b></a>
     ${wsBox()}
@@ -217,7 +217,7 @@ const HEADS = {
   drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.', `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
   accounts: () => ['Brands & accounts', `Each brand holds its TikTok, Instagram and Facebook accounts. Pick a brand when you schedule and its accounts come with it. ${S.me.accounts.length} of ${S.me.limits.accounts} accounts connected.`, `<button class="btn" id="newbrandbtn">${ui('plus', 15)}New brand</button>`],
   settings: () => ['Settings', 'Workspace, people and your account.'],
-  ai: () => ['MCP', 'Plan and schedule posts by chatting with your AI.', ''],
+  ai: () => ['AI connect', 'Plan and schedule posts by chatting with your AI. It connects over MCP, the standard most AI apps use.', ''],
 };
 // Grey shapes in the layout of what is coming, instead of the word Loading.
 const sk = (w = '100%', h = 14, cls = '') => `<span class="sk ${cls}" style="width:${w};height:${h}px"></span>`;
@@ -859,6 +859,7 @@ const reloadLibrary = async () => { [S.lib, S.folders] = await Promise.all([api(
 
 // ---- AI assistant: connect an assistant over MCP --------------------------
 async function loadAi() {
+  if (can('owner') && S.me.api_key_set && S.me.api_key_copyable && !S.keyCache) api('/api-key').then(r => { S.keyCache = r.api_key; if (S.view === 'ai') render(); }).catch(() => {});
   try { const [f, d] = await Promise.all([api('/folders'), api('/drafts')]); S.folders = f.folders; S.drafts = d.drafts; }
   catch (e) { S.folders = S.folders || []; S.drafts = S.drafts || []; }
   if (S.view === 'ai') render();
@@ -873,21 +874,30 @@ const APP_TILE = {
   code: ['#1b1b1b', '<path d="M7 9l3 3-3 3" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.5 15.5h4.5" stroke="#D97757" stroke-width="2" stroke-linecap="round"/>'],
   desktop: ['#D97757', '<g stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M12 5v14M5 12h14M7.1 7.1l9.8 9.8M16.9 7.1l-9.8 9.8"/></g>'],
   cursor: ['#0f0f0f', '<g fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"><path d="M12 4l7 4v8l-7 4-7-4V8z"/><path d="M5 8l7 4 7-4M12 12v8"/></g>'],
-  other: ['#3b4252', '<g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M9 4v4M15 4v4M7 8h10v3a5 5 0 0 1-10 0zM12 16v4"/></g>'],
+  vscode: ['#0a66b8', '<path d="M16.5 4.5 8.5 12l8 7.5V4.5zM8.5 12 5 9.3v5.4L8.5 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/>'],
+  windsurf: ['#0e8f80', '<g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M4.5 9.5c2.5-2 5-2 7.5 0s5 2 7.5 0M4.5 14.5c2.5-2 5-2 7.5 0s5 2 7.5 0"/></g>'],
+  chatgpt: ['#111111', '<g fill="none" stroke="#fff" stroke-width="1.5"><circle cx="12" cy="12" r="6.2"/><path d="M12 5.8v6.2l5.4 3.1M12 12l-5.4 3.1"/></g>'],
 };
 const appTile = (id, s = 36) => `<svg class="apptile" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="${APP_TILE[id][0]}"/>${APP_TILE[id][1]}</svg>`;
-const CLIENTS = [['desktop', 'Claude Desktop'], ['code', 'Claude Code'], ['cursor', 'Cursor'], ['other', 'VS Code & others']];
-// What step 1 copies for each app: [title, line, kind, button].
+const CLIENTS = [['desktop', 'Claude Desktop'], ['code', 'Claude Code'], ['cursor', 'Cursor'], ['vscode', 'VS Code'], ['windsurf', 'Windsurf'], ['chatgpt', 'ChatGPT']];
+// What step 1 hands over for each app: [title, line, copy kind, copy label, one-click install kind].
 const KGET = {
   desktop: ['Your connector link', 'Your API key built into the server address. You paste it into Claude Desktop in step 2.', 'link', 'Copy link'],
   code: ['Your setup command', 'One command with your API key built in. You paste it into Terminal or PowerShell in step 2.', 'code', 'Copy command'],
-  cursor: ['Your Cursor settings', 'The settings with your API key built in. You paste them into Cursor in step 2.', 'config', 'Copy settings'],
-  other: ['Your connector link', 'Your API key built into the server address. You paste it into your app in step 2.', 'link', 'Copy link'],
+  cursor: ['Add ARCO Publisher to Cursor', 'Opens Cursor and asks to install it, with your API key built in.', 'config', 'Copy settings', 'cursor'],
+  vscode: ['Add ARCO Publisher to VS Code', 'Opens VS Code and asks to install it, with your API key built in.', 'link', 'Copy link', 'vscode'],
+  windsurf: ['Your Windsurf settings', 'The settings with your API key built in. You add them to Windsurf in step 2.', 'windsurf', 'Copy settings'],
+  chatgpt: ['Your connector link', 'Your API key built into the server address. You paste it into ChatGPT in step 2.', 'link', 'Copy link'],
 };
-// What a key-holding Copy button puts on the clipboard: the connector link, or a config around it.
+// What a key-holding button gives: the connector link, a command or config around it, or an install link.
 const linkText = (kind, key) => { const link = `${mcpUrl()}/${key}`;
-  return kind === 'link' ? link : kind === 'code' ? `claude mcp add --scope user --transport http arco-publisher ${link}`
-    : JSON.stringify({ mcpServers: { 'arco-publisher': { url: link } } }, null, 2); };
+  if (kind === 'link') return link;
+  if (kind === 'code') return `claude mcp add --scope user --transport http arco-publisher ${link}`;
+  if (kind === 'windsurf') return JSON.stringify({ mcpServers: { 'arco-publisher': { serverUrl: link } } }, null, 2);
+  if (kind === 'cursor') return `cursor://anysphere.cursor-deeplink/mcp/install?name=arco-publisher&config=${encodeURIComponent(btoa(JSON.stringify({ url: link })))}`;
+  if (kind === 'vscode') return `vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'arco-publisher', type: 'http', url: link }))}`;
+  return JSON.stringify({ mcpServers: { 'arco-publisher': { url: link } } }, null, 2); };
+const keyNow = () => S.apiKey || S.keyCache || null;
 
 // What to copy for each app, and the one line that says where it goes.
 // A few steps per app. Each one connects with the link that carries the key.
@@ -896,48 +906,61 @@ function clientSetup() {
   const os = S.aiOS || (/Windows/.test(navigator.userAgent) ? 'win' : 'mac'), mac = os === 'mac';
   const kb = (m, w) => `<kbd>${mac ? m : w}</kbd>`;
   const ask1 = '<b>"What\'s in my library that isn\'t scheduled yet?"</b>';
+  const copy = (text, label) => copyBtn(text, `${ui('copy', 14)}${label}`).replace('btn sec sm', 'btn ghost sm');
+  const tip = t => `<span class="htip">${t}</span>`;
   const steps = {
     desktop: [
-      'In Claude Desktop, go to <b>Settings</b> → <b>Connectors</b> → <b>Add custom connector</b>.',
-      'Paste the link you copied in step 1, name it <b>ARCO Publisher</b>, and click <b>Add</b>.',
-      `Ask something like ${ask1}`,
+      `In Claude Desktop, go to <b>Settings</b> → <b>Connectors</b> → <b>Add custom connector</b>.${tip("Don't see it? Update Claude Desktop. Some Claude plans limit how many connectors you can add.")}`,
+      'Paste the link from step 1, name it <b>ARCO Publisher</b>, and click <b>Add</b>.',
+      `Start a new chat and ask something like ${ask1}${tip('The first time, Claude asks before it uses ARCO Publisher. Click <b>Always allow</b>.')}`,
     ],
     code: [
-      `Install Claude Code if you don't have it: follow <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">Anthropic's install guide</a>.`,
+      `Install Claude Code if you don't have it: follow <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">Anthropic's install guide</a>.${tip('You need a Claude subscription or an Anthropic API account.')}`,
       mac ? `Open <b>Terminal</b>: press ${kb('⌘ Space')}, type <b>Terminal</b>, press ${kb('Return')}.`
         : `Open <b>PowerShell</b>: press the ${kb('', 'Windows')} key, type <b>PowerShell</b>, press ${kb('', 'Enter')}.`,
-      `Click in the ${mac ? 'Terminal' : 'PowerShell'} window, paste the command you copied in step 1 with ${kb('⌘ V', 'Ctrl V')} and press ${kb('Return', 'Enter')}.`,
-      `Type <code>claude</code> and press ${kb('Return', 'Enter')}. Then ask something like ${ask1}`,
+      `Click in the window, paste the command from step 1 with ${kb('⌘ V', 'Ctrl V')} and press ${kb('Return', 'Enter')}.${tip(`Says "already exists"? You added it before. Run this first, then paste again: ${copy('claude mcp remove -s user arco-publisher', 'Copy remove command')}`)}`,
+      `Start Claude Code: type <code>claude</code> and press ${kb('Return', 'Enter')}. Its chat opens right in the window.`,
+      `Type <code>/mcp</code> and press ${kb('Return', 'Enter')}: <b>arco-publisher</b> should say connected. Press ${kb('Esc', 'Esc')}, then ask something like ${ask1}`,
     ],
     cursor: [
-      'In Cursor, go to <b>Cursor Settings</b> → <b>MCP</b> → <b>Add new MCP server</b>.',
-      'Replace what\'s in the file with the settings you copied in step 1, and save.',
-      `Ask something like ${ask1}`,
+      'Click <b>Add to Cursor</b> in step 1. Cursor opens and asks to install ARCO Publisher: click <b>Install</b>.',
+      `In Cursor's chat, switch to <b>Agent</b> mode, then ask something like ${ask1}${tip('Tools only work in Agent mode.')}`,
+      `${tip('Cursor didn\'t open? In Cursor go to <b>Settings</b> → <b>Tools &amp; MCP</b> → <b>New MCP Server</b>, and add the <b>arco-publisher</b> part from <b>Copy settings</b> inside <code>mcpServers</code>. Keep any servers already there.')}`,
     ],
-    other: [
-      'In your app\'s MCP settings, add a server. In VS Code: <b>MCP: Add Server</b> → <b>HTTP</b>.',
-      'Paste the link you copied in step 1 as its address and name it <b>ARCO Publisher</b>.',
-      `Save, and ask something like ${ask1}`,
+    vscode: [
+      'Click <b>Add to VS Code</b> in step 1. VS Code opens and asks to install ARCO Publisher: click <b>Install</b>.',
+      `Open <b>Copilot Chat</b>, switch to <b>Agent</b> mode, then ask something like ${ask1}${tip('Needs GitHub Copilot. Tools only work in Agent mode.')}`,
+      `${tip(`VS Code didn't open? Press ${kb('⌘ ⇧ P', 'Ctrl Shift P')}, run <b>MCP: Add Server</b> → <b>HTTP</b>, and paste the link from <b>Copy link</b>.`)}`,
+    ],
+    windsurf: [
+      'In Windsurf, open <b>Settings</b> → <b>Cascade</b> → <b>MCP Servers</b> → <b>View raw config</b>.',
+      'Inside <code>mcpServers</code>, add the <b>arco-publisher</b> part from step 1 and save. Keep any servers already there.',
+      `Click <b>Refresh</b> in MCP Servers, then ask Cascade something like ${ask1}`,
+    ],
+    chatgpt: [
+      `On chatgpt.com, go to <b>Settings</b> → <b>Apps &amp; Connectors</b> → <b>Advanced settings</b> and turn on <b>Developer mode</b>.${tip("Needs a paid ChatGPT plan. It's a beta, so names can differ slightly.")}`,
+      'Back in <b>Apps &amp; Connectors</b>, click <b>Create</b>. Name it <b>ARCO Publisher</b>, paste the link from step 1 as the <b>MCP server URL</b>, set <b>Authentication</b> to <b>No authentication</b>, tick the box and click <b>Create</b>.',
+      `In a new chat, open <b>+</b> → <b>Developer mode</b>, pick <b>ARCO Publisher</b>, then ask something like ${ask1}`,
     ],
   }[c];
   return `<div class="howto">${c === 'code' ? `<div class="howhead"><b>On</b>
         <div class="seg" role="group" aria-label="Computer">${[['mac', 'Mac'], ['win', 'Windows']].map(([o, l]) => `<button data-aios="${o}" class="${o === os ? 'on' : ''}" aria-pressed="${o === os}">${l}</button>`).join('')}</div></div>` : ''}
-      <ol class="hsteps">${steps.map(t => `<li>${t}</li>`).join('')}</ol>
-      <p class="note hnote">What you copied holds your key, so keep it private. Making a new key or deleting it in step 1 switches it off.</p></div>`;
+      <ol class="hsteps">${steps.map(t => t.startsWith('<span class="htip">') ? `<li class="hfall">${t}</li>` : `<li>${t}</li>`).join('')}</ol>
+      <p class="note hnote">What step 1 gives you holds your key, so keep it private. Making a new key or deleting it switches it off. Once connected, step 1 shows when it was last used.</p></div>`;
 }
 
 async function newApiKey() {
   if (S.me.api_key_set && !await ask({ title: 'Make a new API key?', ok: 'Make a new key', danger: true, icon: ui('spark', 22),
     list: [[false, 'The current key stops working at once'], [false, 'Any AI app using it needs the new key']] })) return;
-  try { S.apiKey = (await api('/api-key', { method: 'POST' })).api_key;
-    Object.assign(S.me, { api_key_set: true, api_key_hint: S.apiKey.slice(-4), api_key_copyable: true, api_key_at: Math.floor(Date.now() / 1000), api_key_name: S.me.api_key_name || 'Main key' }); }
+  try { S.apiKey = (await api('/api-key', { method: 'POST' })).api_key; S.keyCache = null;
+    Object.assign(S.me, { api_key_set: true, api_key_hint: S.apiKey.slice(-4), api_key_copyable: true, api_key_at: Math.floor(Date.now() / 1000), api_key_used_at: null, api_key_name: S.me.api_key_name || 'Main key' }); }
   catch (e) { S.flash = { kind: 'err', text: e.message }; }
   render();
 }
 async function deleteApiKey() {
   if (!await ask({ title: 'Delete the API key?', ok: 'Delete key', danger: true, icon: ui('spark', 22),
     list: [[false, 'Any AI app using it stops working at once'], [true, 'Posts already scheduled still go out'], [true, 'You can create a new key any time']] })) return;
-  try { await api('/api-key', { method: 'DELETE' }); Object.assign(S.me, { api_key_set: false, api_key_hint: null, api_key_name: null, api_key_at: null, api_key_copyable: false }); S.apiKey = null; }
+  try { await api('/api-key', { method: 'DELETE' }); S.keyCache = null; Object.assign(S.me, { api_key_set: false, api_key_hint: null, api_key_name: null, api_key_at: null, api_key_copyable: false }); S.apiKey = null; }
   catch (e) { S.flash = { kind: 'err', text: e.message }; }
   render();
 }
@@ -976,20 +999,24 @@ function aiView() {
       ${keySet ? `<div class="ktable" role="table" aria-label="API key">
           <div class="khead" role="row"><span>Name</span><span>Key</span><span>Created</span><span></span></div>
           <div class="kline ${key ? 'fresh' : ''}" role="row">
-            <span class="kname">${ui('spark', 14)}<b>${esc(S.me.api_key_name || 'Main key')}</b></span>
+            <span class="kname">${ui('spark', 14)}<span><b>${esc(S.me.api_key_name || 'Main key')}</b>
+              <span class="kused ${S.me.api_key_used_at ? 'ok' : ''}">${S.me.api_key_used_at ? `Connected · used ${ago(S.me.api_key_used_at)}` : 'Not used yet'}</span></span></span>
             <code>apk_••••••••••••${esc(S.me.api_key_hint || '')}</code>
             <span class="note">${S.me.api_key_at ? fmt(S.me.api_key_at, { day: 'numeric', month: 'short', year: 'numeric' }) : '–'}</span>
             <span class="kacts">${owner ? `<label class="amenu" title="Key options">${ui('more', 16)}<select id="keymenu" aria-label="Key options"><option value="" selected disabled hidden></option>
                 ${copyable ? '<option value="copy">Copy the key only</option>' : ''}<option value="rename">Rename</option><option value="new">Make a new key</option><option value="delete">Delete key…</option></select></label>` : ''}</span></div></div>
         ${!owner ? '' : copyable ? `<div class="kget"><div><b>${KGET[app][0]}</b><span class="note">${KGET[app][1]}</span>
-              <pre class="kshow"><code>${esc(linkText(KGET[app][2], `apk_••••••••${S.me.api_key_hint || '••••'}`))}</code></pre></div>
-            <button type="button" class="btn" data-keycopy="${KGET[app][2]}">${ui('copy', 14)}${KGET[app][3]}</button></div>`
+              ${KGET[app][4] ? '' : `<pre class="kshow"><code>${esc(linkText(KGET[app][2], `apk_••••••••${S.me.api_key_hint || '••••'}`))}</code></pre>`}</div>
+            <div class="kbtns">${KGET[app][4] ? (keyNow() ? `<a class="btn" href="${esc(linkText(KGET[app][4], keyNow()))}">${appTile(app, 16)}${KGET[app][0].replace('ARCO Publisher ', '')}</a>`
+                : `<button type="button" class="btn" data-keyinstall="${KGET[app][4]}">${appTile(app, 16)}${KGET[app][0].replace('ARCO Publisher ', '')}</button>`)
+              + `<button type="button" class="btn ghost sm" data-keycopy="${KGET[app][2]}">${ui('copy', 14)}${KGET[app][3]}</button>`
+              : `<button type="button" class="btn" data-keycopy="${KGET[app][2]}">${ui('copy', 14)}${KGET[app][3]}</button>`}</div></div>`
           : `<div class="kget warn"><div><b>${KGET[app][0]}</b><span class="note">Your current key was made before keys could be copied here, so make a new one to copy this. The new key replaces the old one, which stops working.</span>
               <pre class="kshow"><code>${esc(linkText(KGET[app][2], 'apk_••••••••••••'))}</code></pre></div>
             <button type="button" class="btn" data-newkey>${ui('plus', 14)}Make a new key</button></div>`}`
       : `<div class="kempty"><span>${ui('spark', 18)}</span><div><b>No API key yet</b><span class="note">Create one, then copy it for ${esc(CLIENTS.find(c => c[0] === app)[1])} right here.</span></div>
           ${owner ? `<button class="btn" id="apikey">${ui('plus', 14)}Create API key</button>` : ''}</div>`}
-      ${owner ? '' : '<p class="note">Only the workspace owner can create, copy or delete it. Ask them for what step 2 needs.</p>'}</div>`)}
+      ${owner ? '' : `<p class="note">Only the workspace owner can create or copy the key. Ask them for <b>${KGET[app][0].replace(/^Your /, 'the ').replace(/^Add ARCO Publisher to .*/, `the connector link`)}</b> for ${esc(CLIENTS.find(c => c[0] === app)[1])}. It holds the key, so they should send it privately.</p>`}</div>`)}
     ${numbered(2, `Connect ${esc(CLIENTS.find(c => c[0] === app)[1])}`, 'Follow these steps.', `<div class="msetup">${clientSetup()}</div>`)}
     ${numbered(3, 'Ask', `Copy one into your AI. It uses the posts in your <a href="#library">Library</a>${unused ? ` (${unused} ready)` : ''}.`,
       `<div class="mprompts">${prompts.map(([ic, tag, p]) => `<button type="button" class="mprompt" data-copy="${esc(p)}" title="Copy">
@@ -2725,14 +2752,16 @@ function bind() {
     catch { toast('Copy did not work here. Select the text and copy it.', 'err'); } });
   on('[data-aiclient]', 'click', e => { S.aiClient = e.currentTarget.dataset.aiclient; render(); });
   on('[data-aios]', 'click', e => { S.aiOS = e.currentTarget.dataset.aios; render(); });
+  on('[data-keyinstall]', 'click', async e => { const kind = e.currentTarget.dataset.keyinstall;
+    try { S.keyCache = S.keyCache || (await api('/api-key')).api_key; location.href = linkText(kind, keyNow()); render(); } catch (er) { toast(er.message, 'err'); } });
   on('[data-keycopy]', 'click', async e => { const b = e.currentTarget, kind = b.dataset.keycopy;
-    try { const k = (S.apiKey ? Promise.resolve(S.apiKey) : api('/api-key').then(r => r.api_key)).then(x => linkText(kind, x));
+    try { const k = (keyNow() ? Promise.resolve(keyNow()) : api('/api-key').then(r => (S.keyCache = r.api_key))).then(x => linkText(kind, x));
       if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ 'text/plain': k.then(t => new Blob([t], { type: 'text/plain' })) })]);
       else await navigator.clipboard.writeText(await k);
       const t = b.innerHTML; b.textContent = 'Copied'; setTimeout(() => { b.innerHTML = t; }, 1400); }
     catch (er) { toast(er.message && !/clipboard|denied|document/i.test(er.message) ? er.message : 'Copy did not work here. Try again.', 'err'); } });
   on('#keymenu', 'change', async e => { const v = e.target.value; e.target.value = '';
-    if (v === 'copy') { const k = S.apiKey ? Promise.resolve(S.apiKey) : api('/api-key').then(r => r.api_key);
+    if (v === 'copy') { const k = keyNow() ? Promise.resolve(keyNow()) : api('/api-key').then(r => r.api_key);
       try { if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ 'text/plain': k.then(t => new Blob([t], { type: 'text/plain' })) })]); else await navigator.clipboard.writeText(await k); toast('Key copied.'); }
       catch { toast('Copy did not work here. Try again.', 'err'); } }
     else if (v === 'new') newApiKey();

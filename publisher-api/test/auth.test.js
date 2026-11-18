@@ -86,6 +86,10 @@ describe('api keys', () => {
     const req = k => new Request('https://x', { headers: { Authorization: `Key ${k}` } });
     expect(await callerFor(env, req(k2))).toMatchObject({ ws: workspace_id, via: 'key', role: 'admin' });
     expect(await callerFor(env, req(k1))).toBeNull();
+    const used = await env.DB.prepare('SELECT api_key_used_at FROM workspaces WHERE id = ?').bind(workspace_id).first();
+    expect(used.api_key_used_at).toBeGreaterThan(0);
+    await rotateApiKey(env, workspace_id);
+    expect((await env.DB.prepare('SELECT api_key_used_at FROM workspaces WHERE id = ?').bind(workspace_id).first()).api_key_used_at).toBeNull();
   });
 
   it('keeps the last four characters as a hint, and a deleted key stops working', async () => {

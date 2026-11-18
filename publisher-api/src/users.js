@@ -159,9 +159,15 @@ export async function callerFor(env, req) {
   const key = auth.startsWith('Key ') ? auth.slice(4).trim() : auth.startsWith('Bearer apk_') ? auth.slice(7).trim() : null;
   if (key) {
     // An API key acts as an admin of its workspace (it cannot manage people).
-    const row = await env.DB.prepare('SELECT id FROM workspaces WHERE api_key_hash = ?')
+    const row = await env.DB.prepare('SELECT id, api_key_used_at FROM workspaces WHERE api_key_hash = ?')
       .bind(await sha256Hex(key)).first();
-    return row ? { ws: row.id, userId: null, role: 'admin', scope: null, via: 'key' } : null;
+    if (!row) return null;
+    // "Last used" for the page; written at most every five minutes.
+    const t = now();
+    if (!row.api_key_used_at || row.api_key_used_at < t - 300) {
+      await env.DB.prepare('UPDATE workspaces SET api_key_used_at = ? WHERE id = ?').bind(t, row.id).run();
+    }
+    return { ws: row.id, userId: null, role: 'admin', scope: null, via: 'key' };
   }
   return sessionCaller(env, cookie(req, 'tt_sid'));
 }
