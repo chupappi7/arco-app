@@ -1390,11 +1390,11 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .bfoot{display:flex;align-items:center;gap:8px;margin:0;padding:8px;color:var(--soft);font-size:13px}
 .bnew{justify-content:center}
 /* brands & accounts: cards beside a connect rail, filling the page height */
-.acc2{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:stretch;min-height:calc(100dvh - 210px);margin-bottom:16px}
-.acc2 .bgrid{margin:0;grid-auto-rows:1fr;align-content:stretch}
-.acc2 .bcard{min-height:280px}
+.acc2{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start;margin-bottom:16px}
+.acc2 .bgrid{margin:0;align-items:stretch}
+.acc2 .bcard{min-height:220px}
 .arail{display:flex;flex-direction:column;min-width:0}
-.arail>.panel{margin:0!important;flex:1;display:flex;flex-direction:column}
+.arail>.panel{margin:0!important;display:flex;flex-direction:column}
 .ameter{height:6px;border-radius:3px;background:var(--well);margin:0 18px 14px;overflow:hidden}
 .ameter i{display:block;height:100%;background:var(--chart);border-radius:3px}
 .rconnect{display:grid;gap:8px;padding:0 14px}
@@ -1404,7 +1404,7 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .rcard b{font-size:14px}.rcard span{font-size:12.5px;color:var(--mute);line-height:1.4}
 .rcard .go{flex:none;width:26px;height:26px;border-radius:50%;background:var(--well);display:grid;place-items:center;color:var(--graphite)}
 .rnote{padding:12px 18px 4px;font-size:12.5px;line-height:1.45}
-.arail .hints{margin:auto 18px 16px;padding-top:10px}
+.arail .hints{margin:4px 18px 16px;padding-top:10px}
 .badds{display:flex;align-items:center;gap:8px;padding:6px 8px}
 .badds .note{font-size:12.5px;font-weight:600;margin-right:2px}
 .bplat{position:relative;display:grid;place-items:center;width:40px;height:40px;border-radius:11px;border:1px solid var(--line);background:var(--canvas)}
@@ -1412,4 +1412,4 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .bplus{position:absolute;right:-5px;bottom:-5px;width:16px;height:16px;border-radius:50%;background:var(--graphite);color:var(--surface);display:grid;place-items:center;border:2px solid var(--surface)}
 .bplus svg{stroke-width:3}
 @media (max-width:1099px){.acc2{grid-template-columns:1fr;min-height:0}.acc2 .bgrid{grid-auto-rows:auto}.arail .hints{margin-top:10px}}
-.acc2 .bgrid{grid-template-columns:repeat(auto-fill,minmax(285px,1fr))}
+.acc2 .bgrid{grid-template-columns:repeat(auto-fit,minmax(285px,1fr))}

@@ -2221,8 +2221,8 @@ function accountsView() {
   return `${!S.me.brands.length && a.length ? `<div class="bhint">${ui('users', 16)}<span>Make a brand for each business you post for, then add its TikTok, Instagram and Facebook to it. Scheduling for a brand then picks all of them at once.</span></div>` : ''}
     <div class="acc2"><div class="bgrid">
       ${brands.map(card).join('')}
-      ${loose.length ? `<section class="bcard loose"><header><span class="bsq big none">${ui('users', 16)}</span><div class="bt"><h2>${S.me.brands.length ? 'Personal' : 'Your accounts'}</h2><span class="note">${S.me.brands.length ? 'In no brand yet' : `${loose.length} account${loose.length === 1 ? '' : 's'}`}</span></div>${mix(loose)}</header>
-        <div class="blist">${byPl(loose).map(x => acctRow(x, null)).join('')}</div>
+      ${loose.length || a.length ? `<section class="bcard loose"><header><span class="bsq big none">${ui('users', 16)}</span><div class="bt"><h2>${S.me.brands.length ? 'Personal' : 'Your accounts'}</h2><span class="note">${!loose.length ? 'No accounts' : S.me.brands.length ? 'In no brand yet' : `${loose.length} account${loose.length === 1 ? '' : 's'}`}</span></div>${mix(loose)}</header>
+        <div class="blist">${byPl(loose).map(x => acctRow(x, null)).join('') || '<p class="bnone">Accounts that aren\'t in a brand show here. Connect one below, or pick "Remove from brand" in an account\'s menu.</p>'}</div>
         <footer>${addButtons(null)}</footer></section>` : ''}
     </div>
     <aside class="arail">
