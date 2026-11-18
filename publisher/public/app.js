@@ -215,7 +215,7 @@ const HEADS = {
   calendar: () => ['Calendar', `Everything scheduled and published, in ${tz().replace(/_/g, ' ')} time.`, `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
   analytics: () => ['Analytics', 'How your posts do, from the numbers each platform shares.'],
   drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.', `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
-  accounts: () => ['Brands & accounts', 'Each brand holds its TikTok, Instagram and Facebook accounts. Pick a brand when you schedule and its accounts come with it.', `<button class="btn" id="newbrandbtn">${ui('plus', 15)}New brand</button>`],
+  accounts: () => ['Brands & accounts', `Each brand holds its TikTok, Instagram and Facebook accounts. Pick a brand when you schedule and its accounts come with it. ${S.me.accounts.length} of ${S.me.limits.accounts} accounts connected.`, `<button class="btn" id="newbrandbtn">${ui('plus', 15)}New brand</button>`],
   settings: () => ['Settings', 'Workspace, people and your account.'],
   ai: () => ['MCP', 'Plan and schedule posts by chatting with your AI.', ''],
 };
@@ -2175,7 +2175,7 @@ function acctRow(x, brandId) {
 // account straight into that brand. Moving an existing one is in its own menu.
 function addButtons(brandId) {
   const pls = ORDER.filter(connectHref);
-  return pls.length ? `<div class="badds"><span class="note">Add</span>${pls.map(pl => `<a class="bplat" href="${connectHref(pl)}" data-cbrand="${brandId || 'none'}" title="Connect a ${PLATFORM[pl]} account${brandId ? ` to ${esc(brandName(brandId))}` : ''}" aria-label="Connect a ${PLATFORM[pl]} account">${appIcon(pl, 26)}<span class="bplus">${ui('plus', 10)}</span></a>`).join('')}</div>` : '';
+  return pls.length ? `<div class="badds"><span class="note">Add</span>${pls.map(pl => `<a class="bplat" href="${connectHref(pl)}" data-cbrand="${brandId || 'none'}" title="Connect a ${PLATFORM[pl]} account${brandId ? ` to ${esc(brandName(brandId))}` : ''}. ${esc(PLATFORM_HINT[pl])}" aria-label="Connect a ${PLATFORM[pl]} account">${appIcon(pl, 26)}<span class="bplus">${ui('plus', 10)}</span></a>`).join('')}</div>` : '';
 }
 
 async function renameBrand(id) {
@@ -2205,8 +2205,6 @@ function accountsView() {
   const a = S.me.accounts, cb = curBrand();
   const loose = a.filter(x => !brandName(x.brand_id));
   const brands = [...S.me.brands].sort((x, y) => (y.id === cb) - (x.id === cb));
-  const hint = { tiktok: 'Photo and video posts with TikTok\'s own settings.',
-    instagram: 'Business or Creator accounts. No Facebook Page needed.', facebook: 'Every Page you manage, in one go.' };
   const byPl = list => list.sort((x, y) => ORDER.indexOf(platformOf(x)) - ORDER.indexOf(platformOf(y)) || String(x.username).localeCompare(String(y.username)));
   const mix = list => `<span class="bmix">${ORDER.map(pl => [pl, list.filter(x => platformOf(x) === pl).length]).filter(([, n]) => n).map(([pl, n]) => `<span title="${PLATFORM[pl]}">${icon(pl, 12)}${n}</span>`).join('')}</span>`;
   const card = b => {
@@ -2214,27 +2212,17 @@ function accountsView() {
     return `<section class="bcard">
       <header><span class="bsq big" style="background:${brandHue(b.id)}">${esc((b.name[0] || '?').toUpperCase())}</span>
         <div class="bt"><h2>${esc(b.name)}</h2><span class="note">${list.length ? `${list.length} account${list.length === 1 ? '' : 's'}` : 'No accounts yet'}</span></div>${mix(list)}
-        <label class="amenu" title="Brand options">${ui('more', 16)}<select data-bmenu="${b.id}" aria-label="Options for ${esc(b.name)}"><option value="" selected disabled hidden></option><option value="rename">Rename</option><option value="delete">Delete brand…</option></select></label></header>
+        <label class="amenu" title="Brand options">${ui('more', 16)}<select data-bmenu="${b.id}" aria-label="Options for ${esc(b.name)}"><option value="" selected disabled hidden></option><option value="rename">Rename</option><option value="settings">Posting times &amp; voice</option><option value="delete">Delete brand…</option></select></label></header>
       <div class="blist">${list.map(x => acctRow(x, b.id)).join('') || '<p class="bnone">Add its TikTok, Instagram or Facebook below. Scheduling for this brand then picks them all at once.</p>'}</div>
       <footer>${addButtons(b.id)}</footer></section>`;
   };
   return `${!S.me.brands.length && a.length ? `<div class="bhint">${ui('users', 16)}<span>Make a brand for each business you post for, then add its TikTok, Instagram and Facebook to it. Scheduling for a brand then picks all of them at once.</span></div>` : ''}
     <div class="acc2"><div class="bgrid">
       ${brands.map(card).join('')}
-      ${loose.length || a.length ? `<section class="bcard loose"><header><span class="bsq big none">${ui('users', 16)}</span><div class="bt"><h2>${S.me.brands.length ? 'Personal' : 'Your accounts'}</h2><span class="note">${!loose.length ? 'No accounts' : S.me.brands.length ? 'In no brand yet' : `${loose.length} account${loose.length === 1 ? '' : 's'}`}</span></div>${mix(loose)}</header>
-        <div class="blist">${byPl(loose).map(x => acctRow(x, null)).join('') || '<p class="bnone">Accounts that aren\'t in a brand show here. Connect one below, or pick "Remove from brand" in an account\'s menu.</p>'}</div>
+      ${loose.length || !S.me.brands.length || a.length ? `<section class="bcard loose"><header><span class="bsq big none">${ui('users', 16)}</span><div class="bt"><h2>${S.me.brands.length ? 'Personal' : 'Your accounts'}</h2><span class="note">${!loose.length ? 'No accounts' : S.me.brands.length ? 'In no brand yet' : `${loose.length} account${loose.length === 1 ? '' : 's'}`}</span></div>${mix(loose)}</header>
+        <div class="blist">${byPl(loose).map(x => acctRow(x, null)).join('') || `<p class="bnone">${S.me.brands.length ? 'Accounts that aren\'t in a brand show here. Connect one below, or pick "Remove from brand" in an account\'s menu.' : 'Connect your TikTok, Instagram or Facebook below.'}</p>`}</div>
         <footer>${addButtons(null)}</footer></section>` : ''}
-    </div>
-    <aside class="arail">
-      <section class="panel"><header><h2>Connect</h2><span class="note">${a.length} of ${S.me.limits.accounts}</span></header>
-        <div class="ameter"><i style="width:${Math.min(100, a.length / S.me.limits.accounts * 100).toFixed(1)}%"></i></div>
-        <div class="rconnect">${ORDER.filter(connectHref).map(pl => `<a class="rcard" href="${connectHref(pl)}" data-cbrand="none">${appIcon(pl, 34)}<div><b>${PLATFORM[pl]}</b><span>${hint[pl]}</span></div><span class="go">${ui('plus', 15)}</span></a>`).join('')}</div>
-        <p class="note rnote">Connects into Personal. To connect straight into a brand, use the icons on its card.</p>
-        <details class="hints"><summary>More than one account per platform</summary>
-          ${ORDER.map(pl => `<p>${appIcon(pl, 16)}<span>${PLATFORM_HINT[pl]}</span></p>`).join('')}</details></section>
-    </aside></div>
-    ${!a.length ? '<section class="panel empty"><b>No accounts yet.</b>Connect TikTok, Instagram or a Facebook Page on the right.</section>' : ''}
-    <p class="foot-note">Posting times and brand voice are in <a href="#settings" data-settab-link="brands">Settings → Brands</a>. Disconnecting deletes the account's token and cancels its scheduled posts. Deleting a brand only ungroups its accounts.</p>`;
+    </div></div>`;
 }
 
 const SET_TABS = () => [['workspace', 'Workspace'], ...(can('admin') && S.me.brands.length ? [['brands', 'Brands']] : []), ...(can('admin') ? [['people', 'People']] : []), ['account', 'Your account'], ...(can('owner') ? [['developer', 'Developer']] : [])];
@@ -2547,7 +2535,7 @@ function bind() {
     const name = await ask({ title: 'New brand', ok: 'Create brand', body: 'One per business you post for. Add its accounts after.', input: { value: '', label: 'Brand name, e.g. Client Bakery' } });
     if (name?.trim()) brandAction(() => send('/brands', 'POST', { name: name.trim() })); });
   on('[data-move]', 'change', e => brandAction(() => send(`/accounts/${e.target.dataset.move}`, 'PATCH', { brand_id: e.target.value || null })));
-  on('[data-bmenu]', 'change', e => { const id = e.target.dataset.bmenu, v = e.target.value; e.target.value = ''; (v === 'rename' ? renameBrand : deleteBrand)(id); });
+  on('[data-bmenu]', 'change', e => { const id = e.target.dataset.bmenu, v = e.target.value; e.target.value = ''; if (v === 'settings') { S.setTab = 'brands'; location.hash = '#settings'; } else (v === 'rename' ? renameBrand : deleteBrand)(id); });
   on('[data-rename]', 'click', e => renameBrand(e.currentTarget.dataset.rename));
   on('[data-delbrand]', 'click', e => deleteBrand(e.currentTarget.dataset.delbrand));
   on('[data-pv]', 'change', e => { S.tt[e.target.dataset.pv].privacy = e.target.value; render(); });

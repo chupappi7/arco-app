@@ -1413,3 +1413,4 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .bplus svg{stroke-width:3}
 @media (max-width:1099px){.acc2{grid-template-columns:1fr;min-height:0}.acc2 .bgrid{grid-auto-rows:auto}.arail .hints{margin-top:10px}}
 .acc2 .bgrid{grid-template-columns:repeat(auto-fit,minmax(285px,1fr))}
+.acc2{grid-template-columns:minmax(0,1fr)}
