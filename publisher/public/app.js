@@ -879,54 +879,44 @@ const appTile = (id, s = 36) => `<svg class="apptile" width="${s}" height="${s}"
 const CLIENTS = [['desktop', 'Claude app & claude.ai'], ['code', 'Claude Code'], ['cursor', 'Cursor'], ['other', 'VS Code & others']];
 // What a key-holding Copy button puts on the clipboard: the connector link, or a config around it.
 const linkText = (kind, key) => { const link = `${mcpUrl()}/${key}`;
-  return kind === 'link' ? link : JSON.stringify({ mcpServers: { 'arco-publisher': { url: link } } }, null, 2); };
+  return kind === 'link' ? link : kind === 'code' ? `claude mcp add --scope user --transport http arco-publisher ${link}`
+    : JSON.stringify({ mcpServers: { 'arco-publisher': { url: link } } }, null, 2); };
 
 // What to copy for each app, and the one line that says where it goes.
-// Step by step for each app, written for someone who has never opened a
-// terminal or a config file. Mac and Windows differ in keys and menus.
-const isWin = () => /Windows/.test(navigator.userAgent);
+// A few steps per app. Each one connects with the link that carries the key.
 function clientSetup(key) {
-  const url = mcpUrl(), c = CLIENTS.some(x => x[0] === S.aiClient) ? S.aiClient : 'desktop';
-  const os = S.aiOS || (isWin() ? 'win' : 'mac'), mac = os === 'mac';
-  const kb = (m, w) => `<kbd>${mac ? m : w}</kbd>`;
+  const c = CLIENTS.some(x => x[0] === S.aiClient) ? S.aiClient : 'desktop';
   const canCopy = !!key || (S.me.api_key_set && S.me.api_key_copyable);
   const keyCopy = (kind, label) => canCopy ? `<button type="button" class="btn sm" data-keycopy="${kind}">${ui('copy', 14)}${label}</button>`
     : `<span class="note warn">${S.me.api_key_set ? 'Make a new key in step 1 first, so it can be copied.' : 'Create your key in step 1 first.'}</span>`;
-  const cmd = mac
-    ? `printf 'Paste your Publisher API key: '; read -rs ARCO_KEY; echo; claude mcp add --scope user --transport http arco-publisher ${url} --header "Authorization: Bearer $ARCO_KEY"; unset ARCO_KEY`
-    : `$k = Read-Host 'Paste your Publisher API key' -AsSecureString; $p = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($k)); claude mcp add --scope user --transport http arco-publisher ${url} --header "Authorization: Bearer $p"; Remove-Variable k, p`;
-  const copy = (text, label) => copyBtn(text, `${ui('copy', 14)}${label}`).replace('btn sec sm', 'btn sm');
-  const shell = mac ? '<b>Terminal</b>' : '<b>PowerShell</b>';
+  const ask1 = '<b>"What\'s in my library that isn\'t scheduled yet?"</b>';
   const steps = {
     desktop: [
-      `Copy your connector link: ${keyCopy('link', 'Copy link')}`,
-      `In Claude, open <b>Settings</b> → <b>Connectors</b>. ${mac ? 'In the app: the <b>Claude</b> menu at the top.' : 'In the app: the <b>☰</b> menu → <b>File</b> → <b>Settings</b>.'} On claude.ai: click your name at the bottom left.`,
-      `Click <b>Add custom connector</b>. Name it <b>ARCO Publisher</b>, paste the link with ${kb('⌘ V', 'Ctrl V')} and click <b>Add</b>.`,
-      `Start a new chat and ask. If it doesn't reply with your posts, open the <b>+</b> menu in the chat box and switch <b>ARCO Publisher</b> on.`,
+      `Copy your link: ${keyCopy('link', 'Copy link')}`,
+      'In Claude, go to <b>Settings</b> → <b>Connectors</b> → <b>Add custom connector</b>.',
+      'Paste the link, name it <b>ARCO Publisher</b>, and click <b>Add</b>.',
+      `Ask something like ${ask1}`,
     ],
     code: [
-      `Install Claude Code if you don't have it: follow <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">Anthropic's install guide</a>.`,
-      mac ? `Open ${shell}: press ${kb('⌘ Space')}, type <b>Terminal</b>, press ${kb('Return')}.` : `Open ${shell}: press the ${kb('', 'Windows')} key, type <b>PowerShell</b>, press ${kb('', 'Enter')}.`,
-      `Copy the setup command: ${copy(cmd, 'Copy command')} then paste it in with ${kb('⌘ V', 'Ctrl V')} and press ${kb('Return', 'Enter')}.`,
-      `It asks for your key: copy it in step 1, paste and press ${kb('Return', 'Enter')}. Nothing shows while you paste; that is on purpose.`,
-      `Type <code>claude</code> and press ${kb('Return', 'Enter')}, then ask.`,
+      `Copy the command: ${keyCopy('code', 'Copy command')}`,
+      'Paste it into Terminal (Mac) or PowerShell (Windows) and press Enter.',
+      `Start <code>claude</code> and ask something like ${ask1}`,
     ],
     cursor: [
-      `Open Cursor, then ${mac ? '<b>Cursor</b> menu → <b>Settings</b> → <b>Cursor Settings</b>' : '<b>File</b> → <b>Preferences</b> → <b>Cursor Settings</b>'} → <b>MCP</b> → <b>Add new MCP server</b>.`,
       `Copy the settings: ${keyCopy('config', 'Copy settings')}`,
-      `In the file that opens, select all with ${kb('⌘ A', 'Ctrl A')}, paste with ${kb('⌘ V', 'Ctrl V')}, save with ${kb('⌘ S', 'Ctrl S')}. A green dot means it's connected.`,
+      'In Cursor, go to <b>Cursor Settings</b> → <b>MCP</b> → <b>Add new MCP server</b>.',
+      'Replace what\'s in the file with the settings and save.',
+      `Ask something like ${ask1}`,
     ],
     other: [
-      `Open your app's MCP settings. VS Code: ${kb('⌘ ⇧ P', 'Ctrl Shift P')}, then <b>MCP: Add Server</b> → <b>HTTP</b>.`,
-      `Copy your connector link: ${keyCopy('link', 'Copy link')} and paste it as the server address.`,
-      `Name it <b>arco-publisher</b>, save, and ask in the app's chat.`,
+      `Copy your link: ${keyCopy('link', 'Copy link')}`,
+      'In your app\'s MCP settings, add a server and paste the link as its address. In VS Code: <b>MCP: Add Server</b> → <b>HTTP</b>.',
+      `Name it <b>ARCO Publisher</b>, save, and ask something like ${ask1}`,
     ],
   }[c];
   return `<div class="mapps" role="tablist">${CLIENTS.map(([id, l]) => `<button role="tab" class="mapp ${c === id ? 'on' : ''}" data-aiclient="${id}" aria-selected="${c === id}">${appTile(id, 30)}<span>${l}</span></button>`).join('')}</div>
-    <div class="howto"><div class="howhead"><b>${CLIENTS.find(x => x[0] === c)[1]} on</b>
-        <div class="seg" role="group" aria-label="Computer">${[['mac', 'Mac'], ['win', 'Windows']].map(([o, l]) => `<button data-aios="${o}" class="${o === os ? 'on' : ''}" aria-pressed="${o === os}">${l}</button>`).join('')}</div></div>
-      <ol class="hsteps">${steps.map(t => `<li>${t}</li>`).join('')}</ol>
-      ${c === 'code' ? '' : '<p class="note">The link holds your key, so keep it private. Making a new key or deleting it in step 1 switches the link off.</p>'}</div>`;
+    <div class="howto"><ol class="hsteps">${steps.map(t => `<li>${t}</li>`).join('')}</ol>
+      <p class="note">The link holds your key, so keep it private. Making a new key or deleting it in step 1 switches it off.</p></div>`;
 }
 
 async function newApiKey() {
@@ -2679,7 +2669,6 @@ function bind() {
       setTimeout(() => { b.innerHTML = t; b.classList.remove('copied'); }, 1400); }
     catch { toast('Copy did not work here. Select the text and copy it.', 'err'); } });
   on('[data-aiclient]', 'click', e => { S.aiClient = e.currentTarget.dataset.aiclient; render(); });
-  on('[data-aios]', 'click', e => { S.aiOS = e.currentTarget.dataset.aios; render(); });
   on('[data-keycopy]', 'click', async e => { const b = e.currentTarget, kind = b.dataset.keycopy;
     try { const k = (S.apiKey ? Promise.resolve(S.apiKey) : api('/api-key').then(r => r.api_key)).then(x => linkText(kind, x));
       if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ 'text/plain': k.then(t => new Blob([t], { type: 'text/plain' })) })]);
