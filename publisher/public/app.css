@@ -1465,3 +1465,4 @@ kbd{font:600 12px/1 var(--mono,ui-monospace,monospace);background:var(--surface)
 .mprompts{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:1099px){.mprompts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:719px){.mprompts{grid-template-columns:1fr}.mintro .mappr{width:100%}}
+.hnote{margin:12px 0 0;padding-left:34px}

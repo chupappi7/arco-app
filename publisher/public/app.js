@@ -876,7 +876,7 @@ const APP_TILE = {
   other: ['#3b4252', '<g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M9 4v4M15 4v4M7 8h10v3a5 5 0 0 1-10 0zM12 16v4"/></g>'],
 };
 const appTile = (id, s = 36) => `<svg class="apptile" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="${APP_TILE[id][0]}"/>${APP_TILE[id][1]}</svg>`;
-const CLIENTS = [['desktop', 'Claude app & claude.ai'], ['code', 'Claude Code'], ['cursor', 'Cursor'], ['other', 'VS Code & others']];
+const CLIENTS = [['desktop', 'Claude Desktop'], ['code', 'Claude Code'], ['cursor', 'Cursor'], ['other', 'VS Code & others']];
 // What a key-holding Copy button puts on the clipboard: the connector link, or a config around it.
 const linkText = (kind, key) => { const link = `${mcpUrl()}/${key}`;
   return kind === 'link' ? link : kind === 'code' ? `claude mcp add --scope user --transport http arco-publisher ${link}`
@@ -887,36 +887,45 @@ const linkText = (kind, key) => { const link = `${mcpUrl()}/${key}`;
 function clientSetup(key) {
   const c = CLIENTS.some(x => x[0] === S.aiClient) ? S.aiClient : 'desktop';
   const canCopy = !!key || (S.me.api_key_set && S.me.api_key_copyable);
+  const owner = can('owner');
   const keyCopy = (kind, label) => canCopy ? `<button type="button" class="btn sm" data-keycopy="${kind}">${ui('copy', 14)}${label}</button>`
-    : `<span class="note warn">${S.me.api_key_set ? 'Make a new key in step 1 first, so it can be copied.' : 'Create your key in step 1 first.'}</span>`;
+    : owner ? `<button type="button" class="btn sm" data-newkey>${ui('plus', 14)}${S.me.api_key_set ? 'Make a new key' : 'Create API key'}</button> <span class="note">${S.me.api_key_set ? 'Your current key was made before it could be copied. Make a new one, then this button copies it.' : 'Then this button copies it.'}</span>`
+    : '<span class="note warn">Ask the workspace owner to create the API key first.</span>';
+  const os = S.aiOS || (/Windows/.test(navigator.userAgent) ? 'win' : 'mac'), mac = os === 'mac';
+  const kb = (m, w) => `<kbd>${mac ? m : w}</kbd>`;
   const ask1 = '<b>"What\'s in my library that isn\'t scheduled yet?"</b>';
   const steps = {
     desktop: [
-      `Copy your link: ${keyCopy('link', 'Copy link')}`,
-      'In Claude, go to <b>Settings</b> → <b>Connectors</b> → <b>Add custom connector</b>.',
+      `Copy your connector link. It's your API key built into the server address: ${keyCopy('link', 'Copy link')}`,
+      'In Claude Desktop, go to <b>Settings</b> → <b>Connectors</b> → <b>Add custom connector</b>.',
       'Paste the link, name it <b>ARCO Publisher</b>, and click <b>Add</b>.',
       `Ask something like ${ask1}`,
     ],
     code: [
-      `Copy the command: ${keyCopy('code', 'Copy command')}`,
-      'Paste it into Terminal (Mac) or PowerShell (Windows) and press Enter.',
-      `Start <code>claude</code> and ask something like ${ask1}`,
+      `Install Claude Code if you don't have it: follow <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">Anthropic's install guide</a>.`,
+      mac ? `Open <b>Terminal</b>: press ${kb('⌘ Space')}, type <b>Terminal</b>, press ${kb('Return')}.`
+        : `Open <b>PowerShell</b>: press the ${kb('', 'Windows')} key, type <b>PowerShell</b>, press ${kb('', 'Enter')}.`,
+      `Copy the setup command. Your API key is built in: ${keyCopy('code', 'Copy command')}`,
+      `Click in the ${mac ? 'Terminal' : 'PowerShell'} window, paste with ${kb('⌘ V', 'Ctrl V')} and press ${kb('Return', 'Enter')}.`,
+      `Type <code>claude</code> and press ${kb('Return', 'Enter')}. Then ask something like ${ask1}`,
     ],
     cursor: [
-      `Copy the settings: ${keyCopy('config', 'Copy settings')}`,
+      `Copy the settings. Your API key is built in: ${keyCopy('config', 'Copy settings')}`,
       'In Cursor, go to <b>Cursor Settings</b> → <b>MCP</b> → <b>Add new MCP server</b>.',
       'Replace what\'s in the file with the settings and save.',
       `Ask something like ${ask1}`,
     ],
     other: [
-      `Copy your link: ${keyCopy('link', 'Copy link')}`,
+      `Copy your connector link. It's your API key built into the server address: ${keyCopy('link', 'Copy link')}`,
       'In your app\'s MCP settings, add a server and paste the link as its address. In VS Code: <b>MCP: Add Server</b> → <b>HTTP</b>.',
       `Name it <b>ARCO Publisher</b>, save, and ask something like ${ask1}`,
     ],
   }[c];
   return `<div class="mapps" role="tablist">${CLIENTS.map(([id, l]) => `<button role="tab" class="mapp ${c === id ? 'on' : ''}" data-aiclient="${id}" aria-selected="${c === id}">${appTile(id, 30)}<span>${l}</span></button>`).join('')}</div>
-    <div class="howto"><ol class="hsteps">${steps.map(t => `<li>${t}</li>`).join('')}</ol>
-      <p class="note">The link holds your key, so keep it private. Making a new key or deleting it in step 1 switches it off.</p></div>`;
+    <div class="howto">${c === 'code' ? `<div class="howhead"><b>Claude Code on</b>
+        <div class="seg" role="group" aria-label="Computer">${[['mac', 'Mac'], ['win', 'Windows']].map(([o, l]) => `<button data-aios="${o}" class="${o === os ? 'on' : ''}" aria-pressed="${o === os}">${l}</button>`).join('')}</div></div>` : ''}
+      <ol class="hsteps">${steps.map(t => `<li>${t}</li>`).join('')}</ol>
+      <p class="note hnote">Keep it private: it holds your key. Making a new key or deleting it in step 1 switches it off.</p></div>`;
 }
 
 async function newApiKey() {
@@ -2669,6 +2678,7 @@ function bind() {
       setTimeout(() => { b.innerHTML = t; b.classList.remove('copied'); }, 1400); }
     catch { toast('Copy did not work here. Select the text and copy it.', 'err'); } });
   on('[data-aiclient]', 'click', e => { S.aiClient = e.currentTarget.dataset.aiclient; render(); });
+  on('[data-aios]', 'click', e => { S.aiOS = e.currentTarget.dataset.aios; render(); });
   on('[data-keycopy]', 'click', async e => { const b = e.currentTarget, kind = b.dataset.keycopy;
     try { const k = (S.apiKey ? Promise.resolve(S.apiKey) : api('/api-key').then(r => r.api_key)).then(x => linkText(kind, x));
       if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ 'text/plain': k.then(t => new Blob([t], { type: 'text/plain' })) })]);
@@ -2689,6 +2699,7 @@ function bind() {
       if (name?.trim()) { try { await send('/api-key', 'PATCH', { name: name.trim() }); S.me.api_key_name = name.trim(); } catch (er) { S.flash = { kind: 'err', text: er.message }; } render(); } } });
   on('#apikeydel', 'click', () => deleteApiKey());
   on('#apikey', 'click', () => newApiKey());
+  on('[data-newkey]', 'click', () => newApiKey());
   on('#delws', 'click', async () => {
     if (!await ask({ title: `Delete ${esc(S.me.workspace.name)}?`, ok: 'Delete workspace', danger: true, icon: ui('x', 22), type: S.me.workspace.name,
       list: [[false, 'All its accounts, brands, posts, photos and members are removed now'], [false, 'Scheduled posts never go out'], [false, 'This cannot be undone']] })) return;
