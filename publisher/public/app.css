@@ -1250,3 +1250,44 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 @media (max-width:1099px){.aposts{contain:none;min-height:0}.aposts .list{max-height:560px}}
 @media (max-width:719px){.atrend>header .seg{margin-left:0;width:100%}.atrend>header .seg button{flex:1}.atrend .chart{height:160px}}
 @media (max-width:719px){.aposts .scols{grid-template-columns:repeat(2,52px)!important}.aposts .scols span:nth-child(n+3){display:none!important}}
+/* library board: a column per brand */
+.ltop{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.ltop .seg button{display:inline-flex;align-items:center;gap:6px}
+.ltop .lc{font-size:11.5px;font-weight:600;color:var(--soft);font-variant-numeric:tabular-nums}
+.ltop .seg button.on .lc{color:var(--mute)}
+.ltop .note{font-size:13px}
+.lboard{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(300px,1fr);gap:16px;overflow-x:auto;align-items:start;padding-bottom:6px;scroll-snap-type:x proximity}
+.lcol{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-panel);padding:14px;min-width:0;scroll-snap-align:start;display:flex;flex-direction:column;gap:10px}
+.lcol.over{outline:2px dashed var(--graphite);outline-offset:-4px}
+.lcol>header{display:flex;align-items:center;gap:8px;min-height:30px}
+.lcol>header h3{margin:0;font-size:15px;font-weight:650;display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lnum{color:var(--soft);font-size:13px;font-weight:600}
+.lnew{margin-left:auto;position:relative;cursor:pointer}
+.lnew input,.lcdrop input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.lcdrop{position:relative;display:flex;align-items:center;justify-content:center;gap:8px;border:1px dashed var(--line);border-radius:10px;padding:12px;color:var(--mute);font-size:13px;cursor:pointer;text-align:center}
+.lcdrop:hover,.lcol.over .lcdrop{border-color:var(--soft);color:var(--graphite)}
+.lclist{display:flex;flex-direction:column;gap:6px}
+.lcard{display:flex;align-items:center;gap:12px;padding:8px;border-radius:10px;border:1px solid transparent;background:var(--canvas);cursor:pointer;min-width:0}
+.lcard:hover{border-color:var(--line)}
+.lthumb{position:relative;flex:none;width:52px;height:66px;border-radius:7px;overflow:hidden;background:var(--well)}
+.lthumb img,.lthumb video{width:100%;height:100%;object-fit:cover;display:block}
+.lthumb .fempty{display:grid;place-items:center;height:100%;color:var(--soft)}
+.lcount,.lplay{position:absolute;right:3px;bottom:3px;background:rgba(0,0,0,.6);color:#fff;font-size:10.5px;font-weight:700;border-radius:5px;padding:1px 5px;display:inline-flex;align-items:center}
+.lbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.lbody b{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lmeta{font-size:12.5px;color:var(--mute)}
+.lmeta .wait{font-style:normal;color:var(--danger);font-weight:600}
+.lnote{font-size:12.5px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lsched{flex:none}
+.lwhen{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--graphite);white-space:nowrap}
+.lwhen.posted{color:var(--success)}
+.lempty{margin:6px 2px;color:var(--soft);font-size:13px}
+.lmore,.lloose{border:0;background:none;color:var(--mute);font-weight:600;font-size:13px;padding:6px 4px;text-align:left;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.lmore:hover,.lloose:hover{color:var(--graphite)}
+.lloose{border-top:1px solid var(--line-2);padding-top:10px}
+.lloose svg{transform:rotate(-90deg);transition:transform .15s}.lloose[aria-expanded="true"] svg{transform:rotate(90deg)}
+.lcol .mgrid.lib{padding:0;grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
+.lcol .mgrid.lup{grid-template-columns:repeat(auto-fill,minmax(60px,1fr))}
+.lboard.one{grid-auto-flow:row;grid-auto-columns:auto}
+.lboard.one .lclist{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+@media (max-width:719px){.lboard{grid-auto-columns:86%;margin:0 -16px;padding:0 16px 6px;scroll-padding:0 16px}.lboard.one{margin:0;padding:0}.ltop .note{display:none}.ltop .seg{width:100%}.ltop .seg button{flex:1;justify-content:center}}

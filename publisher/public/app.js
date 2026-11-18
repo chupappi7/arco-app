@@ -948,7 +948,7 @@ function folderDetail(f) {
   const n = f.items.length, isVid = f.kind === 'video';
   return `<section class="panel fdetail">
     <header><button class="btn ghost sm" id="fback">${ui('chev', 14)}Library</button><span class="fst ${f.status}">${folderStatus(f)}</span>
-      <span class="hacts">${n ? `<button class="btn" data-fsched="${f.id}">${ui('plus', 15)}Schedule</button>` : ''}<button class="btn ghost danger" data-fdel="${f.id}">Delete folder</button></span></header>
+      <span class="hacts">${n ? `<button class="btn" data-fsched="${f.id}">${ui('plus', 15)}Schedule</button>` : ''}<button class="btn ghost danger" data-fdel="${f.id}">Delete post</button></span></header>
     <div class="fform">
       <label class="f" for="fname">Name</label><input type="text" id="fname" maxlength="80" value="${esc(f.name)}">
       ${S.me.brands.length ? `<label class="f" for="fbrandsel">Brand</label><select id="fbrandsel"><option value="">Shared, every brand</option>
@@ -991,44 +991,82 @@ const libTile = (i, sel, attr) => `<label class="mt lt ${sel ? 'sel' : ''}">${is
   <input type="checkbox" ${attr}="${esc(i.key)}" ${sel ? 'checked' : ''} aria-label="Select ${esc(i.name || 'photo')}">
   ${i.brand_id && brandName(i.brand_id) ? `<span class="ltb" style="background:${brandHue(i.brand_id)}" title="${esc(brandName(i.brand_id))}"></span>` : ''}</label>`;
 
+// The library as a board: a column per brand, each with its own drop zone.
+// One post = its photos in order, or one video. Scheduled and posted ones sit
+// in their own tabs so the board shows only what still needs a date.
+const LTABS = [['todo', 'To schedule', f => f.status === 'unused' || f.status === 'awaiting_approval'],
+  ['scheduled', 'Scheduled', f => f.status === 'scheduled'], ['posted', 'Posted', f => f.status === 'posted']];
+const LMORE = 5;
+
+function libCard(f, tab) {
+  const n = f.items.length, first = f.items[0];
+  const kind = !n ? 'No photos yet' : f.kind === 'video' ? `Video${first?.duration_ms ? ` · ${mmss(first.duration_ms)}` : ''}` : `${n} photo${n === 1 ? '' : 's'}`;
+  const when = f.status === 'scheduled' && f.next_at ? fmt(f.next_at, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
+    : f.status === 'posted' && f.posted_at ? `Posted ${fmt(f.posted_at, { day: 'numeric', month: 'short' })}` : '';
+  return `<div class="lcard" data-folder="${f.id}" role="button" tabindex="0" title="Open">
+    <div class="lthumb">${first ? itemPic(first) : `<span class="fempty">${ui('image', 18)}</span>`}${f.kind === 'video' && n ? `<span class="lplay">${ui('play', 10)}</span>` : n > 1 ? `<span class="lcount">${n}</span>` : ''}</div>
+    <div class="lbody"><b>${esc(f.name)}</b>
+      <span class="lmeta">${kind}${f.status === 'awaiting_approval' ? ' · <em class="wait">Waiting for approval</em>' : ''}</span>
+      ${f.note ? `<span class="lnote">${esc(f.note)}</span>` : ''}</div>
+    ${tab === 'todo' ? (n ? `<button class="btn sm lsched" data-fsched="${f.id}">Schedule</button>` : '')
+      : `<span class="lwhen ${f.status}">${f.status === 'scheduled' ? ui('cal', 12) : ''}${when || FSTATUS[f.status]}</span>`}</div>`;
+}
+
 function libraryView() {
   const open = S.folderOpen && folderOf(S.folderOpen);
   const b = curBrand(), items = libShown(b).filter(i => !i.folder_id), sel = (S.libSel || []).filter(k => items.some(i => i.key === k));
-  const folders = foldersShown(b), fsel = S.fFilter || 'all';
-  const fshown = folders.filter(f => fsel === 'all' || f.status === fsel);
   const groups = b === 'all' ? [...S.me.brands.map(x => [x.id, x.name]), ['', 'Shared']] : [[b === 'none' ? '' : b, brandLabel(b)], ...(b === 'none' ? [] : [['', 'Shared']])];
   const inGroup = (x, id) => (x.brand_id || '') === id || (!id && x.brand_id && !brandName(x.brand_id));
-  // Each brand's folders under its own heading, so one brand's posts are not lost among another's.
-  const fgroups = groups.map(([id, name]) => { const list = fshown.filter(f => inGroup(f, id));
-    return list.length ? `${groups.filter(([gid]) => fshown.some(f => inGroup(f, gid))).length > 1 ? `<h3 class="fgh">${id ? `<i class="hdot" style="background:${brandHue(id)}"></i>` : ''}${esc(name)}<span>${list.length}</span></h3>` : ''}
-      <div class="fgrid">${list.map(folderCard).join('')}</div>` : ''; }).join('');
-  const folderSec = !S.folders ? '' : `<section class="panel"><header><h2>Posts ready to go</h2><span class="note">${folders.length ? `${folders.length} folder${folders.length === 1 ? '' : 's'} · one folder is one post` : 'One folder is one post: its photos in order, or one video, with a note'}</span>
-      <span class="hacts"><button class="btn sec" id="fnew">${ui('plus', 15)}New folder</button></span></header>
-    ${S.newFolder ? `<form class="fnewform" id="fnewform"><input type="text" id="fnewname" maxlength="80" placeholder="Folder name, e.g. Black Friday promo" aria-label="Folder name" required>
-      <input type="text" id="fnewnote" maxlength="2000" placeholder="Note for the caption (optional)" aria-label="Note">
-      <button class="btn">Create</button><button type="button" class="btn ghost" id="fnewcancel">Cancel</button></form>` : ''}
-    ${folders.length ? `<div class="chips fchips">${[['all', 'All'], ...Object.entries(FSTATUS)].map(([k, l]) => `<button class="chip ${fsel === k ? 'on' : ''}" data-ffilter="${k}">${l}${k === 'all' ? '' : ` · ${folders.filter(f => f.status === k).length}`}</button>`).join('')}</div>
-      ${fgroups || '<p class="note fnone">No folders with that status.</p>'}` : ''}</section>`;
-  const target = b === 'all' || b === 'none' ? (S.libBrand ?? '') : b;
-  const up = (S.libUp || []).map(u => `<div class="mt up">${u.video ? `<video src="${esc(u.url)}" muted playsinline preload="metadata"></video>` : `<img src="${esc(u.url)}" alt="">`}</div>`).join('');
   const brandSel = (id, val, first) => `<select id="${id}" aria-label="Brand">${first}${S.me.brands.map(x => `<option value="${x.id}" ${val === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`;
-  const body = !S.lib ? `<div class="mgrid">${[...Array(8)].map(() => `<div class="mt">${sk('100%', 140)}</div>`).join('')}</div>`
-    : groups.map(([id, name]) => {
-        const list = items.filter(i => inGroup(i, id));
-        if (!list.length) return '';
-        return `<section class="panel"><header><h2>${id ? `<i class="hdot" style="background:${brandHue(id)}"></i>` : ''}${esc(name)}</h2><span class="note">${libCount(list)}${id ? '' : ' · every brand can use these'}</span></header>
-          <div class="mgrid lib">${list.map(i => libTile(i, sel.includes(i.key), 'data-lsel')).join('')}</div></section>`;
-      }).join('') || (up ? '' : `<section class="panel empty"><b>Nothing here yet.</b>Upload the photos and videos you plan to post. When you schedule, pick them with "From library".</section>`);
-  return `<form class="panel libup" id="libdrop" onsubmit="return false">
-      <label class="libdz"><input type="file" id="libfiles" accept="${ACCEPT}" multiple>${ui('plus', 22)}<b>${open ? `Upload into "${esc(open.name)}"` : 'Upload photos and videos'}</b><span>Drop files here, or click to choose. JPG or PNG photos up to 5 MB, MP4 or MOV videos up to ${videoMb()} MB.</span></label>
-      ${S.me.brands.length && !open ? `<div class="libto"><span class="note">File under</span>${brandSel('libbrand', target, '<option value="">Shared, every brand</option>')}</div>` : ''}
-      ${up ? `<div class="mgrid">${up}</div>` : ''}</form>
-    ${open ? folderDetail(open) : folderSec + (items.length || !folders.length ? `<h3 class="libsub">Not in a folder</h3>${body}` : '')}
-    ${sel.length && !open ? `<div class="libbar"><b>${sel.length} selected</b>
+  const up = col => (S.libUp || []).filter(u => col === undefined || (u.col ?? null) === col).map(u => `<div class="mt up">${u.video ? `<video src="${esc(u.url)}" muted playsinline preload="metadata"></video>` : `<img src="${esc(u.url)}" alt="">`}</div>`).join('');
+
+  if (open) return `<form class="panel libup" id="libdrop" onsubmit="return false">
+      <label class="libdz"><input type="file" id="libfiles" accept="${ACCEPT}" multiple>${ui('plus', 22)}<b>Add photos or a video to "${esc(open.name)}"</b><span>Drop files here, or click to choose. JPG or PNG photos up to 5 MB, MP4 or MOV videos up to ${videoMb()} MB.</span></label>
+      ${up() ? `<div class="mgrid">${up()}</div>` : ''}</form>${folderDetail(open)}`;
+
+  const all = foldersShown(b), tab = S.libTab || 'todo', test = LTABS.find(t => t[0] === tab)[2];
+  const tabs = `<div class="ltop"><div class="seg" role="group" aria-label="Show">${LTABS.map(([k, l, fn]) => `<button data-ltab="${k}" class="${k === tab ? 'on' : ''}" aria-pressed="${k === tab}">${l}<span class="lc">${all.filter(fn).length}</span></button>`).join('')}</div>
+    <span class="note">One post is its photos in order, or one video. Drop files on a brand to make a new post.</span></div>`;
+  if (!S.lib || !S.folders) return `${tabs}<div class="lboard">${[0, 1, 2].map(() => `<section class="lcol">${skRows(4)}</section>`).join('')}</div>`;
+
+  const cols = groups.map(([id, name]) => {
+    const list = all.filter(f => inGroup(f, id) && test(f)).sort((x, y) => tab === 'posted' ? (y.posted_at || 0) - (x.posted_at || 0) : tab === 'scheduled' ? (x.next_at || 0) - (y.next_at || 0) : 0);
+    const loose = items.filter(i => inGroup(i, id));
+    if (!id && b === 'all' && S.me.brands.length && !list.length && !loose.length && !up(null)) return '';
+    const more = (S.libMore || []).includes(id), shown = more ? list : list.slice(0, LMORE), looseOpen = (S.libLoose || []).includes(id);
+    return `<section class="lcol" data-colbrand="${id}">
+      <header><h3>${id ? `<i class="hdot" style="background:${brandHue(id)}"></i>` : ''}${esc(name)}</h3><span class="lnum">${list.length}</span>
+        <label class="btn ghost sm lnew" title="New post from photos or a video"><input type="file" data-colup="${id}" accept="${ACCEPT}" multiple>${ui('plus', 14)}New post</label></header>
+      ${tab === 'todo' ? `<label class="lcdrop"><input type="file" data-colup="${id}" accept="${ACCEPT}" multiple>${ui('image', 16)}<span>Drop photos or a video${id ? '' : ' (every brand can use these)'}</span></label>` : ''}
+      ${up(id || null) ? `<div class="mgrid lup">${up(id || null)}</div>` : ''}
+      <div class="lclist">${shown.map(f => libCard(f, tab)).join('') || `<p class="lempty">${tab === 'todo' ? 'Nothing waiting for a date.' : tab === 'scheduled' ? 'Nothing scheduled.' : 'Nothing posted yet.'}</p>`}</div>
+      ${list.length > LMORE ? `<button class="lmore" data-lmore="${id}">${more ? 'Show less' : `Show ${list.length - LMORE} more`}</button>` : ''}
+      ${tab === 'todo' && loose.length ? `<button class="lloose" data-lloose="${id}" aria-expanded="${looseOpen}">${ui('chev', 12)}${libCount(loose)} not in a post</button>
+        ${looseOpen ? `<div class="mgrid lib">${loose.map(i => libTile(i, sel.includes(i.key), 'data-lsel')).join('')}</div>` : ''}` : ''}
+    </section>`;
+  }).join('');
+  return `${tabs}<div class="lboard ${groups.length === 1 || cols.split('class="lcol"').length === 2 ? 'one' : ''}">${cols}</div>
+    ${sel.length ? `<div class="libbar"><b>${sel.length} selected</b>
       <button class="btn" id="libsched">${ui('plus', 15)}Schedule</button>
-      ${(S.folders || []).length ? `<select id="libtofolder" aria-label="Move to folder"><option value="" disabled selected>Move to folder…</option>${foldersShown(b).map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join('')}</select>` : ''}
+      ${all.length ? `<select id="libtofolder" aria-label="Add to post"><option value="" disabled selected>Add to post…</option>${all.filter(f => f.status === 'unused').map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join('')}</select>` : ''}
       ${S.me.brands.length ? `${brandSel('libmove', '', '<option value="" disabled selected>Move to…</option><option value="-">Shared</option>')}` : ''}
       <button class="btn ghost danger" id="librm">Remove</button><button class="btn ghost" id="libclear">Clear</button></div>` : ''}`;
+}
+
+// Dropped files become posts in that brand: all the photos as one post, each
+// video as a post of its own.
+async function newPostsFrom(files, brand) {
+  files = [...files].filter(f => isVideoFile(f) || /^image\/(jpeg|png)$/.test(f.type) || /\.(jpe?g|png)$/i.test(f.name));
+  if (!files.length) { toast('JPG or PNG photos, or MP4 or MOV videos.', 'err'); return; }
+  const photos = files.filter(f => !isVideoFile(f)), sets = [...(photos.length ? [photos] : []), ...files.filter(isVideoFile).map(v => [v])];
+  for (const set of sets) {
+    try {
+      const name = set[0].name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 80) || 'New post';
+      const f = await send('/folders', 'POST', { name, brand_id: brand || null });
+      await uploadToLibrary(set, { brand: brand || null, folderId: f.id });
+    } catch (e) { S.flash = { kind: 'err', text: e.message }; render(); }
+  }
+  await reloadLibrary(); render();
 }
 
 const ACCEPT = 'image/jpeg,image/png,video/mp4,video/quicktime';
@@ -1086,13 +1124,13 @@ async function uploadVideoFile(file, brand, folderId) {
   return { key: j.key, url: j.url, name: file.name, content_type: type, ...meta };
 }
 
-async function uploadToLibrary(files) {
-  const folder = S.folderOpen && folderOf(S.folderOpen);
-  const brand = folder ? folder.brand_id : $('libbrand')?.value || null;
+async function uploadToLibrary(files, to) {
+  const folder = to ? (to.folderId ? { id: to.folderId, brand_id: to.brand } : null) : S.folderOpen && folderOf(S.folderOpen);
+  const brand = to ? to.brand : folder ? folder.brand_id : $('libbrand')?.value || null;
   S.libBrand = brand || '';
   S.libUp = S.libUp || [];
   for (const file of [...files].slice(0, 100)) {
-    const u = { url: URL.createObjectURL(file), video: isVideoFile(file) };
+    const u = { url: URL.createObjectURL(file), video: isVideoFile(file), col: brand || null };
     S.libUp.push(u); render();
     try {
       if (u.video) { await uploadVideoFile(file, brand, folder?.id); await reloadLibrary(); S.libUp.splice(S.libUp.indexOf(u), 1); render(); continue; }
@@ -2370,9 +2408,16 @@ function bind() {
   on('#closepick', 'click', () => { S.pickOpen = false; S.pickAll = false; render(); });
   on('#pickall', 'click', () => { S.pickAll = true; render(); });
   on('#libfiles', 'change', e => uploadToLibrary(e.target.files));
-  on('[data-folder]', 'click', e => { S.folderOpen = e.currentTarget.dataset.folder; S.libSel = []; render(); window.scrollTo(0, 0); });
+  on('[data-folder]', 'click', e => { if (e.target.closest('button')) return; S.folderOpen = e.currentTarget.dataset.folder; S.libSel = []; render(); window.scrollTo(0, 0); });
   on('[data-folder]', 'keydown', e => { if (e.key === 'Enter') e.currentTarget.click(); });
   on('#fback', 'click', () => { S.folderOpen = null; render(); });
+  on('[data-ltab]', 'click', e => { S.libTab = e.currentTarget.dataset.ltab; S.libSel = []; render(); });
+  on('[data-lmore]', 'click', e => { const id = e.currentTarget.dataset.lmore, m = S.libMore || []; S.libMore = m.includes(id) ? m.filter(x => x !== id) : [...m, id]; render(); });
+  on('[data-lloose]', 'click', e => { const id = e.currentTarget.dataset.lloose, m = S.libLoose || []; S.libLoose = m.includes(id) ? m.filter(x => x !== id) : [...m, id]; render(); });
+  on('[data-colup]', 'change', e => newPostsFrom(e.target.files, e.currentTarget.dataset.colup));
+  on('[data-colbrand]', 'dragover', e => { e.preventDefault(); e.currentTarget.classList.add('over'); });
+  on('[data-colbrand]', 'dragleave', e => { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('over'); });
+  on('[data-colbrand]', 'drop', e => { e.preventDefault(); e.currentTarget.classList.remove('over'); newPostsFrom(e.dataTransfer.files, e.currentTarget.dataset.colbrand); });
   on('[data-ffilter]', 'click', e => { S.fFilter = e.currentTarget.dataset.ffilter; render(); });
   on('#fnew', 'click', () => { S.newFolder = true; render(); $('fnewname')?.focus(); });
   on('#fnewcancel', 'click', () => { S.newFolder = false; render(); });
