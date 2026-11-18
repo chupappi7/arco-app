@@ -879,21 +879,60 @@ const appTile = (id, s = 36) => `<svg class="apptile" width="${s}" height="${s}"
 const CLIENTS = [['code', 'Claude Code'], ['desktop', 'Claude Desktop'], ['cursor', 'Cursor'], ['other', 'VS Code & others']];
 
 // What to copy for each app, and the one line that says where it goes.
+// Step by step for each app, written for someone who has never opened a
+// terminal or a config file. Mac and Windows differ in keys and menus.
+const isWin = () => /Windows/.test(navigator.userAgent);
 function clientSetup(key) {
   const k = key || 'apk_YOUR_KEY', url = mcpUrl(), c = CLIENTS.some(x => x[0] === S.aiClient) ? S.aiClient : 'code';
+  const os = S.aiOS || (isWin() ? 'win' : 'mac'), mac = os === 'mac';
+  const kb = (m, w) => `<kbd>${mac ? m : w}</kbd>`;
   const json = cfg => JSON.stringify(cfg, null, 2);
-  const remote = { mcpServers: { 'arco-publisher': { url, headers: { Authorization: `Bearer ${k}` } } } };
-  const [how, text, label] = {
-    code: ['Paste it into Terminal and press Return. It asks for your key, then you start <code>claude</code>.',
-      `printf 'Paste your Publisher API key: '; read -rs ARCO_KEY; echo; claude mcp add --scope user --transport http arco-publisher ${url} --header "Authorization: Bearer $ARCO_KEY"; unset ARCO_KEY`, 'Copy command'],
-    desktop: ['In Claude Desktop: <b>Settings → Developer → Edit Config</b>. Paste, save, restart Claude. Needs Node.js.',
-      json({ mcpServers: { 'arco-publisher': { command: 'npx', args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${ARCO_AUTH}'], env: { ARCO_AUTH: `Bearer ${k}` } } } }), 'Copy config'],
-    cursor: ['In Cursor: <b>Settings → MCP → Add new server</b>. Paste into <code>mcp.json</code> and save.', json(remote), 'Copy config'],
-    other: ['VS Code, Windsurf and other apps that take a remote MCP server: paste into their MCP settings.', json(remote), 'Copy config'],
+  const remote = json({ mcpServers: { 'arco-publisher': { url, headers: { Authorization: `Bearer ${k}` } } } });
+  const desktopCfg = json({ mcpServers: { 'arco-publisher': { command: 'npx', args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${ARCO_AUTH}'], env: { ARCO_AUTH: `Bearer ${k}` } } } });
+  const cmd = mac
+    ? `printf 'Paste your Publisher API key: '; read -rs ARCO_KEY; echo; claude mcp add --scope user --transport http arco-publisher ${url} --header "Authorization: Bearer $ARCO_KEY"; unset ARCO_KEY`
+    : `$k = Read-Host 'Paste your Publisher API key' -AsSecureString; $p = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($k)); claude mcp add --scope user --transport http arco-publisher ${url} --header "Authorization: Bearer $p"; Remove-Variable k, p`;
+  const copy = (text, label) => copyBtn(text, `${ui('copy', 14)}${label}`).replace('btn sec sm', 'btn sm');
+  const keyStep = key ? 'Your key is already filled in.' : `It holds <code>apk_YOUR_KEY</code>. Create your key in step 1 above first, then copy again and your key is filled in.`;
+  const shell = mac ? '<b>Terminal</b>' : '<b>PowerShell</b>';
+  const openShell = mac ? `Open ${shell}: press ${kb('⌘ Space')}, type <b>Terminal</b>, press ${kb('Return')}.`
+    : `Open ${shell}: press the ${kb('', 'Windows')} key, type <b>PowerShell</b>, press ${kb('', 'Enter')}.`;
+  const steps = {
+    code: [
+      `Install Claude Code if you don't have it: follow <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">Anthropic's install guide</a>.`,
+      openShell,
+      `Copy the setup command: ${copy(cmd, 'Copy command')}`,
+      `Click in the ${shell} window, paste with ${kb('⌘ V', 'Ctrl V')} and press ${kb('Return', 'Enter')}.`,
+      `It asks for your key: paste it with ${kb('⌘ V', 'Ctrl V')} and press ${kb('Return', 'Enter')}. Nothing shows while you paste; that is on purpose.`,
+      `Type <code>claude</code> and press ${kb('Return', 'Enter')}. Then type <code>/mcp</code>: <b>arco-publisher</b> should say connected.`,
+    ],
+    desktop: [
+      `Install <b>Node.js</b> once: go to <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>, download the LTS version and run the installer.`,
+      `Open Claude Desktop, then ${mac ? '<b>Claude</b> menu at the top → <b>Settings</b>' : 'the <b>☰</b> menu at the top left → <b>File</b> → <b>Settings</b>'} → <b>Developer</b> → <b>Edit Config</b>.`,
+      `A folder opens with <code>claude_desktop_config.json</code>. ${mac ? 'Right-click it → <b>Open With</b> → <b>TextEdit</b>.' : 'Right-click it → <b>Open with</b> → <b>Notepad</b>.'}`,
+      `Copy the settings: ${copy(desktopCfg, 'Copy config')} ${keyStep}`,
+      `In the file, select everything with ${kb('⌘ A', 'Ctrl A')}, paste with ${kb('⌘ V', 'Ctrl V')} and save with ${kb('⌘ S', 'Ctrl S')}. If the file already lists other servers, add only the <b>arco-publisher</b> part.`,
+      `Quit Claude completely (${mac ? `${kb('⌘ Q')}` : 'right-click its icon by the clock → <b>Quit</b>'}) and open it again. In a new chat, the tools menu now lists <b>arco-publisher</b>.`,
+    ],
+    cursor: [
+      `Open Cursor, then ${mac ? '<b>Cursor</b> menu → <b>Settings</b> → <b>Cursor Settings</b>' : '<b>File</b> → <b>Preferences</b> → <b>Cursor Settings</b>'}.`,
+      `Go to <b>MCP</b> (or <b>Tools &amp; MCP</b>) and click <b>Add new MCP server</b>. A file called <code>mcp.json</code> opens.`,
+      `Copy the settings: ${copy(remote, 'Copy config')} ${keyStep}`,
+      `In <code>mcp.json</code>, select everything with ${kb('⌘ A', 'Ctrl A')}, paste with ${kb('⌘ V', 'Ctrl V')} and save with ${kb('⌘ S', 'Ctrl S')}.`,
+      `Back in the MCP settings, <b>arco-publisher</b> shows a green dot. Open a chat and ask.`,
+    ],
+    other: [
+      `Open your app's MCP settings. VS Code: ${kb('⌘ ⇧ P', 'Ctrl Shift P')}, type <b>MCP: Open User Configuration</b>. Windsurf: <b>Settings</b> → <b>MCP</b>.`,
+      `Copy the settings: ${copy(remote, 'Copy config')} ${keyStep}`,
+      `Paste them into that file and save with ${kb('⌘ S', 'Ctrl S')}. Keep any servers already there.`,
+      `Restart the app if it asks, then ask in its chat.`,
+    ],
   }[c];
   return `<div class="mapps" role="tablist">${CLIENTS.map(([id, l]) => `<button role="tab" class="mapp ${c === id ? 'on' : ''}" data-aiclient="${id}" aria-selected="${c === id}">${appTile(id, 30)}<span>${l}</span></button>`).join('')}</div>
-    <div class="howto"><p>${how}</p>
-      <div class="howrow">${copyBtn(text, `${ui('copy', 14)}${label}`).replace('btn sec sm', 'btn')}<span class="note">${c === 'code' ? 'Your key never shows on screen.' : key ? 'Your key is filled in. Keep that file private.' : 'Create your key first, then copy: it gets filled in.'}</span></div></div>`;
+    <div class="howto"><div class="howhead"><b>${CLIENTS.find(x => x[0] === c)[1]} on</b>
+        <div class="seg" role="group" aria-label="Computer">${[['mac', 'Mac'], ['win', 'Windows']].map(([o, l]) => `<button data-aios="${o}" class="${o === os ? 'on' : ''}" aria-pressed="${o === os}">${l}</button>`).join('')}</div></div>
+      <ol class="hsteps">${steps.map(t => `<li>${t}</li>`).join('')}</ol>
+      ${c !== 'code' && key ? '<p class="note">The file now holds your key. Keep it private.</p>' : ''}</div>`;
 }
 
 function aiView() {
@@ -2626,6 +2665,7 @@ function bind() {
       setTimeout(() => { b.innerHTML = t; b.classList.remove('copied'); }, 1400); }
     catch { toast('Copy did not work here. Select the text and copy it.', 'err'); } });
   on('[data-aiclient]', 'click', e => { S.aiClient = e.currentTarget.dataset.aiclient; render(); });
+  on('[data-aios]', 'click', e => { S.aiOS = e.currentTarget.dataset.aios; render(); });
   on('#keytoggle', 'click', () => { S.keyShown = !S.keyShown; render(); });
   on('#apikey', 'click', async () => {
     if (S.me.api_key_set && !await ask({ title: 'Make a new API key?', ok: 'Make a new key', danger: true, icon: ui('spark', 22),
