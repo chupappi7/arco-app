@@ -1258,7 +1258,7 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .ltop .note{font-size:13px}
 .lboard{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(300px,1fr);gap:16px;overflow-x:auto;align-items:start;padding-bottom:6px;scroll-snap-type:x proximity}
 .lcol{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-panel);padding:14px;min-width:0;scroll-snap-align:start;display:flex;flex-direction:column;gap:10px}
-.lcol.over{outline:2px dashed var(--graphite);outline-offset:-4px}
+
 .lcol>header{display:flex;align-items:center;gap:8px;min-height:30px}
 .lcol>header h3{margin:0;font-size:15px;font-weight:650;display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lnum{color:var(--soft);font-size:13px;font-weight:600}
@@ -1291,3 +1291,16 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .lboard.one{grid-auto-flow:row;grid-auto-columns:auto}
 .lboard.one .lclist{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
 @media (max-width:719px){.lboard{grid-auto-columns:86%;margin:0 -16px;padding:0 16px 6px;scroll-padding:0 16px}.lboard.one{margin:0;padding:0}.ltop .note{display:none}.ltop .seg{width:100%}.ltop .seg button{flex:1;justify-content:center}}
+/* every column as tall as the screen; its posts scroll inside it */
+.lboard:not(.one){align-items:stretch}
+.lboard:not(.one) .lcol{height:max(420px,calc(100dvh - 250px))}
+.lclist{flex:1;min-height:0;overflow-y:auto;margin:0 -4px;padding:0 4px}
+.lboard.one .lclist{overflow:visible}
+.lcdrop{flex:1;flex-direction:column;gap:6px;padding:24px 16px;min-height:160px}
+.lcdrop b{color:var(--graphite);font-weight:600}
+.lcdrop span{max-width:260px;line-height:1.45}
+.lempty{flex:1}
+.lcol{position:relative}
+.lcol.over::after{content:'Drop to make a new post';position:absolute;inset:0;display:grid;place-items:center;border-radius:inherit;background:color-mix(in srgb,var(--surface) 82%,transparent);border:2px dashed var(--graphite);font-weight:600;color:var(--graphite);pointer-events:none}
+@media (max-width:719px){.lboard:not(.one) .lcol{height:max(380px,calc(100dvh - 300px))}}
+.lclist{scrollbar-width:thin;scrollbar-color:var(--line) transparent}

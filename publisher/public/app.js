@@ -996,7 +996,6 @@ const libTile = (i, sel, attr) => `<label class="mt lt ${sel ? 'sel' : ''}">${is
 // in their own tabs so the board shows only what still needs a date.
 const LTABS = [['todo', 'To schedule', f => f.status === 'unused' || f.status === 'awaiting_approval'],
   ['scheduled', 'Scheduled', f => f.status === 'scheduled'], ['posted', 'Posted', f => f.status === 'posted']];
-const LMORE = 5;
 
 function libCard(f, tab) {
   const n = f.items.length, first = f.items[0];
@@ -1033,14 +1032,14 @@ function libraryView() {
     const list = all.filter(f => inGroup(f, id) && test(f)).sort((x, y) => tab === 'posted' ? (y.posted_at || 0) - (x.posted_at || 0) : tab === 'scheduled' ? (x.next_at || 0) - (y.next_at || 0) : 0);
     const loose = items.filter(i => inGroup(i, id));
     if (!id && b === 'all' && S.me.brands.length && !list.length && !loose.length && !up(null)) return '';
-    const more = (S.libMore || []).includes(id), shown = more ? list : list.slice(0, LMORE), looseOpen = (S.libLoose || []).includes(id);
+    const looseOpen = (S.libLoose || []).includes(id);
     return `<section class="lcol" data-colbrand="${id}">
       <header><h3>${id ? `<i class="hdot" style="background:${brandHue(id)}"></i>` : ''}${esc(name)}</h3><span class="lnum">${list.length}</span>
         <label class="btn ghost sm lnew" title="New post from photos or a video"><input type="file" data-colup="${id}" accept="${ACCEPT}" multiple>${ui('plus', 14)}New post</label></header>
-      ${tab === 'todo' ? `<label class="lcdrop"><input type="file" data-colup="${id}" accept="${ACCEPT}" multiple>${ui('image', 16)}<span>Drop photos or a video${id ? '' : ' (every brand can use these)'}</span></label>` : ''}
       ${up(id || null) ? `<div class="mgrid lup">${up(id || null)}</div>` : ''}
-      <div class="lclist">${shown.map(f => libCard(f, tab)).join('') || `<p class="lempty">${tab === 'todo' ? 'Nothing waiting for a date.' : tab === 'scheduled' ? 'Nothing scheduled.' : 'Nothing posted yet.'}</p>`}</div>
-      ${list.length > LMORE ? `<button class="lmore" data-lmore="${id}">${more ? 'Show less' : `Show ${list.length - LMORE} more`}</button>` : ''}
+      ${list.length ? `<div class="lclist">${list.map(f => libCard(f, tab)).join('')}</div>`
+        : tab === 'todo' ? `<label class="lcdrop"><input type="file" data-colup="${id}" accept="${ACCEPT}" multiple>${ui('plus', 22)}<b>Nothing waiting for a date</b><span>Drop photos or a video here to make a new ${esc(id ? name : 'shared')} post${id ? '' : ' that every brand can use'}.</span></label>`
+        : `<p class="lempty">${tab === 'scheduled' ? 'Nothing scheduled.' : 'Nothing posted yet.'}</p>`}
       ${tab === 'todo' && loose.length ? `<button class="lloose" data-lloose="${id}" aria-expanded="${looseOpen}">${ui('chev', 12)}${libCount(loose)} not in a post</button>
         ${looseOpen ? `<div class="mgrid lib">${loose.map(i => libTile(i, sel.includes(i.key), 'data-lsel')).join('')}</div>` : ''}` : ''}
     </section>`;
@@ -2412,7 +2411,6 @@ function bind() {
   on('[data-folder]', 'keydown', e => { if (e.key === 'Enter') e.currentTarget.click(); });
   on('#fback', 'click', () => { S.folderOpen = null; render(); });
   on('[data-ltab]', 'click', e => { S.libTab = e.currentTarget.dataset.ltab; S.libSel = []; render(); });
-  on('[data-lmore]', 'click', e => { const id = e.currentTarget.dataset.lmore, m = S.libMore || []; S.libMore = m.includes(id) ? m.filter(x => x !== id) : [...m, id]; render(); });
   on('[data-lloose]', 'click', e => { const id = e.currentTarget.dataset.lloose, m = S.libLoose || []; S.libLoose = m.includes(id) ? m.filter(x => x !== id) : [...m, id]; render(); });
   on('[data-colup]', 'change', e => newPostsFrom(e.target.files, e.currentTarget.dataset.colup));
   on('[data-colbrand]', 'dragover', e => { e.preventDefault(); e.currentTarget.classList.add('over'); });
