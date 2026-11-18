@@ -935,6 +935,22 @@ function clientSetup(key) {
       ${c !== 'code' && key ? '<p class="note">The file now holds your key. Keep it private.</p>' : ''}</div>`;
 }
 
+async function newApiKey() {
+  if (S.me.api_key_set && !await ask({ title: 'Make a new API key?', ok: 'Make a new key', danger: true, icon: ui('spark', 22),
+    list: [[false, 'The current key stops working at once'], [false, 'Any AI app using it needs the new key']] })) return;
+  try { S.apiKey = (await api('/api-key', { method: 'POST' })).api_key;
+    Object.assign(S.me, { api_key_set: true, api_key_hint: S.apiKey.slice(-4), api_key_copyable: true, api_key_at: Math.floor(Date.now() / 1000), api_key_name: S.me.api_key_name || 'Main key' }); }
+  catch (e) { S.flash = { kind: 'err', text: e.message }; }
+  render();
+}
+async function deleteApiKey() {
+  if (!await ask({ title: 'Delete the API key?', ok: 'Delete key', danger: true, icon: ui('spark', 22),
+    list: [[false, 'Any AI app using it stops working at once'], [true, 'Posts already scheduled still go out'], [true, 'You can create a new key any time']] })) return;
+  try { await api('/api-key', { method: 'DELETE' }); Object.assign(S.me, { api_key_set: false, api_key_hint: null, api_key_name: null, api_key_at: null, api_key_copyable: false }); S.apiKey = null; }
+  catch (e) { S.flash = { kind: 'err', text: e.message }; }
+  render();
+}
+
 function aiView() {
   const owner = can('owner'), admin = can('admin'), keySet = !!S.me.api_key_set, key = S.apiKey;
   const brand = S.me.brands[0]?.name || 'my brand';
@@ -949,7 +965,7 @@ function aiView() {
     ['warn', 'Fix', 'Something failed yesterday. Find out why and retry it.'],
     ['x', 'Undo', 'Undo what you just scheduled.'],
   ];
-  const numbered = (n, done, title, sub, body) => `<section class="panel mnum ${done ? 'done' : ''}"><header><span class="stepn">${done ? ui('check', 14) : n}</span><div><h2>${title}</h2><span class="note">${sub}</span></div></header>${body}</section>`;
+  const numbered = (n, title, sub, body, aside = '') => `<section class="panel mnum"><header><span class="stepn">${n}</span><div><h2>${title}</h2><span class="note">${sub}</span></div>${aside}</header>${body}</section>`;
   return `<section class="panel mhero">
       <div class="mintro"><span class="eyebrow">MCP</span>
         <h2>Schedule posts by asking your AI</h2>
@@ -961,23 +977,27 @@ function aiView() {
         <div class="bub me">Go</div>
         <div class="bub ai">${ui('check', 13)} Scheduled. ${review ? 'They wait in Drafts for your approval.' : 'They are on the calendar.'}</div></div>
     </section>
-    ${numbered(1, keySet, 'Create your API key', 'Your AI signs in with it. Treat it like a password.', `<div class="kbody">
-      ${key ? `<div class="krow fresh"><code class="key" id="keyshow">${esc(S.keyShown ? key : maskKey(key))}</code>
-          <button type="button" class="btn ghost sm" id="keytoggle">${S.keyShown ? 'Hide' : 'Show'}</button>${copyBtn(key, `${ui('copy', 14)}Copy`).replace('btn sec sm', 'btn sm')}</div>
-        <p class="note warn">Copy it now. For your safety it can't be shown again once you leave this page.</p>`
-      : keySet ? `<div class="krow"><code class="key">apk_••••••••••••${esc(S.me.api_key_hint || '')}</code><span class="kstate">${ui('check', 13)}Active</span></div>
-        <p class="note">The full key was shown once when it was made. Lost it? Make a new one; the old one then stops working.</p>`
-      : '<p class="note">No key yet.</p>'}
-      ${owner ? `<div class="kacts"><button class="btn ${keySet ? 'sec' : ''} sm" id="apikey">${ui('plus', 14)}${keySet ? 'Make a new key' : 'Create API key'}</button>
-          ${keySet ? `<button class="btn ghost danger sm" id="apikeydel">Delete key</button>` : ''}</div>` : '<p class="note">Only the workspace owner can create or delete it.</p>'}</div>`)}
-    ${numbered(2, false, 'Connect your app', 'Pick the app you use and follow the steps.', `<div class="msetup">${clientSetup(key)}</div>`)}
-    ${numbered(3, false, 'Ask', `Copy one into your AI. It uses the posts in your <a href="#library">Library</a>${unused ? ` (${unused} ready)` : ''}.`,
+    ${numbered(1, 'Create your API key', 'Your AI signs in with it. Treat it like a password.', `<div class="kbody">
+      ${keySet ? `<div class="ktable" role="table" aria-label="API key">
+          <div class="khead" role="row"><span>Name</span><span>Key</span><span>Created</span><span></span></div>
+          <div class="kline ${key ? 'fresh' : ''}" role="row">
+            <span class="kname">${ui('spark', 14)}<b>${esc(S.me.api_key_name || 'Main key')}</b></span>
+            <code>apk_••••••••••••${esc(S.me.api_key_hint || '')}</code>
+            <span class="note">${S.me.api_key_at ? fmt(S.me.api_key_at, { day: 'numeric', month: 'short', year: 'numeric' }) : '–'}</span>
+            <span class="kacts">${owner ? `${key || S.me.api_key_copyable ? `<button type="button" class="btn sm" id="keycopy">${ui('copy', 14)}Copy</button>` : ''}
+              <label class="amenu" title="Key options">${ui('more', 16)}<select id="keymenu" aria-label="Key options"><option value="" selected disabled hidden></option>
+                <option value="rename">Rename</option><option value="new">Make a new key</option><option value="delete">Delete key…</option></select></label>` : ''}</span></div></div>
+        ${key ? '<p class="note">New key made. Copy it into your app in step 2.</p>' : !S.me.api_key_copyable && owner ? '<p class="note">This key was made before keys could be copied here. Make a new key from the ⋯ menu to be able to copy it.</p>' : ''}`
+      : `<div class="kempty"><span>${ui('spark', 18)}</span><div><b>No API key yet</b><span class="note">Create one, then paste it into your AI app in step 2.</span></div>
+          ${owner ? `<button class="btn" id="apikey">${ui('plus', 14)}Create API key</button>` : ''}</div>`}
+      ${owner ? '' : '<p class="note">Only the workspace owner can create, copy or delete it.</p>'}</div>`)}
+    ${numbered(2, 'Connect your app', 'Pick the app you use and follow the steps.', `<div class="msetup">${clientSetup(key)}</div>`)}
+    ${numbered(3, 'Ask', `Copy one into your AI. It uses the posts in your <a href="#library">Library</a>${unused ? ` (${unused} ready)` : ''}.`,
       `<div class="mprompts">${prompts.map(([ic, tag, p]) => `<button type="button" class="mprompt" data-copy="${esc(p)}" title="Copy">
-          <span class="mtag">${ui(ic, 13)}${tag}</span><span class="mpt">${esc(p)}</span><span class="mcopy">${ui('copy', 14)}</span></button>`).join('')}</div>`)}
+          <span class="mtag">${ui(ic, 13)}${tag}</span><span class="mpt">${esc(p)}</span><span class="mcopy">${ui('copy', 14)}</span></button>`).join('')}</div>`,
+      `<div class="mappr"><div><b>Approve AI posts first</b><span class="note">${review ? 'They wait in Drafts for you' : 'They go straight onto the calendar'}${waiting ? ` · <a href="#drafts">${waiting} waiting</a>` : ''}</span></div>
+        ${admin ? `<label class="sw"><input type="checkbox" id="aireview" ${review ? 'checked' : ''} aria-label="Approve AI posts first"><span></span></label>` : ''}</div>`)}
     <div class="mfoot">
-      <div class="aisw"><div><b>AI posts need my approval</b><span class="note">${review ? 'They wait in Drafts until someone approves them.' : 'They go straight onto the calendar.'}</span></div>
-        ${admin ? `<label class="sw"><input type="checkbox" id="aireview" ${review ? 'checked' : ''} aria-label="AI posts need approval"><span></span></label>` : ''}
-        ${waiting ? `<a class="btn sm" href="#drafts">Review ${waiting}</a>` : ''}</div>
       <p class="note">It can't connect accounts, invite people or delete brands; those stay here. <a href="/ai.html" target="_blank" rel="noopener">Full guide</a> · <a href="/ai.html#help" target="_blank" rel="noopener">Troubleshooting</a></p></div>`;
 }
 
@@ -2667,17 +2687,20 @@ function bind() {
     catch { toast('Copy did not work here. Select the text and copy it.', 'err'); } });
   on('[data-aiclient]', 'click', e => { S.aiClient = e.currentTarget.dataset.aiclient; render(); });
   on('[data-aios]', 'click', e => { S.aiOS = e.currentTarget.dataset.aios; render(); });
-  on('#keytoggle', 'click', () => { S.keyShown = !S.keyShown; render(); });
-  on('#apikeydel', 'click', async () => {
-    if (!await ask({ title: 'Delete the API key?', ok: 'Delete key', danger: true, icon: ui('spark', 22),
-      list: [[false, 'Any AI app using it stops working at once'], [true, 'Posts already scheduled still go out'], [true, 'You can create a new key any time']] })) return;
-    try { await api('/api-key', { method: 'DELETE' }); S.me.api_key_set = false; S.me.api_key_hint = null; S.apiKey = null; } catch (e) { S.flash = { kind: 'err', text: e.message }; }
-    render(); });
-  on('#apikey', 'click', async () => {
-    if (S.me.api_key_set && !await ask({ title: 'Make a new API key?', ok: 'Make a new key', danger: true, icon: ui('spark', 22),
-      list: [[false, 'The current key stops working at once'], [false, 'Any assistant or tool using it needs the new key']] })) return;
-    try { S.apiKey = (await api('/api-key', { method: 'POST' })).api_key; S.me.api_key_set = true; S.me.api_key_hint = S.apiKey.slice(-4); } catch (e) { S.flash = { kind: 'err', text: e.message }; }
-    render(); });
+  on('#keycopy', 'click', async e => { const b = e.currentTarget;
+    // ClipboardItem takes the key as a promise, so Safari keeps the click's permission while it loads.
+    try { const k = S.apiKey ? Promise.resolve(S.apiKey) : api('/api-key').then(r => r.api_key);
+      if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ 'text/plain': k.then(t => new Blob([t], { type: 'text/plain' })) })]);
+      else await navigator.clipboard.writeText(await k);
+      const t = b.innerHTML; b.textContent = 'Copied'; setTimeout(() => { b.innerHTML = t; }, 1400); }
+    catch (er) { toast(er.message && !/clipboard|denied|document/i.test(er.message) ? er.message : 'Copy did not work here. Try again.', 'err'); } });
+  on('#keymenu', 'change', async e => { const v = e.target.value; e.target.value = '';
+    if (v === 'new') newApiKey();
+    else if (v === 'delete') deleteApiKey();
+    else if (v === 'rename') { const name = await ask({ title: 'Rename the key', ok: 'Save', input: { value: S.me.api_key_name || '', label: 'Key name, e.g. Claude on my Mac' } });
+      if (name?.trim()) { try { await send('/api-key', 'PATCH', { name: name.trim() }); S.me.api_key_name = name.trim(); } catch (er) { S.flash = { kind: 'err', text: er.message }; } render(); } } });
+  on('#apikeydel', 'click', () => deleteApiKey());
+  on('#apikey', 'click', () => newApiKey());
   on('#delws', 'click', async () => {
     if (!await ask({ title: `Delete ${esc(S.me.workspace.name)}?`, ok: 'Delete workspace', danger: true, icon: ui('x', 22), type: S.me.workspace.name,
       list: [[false, 'All its accounts, brands, posts, photos and members are removed now'], [false, 'Scheduled posts never go out'], [false, 'This cannot be undone']] })) return;

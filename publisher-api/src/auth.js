@@ -1,4 +1,4 @@
-import { randomToken, sha256Hex, encrypt } from './crypto.js';
+import { randomToken, sha256Hex, encrypt, decrypt } from './crypto.js';
 import { HttpError, now, cookie } from './http.js';
 import { MAX_ACCOUNTS, SESSION_TTL } from './limits.js';
 import { sessionCaller, need } from './users.js';
@@ -27,15 +27,33 @@ export async function sessionWorkspace(env, sessionId) {
   return row ? row.workspace_id : null;
 }
 
+// The key is checked by its hash; an encrypted copy lets the owner copy it again.
 export async function rotateApiKey(env, workspaceId) {
   const key = randomToken('apk_');
-  await env.DB.prepare('UPDATE workspaces SET api_key_hash = ?, api_key_hint = ? WHERE id = ?')
-    .bind(await sha256Hex(key), key.slice(-4), workspaceId).run();
+  await env.DB.prepare(`UPDATE workspaces SET api_key_hash = ?, api_key_hint = ?, api_key_enc = ?, api_key_at = ?,
+      api_key_name = COALESCE(api_key_name, 'Main key') WHERE id = ?`)
+    .bind(await sha256Hex(key), key.slice(-4), await encrypt(key, env.TOKEN_KEY), now(), workspaceId).run();
   return key;
 }
 
 export async function revokeApiKey(env, workspaceId) {
-  await env.DB.prepare('UPDATE workspaces SET api_key_hash = NULL, api_key_hint = NULL WHERE id = ?').bind(workspaceId).run();
+  await env.DB.prepare(`UPDATE workspaces SET api_key_hash = NULL, api_key_hint = NULL, api_key_enc = NULL,
+      api_key_at = NULL, api_key_name = NULL WHERE id = ?`).bind(workspaceId).run();
+}
+
+export async function revealApiKey(env, workspaceId) {
+  const row = await env.DB.prepare('SELECT api_key_hash, api_key_enc FROM workspaces WHERE id = ?').bind(workspaceId).first();
+  if (!row?.api_key_hash) throw new HttpError(404, 'There is no API key. Create one first.');
+  if (!row.api_key_enc) throw new HttpError(409, 'This key was made before keys could be copied. Make a new key to copy it.');
+  return decrypt(row.api_key_enc, env.TOKEN_KEY);
+}
+
+export async function renameApiKey(env, workspaceId, name) {
+  name = String(name || '').trim();
+  if (!name || name.length > 60) throw new HttpError(400, 'Give the key a name of 1 to 60 characters');
+  const r = await env.DB.prepare('UPDATE workspaces SET api_key_name = ? WHERE id = ? AND api_key_hash IS NOT NULL').bind(name, workspaceId).run();
+  if (!r.meta.changes) throw new HttpError(404, 'There is no API key. Create one first.');
+  return { name };
 }
 
 export async function logout(env, req) {

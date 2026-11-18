@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDb, fakeTk, signUp } from './helpers.js';
-import { oauthIntake, rotateApiKey, revokeApiKey } from '../src/auth.js';
+import { oauthIntake, rotateApiKey, revokeApiKey, revealApiKey, renameApiKey } from '../src/auth.js';
 import { callerFor } from '../src/users.js';
 import { accessTokenFor } from '../src/accounts.js';
 import { decrypt } from '../src/crypto.js';
@@ -98,6 +98,22 @@ describe('api keys', () => {
     expect(await callerFor(env, req)).toBeNull();
     const after = await env.DB.prepare('SELECT api_key_hash, api_key_hint FROM workspaces WHERE id = ?').bind(workspace_id).first();
     expect(after).toEqual({ api_key_hash: null, api_key_hint: null });
+  });
+
+  it('keeps an encrypted copy the owner can read back, and a name', async () => {
+    const { workspace_id } = await intake(fakeTk());
+    const k = await rotateApiKey(env, workspace_id);
+    expect(await revealApiKey(env, workspace_id)).toBe(k);
+    const row = await env.DB.prepare('SELECT api_key_enc, api_key_name FROM workspaces WHERE id = ?').bind(workspace_id).first();
+    expect(row.api_key_enc).not.toContain(k);
+    expect(row.api_key_name).toBe('Main key');
+    await renameApiKey(env, workspace_id, 'Claude on my Mac');
+    const k2 = await rotateApiKey(env, workspace_id);
+    expect(await revealApiKey(env, workspace_id)).toBe(k2);
+    expect((await env.DB.prepare('SELECT api_key_name FROM workspaces WHERE id = ?').bind(workspace_id).first()).api_key_name).toBe('Claude on my Mac');
+    await expect(renameApiKey(env, workspace_id, '')).rejects.toThrow();
+    await revokeApiKey(env, workspace_id);
+    await expect(revealApiKey(env, workspace_id)).rejects.toThrow(/no API key/);
   });
 });
 

@@ -1441,3 +1441,23 @@ kbd{font:600 12px/1 var(--mono,ui-monospace,monospace);background:var(--surface)
 .kacts .btn{display:inline-flex;align-items:center;gap:6px}
 .mnum>header{justify-content:flex-start;text-align:left}.mnum>header>div{flex:1;min-width:0}
 .krow{flex-wrap:nowrap}.krow code{flex:0 1 auto;min-width:0}.krow>*{flex-shrink:0}.krow>code{flex-shrink:1}
+/* MCP: API key table */
+.ktable{width:100%;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.khead,.kline{display:grid;grid-template-columns:minmax(140px,1.2fr) minmax(180px,1.5fr) 120px auto;align-items:center;gap:14px;padding:10px 14px}
+.khead{background:var(--canvas);font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
+.kline{border-top:1px solid var(--line-2);min-height:56px}
+.kline.fresh{background:color-mix(in srgb,var(--saffron) 8%,transparent)}
+.kname{display:flex;align-items:center;gap:8px;min-width:0}
+.kname svg{color:var(--mute);flex:none}
+.kname b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kline code{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kline .kacts{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.kline .kacts .btn{display:inline-flex;align-items:center;gap:6px}
+.kempty{display:flex;align-items:center;gap:14px;width:100%;border:1px dashed var(--line);border-radius:12px;padding:14px 16px}
+.kempty>span{width:36px;height:36px;border-radius:10px;background:var(--well);display:grid;place-items:center;color:var(--mute);flex:none}
+.kempty>div{flex:1;display:flex;flex-direction:column;gap:2px}
+.kempty .btn{display:inline-flex;align-items:center;gap:6px}
+.mappr{margin-left:auto;display:flex;align-items:center;gap:12px;background:var(--canvas);border:1px solid var(--line);border-radius:12px;padding:8px 12px;flex:none}
+.mappr>div{display:flex;flex-direction:column}
+.mappr b{font-size:13.5px}.mappr .note{font-size:12px;margin:0!important}
+@media (max-width:719px){.khead{display:none}.kline{grid-template-columns:1fr auto;grid-template-areas:"n a" "c c" "d d";row-gap:4px}.kline .kname{grid-area:n}.kline .kacts{grid-area:a}.kline code{grid-area:c}.kline>.note{grid-area:d}.mnum>header{flex-wrap:wrap}.mappr{margin-left:0;width:100%;justify-content:space-between}}
