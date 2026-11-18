@@ -27,7 +27,8 @@ How to work:
 5. Times are in the workspace's time zone unless they carry an offset. Leave "at" out to use the brand's next free posting slot.
 6. If the workspace has approval on, confirmed posts wait as drafts until a person approves them in Publisher. Say so.
 7. Each confirmed run returns a batch_id; undo_batch cancels everything in it that has not been published.
-8. Files: if they are online, give their links to upload_to_folder. If they are on the person's own computer and you can run commands there, call get_upload_links, then upload each file to its link (one command each, in order). Upload only the files the person named, never others from their computer.`;
+8. Posts made outside Publisher (in the apps, or before an account was connected) are read in with their numbers, so list_posts and get_stats cover whole accounts. They carry imported: true and are read-only: they cannot be edited, cancelled or retried.
+9. Files: if they are online, give their links to upload_to_folder. If they are on the person's own computer and you can run commands there, call get_upload_links, then upload each file to its link (one command each, in order). Upload only the files the person named, never others from their computer.`;
 
 const str = (description, extra = {}) => ({ type: 'string', description, ...extra });
 const UPLOAD_LINK_TTL = 15 * 60;
@@ -131,7 +132,7 @@ const TOOLS = [
   },
   {
     name: 'list_posts',
-    description: 'Posts in a time window (default: the last 7 days and the next 21), with status (awaiting_approval, queued, publishing, published, failed), caption, folder, batch and numbers.',
+    description: 'Posts in a time window (default: the last 7 days and the next 21), with status (awaiting_approval, queued, publishing, published, failed), caption, folder, batch and numbers. Posts made outside Publisher have imported: true and are read-only.',
     inputSchema: { type: 'object', properties: { brand: brandArg, from: str('From'), to: str('To'),
       status: str('Only this status', { enum: ['all', 'draft', 'queued', 'publishing', 'published', 'failed'] }) } },
     annotations: { readOnlyHint: true },
@@ -174,7 +175,8 @@ const TOOLS = [
       const st = await getStats(c.env, c.who, a.days || 30, undefined, a.platform || 'all', b === undefined ? 'all' : b === null ? 'none' : b.id);
       return { days: st.days, published: st.published, tracked: st.tracked, totals: st.totals, previous: st.previous, followers: st.followers,
         by_platform: st.by_platform, accounts: st.accounts,
-        top: (st.top || []).map(p => ({ post_id: p.id, platform: p.platform, username: p.username, at: p.scheduled_at, caption: p.caption, stats: p.stats, post_url: p.post_url })) };
+        imported: st.imported,
+        top: (st.top || []).map(p => ({ post_id: p.id, platform: p.platform, username: p.username, at: p.scheduled_at, caption: p.caption, stats: p.stats, post_url: p.post_url, imported: p.imported })) };
     },
   },
 ];

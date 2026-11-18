@@ -118,6 +118,16 @@ export function meta({ appId, appSecret, igAppId, igAppSecret, fetch }) {
           + (insights ? ',insights.metric(post_media_view,post_total_media_view_unique)' : '') } }),
     fbPageStats: (token, pageId) => call(`/${pageId}`, { label: 'facebook page stats',
       params: { fields: 'followers_count,fan_count,picture{url}', access_token: token } }),
+
+    // Past posts, newest first, a page at a time: { data, paging.cursors.after }.
+    igMediaPage: (token, igId, { after, insights = false } = {}) => call(`/${igId}/media`, { base: GRAPH_IG, label: 'instagram media list',
+      params: { access_token: token, limit: '50', ...(after ? { after } : {}),
+        fields: 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count'
+          + (insights ? ',insights.metric(views,reach,saved,shares)' : '') } }),
+    fbPostsPage: (token, pageId, { after, since, insights = false } = {}) => call(`/${pageId}/posts`, { label: 'facebook post list',
+      params: { access_token: token, limit: '50', ...(after ? { after } : {}), ...(since ? { since: String(since) } : {}),
+        fields: 'id,message,created_time,permalink_url,full_picture,shares,reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0)'
+          + (insights ? ',insights.metric(post_media_view,post_total_media_view_unique)' : '') } }),
   };
 }
 

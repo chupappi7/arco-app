@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS accounts (
   token_updated_at INTEGER NOT NULL,
   followers INTEGER,                       -- last follower count read from the platform
   stats_at INTEGER,                        -- when it was read
-  insights_denied_at INTEGER               -- the account's token cannot read insights (views, reach)
+  insights_denied_at INTEGER,              -- the account's token cannot read insights (views, reach)
+  imported_at INTEGER,                     -- last full read of its past posts (90 days back)
+  import_cursor TEXT                       -- the platform's paging cursor while a read is under way
 );
 CREATE INDEX IF NOT EXISTS accounts_ws ON accounts(workspace_id);
 CREATE INDEX IF NOT EXISTS accounts_meta_user ON accounts(meta_user_id);
@@ -159,6 +161,9 @@ CREATE TABLE IF NOT EXISTS posts (
   fail_reason TEXT,
   stats TEXT,                              -- JSON: likes, comments, shares, views, reach, saves
   stats_at INTEGER,                        -- when they were read
+  imported INTEGER NOT NULL DEFAULT 0,     -- 1: posted outside Publisher, read in from the platform (read-only)
+  media_url TEXT,                          -- imported only: the platform's media link
+  thumb_url TEXT,                          -- imported only: the platform's thumbnail
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -166,6 +171,7 @@ CREATE INDEX IF NOT EXISTS posts_due ON posts(status, next_attempt_at);
 CREATE INDEX IF NOT EXISTS posts_folder ON posts(folder_id);
 CREATE INDEX IF NOT EXISTS posts_batch ON posts(batch_id);
 CREATE INDEX IF NOT EXISTS posts_stats ON posts(status, stats_at);
+CREATE INDEX IF NOT EXISTS posts_remote ON posts(account_id, public_post_id);
 
 -- One follower count per account per UTC day, for "new followers".
 CREATE TABLE IF NOT EXISTS follower_history (

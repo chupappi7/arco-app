@@ -96,7 +96,13 @@ export function postJson(env, row) {
     folder_id: row.folder_id ?? null, batch_id: row.batch_id ?? null, source: row.source ?? null,
     post_url: row.status === 'published' ? (row.post_url || tiktokUrl(row)) : null,
     stats: row.stats ? JSON.parse(row.stats) : null, stats_at: row.stats_at ?? null,
+    imported: !!row.imported, thumb_url: row.thumb_url ?? null, media_url: row.media_url ?? null,
   };
+}
+
+// A post read in from the platform (posted outside Publisher) is only shown.
+export function refuseImported(row) {
+  if (row.imported) throw new HttpError(400, 'This post was made outside Publisher, so it can only be viewed here', 'imported');
 }
 
 export async function loadPost(env, w, id) {
@@ -131,6 +137,7 @@ export async function createPost(env, tk, w, input) {
   const replaces = typeof input?.replaces === 'string' && input.replaces ? input.replaces : null;
   if (replaces) {
     const old = await loadPost(env, w, replaces);
+    refuseImported(old);
     if (old.status !== 'queued') throw new HttpError(409, 'That post has already started or finished, so it cannot be edited');
   }
 
@@ -207,6 +214,7 @@ export async function listPosts(env, w, from, to) {
 
 export async function cancelPost(env, w, id) {
   const row = await loadPost(env, w, id);
+  refuseImported(row);
   if (row.status === 'draft') {
     const t = now();
     await env.DB.batch([
@@ -226,6 +234,7 @@ export async function cancelPost(env, w, id) {
 
 export async function retryPost(env, w, id) {
   const row = await loadPost(env, w, id);
+  refuseImported(row);
   if (row.status !== 'failed') throw new HttpError(409, 'Only failed posts can be retried');
   if (row.publish_id !== null) {
     throw new HttpError(409, 'This post may already have been published. Check the profile, then use Edit to post it again.');
@@ -260,6 +269,7 @@ export async function listDrafts(env, w) {
 // never changed under it.
 export async function updatePost(env, w, id, body) {
   const row = await loadPost(env, w, id);
+  refuseImported(row);
   if (!['queued', 'draft'].includes(row.status)) throw new HttpError(409, 'That post has already started or finished');
   const merged = { account_id: row.account_id, image_keys: JSON.parse(row.image_keys), video_key: row.video_key, cover_index: row.cover_index,
     settings: JSON.parse(row.settings), title: body?.title ?? row.title, caption: body?.caption ?? row.caption,

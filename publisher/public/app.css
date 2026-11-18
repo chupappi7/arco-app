@@ -1208,3 +1208,10 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .rpost>.scols{display:grid;grid-template-columns:repeat(4,58px);flex:none;margin-left:auto;color:var(--mute);font-size:12.5px;font-variant-numeric:tabular-nums}
 .rpost>.scols span{display:inline-flex;align-items:center;justify-content:flex-end;gap:3px;white-space:nowrap}
 @media (max-width:719px){.rpost>.scols{grid-template-columns:repeat(4,44px)}}
+/* Posts made outside Publisher, read in from the platform: a quiet tag and a dashed edge. */
+.otag{display:inline-block;font-size:10.5px;font-weight:650;line-height:1.55;padding:0 7px;border-radius:999px;background:var(--line-2);color:var(--mute);white-space:nowrap;vertical-align:middle}
+.rpost .wh .otag{display:inline-block;margin-left:6px;font-size:10.5px;color:var(--mute)}
+.tx .otag{align-self:flex-start;margin-top:2px;font-size:10px;padding:0 5px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.tp .im .otag{position:absolute;left:8px;bottom:8px;max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis;background:rgba(0,0,0,.6);color:#fff}
+.opt.imp,.pc.imp,.mp.imp{border-left-style:dashed}
+.aimp{display:block;font-size:11.5px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

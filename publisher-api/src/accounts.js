@@ -5,9 +5,13 @@ import { wsOf, inScope } from './scope.js';
 
 export async function listAccounts(env, w) {
   const sc = inScope(w);
-  const { results } = await env.DB.prepare(`SELECT id, platform, username, display_name, avatar_url, needs_reconnect, brand_id
+  const { results } = await env.DB.prepare(`SELECT id, platform, username, display_name, avatar_url, needs_reconnect, brand_id,
+      imported_at, import_cursor, (SELECT COUNT(*) FROM posts p WHERE p.account_id = accounts.id AND p.imported = 1) AS imported_posts
       FROM accounts WHERE workspace_id = ?${sc.sql} ORDER BY connected_at`).bind(wsOf(w), ...sc.binds).all();
-  return results.map(r => ({ ...r, needs_reconnect: !!r.needs_reconnect }));
+  // imported_posts: past posts read in from the platform; importing: a read is
+  // still under way (or has not started).
+  return results.map(({ import_cursor, ...r }) => ({ ...r, needs_reconnect: !!r.needs_reconnect,
+    importing: r.imported_at === null || import_cursor !== null }));
 }
 
 export async function getAccount(env, w, id) {
@@ -86,6 +90,8 @@ export async function disconnect(env, w, id) {
     env.DB.prepare(`UPDATE media SET delete_after = ? WHERE post_id IN
         (SELECT id FROM posts WHERE account_id = ?) AND delete_after IS NULL`).bind(t + KEEP_AFTER_DONE, id),
     env.DB.prepare('DELETE FROM follower_history WHERE account_id = ?').bind(id),
+    // Its past posts were only read in; connecting it again reads them again.
+    env.DB.prepare('DELETE FROM posts WHERE account_id = ? AND imported = 1').bind(id),
     env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(id),
   ]);
 }

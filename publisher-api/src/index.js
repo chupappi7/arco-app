@@ -17,6 +17,7 @@ import { notifyFailures } from './notify.js';
 import { writeCaptions, aiUsage } from './ai.js';
 import { runCleanup, deleteWorkspace } from './cleanup.js';
 import { refreshStats, getStats, STATS_PER_TICK } from './stats.js';
+import { importPast, IMPORT_PER_TICK } from './importer.js';
 import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './brands.js';
 
 async function me(req, env, { who }) {
@@ -200,6 +201,8 @@ export default {
       // Stats use only what publishing left of the per-run call allowance.
       const spare = L.TICK_FETCH_BUDGET - counts.calls - 3;
       await refreshStats(env, metaFor(env), tk, now(), Math.min(STATS_PER_TICK, spare)).catch(e => console.error('stats', e));
+      // Past posts get what is left after stats took their full share.
+      await importPast(env, metaFor(env), tk, now(), Math.min(IMPORT_PER_TICK, spare - STATS_PER_TICK)).catch(e => console.error('import', e));
       await runCleanup(env);
     })());
   },

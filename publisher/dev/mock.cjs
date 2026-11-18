@@ -56,7 +56,15 @@ const posts = [
   mk('ai1', 'a1', 'draft', 26, 'Your focus, explained in 7 slides. Which one surprised you?', { source: 'ai', batch_id: 'bat_1', folder_id: 'fld2', group_id: 'grp_ai1', settings: { privacy_level: '' } }),
   mk('ai2', 'a2', 'draft', 26, 'Your focus, explained in 7 slides 🧠 #focus #productivity', { source: 'ai', batch_id: 'bat_1', folder_id: 'fld2', group_id: 'grp_ai1' }),
   mk('ai3', 'a4', 'draft', 75, 'Black Friday starts now: 20% off everything with code BF20.', { source: 'ai', batch_id: 'bat_1', folder_id: 'fld1', group_id: 'grp_ai2' }),
+  // Posted in the apps themselves, read in with their numbers: read-only.
+  ...[['imp1', 'a1', -6, 'my desk setup for deep work 🎧 #studytok', { views: 23800, likes: 1904, comments: 77, shares: 140 }, 'https://www.tiktok.com/@arco.app/video/7500000000000000101'],
+    ['imp2', 'a2', -30, 'Sunday reset, phone in the drawer', { views: 6120, reach: 4200, likes: 388, comments: 21, saves: 30 }, 'https://www.instagram.com/p/imp2/'],
+    ['imp3', 'a3', -74, 'We are hiring a part-time barista. DM us.', { views: 910, likes: 64, comments: 12, shares: 9 }, 'https://www.facebook.com/imp3'],
+    ['imp4', 'a4', -100, 'Fresh out of the oven', { likes: 41, comments: 3, shares: 2 }, 'https://www.facebook.com/imp4']]
+    .map(([id, a, h, cap, stats, url]) => mk(id, a, 'published', h, cap, { images: [], image_keys: [], imported: true, thumb_url: `/fake/${id}.svg`, post_url: url, stats })),
 ];
+for (const a of me.accounts) Object.assign(a, a.needs_reconnect ? { imported_posts: 0, imported_at: null, importing: true }
+  : { imported_posts: posts.filter(x => x.imported && x.account_id === a.id).length + 17, imported_at: H(-3), importing: false });
 const svg = id => { const n = [...id].reduce((s, c) => s + c.charCodeAt(0), 0); const h = [[28, 12], [205, 225], [110, 95], [320, 295], [42, 30], [250, 265]][n % 6];
   return `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='500'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='hsl(${h[0]},60%,78%)'/><stop offset='1' stop-color='hsl(${h[1]},42%,42%)'/></linearGradient></defs><rect width='400' height='500' fill='url(#g)'/></svg>`; };
 const media = {}, tickets = {};

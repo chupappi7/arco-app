@@ -5,7 +5,7 @@ const VIDEO_INIT_URL = 'https://open.tiktokapis.com/v2/post/publish/video/init/'
 const STATUS_URL = 'https://open.tiktokapis.com/v2/post/publish/status/fetch/';
 // Numbers: user.info.stats for the account, video.list for its posts.
 const USER_STATS_URL = 'https://open.tiktokapis.com/v2/user/info/?fields=follower_count,likes_count,video_count,avatar_url';
-const VIDEO_LIST_URL = 'https://open.tiktokapis.com/v2/video/list/?fields=id,create_time,view_count,like_count,comment_count,share_count';
+const VIDEO_LIST_URL = 'https://open.tiktokapis.com/v2/video/list/?fields=id,create_time,view_count,like_count,comment_count,share_count,title,video_description,cover_image_url,share_url';
 const VIDEO_QUERY_URL = 'https://open.tiktokapis.com/v2/video/query/?fields=id,view_count,like_count,comment_count,share_count,cover_image_url';
 
 const TRANSIENT_CODES = new Set(['internal_error', 'rate_limit_exceeded']);
@@ -95,6 +95,11 @@ export function tiktok({ clientKey, clientSecret, fetch }) {
       .then(d => d.videos || []),
     // The account's 20 most recent posts, newest first.
     listVideos: accessToken => v2(VIDEO_LIST_URL, accessToken, { max_count: 20 }, 'tiktok video list').then(d => d.videos || []),
+    // One page of the account's posts, newest first; pass the returned cursor
+    // (a time in milliseconds) for the next, older page.
+    videoPage: (accessToken, cursor) => v2(VIDEO_LIST_URL, accessToken,
+      { max_count: 20, ...(cursor ? { cursor: Number(cursor) } : {}) }, 'tiktok video list')
+      .then(d => ({ videos: d.videos || [], cursor: d.cursor ?? null, has_more: !!d.has_more })),
   };
 }
 

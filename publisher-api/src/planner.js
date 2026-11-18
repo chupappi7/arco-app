@@ -7,7 +7,7 @@ import { listBrands } from './brands.js';
 import { parseSlots } from './slots.js';
 import { listFolders } from './folders.js';
 import { copyMedia, mediaUrl } from './media.js';
-import { createPost, cancelPost, updatePost, validatePost, checkLength, loadPost, postJson } from './posts.js';
+import { createPost, cancelPost, updatePost, validatePost, checkLength, loadPost, postJson, refuseImported } from './posts.js';
 
 // Scheduling by plan: what an AI agent (or any API client) uses to turn
 // library folders into posts. A plan is checked in full and shown first
@@ -265,6 +265,7 @@ export async function undoBatch(env, w, batch) {
 export async function editPost(env, w, id, body) {
   const info = await workspaceInfo(env, wsOf(w));
   const row = await loadPost(env, w, id);
+  refuseImported(row);
   const at = body?.at === undefined ? undefined : parseWhen(body.at, info.timezone);
   if (row.status === 'draft') {
     if (at !== undefined && at < now() + MIN_LEAD_SECONDS) bad('Pick a time at least 5 minutes from now');
@@ -280,6 +281,7 @@ export async function editPost(env, w, id, body) {
 // new one), with a TikTok privacy choice where needed.
 export async function approvePost(env, tk, w, id, body = {}) {
   const row = await loadPost(env, w, id);
+  refuseImported(row);
   if (row.status !== 'draft') throw new HttpError(409, 'Only drafts can be approved');
   const info = await workspaceInfo(env, wsOf(w));
   const at = body.at === undefined ? row.scheduled_at : parseWhen(body.at, info.timezone);
@@ -318,5 +320,6 @@ export async function findPosts(env, w, { from, to, brand, status = 'all' } = {}
     when: when(r.scheduled_at, tz), platform: r.platform, account_id: r.account_id, handle: handle(r), brand_id: r.brand_id,
     folder: r.folder_id ? { id: r.folder_id, name: r.folder_name } : null, batch_id: r.batch_id || null, by_ai: r.source === 'ai',
     caption: r.caption, media: r.video_key ? 'video' : `${JSON.parse(r.image_keys).length} photos`,
-    fail_reason: r.fail_reason || undefined, post_url: r.post_url || undefined, stats: r.stats ? JSON.parse(r.stats) : undefined })) };
+    fail_reason: r.fail_reason || undefined, post_url: r.post_url || undefined, stats: r.stats ? JSON.parse(r.stats) : undefined,
+    imported: !!r.imported })) };
 }

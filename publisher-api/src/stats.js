@@ -17,23 +17,23 @@ export const FOLLOW_FOR = 30 * DAY;
 const YOUNG = 3 * DAY;
 const YOUNG_EVERY = 3 * 3600;
 const ACCOUNT_EVERY = 6 * 3600;
-const INSIGHTS_RETRY = 7 * DAY;
+export const INSIGHTS_RETRY = 7 * DAY;
 const ID_EVERY = 15 * 60;
-const ID_MATCH = 3600;
+export const ID_MATCH = 3600;
 export const STATS_PER_TICK = 6;
 
 const utcDay = t => new Date(t * 1000).toISOString().slice(0, 10);
-const count = v => (Number.isFinite(Number(v)) ? Number(v) : 0);
+export const count = v => (Number.isFinite(Number(v)) ? Number(v) : 0);
 // Graph says "no permission" as code 10, 200-299, or a 100 about permissions.
-const denied = err => /^(10|2\d\d)$/.test(String(err.code)) || err.code === 'scope_not_authorized'
+export const denied = err => /^(10|2\d\d)$/.test(String(err.code)) || err.code === 'scope_not_authorized'
   || /permission|scope/i.test(err.message || '');
 const resting = (a, t) => a.insights_denied_at && a.insights_denied_at > t - INSIGHTS_RETRY;
-async function rest(env, account, t) {
+export async function rest(env, account, t) {
   await env.DB.prepare('UPDATE accounts SET insights_denied_at = ? WHERE id = ?').bind(t, account.id).run();
   account.insights_denied_at = t;
 }
 
-async function markReconnect(env, accountId) {
+export async function markReconnect(env, accountId) {
   await env.DB.prepare('UPDATE accounts SET needs_reconnect = 1 WHERE id = ?').bind(accountId).run();
 }
 
@@ -118,8 +118,10 @@ async function findTikTokIds(env, tk, load, t, budget) {
       }
       if (!id) {
         if (!lists.has(p.account_id)) { spent++; lists.set(p.account_id, await tk.listVideos(token).catch(() => [])); }
-        const { results: taken } = await env.DB.prepare(`SELECT public_post_id FROM posts WHERE account_id = ? AND public_post_id IS NOT NULL`)
-          .bind(p.account_id).all();
+        // A post read in from the account's past does not claim the id: this
+        // Publisher post takes it over, and the imported copy goes.
+        const { results: taken } = await env.DB.prepare(`SELECT public_post_id FROM posts WHERE account_id = ? AND public_post_id IS NOT NULL
+            AND imported = 0`).bind(p.account_id).all();
         const claimed = new Set(taken.map(r => String(r.public_post_id)));
         const near = lists.get(p.account_id).filter(v => v.create_time && !claimed.has(String(v.id))
             && Math.abs(v.create_time - p.scheduled_at) <= ID_MATCH)
@@ -127,7 +129,10 @@ async function findTikTokIds(env, tk, load, t, budget) {
         if (near.length) id = near[0].id;
       }
     } catch (err) { console.error('tiktok id', p.id, err.message); }
-    if (id) await env.DB.prepare('UPDATE posts SET public_post_id = ?, stats_at = NULL WHERE id = ?').bind(String(id), p.id).run();
+    if (id) await env.DB.batch([
+      env.DB.prepare('UPDATE posts SET public_post_id = ?, stats_at = NULL WHERE id = ?').bind(String(id), p.id),
+      env.DB.prepare('DELETE FROM posts WHERE account_id = ? AND public_post_id = ? AND imported = 1').bind(p.account_id, String(id)),
+    ]);
     else await env.DB.prepare('UPDATE posts SET stats_at = ? WHERE id = ?').bind(t, p.id).run();
   }
   return spent;
@@ -255,9 +260,10 @@ export async function getStats(env, w, days, t = now(), platform = 'all', brand 
   const totals = Object.fromEntries(METRICS.map(m => [m, 0]));
   const has = new Set();
   const byPlatform = Object.fromEntries(PLATFORMS.map(pl => [pl, { platform: pl, posts: 0, views: null, likes: null, comments: null, shares: null, followers: null }]));
-  let tracked = 0, updated = 0;
+  let tracked = 0, updated = 0, imported = 0;
   const withStats = [];
   for (const r of rows) {
+    if (r.imported) imported++;
     const pl = r.platform || 'tiktok', d = perDay.get(utcDay(r.scheduled_at));
     byPlatform[pl].posts++;
     if (d) d.posts++;
@@ -315,7 +321,8 @@ export async function getStats(env, w, days, t = now(), platform = 'all', brand 
 
   const flagsFrom = all.map(a => ({ platform: a.platform || 'tiktok', followers: a.followers, limited: !!a.insights_denied_at && a.insights_denied_at > t - INSIGHTS_RETRY }));
   return {
-    days, platform, published: rows.length, tracked, updated_at: updated || null,
+    // published counts every post of the period, imported (posted outside Publisher) included.
+    days, platform, published: rows.length, imported, tracked, updated_at: updated || null,
     totals: Object.fromEntries(METRICS.filter(m => has.has(m)).map(m => [m, totals[m]])),
     previous: { published: prevRows.length, totals: Object.fromEntries(METRICS.filter(m => has.has(m)).map(m => [m, prev[m]])) },
     followers: { total: known.length ? known.reduce((n, a) => n + a.followers, 0) : null,

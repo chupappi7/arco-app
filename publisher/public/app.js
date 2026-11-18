@@ -312,7 +312,10 @@ function greeting() {
   return h < 5 ? 'Good evening' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-const thumbOf = p => p.images?.[p.cover_index] || p.images?.[0] || p.video;
+const thumbOf = p => p.images?.[p.cover_index] || p.images?.[0] || p.video || p.thumb_url;
+// Posts read in from the platform: made in the app itself, or before the account was connected.
+const OUTSIDE = 'Posted outside Publisher';
+const outTag = (p, short) => p.imported ? `<span class="otag" title="${OUTSIDE}">${short ? 'Imported' : OUTSIDE}</span>` : '';
 // TikTok's own cover once stats are in; its link expires, so the post's media stays behind it.
 const thumb = (p, attrs = 'alt=""') => {
   const own = thumbOf(p), cover = p.stats?.cover;
@@ -436,9 +439,9 @@ function overviewView() {
   const days = [...Array(7)].map((_, i) => addDays(t0, i));
   const onDay = d => live.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((x, y) => x.scheduled_at - y.scheduled_at);
   const tile = p => { const st = next && p.id === next.id ? 'next' : p.status, a = all.find(x => x.id === p.account_id);
-    return `<button class="opt ${st}" data-open="${p.id}" style="--bc:${brandHue(a?.brand_id)}" title="Open post">
+    return `<button class="opt ${st}${p.imported ? ' imp' : ''}" data-open="${p.id}" style="--bc:${brandHue(a?.brand_id)}" title="Open post">
       <span class="oth">${thumb(p)}<span class="pb">${icon(p.platform || 'tiktok', 9)}</span></span>
-      <span class="tx"><b>${at(p.scheduled_at)}${st === 'failed' ? ' · failed' : st === 'next' ? ' · next' : ''}</b><span>${who(p)}</span></span></button>`; };
+      <span class="tx"><b>${at(p.scheduled_at)}${st === 'failed' ? ' · failed' : st === 'next' ? ' · next' : ''}</b><span>${who(p)}</span>${outTag(p, true)}</span></button>`; };
   const nowLine = `<div class="nowl"><time>${at(now)}</time><i></i></div>`;
   const col = (d, i) => { const k = dayKey(d), list = onDay(d), isT = i === 0;
     const before = isT ? list.filter(p => p.scheduled_at < now) : [], after = isT ? list.filter(p => p.scheduled_at >= now) : list;
@@ -471,7 +474,7 @@ function overviewView() {
   // Best of the last 7 days by views (or engagement where views are not shared), else the latest.
   const scored = cur.filter(p => p.stats).sort((x, y) => (y.stats.views || 0) - (x.stats.views || 0) || engOf(y.stats) - engOf(x.stats));
   const top = (scored.length ? scored : pub.slice().sort((x, y) => y.scheduled_at - x.scheduled_at)).slice(0, 3);
-  const ttile = p => `<button class="tp" data-open="${p.id}"><span class="im">${thumb(p)}<span class="pbadge">${appIcon(p.platform || 'tiktok', 20)}</span></span>
+  const ttile = p => `<button class="tp" data-open="${p.id}"><span class="im">${thumb(p)}<span class="pbadge">${appIcon(p.platform || 'tiktok', 20)}</span>${outTag(p, true)}</span>
     <b>${p.stats?.views != null ? `${num(p.stats.views)} views` : p.stats ? `${num(engOf(p.stats))} engagements` : fmt(p.scheduled_at, { month: 'short', day: 'numeric' })}</b>
     <span>${who(p)}</span></button>`;
   const topCard = `<section class="panel otop"><header><h2>${scored.length ? 'Top posts' : 'Recently published'}</h2><span class="note">${scored.length ? 'last 7 days' : ''}</span><a href="#analytics">See all</a></header>
@@ -569,7 +572,7 @@ function analyticsView() {
       <div class="bpv"><span>Likes</span><b>${x.likes == null ? '–' : num(x.likes)}</b></div>
       <div class="bpv"><span>Followers</span><b>${x.followers == null ? '–' : num(x.followers)}</b></div></div>`;
   const row = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumb(p, 'class="thumb" alt=""') || '<span class="noimg"></span>'}
-      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${fmt(p.scheduled_at, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>
+      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${fmt(p.scheduled_at, { month: 'short', day: 'numeric', year: 'numeric' })}${outTag(p)}</span></div>
       <span class="scols">${['views', 'likes', 'comments', 'shares'].map(k => `<span title="${METRIC[k]}">${ui(STAT_ICON[k], 12)}${p.stats?.[k] == null ? '–' : num(p.stats[k])}</span>`).join('')}</span></div>`;
   const acc = a => `<div class="arow">${icon(a.platform, 14)}<b>${who(a)}</b>
       <span class="fv">${a.limited && a.platform === 'tiktok' ? `<a class="rc" href="/api/auth/start?add=1">Reconnect</a>` : a.followers == null ? '<em>Reading…</em>' : num(a.followers)}</span>
@@ -1903,15 +1906,15 @@ function postCard(p, compact) {
   const time = fmt(p.scheduled_at, { hour: '2-digit', minute: '2-digit' });
   const drag = p.status === 'queued' ? `draggable="true" data-drag="${p.id}"` : '';
   if (compact) {
-    return `<div class="mp ${p.status}" ${drag} data-open="${p.id}" role="button" tabindex="0"
-        title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.status}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
+    return `<div class="mp ${p.status}${p.imported ? ' imp' : ''}" ${drag} data-open="${p.id}" role="button" tabindex="0"
+        title="${esc(`${PLATFORM[p.platform] || 'TikTok'} · ${p.username} · ${p.imported ? OUTSIDE.toLowerCase() : p.status}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
       ${thumb(p) || '<span class="noimg"></span>'}<div><b>${icon(p.platform || 'tiktok', 11)}${at(p.scheduled_at)}</b><span>${bdot(p)}${p.platform === 'facebook' ? '' : '@'}${esc(p.username)}</span></div></div>`;
   }
   // Week view: a small row per post. Everything you can do with it is one
   // click away in the drawer.
-  const label = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
-  return `<div class="pc ${p.status}" ${drag} data-open="${p.id}" role="button" tabindex="0"
-      title="${esc(`${label}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
+  const label = p.imported ? 'Imported' : { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
+  return `<div class="pc ${p.status}${p.imported ? ' imp' : ''}" ${drag} data-open="${p.id}" role="button" tabindex="0"
+      title="${esc(`${p.imported ? OUTSIDE : label}${p.fail_reason ? `: ${p.fail_reason}` : ''}`)}">
     ${thumb(p) || '<span class="noimg"></span>'}
     <div class="pt"><b>${icon(p.platform || 'tiktok', 12)}${at(p.scheduled_at)}</b>
       <span>${bdot(p)}${who(p)}</span>
@@ -1970,13 +1973,13 @@ function detailView() {
   if (!p) return '';
   const a = acct(p.account_id), editable = p.status === 'queued', pl = p.platform || 'tiktok';
   const label = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
-  const cover = p.images[p.cover_index] || p.images[0];
+  const cover = p.images[p.cover_index] || p.images[0] || p.thumb_url;
   return `<div class="overlay" id="overlay"><aside class="drawer" role="dialog" aria-modal="true" aria-label="Post">
     <header class="dh">${withBadge(avatar(a?.avatar_url, p.username), pl)}
       <div><b>${pl === 'facebook' ? '' : '@'}${esc(p.username)}</b><span>${PLATFORM[pl]}</span></div>
       <button class="xbtn" id="closedetail" aria-label="Close">${ui('x', 18)}</button></header>
     <div class="dscroll">
-      <div class="dwhen"><span class="st ${p.status === 'queued' ? 'queued' : p.status}">${label}</span>
+      <div class="dwhen"><span class="st ${p.status === 'queued' ? 'queued' : p.status}">${label}</span>${outTag(p)}
         <b>${fmt(p.scheduled_at, { weekday: 'long', month: 'short', day: 'numeric' })} · ${at(p.scheduled_at)}</b>
         <small>${esc(tz().replace(/_/g, ' '))}</small></div>
       ${p.fail_reason ? `<div class="dfail">${ui('x', 15)}<span>${esc(p.fail_reason)}</span></div>` : ''}
@@ -1984,7 +1987,8 @@ function detailView() {
       ${p.video ? `<div class="dmedia"><video class="big" src="${esc(p.video)}" poster="${esc(p.video)}.jpg" controls preload="none" playsinline></video></div>`
         : cover ? `<div class="dmedia"><img class="big" src="${esc(cover)}" alt="Cover">
         ${p.images.length > 1 ? `<div class="dthumbs">${p.images.map((u, n) => `<img src="${esc(u)}" alt="Photo ${n + 1}" class="${n === p.cover_index ? 'cv' : ''}">`).join('')}</div>` : ''}</div>`
-        : `<p class="note">${['published', 'failed', 'cancelled'].includes(p.status) ? 'The photos were deleted 7 days after the post finished.' : 'No photos.'}</p>`}
+        : `<p class="note">${p.imported ? `${PLATFORM[pl]} did not share a picture of this post.` : ['published', 'failed', 'cancelled'].includes(p.status) ? 'The photos were deleted 7 days after the post finished.' : 'No photos.'}</p>`}
+      ${p.imported ? `<p class="note">Posted on ${PLATFORM[pl]} directly, not through Publisher. Its numbers are read from ${PLATFORM[pl]}, and it can only be viewed here.</p>` : ''}
       ${p.title ? `<p class="dtitle">${esc(p.title)}</p>` : ''}
       <label class="f" for="dcap">Caption</label>
       ${editable ? `<textarea id="dcap">${esc(p.caption)}</textarea>`
@@ -1994,8 +1998,8 @@ function detailView() {
       ${editable ? `<button class="btn" id="savecap">Save caption</button><button class="btn sec" data-edit="${p.id}">Open in editor</button>
         <button class="btn ghost danger" data-cancel="${p.id}">Cancel post</button>` : ''}
       ${p.status === 'failed' ? `<button class="btn" data-retry="${p.id}">Retry</button><button class="btn sec" data-edit="${p.id}">Edit</button>` : ''}
-      ${p.status === 'published' || p.status === 'cancelled' ? `<button class="btn sec" data-again="${p.id}">Post again</button>` : ''}
-      ${p.post_url ? `<a class="btn ${p.status === 'published' ? '' : 'sec'}" href="${esc(p.post_url)}" target="_blank" rel="noopener">View live post</a>` : ''}
+      ${(p.status === 'published' || p.status === 'cancelled') && !p.imported ? `<button class="btn sec" data-again="${p.id}">Post again</button>` : ''}
+      ${p.post_url ? `<a class="btn ${p.status === 'published' ? '' : 'sec'}" href="${esc(p.post_url)}" target="_blank" rel="noopener">${p.imported ? `Open on ${PLATFORM[pl]}` : 'View live post'}</a>` : ''}
     </footer></aside></div>`;
 }
 
@@ -2075,11 +2079,15 @@ function accountCard(x) {
       <button class="btn ghost danger" data-disc="${x.id}">Disconnect</button></div></div>`;
 }
 
+// "Imported 40 past posts · updated 3 h ago": what was read in from the account's own past.
+const importLine = x => x.imported_posts === undefined ? '' : `<small class="aimp">${x.imported_at == null && x.importing
+  ? 'Reading past posts…' : `Imported ${num(x.imported_posts)} past post${x.imported_posts === 1 ? '' : 's'}${x.imported_at ? ` · updated ${ago(x.imported_at)}` : ''}${x.importing ? ' · reading…' : ''}`}</small>`;
+
 // One row per account, inside its platform's slot.
 function acctRow(x, inBrandCard) {
   const pl = platformOf(x);
   return `<div class="arow3 ${x.needs_reconnect ? 'bad' : ''}">${withBadge(avatar(x.avatar_url, x.username || x.display_name), pl)}
-    <div class="aname"><b>${handle(x)}</b><span>${x.needs_reconnect ? '<em class="st bad">Reconnect needed</em>' : '<em class="st ok">Connected</em>'}${x.display_name && x.display_name !== x.username ? ` · ${esc(x.display_name)}` : ''}</span></div>
+    <div class="aname"><b>${handle(x)}</b><span>${x.needs_reconnect ? '<em class="st bad">Reconnect needed</em>' : '<em class="st ok">Connected</em>'}${x.display_name && x.display_name !== x.username ? ` · ${esc(x.display_name)}` : ''}</span>${importLine(x)}</div>
     <div class="aacts">${x.needs_reconnect && connectHref(pl) ? `<a class="btn sm" href="${connectHref(pl)}">Reconnect</a>` : ''}
       ${inBrandCard ? `<button class="btn ghost sm" data-unbrand="${x.id}">Remove</button>`
         : S.me.brands.length ? `<select class="sm" data-move="${x.id}" aria-label="Add ${esc(x.username)} to a brand"><option value="">Add to brand…</option>
