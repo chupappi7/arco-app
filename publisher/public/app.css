@@ -1461,3 +1461,7 @@ kbd{font:600 12px/1 var(--mono,ui-monospace,monospace);background:var(--surface)
 .mappr>div{display:flex;flex-direction:column}
 .mappr b{font-size:13.5px}.mappr .note{font-size:12px;margin:0!important}
 @media (max-width:719px){.khead{display:none}.kline{grid-template-columns:1fr auto;grid-template-areas:"n a" "c c" "d d";row-gap:4px}.kline .kname{grid-area:n}.kline .kacts{grid-area:a}.kline code{grid-area:c}.kline>.note{grid-area:d}.mnum>header{flex-wrap:wrap}.mappr{margin-left:0;width:100%;justify-content:space-between}}
+.mintro .mappr{margin:16px 0 0;width:max-content;max-width:100%;justify-content:space-between;gap:16px}
+.mprompts{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:1099px){.mprompts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:719px){.mprompts{grid-template-columns:1fr}.mintro .mappr{width:100%}}

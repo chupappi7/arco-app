@@ -876,63 +876,57 @@ const APP_TILE = {
   other: ['#3b4252', '<g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M9 4v4M15 4v4M7 8h10v3a5 5 0 0 1-10 0zM12 16v4"/></g>'],
 };
 const appTile = (id, s = 36) => `<svg class="apptile" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="${APP_TILE[id][0]}"/>${APP_TILE[id][1]}</svg>`;
-const CLIENTS = [['code', 'Claude Code'], ['desktop', 'Claude Desktop'], ['cursor', 'Cursor'], ['other', 'VS Code & others']];
+const CLIENTS = [['desktop', 'Claude app & claude.ai'], ['code', 'Claude Code'], ['cursor', 'Cursor'], ['other', 'VS Code & others']];
+// What a key-holding Copy button puts on the clipboard: the connector link, or a config around it.
+const linkText = (kind, key) => { const link = `${mcpUrl()}/${key}`;
+  return kind === 'link' ? link : JSON.stringify({ mcpServers: { 'arco-publisher': { url: link } } }, null, 2); };
 
 // What to copy for each app, and the one line that says where it goes.
 // Step by step for each app, written for someone who has never opened a
 // terminal or a config file. Mac and Windows differ in keys and menus.
 const isWin = () => /Windows/.test(navigator.userAgent);
 function clientSetup(key) {
-  const k = key || 'apk_YOUR_KEY', url = mcpUrl(), c = CLIENTS.some(x => x[0] === S.aiClient) ? S.aiClient : 'code';
+  const url = mcpUrl(), c = CLIENTS.some(x => x[0] === S.aiClient) ? S.aiClient : 'desktop';
   const os = S.aiOS || (isWin() ? 'win' : 'mac'), mac = os === 'mac';
   const kb = (m, w) => `<kbd>${mac ? m : w}</kbd>`;
-  const json = cfg => JSON.stringify(cfg, null, 2);
-  const remote = json({ mcpServers: { 'arco-publisher': { url, headers: { Authorization: `Bearer ${k}` } } } });
-  const desktopCfg = json({ mcpServers: { 'arco-publisher': { command: 'npx', args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${ARCO_AUTH}'], env: { ARCO_AUTH: `Bearer ${k}` } } } });
+  const canCopy = !!key || (S.me.api_key_set && S.me.api_key_copyable);
+  const keyCopy = (kind, label) => canCopy ? `<button type="button" class="btn sm" data-keycopy="${kind}">${ui('copy', 14)}${label}</button>`
+    : `<span class="note warn">${S.me.api_key_set ? 'Make a new key in step 1 first, so it can be copied.' : 'Create your key in step 1 first.'}</span>`;
   const cmd = mac
     ? `printf 'Paste your Publisher API key: '; read -rs ARCO_KEY; echo; claude mcp add --scope user --transport http arco-publisher ${url} --header "Authorization: Bearer $ARCO_KEY"; unset ARCO_KEY`
     : `$k = Read-Host 'Paste your Publisher API key' -AsSecureString; $p = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($k)); claude mcp add --scope user --transport http arco-publisher ${url} --header "Authorization: Bearer $p"; Remove-Variable k, p`;
   const copy = (text, label) => copyBtn(text, `${ui('copy', 14)}${label}`).replace('btn sec sm', 'btn sm');
-  const keyStep = key ? 'Your key is already filled in.' : `It holds <code>apk_YOUR_KEY</code>. Create your key in step 1 above first, then copy again and your key is filled in.`;
   const shell = mac ? '<b>Terminal</b>' : '<b>PowerShell</b>';
-  const openShell = mac ? `Open ${shell}: press ${kb('⌘ Space')}, type <b>Terminal</b>, press ${kb('Return')}.`
-    : `Open ${shell}: press the ${kb('', 'Windows')} key, type <b>PowerShell</b>, press ${kb('', 'Enter')}.`;
   const steps = {
+    desktop: [
+      `Copy your connector link: ${keyCopy('link', 'Copy link')}`,
+      `In Claude, open <b>Settings</b> → <b>Connectors</b>. ${mac ? 'In the app: the <b>Claude</b> menu at the top.' : 'In the app: the <b>☰</b> menu → <b>File</b> → <b>Settings</b>.'} On claude.ai: click your name at the bottom left.`,
+      `Click <b>Add custom connector</b>. Name it <b>ARCO Publisher</b>, paste the link with ${kb('⌘ V', 'Ctrl V')} and click <b>Add</b>.`,
+      `Start a new chat and ask. If it doesn't reply with your posts, open the <b>+</b> menu in the chat box and switch <b>ARCO Publisher</b> on.`,
+    ],
     code: [
       `Install Claude Code if you don't have it: follow <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">Anthropic's install guide</a>.`,
-      openShell,
-      `Copy the setup command: ${copy(cmd, 'Copy command')}`,
-      `Click in the ${shell} window, paste with ${kb('⌘ V', 'Ctrl V')} and press ${kb('Return', 'Enter')}.`,
-      `It asks for your key: paste it with ${kb('⌘ V', 'Ctrl V')} and press ${kb('Return', 'Enter')}. Nothing shows while you paste; that is on purpose.`,
-      `Type <code>claude</code> and press ${kb('Return', 'Enter')}. Then type <code>/mcp</code>: <b>arco-publisher</b> should say connected.`,
-    ],
-    desktop: [
-      `Install <b>Node.js</b> once: go to <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>, download the LTS version and run the installer.`,
-      `Open Claude Desktop, then ${mac ? '<b>Claude</b> menu at the top → <b>Settings</b>' : 'the <b>☰</b> menu at the top left → <b>File</b> → <b>Settings</b>'} → <b>Developer</b> → <b>Edit Config</b>.`,
-      `A folder opens with <code>claude_desktop_config.json</code>. ${mac ? 'Right-click it → <b>Open With</b> → <b>TextEdit</b>.' : 'Right-click it → <b>Open with</b> → <b>Notepad</b>.'}`,
-      `Copy the settings: ${copy(desktopCfg, 'Copy config')} ${keyStep}`,
-      `In the file, select everything with ${kb('⌘ A', 'Ctrl A')}, paste with ${kb('⌘ V', 'Ctrl V')} and save with ${kb('⌘ S', 'Ctrl S')}. If the file already lists other servers, add only the <b>arco-publisher</b> part.`,
-      `Quit Claude completely (${mac ? `${kb('⌘ Q')}` : 'right-click its icon by the clock → <b>Quit</b>'}) and open it again. In a new chat, the tools menu now lists <b>arco-publisher</b>.`,
+      mac ? `Open ${shell}: press ${kb('⌘ Space')}, type <b>Terminal</b>, press ${kb('Return')}.` : `Open ${shell}: press the ${kb('', 'Windows')} key, type <b>PowerShell</b>, press ${kb('', 'Enter')}.`,
+      `Copy the setup command: ${copy(cmd, 'Copy command')} then paste it in with ${kb('⌘ V', 'Ctrl V')} and press ${kb('Return', 'Enter')}.`,
+      `It asks for your key: copy it in step 1, paste and press ${kb('Return', 'Enter')}. Nothing shows while you paste; that is on purpose.`,
+      `Type <code>claude</code> and press ${kb('Return', 'Enter')}, then ask.`,
     ],
     cursor: [
-      `Open Cursor, then ${mac ? '<b>Cursor</b> menu → <b>Settings</b> → <b>Cursor Settings</b>' : '<b>File</b> → <b>Preferences</b> → <b>Cursor Settings</b>'}.`,
-      `Go to <b>MCP</b> (or <b>Tools &amp; MCP</b>) and click <b>Add new MCP server</b>. A file called <code>mcp.json</code> opens.`,
-      `Copy the settings: ${copy(remote, 'Copy config')} ${keyStep}`,
-      `In <code>mcp.json</code>, select everything with ${kb('⌘ A', 'Ctrl A')}, paste with ${kb('⌘ V', 'Ctrl V')} and save with ${kb('⌘ S', 'Ctrl S')}.`,
-      `Back in the MCP settings, <b>arco-publisher</b> shows a green dot. Open a chat and ask.`,
+      `Open Cursor, then ${mac ? '<b>Cursor</b> menu → <b>Settings</b> → <b>Cursor Settings</b>' : '<b>File</b> → <b>Preferences</b> → <b>Cursor Settings</b>'} → <b>MCP</b> → <b>Add new MCP server</b>.`,
+      `Copy the settings: ${keyCopy('config', 'Copy settings')}`,
+      `In the file that opens, select all with ${kb('⌘ A', 'Ctrl A')}, paste with ${kb('⌘ V', 'Ctrl V')}, save with ${kb('⌘ S', 'Ctrl S')}. A green dot means it's connected.`,
     ],
     other: [
-      `Open your app's MCP settings. VS Code: ${kb('⌘ ⇧ P', 'Ctrl Shift P')}, type <b>MCP: Open User Configuration</b>. Windsurf: <b>Settings</b> → <b>MCP</b>.`,
-      `Copy the settings: ${copy(remote, 'Copy config')} ${keyStep}`,
-      `Paste them into that file and save with ${kb('⌘ S', 'Ctrl S')}. Keep any servers already there.`,
-      `Restart the app if it asks, then ask in its chat.`,
+      `Open your app's MCP settings. VS Code: ${kb('⌘ ⇧ P', 'Ctrl Shift P')}, then <b>MCP: Add Server</b> → <b>HTTP</b>.`,
+      `Copy your connector link: ${keyCopy('link', 'Copy link')} and paste it as the server address.`,
+      `Name it <b>arco-publisher</b>, save, and ask in the app's chat.`,
     ],
   }[c];
   return `<div class="mapps" role="tablist">${CLIENTS.map(([id, l]) => `<button role="tab" class="mapp ${c === id ? 'on' : ''}" data-aiclient="${id}" aria-selected="${c === id}">${appTile(id, 30)}<span>${l}</span></button>`).join('')}</div>
     <div class="howto"><div class="howhead"><b>${CLIENTS.find(x => x[0] === c)[1]} on</b>
         <div class="seg" role="group" aria-label="Computer">${[['mac', 'Mac'], ['win', 'Windows']].map(([o, l]) => `<button data-aios="${o}" class="${o === os ? 'on' : ''}" aria-pressed="${o === os}">${l}</button>`).join('')}</div></div>
       <ol class="hsteps">${steps.map(t => `<li>${t}</li>`).join('')}</ol>
-      ${c !== 'code' && key ? '<p class="note">The file now holds your key. Keep it private.</p>' : ''}</div>`;
+      ${c === 'code' ? '' : '<p class="note">The link holds your key, so keep it private. Making a new key or deleting it in step 1 switches the link off.</p>'}</div>`;
 }
 
 async function newApiKey() {
@@ -953,27 +947,28 @@ async function deleteApiKey() {
 
 function aiView() {
   const owner = can('owner'), admin = can('admin'), keySet = !!S.me.api_key_set, key = S.apiKey;
-  const brand = S.me.brands[0]?.name || 'my brand';
   const unused = (S.folders || []).filter(f => f.status === 'unused' && f.items.length).length;
   const waiting = (S.drafts || []).filter(d => d.source === 'ai').length;
   const review = S.me.ai_review !== false;
   const prompts = [
-    ['cal', 'Plan', `Schedule the new ${brand} posts for next week, one a day. Show me the plan first.`],
-    ['edit', 'Write', `Write a short, funny caption for the newest ${brand} post.`],
-    ['chart', 'Learn', 'Which posts did best this month, and why?'],
-    ['image', 'Check', "What's in the library that isn't scheduled yet?"],
-    ['warn', 'Fix', 'Something failed yesterday. Find out why and retry it.'],
-    ['x', 'Undo', 'Undo what you just scheduled.'],
+    ['cal', 'Schedule', 'Schedule my newest library post on Sunday at 10 am to my TikTok account.'],
+    ['cal', 'Plan', 'Plan next week from my library: one post a day at 6 pm on Instagram. Show me the plan first.'],
+    ['edit', 'Write', 'Write a short, friendly caption for each of those posts, with three hashtags.'],
+    ['chart', 'Learn', 'Which of my posts did best this month, and why?'],
+    ['warn', 'Fix', 'A post failed yesterday. Find out why and post it again.'],
+    ['x', 'Undo', 'Cancel everything you scheduled for Sunday.'],
   ];
   const numbered = (n, title, sub, body, aside = '') => `<section class="panel mnum"><header><span class="stepn">${n}</span><div><h2>${title}</h2><span class="note">${sub}</span></div>${aside}</header>${body}</section>`;
   return `<section class="panel mhero">
       <div class="mintro"><span class="eyebrow">MCP</span>
         <h2>Schedule posts by asking your AI</h2>
         <p>Connect Claude or Cursor to ARCO Publisher. Ask in plain words, and it plans captions and times from your library, then schedules them once you say go.</p>
-        <ul class="mperks"><li>${ui('edit', 15)}Writes captions from your photos, notes and brand voice</li><li>${ui('cal', 15)}Fills your free posting times</li><li>${ui('check', 15)}Nothing goes out without your OK</li></ul></div>
+        <ul class="mperks"><li>${ui('edit', 15)}Writes captions from your photos, notes and brand voice</li><li>${ui('cal', 15)}Fills your free posting times</li><li>${ui('check', 15)}You see the plan before anything is scheduled</li></ul>
+        <div class="mappr"><div><b>Approve AI posts first</b><span class="note">${review ? 'Posts your AI schedules wait in Drafts for you' : 'Posts your AI schedules go straight onto the calendar'}${waiting ? ` · <a href="#drafts">${waiting} waiting</a>` : ''}</span></div>
+          ${admin ? `<label class="sw"><input type="checkbox" id="aireview" ${review ? 'checked' : ''} aria-label="Approve AI posts first"><span></span></label>` : ''}</div></div>
       <div class="mchat" aria-label="Example conversation">
-        <div class="bub me">Schedule the new ${esc(brand)} videos for next week.</div>
-        <div class="bub ai"><b>5 posts</b>, Mon to Fri at 18:00 on TikTok and Instagram. Captions are drafted from each video's note. Go?</div>
+        <div class="bub me">Schedule my new videos for next week.</div>
+        <div class="bub ai"><b>5 posts</b>, Mon to Fri at 6 pm on TikTok and Instagram. Captions are drafted from each video's note. Go?</div>
         <div class="bub me">Go</div>
         <div class="bub ai">${ui('check', 13)} Scheduled. ${review ? 'They wait in Drafts for your approval.' : 'They are on the calendar.'}</div></div>
     </section>
@@ -994,9 +989,7 @@ function aiView() {
     ${numbered(2, 'Connect your app', 'Pick the app you use and follow the steps.', `<div class="msetup">${clientSetup(key)}</div>`)}
     ${numbered(3, 'Ask', `Copy one into your AI. It uses the posts in your <a href="#library">Library</a>${unused ? ` (${unused} ready)` : ''}.`,
       `<div class="mprompts">${prompts.map(([ic, tag, p]) => `<button type="button" class="mprompt" data-copy="${esc(p)}" title="Copy">
-          <span class="mtag">${ui(ic, 13)}${tag}</span><span class="mpt">${esc(p)}</span><span class="mcopy">${ui('copy', 14)}</span></button>`).join('')}</div>`,
-      `<div class="mappr"><div><b>Approve AI posts first</b><span class="note">${review ? 'They wait in Drafts for you' : 'They go straight onto the calendar'}${waiting ? ` · <a href="#drafts">${waiting} waiting</a>` : ''}</span></div>
-        ${admin ? `<label class="sw"><input type="checkbox" id="aireview" ${review ? 'checked' : ''} aria-label="Approve AI posts first"><span></span></label>` : ''}</div>`)}
+          <span class="mtag">${ui(ic, 13)}${tag}</span><span class="mpt">${esc(p)}</span><span class="mcopy">${ui('copy', 14)}</span></button>`).join('')}</div>`)}
     <div class="mfoot">
       <p class="note">It can't connect accounts, invite people or delete brands; those stay here. <a href="/ai.html" target="_blank" rel="noopener">Full guide</a> · <a href="/ai.html#help" target="_blank" rel="noopener">Troubleshooting</a></p></div>`;
 }
@@ -2687,6 +2680,12 @@ function bind() {
     catch { toast('Copy did not work here. Select the text and copy it.', 'err'); } });
   on('[data-aiclient]', 'click', e => { S.aiClient = e.currentTarget.dataset.aiclient; render(); });
   on('[data-aios]', 'click', e => { S.aiOS = e.currentTarget.dataset.aios; render(); });
+  on('[data-keycopy]', 'click', async e => { const b = e.currentTarget, kind = b.dataset.keycopy;
+    try { const k = (S.apiKey ? Promise.resolve(S.apiKey) : api('/api-key').then(r => r.api_key)).then(x => linkText(kind, x));
+      if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ 'text/plain': k.then(t => new Blob([t], { type: 'text/plain' })) })]);
+      else await navigator.clipboard.writeText(await k);
+      const t = b.innerHTML; b.textContent = 'Copied'; setTimeout(() => { b.innerHTML = t; }, 1400); }
+    catch (er) { toast(er.message && !/clipboard|denied|document/i.test(er.message) ? er.message : 'Copy did not work here. Try again.', 'err'); } });
   on('#keycopy', 'click', async e => { const b = e.currentTarget;
     // ClipboardItem takes the key as a promise, so Safari keeps the click's permission while it loads.
     try { const k = S.apiKey ? Promise.resolve(S.apiKey) : api('/api-key').then(r => r.api_key);

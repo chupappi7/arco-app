@@ -55,6 +55,13 @@ describe('mcp protocol', () => {
     expect(init.result.instructions).toMatch(/confirm: false/);
     expect((await callWorker('/mcp', { method: 'POST', headers: h, body: { jsonrpc: '2.0', method: 'notifications/initialized' } })).status).toBe(202);
 
+    // The connector link carries the key in the path instead of a header.
+    const link = `/mcp/${h.Authorization.slice(7)}`;
+    const viaLink = await callWorker(link, { method: 'POST', body: { jsonrpc: '2.0', id: 99, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' } } } });
+    expect(viaLink.status).toBe(200);
+    expect((await viaLink.json()).result.serverInfo.name).toBe('arco-publisher');
+    expect((await callWorker(`/mcp/apk_${'0'.repeat(64)}`, { method: 'POST', body: { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} } })).status).toBe(401);
+
     const tools = (await rpc(h, 'tools/list')).body.result.tools.map(t => t.name);
     expect(tools).toEqual(expect.arrayContaining(['get_overview', 'list_folders', 'upload_to_folder', 'schedule_posts', 'undo_batch', 'get_stats']));
     expect((await rpc(h, 'nope/nope')).body.error.code).toBe(-32601);

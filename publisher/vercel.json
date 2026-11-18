@@ -3,6 +3,7 @@
   "rewrites": [
     { "source": "/api/v1/:path*", "destination": "https://arco-publisher-api.thinht7110.workers.dev/v1/:path*" },
     { "source": "/mcp", "destination": "https://arco-publisher-api.thinht7110.workers.dev/mcp" },
+    { "source": "/mcp/:key", "destination": "https://arco-publisher-api.thinht7110.workers.dev/mcp/:key" },
     { "source": "/media/:path*", "destination": "https://arco-publisher-api.thinht7110.workers.dev/media/:path*" }
   ],
   "headers": [

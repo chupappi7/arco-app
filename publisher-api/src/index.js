@@ -174,6 +174,14 @@ function toResponse(err) {
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
+    // Claude's connectors take a link, not a header: /mcp/apk_… carries the key.
+    const linked = url.pathname.match(/^\/mcp\/(apk_[0-9a-f]{64})\/?$/);
+    if (linked) {
+      const h = new Headers(req.headers);
+      h.set('Authorization', `Bearer ${linked[1]}`);
+      url.pathname = '/mcp';
+      req = new Request(url, { method: req.method, headers: h, body: req.body });
+    }
     try {
       for (const [method, pattern, handler, access] of ROUTES) {
         if (method !== req.method) continue;
