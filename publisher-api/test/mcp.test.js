@@ -238,7 +238,7 @@ describe('upload links (files on the person\'s computer)', () => {
     expect((await put(a.upload_url, new Uint8Array([...JPEG, 9]), 'image/jpeg')).status).toBe(400);
     expect((await put(b.upload_url, JPEG, 'image/png')).status).toBe(400);
     expect((await put(c.upload_url, new Uint8Array(JPEG.length).fill(7), 'image/jpeg')).status).toBe(400);
-    expect((await put(a.upload_url.replace(/.$/, 'x'), JPEG, 'image/jpeg')).status).toBe(403);
+    expect((await put(a.upload_url.replace(/.$/, ch => (ch === 'x' ? 'y' : 'x')), JPEG, 'image/jpeg')).status).toBe(403);
     expect((await tool(h, 'list_folders', {})).data.folders[0].items).toEqual([]);
   });
 

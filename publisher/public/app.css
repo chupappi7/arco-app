@@ -1535,3 +1535,4 @@ kbd{font:600 12px/1 var(--mono,ui-monospace,monospace);background:var(--surface)
 @media (max-width:719px){.kbtns{flex-direction:row;flex-wrap:wrap}}
 .kbtns{width:200px;max-width:100%}.kbtns .btn{width:100%}
 .kget>.kbtns{flex:none;width:200px}
+.pchips .aacct{width:auto;max-width:260px;border-radius:999px;padding:7px 32px 7px 14px;font-weight:600;font-size:14px}

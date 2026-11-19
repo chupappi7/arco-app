@@ -120,6 +120,10 @@ describe('getStats', () => {
     expect(s.followers).toEqual({ total: 1500, change: 50 });
     expect(s.tiktok_pending).toBe(true);
     expect((await getStats(env, 'ws1', 30, T)).totals.likes).toBe(112);
+    const one = await getStats(env, 'ws1', 7, T, 'all', 'all', 'fb1');
+    expect(one.published).toBe(1);
+    expect(one.totals).toEqual({ likes: 3, comments: 1, shares: 2 });
+    expect(one.accounts.map(a => a.id)).toEqual(['fb1']);
   });
 
   it('shows nothing from another workspace or outside a member\'s brands', async () => {

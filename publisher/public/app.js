@@ -91,8 +91,8 @@ async function boot() {
 // first tap on each shows real data instead of a placeholder.
 function prefetch() {
   if (!S.me || S.me.needs_email) return;
-  const b = curBrand(), days = S.statsDays || 30, plat = S.statsPlat || 'all', key = `${days}|${plat}|${b}`;
-  if (!statsCache.has(key)) api(`/stats?days=${days}&platform=${plat}&brand=${encodeURIComponent(b)}`).then(st => statsCache.set(key, st)).catch(() => {});
+  const b = curBrand(), days = S.statsDays || 30, plat = S.statsPlat || 'all', ac = statsAcct(plat), key = `${days}|${plat}|${b}|${ac}`;
+  if (!statsCache.has(key)) api(statsQuery(days, plat, ac)).then(st => statsCache.set(key, st)).catch(() => {});
   if (!S.lib || !S.folders) Promise.all([api('/library'), api('/folders')]).then(([l, f]) => { S.lib = S.lib || l; S.folders = S.folders || f.folders; }).catch(() => {});
   if (!S.drafts) api('/drafts').then(d => { S.drafts = S.drafts || d.drafts; }).catch(() => {});
 }
@@ -514,14 +514,18 @@ const ago = sec => { const m = Math.round((Date.now() / 1000 - sec) / 60);
   return m < 60 ? `${Math.max(1, m)} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
 
 const statsCache = new Map();
+// The chosen account, if it still belongs to the chosen brand and platform.
+const statsAcct = (plat = S.statsPlat || 'all') => { const a = S.statsAcct && acct(S.statsAcct);
+  return a && inBrand(a, curBrand()) && (plat === 'all' || platformOf(a) === plat) ? a.id : ''; };
+const statsQuery = (days, plat, ac) => `/stats?days=${days}&platform=${plat}&brand=${encodeURIComponent(curBrand())}${ac ? `&account=${encodeURIComponent(ac)}` : ''}`;
 async function loadStats(days = S.statsDays || 30, plat = S.statsPlat || 'all') {
-  S.statsDays = days; S.statsPlat = plat;
-  const key = `${days}|${plat}|${curBrand()}`;
+  S.statsDays = days; S.statsPlat = plat; S.statsAcct = statsAcct(plat);
+  const ac = S.statsAcct, key = `${days}|${plat}|${curBrand()}|${ac}`;
   S.stats = statsCache.get(key) || null;
   if (S.view === 'analytics') render();
   let st;
-  try { st = await api(`/stats?days=${days}&platform=${plat}&brand=${encodeURIComponent(curBrand())}`); statsCache.set(key, st); } catch (e) { st = statsCache.get(key) || { err: e.message }; }
-  if (key !== `${S.statsDays}|${S.statsPlat}|${curBrand()}`) return;
+  try { st = await api(statsQuery(days, plat, ac)); statsCache.set(key, st); } catch (e) { st = statsCache.get(key) || { err: e.message }; }
+  if (key !== `${S.statsDays}|${S.statsPlat}|${curBrand()}|${S.statsAcct}`) return;
   S.stats = st;
   if (S.view === 'analytics') render();
 }
@@ -562,9 +566,13 @@ const ksplit = parts => `<span class="ksplit">${parts.map(([pl, v]) =>
 function analyticsView() {
   const st = S.stats, days = S.statsDays || 30, plat = S.statsPlat || 'all';
   const plats = ORDER.filter(pl => brandAccounts().some(a => platformOf(a) === pl));
+  const pick = brandAccounts().filter(a => plat === 'all' || platformOf(a) === plat)
+    .sort((x, y) => ORDER.indexOf(platformOf(x)) - ORDER.indexOf(platformOf(y)) || String(x.username).localeCompare(String(y.username)));
   const filters = `<div class="afilters">
     <div class="pchips" role="group" aria-label="Platform">${[['all', 'All platforms'], ...plats.map(pl => [pl, PLATFORM[pl]])].map(([k, l]) =>
-      `<button class="pchip ${plat === k ? 'on' : ''}" data-aplat="${k}" aria-pressed="${plat === k}">${k === 'all' ? '' : appIcon(k, 18)}${l}</button>`).join('')}</div>
+      `<button class="pchip ${plat === k ? 'on' : ''}" data-aplat="${k}" aria-pressed="${plat === k}">${k === 'all' ? '' : appIcon(k, 18)}${l}</button>`).join('')}
+      ${pick.length > 1 ? `<select id="aacct" class="aacct" aria-label="Account"><option value="">All accounts</option>${pick.map(a =>
+        `<option value="${a.id}" ${S.statsAcct === a.id ? 'selected' : ''}>${plat === 'all' ? `${PLATFORM[platformOf(a)]} · ` : ''}${handle(a)}</option>`).join('')}</select>` : ''}</div>
     <div class="seg" role="group" aria-label="Period">${[7, 30, 90].map(d => `<button data-days="${d}" class="${d === days ? 'on' : ''}" aria-pressed="${d === days}">${d} days</button>`).join('')}</div></div>`;
   if (!st) return `${filters}${skKpis(5)}<section class="panel atrend"><div class="chart">${sk('100%', 160)}</div></section><div class="an2"><section class="panel aposts"><header><h2>Posts</h2></header><div class="oscroll">${skRows(6)}</div></section><div class="aside"><section class="panel ocard"><header><h2>Followers</h2></header><div class="oscroll">${skRows(3)}</div></section></div></div>`;
   if (st.err) return `${filters}<div class="panel empty"><b>Couldn't load the numbers.</b>${esc(st.err)}</div>`;
@@ -2695,6 +2703,7 @@ function bind() {
   on('[data-atrend]', 'click', e => { S.statsTrend = e.currentTarget.dataset.atrend; render(); });
   on('[data-asort]', 'click', e => { S.statsSort = e.currentTarget.dataset.asort; render(); });
   on('[data-aplat]', 'click', e => loadStats(undefined, e.currentTarget.dataset.aplat));
+  on('#aacct', 'change', e => { S.statsAcct = e.target.value; loadStats(); });
   on('.chart .hit', 'mouseenter', e => { const pl = e.target.closest('.plot'), tip = pl.querySelector('.ctip'), cx = pl.querySelector('.cx'), x = e.target.dataset.x;
     tip.textContent = e.target.dataset.tip; tip.style.left = `${x}%`; tip.classList.add('on'); cx.style.left = `${x}%`; cx.classList.add('on'); });
   on('.chart .plot', 'mouseleave', e => { e.currentTarget.querySelector('.ctip').classList.remove('on'); e.currentTarget.querySelector('.cx').classList.remove('on'); });

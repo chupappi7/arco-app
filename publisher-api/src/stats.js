@@ -234,11 +234,13 @@ const METRICS = ['views', 'reach', 'likes', 'comments', 'shares', 'saves'];
 // change over the period. Limited to the caller's brands like everything else.
 export const PERIODS = [7, 30, 90];
 const PLATFORMS = ['tiktok', 'instagram', 'facebook'];
-export async function getStats(env, w, days, t = now(), platform = 'all', brand = 'all') {
+export async function getStats(env, w, days, t = now(), platform = 'all', brand = 'all', account = null) {
   if (!PERIODS.includes(days)) throw new HttpError(400, 'days must be 7, 30 or 90');
   if (platform !== 'all' && !PLATFORMS.includes(platform)) throw new HttpError(400, 'unknown platform');
   const from = t - days * DAY;
   const pf = platform === 'all' ? { sql: '', binds: [] } : { sql: ' AND a.platform = ?', binds: [platform] };
+  // One account, on top of the platform and brand.
+  if (account) { pf.sql += ' AND a.id = ?'; pf.binds.push(String(account)); }
   // One brand ('none' = accounts in no brand), on top of the caller's own scope.
   const bf = col => brand === 'all' || !brand ? { sql: '', binds: [] }
     : brand === 'none' ? { sql: ` AND ${col} IS NULL`, binds: [] } : { sql: ` AND ${col} = ?`, binds: [String(brand)] };
@@ -286,6 +288,7 @@ export async function getStats(env, w, days, t = now(), platform = 'all', brand 
   const accounts = [];
   for (const a of all) {
     if (platform !== 'all' && (a.platform || 'tiktok') !== platform) continue;
+    if (account && a.id !== account) continue;
     let change = null;
     if (a.followers !== null) {
       const first = await env.DB.prepare(`SELECT day, followers FROM follower_history WHERE account_id = ? AND day >= ?
