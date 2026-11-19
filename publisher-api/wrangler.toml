@@ -3,6 +3,12 @@ main = "src/index.js"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 
+# The database lives in Asia-Pacific and each request makes several lookups in
+# a row. Smart Placement runs the Worker next to it, so a request crosses the
+# distance once instead of once per lookup.
+[placement]
+mode = "smart"
+
 [vars]
 PUBLIC_ORIGIN = "https://arco-publisher.vercel.app"
 # Where the page uploads videos directly (they skip the site's proxy).

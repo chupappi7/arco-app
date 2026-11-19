@@ -84,6 +84,17 @@ async function boot() {
   // page being opened (S.keepFlash).
   window.addEventListener('hashchange', () => { if (!S.keepFlash) S.flash = null; S.keepFlash = false; S.detail = null; route(); });
   route();
+  setTimeout(prefetch, 1200);
+}
+
+// Once the first page is up, fetch what the other pages need, quietly, so the
+// first tap on each shows real data instead of a placeholder.
+function prefetch() {
+  if (!S.me || S.me.needs_email) return;
+  const b = curBrand(), days = S.statsDays || 30, plat = S.statsPlat || 'all', key = `${days}|${plat}|${b}`;
+  if (!statsCache.has(key)) api(`/stats?days=${days}&platform=${plat}&brand=${encodeURIComponent(b)}`).then(st => statsCache.set(key, st)).catch(() => {});
+  if (!S.lib || !S.folders) Promise.all([api('/library'), api('/folders')]).then(([l, f]) => { S.lib = S.lib || l; S.folders = S.folders || f.folders; }).catch(() => {});
+  if (!S.drafts) api('/drafts').then(d => { S.drafts = S.drafts || d.drafts; }).catch(() => {});
 }
 
 async function loadMe() {
