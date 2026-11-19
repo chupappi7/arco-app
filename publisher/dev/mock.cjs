@@ -51,6 +51,8 @@ const posts = [
   mk('p7', 'a6', 'published', -50, 'Morning routine that works', { stats: { likes: 212, comments: 17, views: 4810 } }),
   mk('p8', 'a3', 'queued', 30, 'Tomorrow: new colorway'),
   mk('p9', 'a1', 'queued', 52, 'Study timer setup'),
+  // One post to three accounts at the same minute: the week shows it as one card.
+  ...['a1', 'a2', 'a6'].map((a, i) => mk(`g${i}`, a, 'queued', 3, 'Focus mode, explained', { folder_id: 'fld2', scheduled_at: Math.floor(H(3) / 60) * 60 })),
   mk('d1', 'a2', 'draft', -20, 'Draft: weekend vibes'),
   // An AI plan waiting for approval: one post to two Bakery accounts... and ARCO's TikTok.
   mk('ai1', 'a1', 'draft', 26, 'Your focus, explained in 7 slides. Which one surprised you?', { source: 'ai', batch_id: 'bat_1', folder_id: 'fld2', group_id: 'grp_ai1', settings: { privacy_level: '' } }),

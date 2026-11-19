@@ -446,22 +446,48 @@ function overviewView() {
     ['#calendar', 'Published · 7 days', String(cur.length), `${next7} scheduled next 7 days${failed.length ? ` · <span class="dn">${failed.length} failed</span>` : ''}`, ''],
   ];
 
-  // The week: today and the six days after, every post as a tile.
+  // The week: today and the six days after. The same media at the same minute on several
+  // accounts is one post to the person, so it is one card; it opens to show each account.
   const days = [...Array(7)].map((_, i) => addDays(t0, i));
-  const onDay = d => live.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((x, y) => x.scheduled_at - y.scheduled_at);
-  const tile = p => { const st = next && p.id === next.id ? 'next' : p.status, a = all.find(x => x.id === p.account_id);
+  const wAcc = S.ovAcct && ids.has(S.ovAcct) ? S.ovAcct : '';
+  const wLive = wAcc ? live.filter(p => p.account_id === wAcc) : live;
+  const onDay = d => wLive.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((x, y) => x.scheduled_at - y.scheduled_at);
+  const groupsOf = list => { const m = new Map();
+    for (const p of list) { const k = `${p.folder_id || p.video_key || (p.image_keys || []).join(',') || p.id}|${Math.floor(p.scheduled_at / 60)}`;
+      m.has(k) ? m.get(k).push(p) : m.set(k, [p]); }
+    return [...m.entries()].map(([k, ps]) => ({ k, ps, at: ps[0].scheduled_at })); };
+  const stOf = p => (next && p.id === next.id ? 'next' : p.status);
+  const gSt = ps => { const s = ps.map(stOf);
+    return s.includes('failed') ? 'failed' : s.includes('next') ? 'next' : s.every(x => x === 'published') ? 'published' : s.includes('publishing') ? 'publishing' : 'queued'; };
+  const sfx = st => (st === 'failed' ? ' · failed' : st === 'next' ? ' · next' : '');
+  const tile = p => { const st = stOf(p), a = all.find(x => x.id === p.account_id);
     return `<button class="opt ${st}" data-open="${p.id}" style="--bc:${brandHue(a?.brand_id)}" title="Open post">
       <span class="oth">${thumb(p)}<span class="pb">${icon(p.platform || 'tiktok', 9)}</span></span>
-      <span class="tx"><b>${at(p.scheduled_at)}${st === 'failed' ? ' · failed' : st === 'next' ? ' · next' : ''}</b><span>${who(p)}</span></span></button>`; };
+      <span class="tx"><b>${at(p.scheduled_at)}${sfx(st)}</b><span>${who(p)}</span></span></button>`; };
+  const gtile = g => { if (g.ps.length === 1) return tile(g.ps[0]);
+    const p = g.ps[0], st = gSt(g.ps), a = all.find(x => x.id === p.account_id), open = S.ovOpen === g.k;
+    const f = p.folder_id && folderOf(p.folder_id);
+    const avs = g.ps.slice(0, 4).map(q => { const qa = acct(q.account_id);
+      return `<span class="gav ${q.status === 'failed' ? 'bad' : ''}">${avatar(qa?.avatar_url, qa?.username || qa?.display_name)}</span>`; }).join('');
+    return `<div class="ogrp ${st} ${open ? 'open' : ''}" style="--bc:${brandHue(a?.brand_id)}">
+      <button class="opt ${st}" data-ogrp="${esc(g.k)}" aria-expanded="${open}" title="${g.ps.length} accounts">
+        <span class="oth">${thumb(p)}<span class="pb">${icon(p.platform || 'tiktok', 9)}</span></span>
+        <span class="tx"><b>${at(g.at)}${sfx(st)}</b><span>${esc(f ? f.name : (p.caption || '').split('\n')[0] || `${g.ps.length} accounts`)}</span>
+          <span class="gavs">${avs}${g.ps.length > 4 ? `<em>+${g.ps.length - 4}</em>` : ''}<small>${g.ps.length}</small></span></span></button>
+      ${open ? `<div class="gl">${g.ps.map(q => `<button class="gi ${stOf(q)}" data-open="${q.id}">${who(q)}<i>${q.status === 'queued' ? '' : q.status}</i></button>`).join('')}</div>` : ''}</div>`; };
   const nowLine = `<div class="nowl"><time>${at(now)}</time><i></i></div>`;
   const col = (d, i) => { const k = dayKey(d), list = onDay(d), isT = i === 0;
-    const before = isT ? list.filter(p => p.scheduled_at < now) : [], after = isT ? list.filter(p => p.scheduled_at >= now) : list;
-    return `<div class="owd ${isT ? 'today' : ''}"><div class="wdh"><span>${i === 0 ? 'Today' : dayLabel(d, { weekday: 'short' })} <b>${d.d}</b></span><em class="${list.length ? '' : 'z'}">${list.length || '–'}</em></div>
-      <div class="wdl">${before.map(tile).join('')}${isT && list.length ? nowLine : ''}${after.map(tile).join('')}</div>
+    const before = groupsOf(isT ? list.filter(p => p.scheduled_at < now) : []), after = groupsOf(isT ? list.filter(p => p.scheduled_at >= now) : list);
+    const n = before.length + after.length;
+    return `<div class="owd ${isT ? 'today' : ''}"><div class="wdh"><span>${i === 0 ? 'Today' : dayLabel(d, { weekday: 'short' })} <b>${d.d}</b></span><em class="${n ? '' : 'z'}" title="${list.length} post${list.length === 1 ? '' : 's'}">${n || '–'}</em></div>
+      <div class="wdl">${before.map(gtile).join('')}${isT && list.length ? nowLine : ''}${after.map(gtile).join('')}</div>
       <button class="wadd" data-newon="${k}" aria-label="Schedule a post on ${esc(dayLabel(d, { weekday: 'long' }))}">${ui('plus', 13)}<span>Schedule</span></button></div>`; };
   const weekEmpty = days.every(d => !onDay(d).length);
   const legend = brands.length && b === 'all' ? `<span class="legend">${brands.map(x => `<span><i style="background:${brandHue(x.id)}"></i>${esc(x.name)}</span>`).join('')}${loose ? '<span><i style="background:var(--soft)"></i>Personal</span>' : ''}</span>` : '';
-  const weekCard = `<section class="panel owk"><header><h2>This week</h2>${legend}<a href="#calendar">Open calendar</a></header>
+  const wpick = acc.slice().sort((x, y) => ORDER.indexOf(platformOf(x)) - ORDER.indexOf(platformOf(y)) || String(x.username).localeCompare(String(y.username)));
+  const wsel = wpick.length > 1 ? `<select id="ovacct" class="aacct" aria-label="Account"><option value="">All accounts</option>${wpick.map(a =>
+    `<option value="${a.id}" ${wAcc === a.id ? 'selected' : ''}>${PLATFORM[platformOf(a)]} · ${handle(a)}</option>`).join('')}</select>` : '';
+  const weekCard = `<section class="panel owk"><header><h2>This week</h2>${legend}${wsel}<a href="#calendar">Open calendar</a></header>
     ${weekEmpty ? `<div class="splan"><span class="splan-ic">${ui('cal', 22)}</span><b>Nothing scheduled this week</b>
       <span>Plan a post for any day, or set posting times and let "Add to queue" fill them for you.</span>
       <div><button class="btn" data-newon="${todayKey}">${ui('plus', 15)}Schedule a post</button>${!S.me.workspace.slots && can('admin') ? '<a class="btn sec" href="#settings">Set posting times</a>' : ''}</div></div>`
@@ -2704,6 +2730,8 @@ function bind() {
   on('[data-asort]', 'click', e => { S.statsSort = e.currentTarget.dataset.asort; render(); });
   on('[data-aplat]', 'click', e => loadStats(undefined, e.currentTarget.dataset.aplat));
   on('#aacct', 'change', e => { S.statsAcct = e.target.value; loadStats(); });
+  on('#ovacct', 'change', e => { S.ovAcct = e.target.value; S.ovOpen = null; render(); });
+  on('[data-ogrp]', 'click', e => { const k = e.currentTarget.dataset.ogrp; S.ovOpen = S.ovOpen === k ? null : k; render(); });
   on('.chart .hit', 'mouseenter', e => { const pl = e.target.closest('.plot'), tip = pl.querySelector('.ctip'), cx = pl.querySelector('.cx'), x = e.target.dataset.x;
     tip.textContent = e.target.dataset.tip; tip.style.left = `${x}%`; tip.classList.add('on'); cx.style.left = `${x}%`; cx.classList.add('on'); });
   on('.chart .plot', 'mouseleave', e => { e.currentTarget.querySelector('.ctip').classList.remove('on'); e.currentTarget.querySelector('.cx').classList.remove('on'); });
