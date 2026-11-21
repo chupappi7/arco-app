@@ -400,7 +400,9 @@ function overviewView() {
   if (!S.ov) return `<div class="ohead"><div><h1>${greeting()}</h1><p>${sk('260px', 14)}</p></div>${chips}</div>${skKpis(4)}
     <section class="panel"><header><h2>This week</h2></header><div class="wk">${[...Array(7)].map(() => `<div class="owd">${sk('60%', 14)}${sk('100%', 50)}</div>`).join('')}</div></section>`;
 
-  const acc = all.filter(a => inBrand(a, b)), ids = new Set(acc.map(a => a.id));
+  // One account, if picked, narrows the whole page: numbers, week, accounts and top posts.
+  const inB = all.filter(a => inBrand(a, b)), oAcc = S.ovAcct && inB.some(a => a.id === S.ovAcct) ? S.ovAcct : '';
+  const acc = oAcc ? inB.filter(a => a.id === oAcc) : inB, ids = new Set(acc.map(a => a.id));
   const now = Math.floor(Date.now() / 1000), week = 7 * 86400, t0 = today(), todayKey = dayKey(t0);
   const live = S.posts.filter(p => p.status !== 'cancelled' && ids.has(p.account_id));
   const upcoming = live.filter(p => p.status === 'queued' && p.scheduled_at >= now).sort((x, y) => x.scheduled_at - y.scheduled_at);
@@ -449,9 +451,7 @@ function overviewView() {
   // The week: today and the six days after. The same media at the same minute on several
   // accounts is one post to the person, so it is one card; it opens to show each account.
   const days = [...Array(7)].map((_, i) => addDays(t0, i));
-  const wAcc = S.ovAcct && ids.has(S.ovAcct) ? S.ovAcct : '';
-  const wLive = wAcc ? live.filter(p => p.account_id === wAcc) : live;
-  const onDay = d => wLive.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((x, y) => x.scheduled_at - y.scheduled_at);
+  const onDay = d => live.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((x, y) => x.scheduled_at - y.scheduled_at);
   const groupsOf = list => { const m = new Map();
     for (const p of list) { const k = postGroupKey(p);
       m.has(k) ? m.get(k).push(p) : m.set(k, [p]); }
@@ -484,10 +484,10 @@ function overviewView() {
       <button class="wadd" data-newon="${k}" aria-label="Schedule a post on ${esc(dayLabel(d, { weekday: 'long' }))}">${ui('plus', 13)}<span>Schedule</span></button></div>`; };
   const weekEmpty = days.every(d => !onDay(d).length);
   const legend = brands.length && b === 'all' ? `<span class="legend">${brands.map(x => `<span><i style="background:${brandHue(x.id)}"></i>${esc(x.name)}</span>`).join('')}${loose ? '<span><i style="background:var(--soft)"></i>Personal</span>' : ''}</span>` : '';
-  const wpick = acc.slice().sort((x, y) => ORDER.indexOf(platformOf(x)) - ORDER.indexOf(platformOf(y)) || String(x.username).localeCompare(String(y.username)));
+  const wpick = inB.slice().sort((x, y) => ORDER.indexOf(platformOf(x)) - ORDER.indexOf(platformOf(y)) || String(x.username).localeCompare(String(y.username)));
   const wsel = wpick.length > 1 ? `<select id="ovacct" class="aacct" aria-label="Account"><option value="">All accounts</option>${wpick.map(a =>
-    `<option value="${a.id}" ${wAcc === a.id ? 'selected' : ''}>${PLATFORM[platformOf(a)]} · ${handle(a)}</option>`).join('')}</select>` : '';
-  const weekCard = `<section class="panel owk"><header><h2>This week</h2>${legend}${wsel}<a href="#calendar">Open calendar</a></header>
+    `<option value="${a.id}" ${oAcc === a.id ? 'selected' : ''}>${PLATFORM[platformOf(a)]} · ${handle(a)}</option>`).join('')}</select>` : '';
+  const weekCard = `<section class="panel owk"><header><h2>This week</h2>${oAcc ? '' : legend}<a href="#calendar">Open calendar</a></header>
     ${weekEmpty ? `<div class="splan"><span class="splan-ic">${ui('cal', 22)}</span><b>Nothing scheduled this week</b>
       <span>Plan a post for any day, or set posting times and let "Add to queue" fill them for you.</span>
       <div><button class="btn" data-newon="${todayKey}">${ui('plus', 15)}Schedule a post</button>${!S.me.workspace.slots && can('admin') ? '<a class="btn sec" href="#settings">Set posting times</a>' : ''}</div></div>`
@@ -518,7 +518,7 @@ function overviewView() {
     ${top.length ? `<div class="tops">${top.map(ttile).join('')}</div>`
       : `<div class="snone"><span>Published posts show here with their numbers.</span><a class="btn sec" href="#compose">${ui('plus', 15)}Create post</a></div>`}</section>`;
 
-  return `<div class="ohead"><div><h1>${greeting()}</h1><p>${sub}</p></div>${chips}</div>
+  return `<div class="ohead"><div><h1>${greeting()}</h1><p>${sub}</p></div>${chips}${wsel ? `<div class="ofilt">${wsel}</div>` : ''}</div>
   ${alert}
   <div class="kpis">${kpis.map(([href, l, v, note, sp, parts = '']) => `<a href="${href}" class="kpi"><span>${l}</span><b>${v}</b><small>${note}</small>${parts}${sp}</a>`).join('')}</div>
   ${weekCard}

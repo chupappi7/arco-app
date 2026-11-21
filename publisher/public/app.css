@@ -1567,3 +1567,4 @@ kbd{font:600 12px/1 var(--mono,ui-monospace,monospace);background:var(--surface)
 .dsn .st{align-self:flex-start;font-size:11px}
 .dsv{display:grid;grid-template-columns:repeat(3,44px);justify-items:end;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
 .dsv em{grid-column:1/-1;font-style:normal;font-weight:400;color:var(--mute);font-size:12px}
+.ohead .ofilt{margin-left:auto;align-self:flex-end}.ohead .ofilt .aacct{width:auto;max-width:280px;border-radius:999px;padding:7px 32px 7px 14px;font-weight:600;font-size:14px}
