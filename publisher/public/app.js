@@ -453,7 +453,7 @@ function overviewView() {
   const wLive = wAcc ? live.filter(p => p.account_id === wAcc) : live;
   const onDay = d => wLive.filter(p => dayOf(p.scheduled_at) === dayKey(d)).sort((x, y) => x.scheduled_at - y.scheduled_at);
   const groupsOf = list => { const m = new Map();
-    for (const p of list) { const k = `${p.folder_id || p.video_key || (p.image_keys || []).join(',') || p.id}|${Math.floor(p.scheduled_at / 60)}`;
+    for (const p of list) { const k = postGroupKey(p);
       m.has(k) ? m.get(k).push(p) : m.set(k, [p]); }
     return [...m.entries()].map(([k, ps]) => ({ k, ps, at: ps[0].scheduled_at })); };
   const stOf = p => (next && p.id === next.id ? 'next' : p.status);
@@ -465,16 +465,16 @@ function overviewView() {
       <span class="oth">${thumb(p)}<span class="pb">${icon(p.platform || 'tiktok', 9)}</span></span>
       <span class="tx"><b>${at(p.scheduled_at)}${sfx(st)}</b><span>${who(p)}</span></span></button>`; };
   const gtile = g => { if (g.ps.length === 1) return tile(g.ps[0]);
-    const p = g.ps[0], st = gSt(g.ps), a = all.find(x => x.id === p.account_id), open = S.ovOpen === g.k;
+    const p = g.ps[0], st = gSt(g.ps), a = all.find(x => x.id === p.account_id);
     const f = p.folder_id && folderOf(p.folder_id);
     const avs = g.ps.slice(0, 4).map(q => { const qa = acct(q.account_id);
       return `<span class="gav ${q.status === 'failed' ? 'bad' : ''}">${avatar(qa?.avatar_url, qa?.username || qa?.display_name)}</span>`; }).join('');
-    return `<div class="ogrp ${st} ${open ? 'open' : ''}" style="--bc:${brandHue(a?.brand_id)}">
-      <button class="opt ${st}" data-ogrp="${esc(g.k)}" aria-expanded="${open}" title="${g.ps.length} accounts">
+    return `<div class="ogrp ${st}" style="--bc:${brandHue(a?.brand_id)}">
+      <button class="opt ${st}" data-open="${p.id}" title="Open post · ${g.ps.length} accounts">
         <span class="oth">${thumb(p)}<span class="pb">${icon(p.platform || 'tiktok', 9)}</span></span>
         <span class="tx"><b>${at(g.at)}${sfx(st)}</b><span>${esc(f ? f.name : (p.caption || '').split('\n')[0] || `${g.ps.length} accounts`)}</span>
           <span class="gavs">${avs}${g.ps.length > 4 ? `<em>+${g.ps.length - 4}</em>` : ''}<small>${g.ps.length}</small></span></span></button>
-      ${open ? `<div class="gl">${g.ps.map(q => `<button class="gi ${stOf(q)}" data-open="${q.id}">${who(q)}<i>${q.status === 'queued' ? '' : q.status}</i></button>`).join('')}</div>` : ''}</div>`; };
+      </div>`; };
   const nowLine = `<div class="nowl"><time>${at(now)}</time><i></i></div>`;
   const col = (d, i) => { const k = dayKey(d), list = onDay(d), isT = i === 0;
     const before = groupsOf(isT ? list.filter(p => p.scheduled_at < now) : []), after = groupsOf(isT ? list.filter(p => p.scheduled_at >= now) : list);
@@ -2213,9 +2213,24 @@ function calendarView() {
 // The whole post, from the calendar: photos, every word of the caption, what
 // happened, and what can still be done. A post that has not started can have
 // its caption fixed right here.
+// One post sent to several accounts: the same folder or video at the same minute.
+const postGroupKey = p => `${p.folder_id || p.video_key || (p.image_keys || []).join(',') || p.id}|${Math.floor(p.scheduled_at / 60)}`;
+const siblingsOf = p => { const k = postGroupKey(p), seen = new Set(), out = [];
+  for (const q of [...S.posts, ...(S.stats?.posts || [])]) if (postGroupKey(q) === k && !seen.has(q.id)) { seen.add(q.id); out.push(q); }
+  return out.sort((a, b) => ORDER.indexOf(a.platform || 'tiktok') - ORDER.indexOf(b.platform || 'tiktok') || String(a.username).localeCompare(String(b.username))); };
+const ST_LABEL = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' };
+
 function detailView() {
   const p = S.posts.find(x => x.id === S.detail) || (S.stats?.posts || S.stats?.top)?.find(x => x.id === S.detail);
   if (!p) return '';
+  const sibs = siblingsOf(p);
+  const sum = k => sibs.reduce((n, q) => n + (q.stats?.[k] || 0), 0), anyStats = sibs.some(q => q.stats);
+  const sibList = sibs.length < 2 ? '' : `<div class="dsibs"><div class="dsh"><b>Posted to ${sibs.length} accounts</b>
+      ${anyStats ? `<span class="dsum">${['views', 'likes', 'comments'].map(k => `<span title="${METRIC[k]} in total">${ui(STAT_ICON[k], 12)}${num(sum(k))}</span>`).join('')}</span>` : ''}</div>
+    ${sibs.map(q => { const qa = acct(q.account_id), ql = q.platform || 'tiktok';
+      return `<button type="button" class="dsib ${q.id === p.id ? 'on' : ''}" data-open="${q.id}" aria-current="${q.id === p.id}">
+        ${withBadge(avatar(qa?.avatar_url, q.username), ql)}<span class="dsn"><b>${ql === 'facebook' ? '' : '@'}${esc(q.username)}</b><span class="st ${q.status}">${ST_LABEL[q.status] || q.status}</span></span>
+        <span class="dsv">${q.stats ? ['views', 'likes', 'comments'].map(k => `<span>${q.stats[k] == null ? '–' : num(q.stats[k])}</span>`).join('') : '<em>no numbers yet</em>'}</span></button>`; }).join('')}</div>`;
   const a = acct(p.account_id), editable = p.status === 'queued', pl = p.platform || 'tiktok';
   const label = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' }[p.status] || p.status;
   const cover = p.images[p.cover_index] || p.images[0];
@@ -2227,6 +2242,7 @@ function detailView() {
       <div class="dwhen"><span class="st ${p.status === 'queued' ? 'queued' : p.status}">${label}</span>
         <b>${fmt(p.scheduled_at, { weekday: 'long', month: 'short', day: 'numeric' })} · ${at(p.scheduled_at)}</b>
         <small>${esc(tz().replace(/_/g, ' '))}</small></div>
+      ${sibList}
       ${p.fail_reason ? `<div class="dfail">${ui('x', 15)}<span>${esc(p.fail_reason)}</span></div>` : ''}
       ${p.stats ? `<div class="dstats">${STAT_KEYS.filter(k => p.stats[k] != null).map(k => `<div><b>${num(p.stats[k])}</b><span>${METRIC[k]}</span></div>`).join('')}</div>` : ''}
       ${p.video ? `<div class="dmedia"><video class="big" src="${esc(p.video)}" poster="${esc(p.video)}.jpg" controls preload="none" playsinline></video></div>`
@@ -2730,8 +2746,7 @@ function bind() {
   on('[data-asort]', 'click', e => { S.statsSort = e.currentTarget.dataset.asort; render(); });
   on('[data-aplat]', 'click', e => loadStats(undefined, e.currentTarget.dataset.aplat));
   on('#aacct', 'change', e => { S.statsAcct = e.target.value; loadStats(); });
-  on('#ovacct', 'change', e => { S.ovAcct = e.target.value; S.ovOpen = null; render(); });
-  on('[data-ogrp]', 'click', e => { const k = e.currentTarget.dataset.ogrp; S.ovOpen = S.ovOpen === k ? null : k; render(); });
+  on('#ovacct', 'change', e => { S.ovAcct = e.target.value; render(); });
   on('.chart .hit', 'mouseenter', e => { const pl = e.target.closest('.plot'), tip = pl.querySelector('.ctip'), cx = pl.querySelector('.cx'), x = e.target.dataset.x;
     tip.textContent = e.target.dataset.tip; tip.style.left = `${x}%`; tip.classList.add('on'); cx.style.left = `${x}%`; cx.classList.add('on'); });
   on('.chart .plot', 'mouseleave', e => { e.currentTarget.querySelector('.ctip').classList.remove('on'); e.currentTarget.querySelector('.cx').classList.remove('on'); });
