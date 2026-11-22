@@ -543,6 +543,11 @@ const num = n => (n == null ? '–' : new Intl.NumberFormat(undefined, n >= 1000
 const signed = n => (n == null ? '' : `${n > 0 ? '+' : n < 0 ? '−' : ''}${num(Math.abs(n))}`);
 const statLine = st => `<span class="sline">${['views', 'likes', 'comments', 'shares'].filter(k => st[k] != null)
   .map(k => `<span title="${METRIC[k]}">${ui(STAT_ICON[k], 12)}${num(st[k])}</span>`).join('')}</span>`;
+// When a post went out: date and time, plus how long ago for the first week.
+const postedAt = sec => { const d = Date.now() / 1000 - sec, h = Math.floor(d / 3600), dd = Math.floor(d / 86400);
+  const date = fmt(sec, { month: 'short', day: 'numeric', ...(fmt(sec, { year: 'numeric' }) === fmt(Date.now() / 1000, { year: 'numeric' }) ? {} : { year: 'numeric' }) });
+  const rel = d < 0 ? '' : d < 3600 ? `${Math.max(1, Math.round(d / 60))} min ago` : d < 86400 ? `${h} h ago` : d < 7 * 86400 ? `${dd} day${dd === 1 ? '' : 's'} ago` : '';
+  return `${date} · ${at(sec)}${rel ? ` · <em class="ago">${rel}</em>` : ''}`; };
 const ago = sec => { const m = Math.round((Date.now() / 1000 - sec) / 60);
   return m < 60 ? `${Math.max(1, m)} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
 
@@ -645,7 +650,7 @@ function analyticsView() {
   const trend = S.statsTrend || 'views';
 
   const row = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumb(p, 'class="thumb" alt=""') || '<span class="noimg"></span>'}
-      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${fmt(p.scheduled_at, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>
+      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${postedAt(p.scheduled_at)}</span></div>
       <span class="scols">${['views', 'likes', 'comments', 'shares'].map(k => `<span>${p.stats?.[k] == null ? '–' : num(p.stats[k])}</span>`).join('')}</span></div>`;
   const sort = S.statsSort || 'new';
   const SORTS = [['new', 'Newest'], ['views', 'Most views'], ['eng', 'Engagement']];
