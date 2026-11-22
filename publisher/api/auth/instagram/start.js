@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { b64url, clearCookie, env, originOf, setCookie } from '../../_lib.js';
 
 const AUTHORIZE = 'https://www.instagram.com/oauth/authorize';
-const SCOPE = 'instagram_business_basic,instagram_business_content_publish';
+const SCOPE = 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_insights';
 export const igRedirectUri = req => `${originOf(req)}/api/auth/instagram/callback`;
 
 export default function handler(req, res) {
