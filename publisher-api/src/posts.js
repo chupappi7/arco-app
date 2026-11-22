@@ -50,7 +50,7 @@ export function validatePost(input, t = now(), platform = 'tiktok', { draft = fa
   const toggles = {
     disable_comment: !!s.disable_comment,
     // Music is added to photo posts only; duet and stitch exist for videos only.
-    ...(video ? { disable_duet: !!s.disable_duet, disable_stitch: !!s.disable_stitch } : { auto_add_music: !!s.auto_add_music }),
+    ...(video ? { disable_duet: !!s.disable_duet, disable_stitch: !!s.disable_stitch } : { auto_add_music: true }),
     brand_organic: !!s.brand_organic,
     branded_content: !!s.branded_content,
   };

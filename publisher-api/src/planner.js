@@ -186,7 +186,7 @@ async function draftEntry(env, w, item, n, ctx) {
     const input = { account_id: a.id, caption: typeof captions[a.platform] === 'string' ? captions[a.platform] : item.caption,
       title: String(item.title ?? ''), image_keys: video ? [] : media.map(m => m.key), video_key: video ? video.key : null, cover_index: 0,
       settings: a.platform === 'tiktok' ? { privacy_level: tt.privacy_level || '', disable_comment: !!tt.disable_comment,
-        auto_add_music: !!tt.auto_add_music, disable_duet: !!tt.disable_duet, disable_stitch: !!tt.disable_stitch,
+        auto_add_music: true, disable_duet: !!tt.disable_duet, disable_stitch: !!tt.disable_stitch,
         brand_organic: !!tt.brand_organic, branded_content: !!tt.branded_content }
         : a.platform === 'youtube' ? { yt_privacy: yt.privacy || 'public', yt_title: yt.title || '' } : {},
       scheduled_at: Math.max(at, now() + MIN_LEAD_SECONDS) };

@@ -828,7 +828,6 @@ function composeView() {
             : row('Duet', 'Video posts only, not available for photo posts.', '<input type="checkbox" disabled>')}
           ${S.video ? row('Allow Stitch', '', `<input type="checkbox" data-k="stitch" ${S.set.stitch ? 'checked' : ''}>`)
             : row('Stitch', 'Video posts only, not available for photo posts.', '<input type="checkbox" disabled>')}
-          ${S.video ? '' : row('Add recommended music', 'Lets TikTok pick a track for the slideshow.', `<input type="checkbox" data-k="music" ${S.set.music ? 'checked' : ''}>`)}
           ${row('Disclose post content', 'Turn on if this post promotes yourself, a brand, product or service.',
             `<input type="checkbox" data-k="disclose" ${S.set.disclose ? 'checked' : ''}>`)}
           ${S.set.disclose ? `<div class="disc">
@@ -1758,7 +1757,7 @@ async function keysFor(platforms, { raw = false } = {}) {
 
 // What a TikTok post sends: music for photos, duet and stitch for a video.
 const ttSettings = (t, privacy) => ({ privacy_level: privacy, disable_comment: !t.comment || !!t.info?.comment_disabled,
-  ...(S.video ? { disable_duet: !S.set.duet, disable_stitch: !S.set.stitch } : { auto_add_music: S.set.music }),
+  ...(S.video ? { disable_duet: !S.set.duet, disable_stitch: !S.set.stitch } : { auto_add_music: true }),
   brand_organic: S.set.disclose && S.set.brand, branded_content: S.set.disclose && S.set.branded });
 
 async function submit() {

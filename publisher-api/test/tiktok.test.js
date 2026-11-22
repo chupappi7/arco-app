@@ -66,7 +66,7 @@ describe('tiktok client', () => {
     expect(b).toEqual({
       media_type: 'PHOTO', post_mode: 'DIRECT_POST',
       post_info: { title: 't', description: 'c', privacy_level: 'PUBLIC_TO_EVERYONE',
-        disable_comment: true, auto_add_music: false,
+        disable_comment: true, auto_add_music: true,
         brand_organic_toggle: true, brand_content_toggle: false },
       source_info: { source: 'PULL_FROM_URL', photo_images: ['https://a/1.jpg', 'https://a/2.jpg'],
         photo_cover_index: 1 },

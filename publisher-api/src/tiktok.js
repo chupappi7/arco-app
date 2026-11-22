@@ -111,7 +111,8 @@ export function buildPhotoBody({ title, caption, imageUrls, coverIndex, settings
       description: caption,
       privacy_level: settings.privacy_level,
       disable_comment: !!settings.disable_comment,
-      auto_add_music: !!settings.auto_add_music,
+      // Always on: a slideshow without TikTok's recommended track goes out silent.
+      auto_add_music: true,
       brand_organic_toggle: !!settings.brand_organic,
       brand_content_toggle: !!settings.branded_content,
     },

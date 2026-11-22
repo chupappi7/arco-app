@@ -123,7 +123,7 @@ const TOOLS = [
           title: str('TikTok title (photo posts), up to 90 characters'),
           tiktok: { type: 'object', description: 'TikTok settings. privacy_level is required when approval is off.', properties: {
             privacy_level: str('Who can view', { enum: ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'] }),
-            disable_comment: { type: 'boolean' }, auto_add_music: { type: 'boolean' }, disable_duet: { type: 'boolean' }, disable_stitch: { type: 'boolean' },
+            disable_comment: { type: 'boolean' }, disable_duet: { type: 'boolean' }, disable_stitch: { type: 'boolean' },
             brand_organic: { type: 'boolean', description: 'Promotes your own brand' }, branded_content: { type: 'boolean', description: 'Paid partnership' } } },
           youtube: { type: 'object', description: 'YouTube settings (videos only). The caption becomes the description.', properties: {
             privacy: str('Who can see it', { enum: ['public', 'unlisted', 'private'] }),
