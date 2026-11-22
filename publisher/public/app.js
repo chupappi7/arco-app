@@ -590,8 +590,8 @@ function chart(series, key, { kind = 'bar', label, fmtv = num } = {}) {
   const grid = [0, .5, 1].map(f => `<line x1="0" x2="${W}" y1="${Hh * f}" y2="${Hh * f}" class="g"/>`).join('');
   let marks = '';
   if (kind === 'bar') {
-    const bw = Math.max(1, step - 2);
-    marks = vals.map((v, i) => v ? `<rect class="b" x="${i * step + 1}" y="${y(v)}" width="${bw}" height="${Hh - y(v)}"/>` : '').join('');
+    const bw = Math.max(1, Math.min(step - 2, 22));
+    marks = vals.map((v, i) => v ? `<rect class="b" x="${i * step + (step - bw) / 2}" y="${y(v)}" width="${bw}" height="${Hh - y(v)}"/>` : '').join('');
   } else {
     let d = '', on = false;
     vals.forEach((v, i) => { if (v == null) { on = false; return; } d += `${on ? 'L' : 'M'}${(i + .5) * step},${y(v)}`; on = true; });
