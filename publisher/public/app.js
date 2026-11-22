@@ -570,6 +570,14 @@ async function loadStats(days = S.statsDays || 30, plat = S.statsPlat || 'all') 
 
 // A small chart: one series, one axis, a hover tooltip per day. Bars for
 // counts per day, a line for a running total.
+// Start the trend at the first day with a post, so a new or quiet account's
+// week of posts is not squeezed into the end of a mostly empty month.
+// Never fewer than 7 days, so a single post does not fill the whole width.
+const fromFirstPost = series => {
+  const first = series.findIndex(d => d.posts > 0);
+  return first < 0 ? series : series.slice(Math.max(0, Math.min(first, series.length - 7)));
+};
+
 function chart(series, key, { kind = 'bar', label, fmtv = num } = {}) {
   const vals = series.map(d => d[key]);
   const known = vals.filter(v => v != null);
@@ -670,7 +678,7 @@ function analyticsView() {
     <div class="kpis five">${kpis.map(([l, v, n, c, parts = '']) => `<div class="kpi"><span>${l}</span><b>${v}</b><small class="${c}">${n}</small>${parts}</div>`).join('')}</div>
     <section class="panel atrend"><header><h2>Trend</h2><span class="note">by publish day</span>
         <div class="seg" role="group" aria-label="Chart">${TRENDS.map(([k, l]) => `<button data-atrend="${k}" class="${k === trend ? 'on' : ''}" aria-pressed="${k === trend}">${l}</button>`).join('')}</div></header>
-      ${chart(st.series, trend, { label: TRENDS.find(t => t[0] === trend)[1] })}</section>
+      ${chart(fromFirstPost(st.series), trend, { label: TRENDS.find(t => t[0] === trend)[1] })}</section>
     <div class="an2">
       <section class="panel aposts"><header><h2>Posts</h2><span class="note">${st.published} published</span>
         <div class="seg" role="group" aria-label="Sort posts">${SORTS.map(([k, l]) => `<button data-asort="${k}" class="${k === sort ? 'on' : ''}" aria-pressed="${k === sort}">${l}</button>`).join('')}</div></header>
