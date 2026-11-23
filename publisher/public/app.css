@@ -376,9 +376,32 @@ select.move{width:auto;max-width:180px;padding:7px 10px}
 .loginform{display:flex;flex-direction:column;gap:10px}
 .loginform input{font-size:16px;padding:11px 12px}
 #lc{letter-spacing:8px;font-size:24px;text-align:center}
-.signart{background:var(--graphite);color:var(--on-dark);padding:56px;display:flex;align-items:center;justify-content:center}
-.signart .mini{width:100%;max-width:420px;background:var(--surface);color:var(--graphite);border-radius:16px;padding:18px 18px 8px;box-shadow:0 30px 60px rgba(0,0,0,.35)}
+.signplat{display:flex;gap:8px;margin:-8px 0 26px}
+.signplat span{display:inline-flex;border-radius:8px;box-shadow:0 0 0 1px var(--line)}
+.signart{position:relative;overflow:hidden;background:#0E121A;padding:56px 48px;display:flex;align-items:center;justify-content:center;
+  background-image:radial-gradient(60% 50% at 70% 20%,rgba(233,162,59,.16),transparent 70%),radial-gradient(50% 45% at 15% 90%,rgba(91,141,239,.14),transparent 70%),radial-gradient(rgba(255,255,255,.07) 1px,transparent 1px);
+  background-size:auto,auto,22px 22px}
+.signart .stage{width:100%;max-width:440px;display:flex;flex-direction:column;gap:16px}
+.signart .mini{background:var(--surface);color:var(--graphite);border-radius:16px;padding:16px 16px 8px;box-shadow:0 30px 60px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.06)}
 .signart .mini h3{font:650 15px var(--display);margin:0 0 6px}
+.signart .skpi{padding-bottom:14px;margin-left:36px;transform:rotate(-1.2deg)}
+.signart .skpi header{display:flex;align-items:baseline;justify-content:space-between}
+.signart .skpi header span{color:var(--mute);font-size:12px}
+.sk3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 0 12px}
+.sk3 div{display:flex;flex-direction:column;min-width:0}
+.sk3 span{color:var(--mute);font-size:12px}
+.sk3 b{font:700 22px/1.15 var(--display);letter-spacing:-.02em}
+.sk3 small{color:var(--success);font-weight:600;font-size:12px}
+.sbars{display:flex;align-items:flex-end;gap:6px;height:44px}
+.sbars i{flex:1;background:color-mix(in srgb,var(--chart) 35%,transparent);border-radius:4px 4px 2px 2px}
+.sbars i.on{background:var(--chart)}
+.signart .stoday{margin-right:24px}
+.signart .stoday .rpost{cursor:default}
+.signart .noimg.sga{background:linear-gradient(150deg,#F6D365,#FDA085)}
+.signart .noimg.sgb{background:linear-gradient(150deg,#A18CD1,#FBC2EB)}
+.signart .noimg.sgc{background:linear-gradient(150deg,#30475E,#F05454)}
+.signart .noimg.sgd{background:linear-gradient(150deg,#43C6AC,#191654)}
+.signart .stag{color:rgba(255,255,255,.72);font:500 15px/1.45 var(--display);margin:6px 0 0;max-width:340px}
 @media (max-width:1023px){.signwrap{grid-template-columns:1fr}.signart{display:none}.signside{padding:32px 20px}}
 
 /* ---------- create: two panes and a bar that stays put ---------- */

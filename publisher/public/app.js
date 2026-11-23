@@ -746,7 +746,8 @@ function signInView() {
     <p class="lead">${claiming
       ? 'ARCO Publisher now signs in with email. Add yours to keep this workspace, its accounts and its posts. From then on you sign in with it, and you can invite teammates.'
       : invited ? 'Sign in with the email the invite was sent to, and you will join the workspace.'
-      : 'Schedule photo posts to TikTok, Instagram and Facebook Pages, one account or many. No password: we email you a code.'}</p>
+      : 'Plan a week of photo and video posts for TikTok, Instagram, Facebook and YouTube, then see what worked. No password: we email you a code.'}</p>
+    ${claiming ? '' : `<div class="signplat">${ORDER.map(pl => `<span title="${PLATFORM[pl]}">${appIcon(pl, 26)}</span>`).join('')}</div>`}
     ${L.step === 'email' ? `<form id="loginemail" class="loginform">
         <label class="f" for="le">Email</label>
         <input type="email" id="le" autocomplete="email" required value="${esc(L.email)}" placeholder="you@company.com">
@@ -764,10 +765,16 @@ function signInView() {
       <a href="/api/auth/start">Continue with TikTok</a> once, then add your email.</p>`}
     <p class="note">By continuing you agree to the <a href="/terms.html">terms</a> and <a href="/privacy.html">privacy policy</a>.</p>
   </div></div></div>
-  <div class="signart" aria-hidden="true"><div class="mini"><h3>Today</h3>
-    ${[['07:30', 'facebook', 'Your Page', 'published', 'Published'], ['now'], ['09:00', 'instagram', '@yourbrand', 'next', 'Next up'], ['18:00', 'tiktok', '@yourbrand', 'queued', 'Scheduled']].map(r => r[0] === 'now'
+  <div class="signart" aria-hidden="true"><div class="stage">
+    <div class="mini skpi"><header><h3>Last 7 days</h3><span>All accounts</span></header>
+      <div class="sk3">${[['Views', '48.2K', '+18%'], ['Likes', '3,140', '+9%'], ['Followers', '12.4K', '+312']].map(([l, v, c]) => `<div><span>${l}</span><b>${v}</b><small>${c}</small></div>`).join('')}</div>
+      <div class="sbars">${[38, 52, 44, 70, 58, 86, 100].map((h, i) => `<i style="height:${h}%"${i === 6 ? ' class="on"' : ''}></i>`).join('')}</div></div>
+    <div class="mini stoday"><h3>Today</h3>
+    ${[['07:30', 'facebook', 'Your Page', 'published', 'Published', 'Photo post', 'a'], ['now'], ['09:00', 'instagram', '@yourbrand', 'next', 'Next up', 'Reel', 'b'], ['18:00', 'youtube', 'Your channel', 'queued', 'Scheduled', 'Short', 'c'], ['19:00', 'tiktok', '@yourbrand', 'queued', 'Scheduled', '6 photos', 'd']].map(r => r[0] === 'now'
       ? '<div class="nowline"><time>Now</time><div class="bar"></div></div>'
-      : `<div class="slot ${r[3]}"><time>${r[0]}</time><div class="dot"><i></i></div><div class="rpost"><span class="noimg"></span><div class="wh"><b>${icon(r[1], 14)}${r[2]}</b><span>Photo post</span></div><span class="st ${r[3]}">${r[4]}</span></div></div>`).join('')}
+      : `<div class="slot ${r[3]}"><time>${r[0]}</time><div class="dot"><i></i></div><div class="rpost"><span class="noimg sg${r[6]}"></span><div class="wh"><b>${icon(r[1], 14)}${r[2]}</b><span>${r[5]}</span></div><span class="st ${r[3]}">${r[4]}</span></div></div>`).join('')}
+    </div>
+    <p class="stag">Plan the week once. Publisher posts on time and shows what worked.</p>
   </div></div></div>`;
 }
 
