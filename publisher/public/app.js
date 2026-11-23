@@ -369,7 +369,7 @@ const brandDot = k => (k === 'all' ? '' : `<i style="background:${k === 'none' ?
 // numbers on Analytics are read again for it.
 function setBrand(k) {
   S.brand = k; try { localStorage.setItem(BRAND_KEY, k); } catch {}
-  S.fAcct = 'all'; S.pq = '';
+  S.acct = ''; S.fAcct = 'all'; S.pq = '';
   if (k !== 'all') {
     if (!S.replaces && !S.fromDraft) {
       for (const id of [...S.targets]) toggleTarget(id, false, false);
@@ -386,9 +386,19 @@ function brandNav() {
     <a class="bnew" href="#accounts" title="New brand"><span class="bsq">${ui('plus', 14)}</span><span class="lb">New brand</span></a></div>` : '';
   const b = curBrand();
   return `<div class="bnav" role="group" aria-label="Brand"><span class="bnh">Brands</span>${brandOpts().map(([k, l, n]) =>
-    `<button class="${b === k ? 'on' : ''}" data-brand="${k}" aria-pressed="${b === k}" title="${esc(l)}">
+    `<button class="${b === k ? `on${k !== 'all' && sideAcct() ? ' sub' : ''}` : ''}" data-brand="${k}" aria-pressed="${b === k}" title="${esc(l)}">
       <span class="bsq" style="${k === 'all' ? '' : `background:${k === 'none' ? 'var(--soft)' : brandHue(k)}`}">${k === 'all' ? ui('users', 14) : esc((l[0] || '?').toUpperCase())}</span>
-      <span class="lb">${esc(l)}</span><span class="bn">${n}</span></button>`).join('')}</div>`;
+      <span class="lb">${esc(l)}</span><span class="bn">${n}</span></button>${b === k && k !== 'all' ? brandAcctNav(k) : ''}`).join('')}</div>`;
+}
+// The chosen brand's accounts, under it: one narrows Overview and Analytics
+// to that account; the brand itself means all of them.
+const sideAcct = () => { const a = S.acct && acct(S.acct); return a && curBrand() !== 'all' && inBrand(a, curBrand()) ? a.id : ''; };
+function brandAcctNav(k) {
+  const list = brandAccounts(k).sort((x, y) => ORDER.indexOf(platformOf(x)) - ORDER.indexOf(platformOf(y)) || String(x.username).localeCompare(String(y.username)));
+  if (list.length < 2) return '';
+  const on = sideAcct();
+  return `<div class="bacc">${list.map(a => `<button class="${on === a.id ? 'on' : ''}" data-sacct="${a.id}" aria-pressed="${on === a.id}" title="${esc(`${PLATFORM[platformOf(a)]} · ${handle(a)}`)}">
+    ${appIcon(platformOf(a), 14)}<span class="lb">${esc(handle(a))}</span></button>`).join('')}</div>`;
 }
 function brandChips(cls = '') {
   if (!S.me.brands.length) return '';
@@ -408,7 +418,7 @@ function overviewView() {
     <section class="panel"><header><h2>This week</h2></header><div class="wk">${[...Array(7)].map(() => `<div class="owd">${sk('60%', 14)}${sk('100%', 50)}</div>`).join('')}</div></section>`;
 
   // One account, if picked, narrows the whole page: numbers, week, accounts and top posts.
-  const inB = all.filter(a => inBrand(a, b)), oAcc = S.ovAcct && inB.some(a => a.id === S.ovAcct) ? S.ovAcct : '';
+  const inB = all.filter(a => inBrand(a, b)), oAcc = sideAcct();
   const acc = oAcc ? inB.filter(a => a.id === oAcc) : inB, ids = new Set(acc.map(a => a.id));
   const now = Math.floor(Date.now() / 1000), week = 7 * 86400, t0 = today(), todayKey = dayKey(t0);
   const live = S.posts.filter(p => p.status !== 'cancelled' && ids.has(p.account_id));
@@ -491,9 +501,6 @@ function overviewView() {
       <button class="wadd" data-newon="${k}" aria-label="Schedule a post on ${esc(dayLabel(d, { weekday: 'long' }))}">${ui('plus', 13)}<span>Schedule</span></button></div>`; };
   const weekEmpty = days.every(d => !onDay(d).length);
   const legend = brands.length && b === 'all' ? `<span class="legend">${brands.map(x => `<span><i style="background:${brandHue(x.id)}"></i>${esc(x.name)}</span>`).join('')}${loose ? '<span><i style="background:var(--soft)"></i>Personal</span>' : ''}</span>` : '';
-  const wpick = inB.slice().sort((x, y) => ORDER.indexOf(platformOf(x)) - ORDER.indexOf(platformOf(y)) || String(x.username).localeCompare(String(y.username)));
-  const wsel = wpick.length > 1 ? `<select id="ovacct" class="aacct" aria-label="Account"><option value="">All accounts</option>${wpick.map(a =>
-    `<option value="${a.id}" ${oAcc === a.id ? 'selected' : ''}>${PLATFORM[platformOf(a)]} · ${handle(a)}</option>`).join('')}</select>` : '';
   const weekCard = `<section class="panel owk"><header><h2>This week</h2>${oAcc ? '' : legend}<a href="#calendar">Open calendar</a></header>
     ${weekEmpty ? `<div class="splan"><span class="splan-ic">${ui('cal', 22)}</span><b>Nothing scheduled this week</b>
       <span>Plan a post for any day, or set posting times and let "Add to queue" fill them for you.</span>
@@ -525,7 +532,7 @@ function overviewView() {
     ${top.length ? `<div class="tops">${top.map(ttile).join('')}</div>`
       : `<div class="snone"><span>Published posts show here with their numbers.</span><a class="btn sec" href="#compose">${ui('plus', 15)}Create post</a></div>`}</section>`;
 
-  return `<div class="ohead"><div><h1>${greeting()}</h1><p>${sub}</p></div>${chips}${wsel ? `<div class="ofilt">${wsel}</div>` : ''}</div>
+  return `<div class="ohead"><div><h1>${greeting()}</h1><p>${sub}</p></div>${chips}</div>
   ${alert}
   <div class="kpis">${kpis.map(([href, l, v, note, sp, parts = '']) => `<a href="${href}" class="kpi"><span>${l}</span><b>${v}</b><small>${note}</small>${parts}${sp}</a>`).join('')}</div>
   ${weekCard}
@@ -553,8 +560,8 @@ const ago = sec => { const m = Math.round((Date.now() / 1000 - sec) / 60);
 
 const statsCache = new Map();
 // The chosen account, if it still belongs to the chosen brand and platform.
-const statsAcct = (plat = S.statsPlat || 'all') => { const a = S.statsAcct && acct(S.statsAcct);
-  return a && inBrand(a, curBrand()) && (plat === 'all' || platformOf(a) === plat) ? a.id : ''; };
+const statsAcct = (plat = S.statsPlat || 'all') => { const a = sideAcct() && acct(sideAcct());
+  return a && (plat === 'all' || platformOf(a) === plat) ? a.id : ''; };
 const statsQuery = (days, plat, ac) => `/stats?days=${days}&platform=${plat}&brand=${encodeURIComponent(curBrand())}${ac ? `&account=${encodeURIComponent(ac)}` : ''}`;
 async function loadStats(days = S.statsDays || 30, plat = S.statsPlat || 'all') {
   S.statsDays = days; S.statsPlat = plat; S.statsAcct = statsAcct(plat);
@@ -612,13 +619,9 @@ const ksplit = parts => `<span class="ksplit">${parts.map(([pl, v]) =>
 function analyticsView() {
   const st = S.stats, days = S.statsDays || 30, plat = S.statsPlat || 'all';
   const plats = ORDER.filter(pl => brandAccounts().some(a => platformOf(a) === pl));
-  const pick = brandAccounts().filter(a => plat === 'all' || platformOf(a) === plat)
-    .sort((x, y) => ORDER.indexOf(platformOf(x)) - ORDER.indexOf(platformOf(y)) || String(x.username).localeCompare(String(y.username)));
   const filters = `<div class="afilters">
     <div class="pchips" role="group" aria-label="Platform">${[['all', 'All platforms'], ...plats.map(pl => [pl, PLATFORM[pl]])].map(([k, l]) =>
-      `<button class="pchip ${plat === k ? 'on' : ''}" data-aplat="${k}" aria-pressed="${plat === k}">${k === 'all' ? '' : appIcon(k, 18)}${l}</button>`).join('')}
-      ${pick.length > 1 ? `<select id="aacct" class="aacct" aria-label="Account"><option value="">All accounts</option>${pick.map(a =>
-        `<option value="${a.id}" ${S.statsAcct === a.id ? 'selected' : ''}>${plat === 'all' ? `${PLATFORM[platformOf(a)]} · ` : ''}${handle(a)}</option>`).join('')}</select>` : ''}</div>
+      `<button class="pchip ${plat === k ? 'on' : ''}" data-aplat="${k}" aria-pressed="${plat === k}">${k === 'all' ? '' : appIcon(k, 18)}${l}</button>`).join('')}</div>
     <div class="seg" role="group" aria-label="Period">${[7, 30, 90].map(d => `<button data-days="${d}" class="${d === days ? 'on' : ''}" aria-pressed="${d === days}">${d} days</button>`).join('')}</div></div>`;
   if (!st) return `${filters}${skKpis(5)}<section class="panel atrend"><div class="chart">${sk('100%', 160)}</div></section><div class="an2"><section class="panel aposts"><header><h2>Posts</h2></header><div class="oscroll">${skRows(6)}</div></section><div class="aside"><section class="panel ocard"><header><h2>Followers</h2></header><div class="oscroll">${skRows(3)}</div></section></div></div>`;
   if (st.err) return `${filters}<div class="panel empty"><b>Couldn't load the numbers.</b>${esc(st.err)}</div>`;
@@ -2808,8 +2811,8 @@ function bind() {
   on('[data-atrend]', 'click', e => { S.statsTrend = e.currentTarget.dataset.atrend; render(); });
   on('[data-asort]', 'click', e => { S.statsSort = e.currentTarget.dataset.asort; render(); });
   on('[data-aplat]', 'click', e => loadStats(undefined, e.currentTarget.dataset.aplat));
-  on('#aacct', 'change', e => { S.statsAcct = e.target.value; loadStats(); });
-  on('#ovacct', 'change', e => { S.ovAcct = e.target.value; render(); });
+  on('[data-sacct]', 'click', e => { const id = e.currentTarget.dataset.sacct; S.acct = S.acct === id ? '' : id; S.fAcct = S.acct || 'all';
+    if (S.view === 'analytics') loadStats(); else render(); });
   on('.chart .hit', 'mouseenter', e => { const pl = e.target.closest('.plot'), tip = pl.querySelector('.ctip'), cx = pl.querySelector('.cx'), x = e.target.dataset.x;
     tip.textContent = e.target.dataset.tip; tip.style.left = `${x}%`; tip.classList.add('on'); cx.style.left = `${x}%`; cx.classList.add('on'); });
   on('.chart .plot', 'mouseleave', e => { e.currentTarget.querySelector('.ctip').classList.remove('on'); e.currentTarget.querySelector('.cx').classList.remove('on'); });

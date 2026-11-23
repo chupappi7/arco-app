@@ -949,8 +949,6 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .opt.published{opacity:.62}
 .opt.failed{background:var(--danger-tint);border-color:var(--danger);border-left-color:var(--bc)}.opt.failed b{color:var(--danger)}
 .opt.next{box-shadow:0 0 0 2px var(--saffron)}.opt.next b{color:var(--next-ink)}
-.owk>header .aacct{width:auto;max-width:230px;margin-left:auto;border-radius:999px;padding:5px 30px 5px 12px;font-size:13px;font-weight:600}
-.owk>header .legend+.aacct{margin-left:0}
 .ogrp{display:flex;flex-direction:column;min-width:0}
 .ogrp.open>.opt{border-bottom-left-radius:0;border-bottom-right-radius:0}
 .gavs{display:flex;align-items:center;margin-top:3px;padding-left:4px}
@@ -1017,12 +1015,16 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .bnav .lb{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bnav .bn{font-size:12px;color:var(--mute);min-width:18px;text-align:right}
 .bnav button.on .bsq{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--graphite)}
+.bnav button.on.sub{background:none}
+.bacc{display:flex;flex-direction:column;gap:1px;margin:1px 0 4px 21px;padding-left:10px;border-left:1px solid var(--line)}
+.bnav .bacc button{padding:5px 8px;font-size:13px;gap:8px}
+.bnav .bacc button.on{background:var(--canvas);color:var(--graphite);font-weight:650}
 .bchips.phone{margin:0 0 14px}
 @media (min-width:640px){.bchips.phone{display:none}}
 @media (max-width:639px){.bchips.phone{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px}.bchips.phone .bchip{flex:none}}
 @media (min-width:640px) and (max-width:1023px){
   .bnav{align-items:center;gap:4px;margin-bottom:12px}
-  .bnh,.bnav .lb,.bnav .bn{display:none}
+  .bnh,.bnav .lb,.bnav .bn,.bacc{display:none}
   .bnav button{width:44px;height:40px;padding:0;justify-content:center}
   .bnav .bsq{width:28px;height:28px;font-size:12px}
 }
@@ -1551,7 +1553,6 @@ kbd{font:600 12px/1 var(--mono,ui-monospace,monospace);background:var(--surface)
 @media (max-width:719px){.kbtns{flex-direction:row;flex-wrap:wrap}}
 .kbtns{width:200px;max-width:100%}.kbtns .btn{width:100%}
 .kget>.kbtns{flex:none;width:200px}
-.pchips .aacct{width:auto;max-width:260px;border-radius:999px;padding:7px 32px 7px 14px;font-weight:600;font-size:14px}
 /* post window: every account the post went to */
 .dsibs{border:1px solid var(--line);border-radius:12px;margin:0 0 12px;overflow:hidden}
 .dsh{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--canvas);border-bottom:1px solid var(--line-2)}
@@ -1567,7 +1568,6 @@ kbd{font:600 12px/1 var(--mono,ui-monospace,monospace);background:var(--surface)
 .dsn .st{align-self:flex-start;font-size:11px}
 .dsv{display:grid;grid-template-columns:repeat(3,44px);justify-items:end;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
 .dsv em{grid-column:1/-1;font-style:normal;font-weight:400;color:var(--mute);font-size:12px}
-.ohead .ofilt{margin-left:auto;align-self:flex-end}.ohead .ofilt .aacct{width:auto;max-width:280px;border-radius:999px;padding:7px 32px 7px 14px;font-weight:600;font-size:14px}
 
 /* ---------- YouTube ---------- */
 .pi.youtube{fill:#FF0000}
