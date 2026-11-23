@@ -89,7 +89,7 @@ async function boot() {
   await loadMe();
   // A message belongs to the page it was shown on, unless it was set for the
   // page being opened (S.keepFlash).
-  window.addEventListener('hashchange', () => { if (!S.keepFlash) S.flash = null; S.keepFlash = false; S.detail = null; route(); });
+  window.addEventListener('hashchange', () => { S.more = false; if (!S.keepFlash) S.flash = null; S.keepFlash = false; S.detail = null; route(); });
   route();
   setTimeout(prefetch, 1200);
 }
@@ -153,12 +153,14 @@ async function fileNewAccounts() {
 function saveTargets() { try { localStorage.setItem(SAVED, JSON.stringify(S.targets)); } catch {} }
 
 const VIEWS = ['overview', 'compose', 'library', 'calendar', 'analytics', 'drafts', 'accounts', 'ai', 'settings'];
+const phone = () => matchMedia('(max-width:639px)').matches;
 function route() {
   S.view = (location.hash || '#overview').slice(1);
   if (!VIEWS.includes(S.view)) S.view = 'overview';
   const signedIn = !!S.me && !S.me.needs_email;
   if (signedIn && S.view === 'overview') loadOverview();
-  if (signedIn && S.view === 'calendar') loadWeek();
+  // A month grid is unreadable on a phone: the calendar shows a week there.
+  if (signedIn && S.view === 'calendar') { if (phone() && S.calMode !== 'week') { S.calMode = 'week'; S.week = 0; S.month = 0; } loadWeek(); }
   if (signedIn && S.view === 'ai') loadAi();
   if (signedIn && S.view === 'drafts') loadDrafts();
   if (signedIn && S.view === 'analytics') loadStats();
@@ -188,6 +190,7 @@ const UI = {
   retry: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/>',
   chev: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>', check: '<path d="m5 12 5 5 9-10"/>',
   chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>', out: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 17l-5-5 5-5M5 12h11"/>',
   heart: '<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/>',
   comment: '<path d="M4 5h16v11H9l-5 4z"/>', share: '<path d="M4 13v6h16v-6M12 3v12M7 8l5-5 5 5"/>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
@@ -220,11 +223,19 @@ function menu() {
       <div><b>${esc(email)}</b><a href="/api/auth/logout">Sign out</a></div></div>`;
 }
 
+// The phone's bar: the four places used most, and More for the rest.
+const MORE = () => [['library', 'Library', 'image'], ['drafts', 'Drafts', 'draft', S.counts.drafts], ...(can('admin') ? [['accounts', 'Brands & accounts', 'users']] : []),
+  ['ai', 'AI connect', 'spark'], ['settings', 'Settings', 'gear']];
 function tabbar() {
-  const t = (k, l, i) => `<a href="#${k}" class="${S.view === k ? 'on' : ''}">${ui(i, 20)}${l}</a>`;
-  return t('overview', 'Overview', 'home') + t('calendar', 'Calendar', 'cal') +
+  const t = (k, l, i, n) => `<a href="#${k}" class="${S.view === k ? 'on' : ''}">${ui(i, 20)}${l}${n ? `<span class="tn">${n}</span>` : ''}</a>`;
+  const more = MORE(), inMore = more.some(m => m[0] === S.view), waiting = more.reduce((n, m) => n + (m[3] || 0), 0);
+  return t('overview', 'Overview', 'home') + t('calendar', 'Calendar', 'cal', S.counts.failed) +
     `<a href="#compose" aria-label="Schedule post"><span class="plus">${ui('plus', 22)}</span></a>` +
-    t('drafts', 'Drafts', 'draft') + (can('admin') ? t('accounts', 'Accounts', 'users') : t('settings', 'Settings', 'gear'));
+    t('analytics', 'Analytics', 'chart') +
+    `<button type="button" id="morebtn" class="${inMore || S.more ? 'on' : ''}" aria-expanded="${!!S.more}">${ui('menu', 20)}More${waiting ? `<span class="tn n">${waiting}</span>` : ''}</button>` +
+    (S.more ? `<div class="msheet-bg" data-moreclose></div><div class="msheet" role="dialog" aria-label="More">
+      ${more.map(([k, l, i, n]) => `<a href="#${k}" class="${S.view === k ? 'on' : ''}">${ui(i, 20)}<span>${l}</span>${n ? `<em>${n}</em>` : ''}</a>`).join('')}
+      <a href="/api/auth/logout" class="out">${ui('out', 20)}<span>Sign out</span><small>${esc(S.me.user?.email || '')}</small></a></div>` : '');
 }
 
 const HEADS = {
@@ -404,7 +415,15 @@ function brandChips(cls = '') {
   if (!S.me.brands.length) return '';
   const b = curBrand();
   return `<div class="bchips ${cls}" role="group" aria-label="Brand">${brandOpts().map(([k, l]) =>
-    `<button class="bchip ${b === k ? 'on' : ''}" data-brand="${k}" aria-pressed="${b === k}">${brandDot(k)}${esc(l)}</button>`).join('')}</div>`;
+    `<button class="bchip ${b === k ? 'on' : ''}" data-brand="${k}" aria-pressed="${b === k}">${brandDot(k)}${esc(l)}</button>`).join('')}</div>${b !== 'all' && cls === 'phone' && ['overview', 'analytics', 'calendar'].includes(S.view) ? acctChips(b) : ''}`;
+}
+// On a phone, the chosen brand's accounts as a second row (the menu's list).
+function acctChips(b) {
+  const list = brandAccounts(b).sort((x, y) => ORDER.indexOf(platformOf(x)) - ORDER.indexOf(platformOf(y)) || String(x.username).localeCompare(String(y.username)));
+  if (list.length < 2) return '';
+  const on = sideAcct();
+  return `<div class="bchips phone acc" role="group" aria-label="Account"><button class="bchip ${on ? '' : 'on'}" data-brand="${b}" aria-pressed="${!on}">All accounts</button>${list.map(a =>
+    `<button class="bchip ${on === a.id ? 'on' : ''}" data-sacct="${a.id}" aria-pressed="${on === a.id}">${appIcon(platformOf(a), 14)}${esc(handle(a))}</button>`).join('')}</div>`;
 }
 const inBrand = (a, b) => b === 'all' || (b === 'none' ? !brandName(a?.brand_id) : a?.brand_id === b);
 const engOf = s => (s.likes || 0) + (s.comments || 0) + (s.shares || 0) + (s.saves || 0);
@@ -2252,7 +2271,7 @@ function calendarView() {
       <button class="btn sec" data-wk="1" aria-label="Next">›</button></span>
       <b class="ctitle">${r.title}</b>
       ${offset ? '<button class="btn ghost" data-today>Today</button>' : ''}
-      <span class="seg">${[['week', 'Week'], ['weeks', '4 weeks'], ['month', 'Month']].map(([k, l]) =>
+      <span class="seg cmodes">${[['week', 'Week'], ['weeks', '4 weeks'], ['month', 'Month']].map(([k, l]) =>
         `<button class="${S.calMode === k ? 'on' : ''}" data-mode="${k}">${l}</button>`).join('')}</span>
       <span class="note">${esc(tz().replace(/_/g, ' '))}</span>
     </div>
@@ -2844,6 +2863,8 @@ function bind() {
     resetComposer(); S.when = 'later'; S.at = `${y}-${pad(m)}-${pad(d)}T${pad(h)}:00`; location.hash = '#compose';
   });
   on('[data-brand]', 'click', e => setBrand(e.currentTarget.dataset.brand));
+  on('#morebtn', 'click', () => { S.more = !S.more; render(); });
+  on('[data-moreclose]', 'click', () => { S.more = false; render(); });
   on('[data-newon]', 'click', e => { const [y, m, d] = e.currentTarget.dataset.newon.split('-').map(Number);
     const n = zoned(Date.now()), isToday = n.y === y && n.m === m && n.d === d, h = isToday ? Math.max(9, n.h + 1) : 9;
     resetComposer(); if (h <= 23) { S.when = 'later'; S.at = `${y}-${pad(m)}-${pad(d)}T${pad(h)}:00`; } location.hash = '#compose'; });
