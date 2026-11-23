@@ -118,6 +118,7 @@ const TOOLS = [
           account_ids: { type: 'array', items: { type: 'string' }, description: 'Exactly these accounts instead of the brand' },
           at: str('When, e.g. 2026-11-20T18:00 (workspace time). Leave out for the next free slot.'),
           after: str('With no "at": take the first free slot after this time'),
+          stagger: { type: 'boolean', description: 'Default true: when several accounts on one platform get this post, each goes out an hour after the one before, so the platform does not hold them back as copies. false = all at the same time.' },
           caption: str('Caption for every platform'),
           captions: { type: 'object', description: 'Per-platform caption overrides', properties: { tiktok: { type: 'string' }, instagram: { type: 'string' }, facebook: { type: 'string' } } },
           title: str('TikTok title (photo posts), up to 90 characters'),

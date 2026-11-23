@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDb, callWorker, signUp } from './helpers.js';
 import { encrypt } from '../src/crypto.js';
 import { rotateApiKey } from '../src/auth.js';
-import { zonedToEpoch, parseWhen, localIso } from '../src/planner.js';
+import { zonedToEpoch, parseWhen, localIso, staggerOffsets, STAGGER } from '../src/planner.js';
 
 const JPEG_B64 = btoa(String.fromCharCode(0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4));
 const PNG_B64 = btoa(String.fromCharCode(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9));
@@ -77,6 +77,15 @@ describe('time', () => {
     expect(parseWhen('2026-12-01T09:00Z', 'Europe/Prague')).toBe(Date.UTC(2026, 11, 1, 9, 0) / 1000);
     expect(localIso(Date.UTC(2026, 11, 1, 8, 0) / 1000, 'Europe/Prague')).toBe('2026-12-01T09:00+01:00');
     expect(() => parseWhen('next tuesday', 'UTC')).toThrow(/2026-11-20T18:00/);
+  });
+});
+
+describe('stagger', () => {
+  it('spaces accounts on one platform an hour apart, other platforms start at the same time', () => {
+    const accts = [{ id: 'a', platform: 'tiktok' }, { id: 'b', platform: 'instagram' }, { id: 'c', platform: 'tiktok' }, { id: 'd', platform: 'tiktok' }];
+    const o = staggerOffsets(accts);
+    expect([o.get('a'), o.get('b'), o.get('c'), o.get('d')]).toEqual([0, 0, STAGGER, 2 * STAGGER]);
+    expect([...staggerOffsets(accts, false).values()]).toEqual([0, 0, 0, 0]);
   });
 });
 

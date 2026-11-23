@@ -18,6 +18,17 @@ import { createPost, cancelPost, updatePost, validatePost, checkLength, loadPost
 const bad = msg => { throw new HttpError(400, msg); };
 const PLATFORMS = ['tiktok', 'instagram', 'facebook', 'youtube'];
 export const MAX_PLAN = 30;
+// The same post on several accounts of one platform goes out this far apart:
+// copies landing in the same minute get held back as duplicates.
+export const STAGGER = 3600;
+
+// Seconds after the post's time for each account: 0 for the first account on a
+// platform, then one STAGGER more for each next one.
+export function staggerOffsets(accounts, on = true) {
+  const seen = {}, out = new Map();
+  for (const a of accounts) { const k = seen[a.platform] || 0; out.set(a.id, on ? k * STAGGER : 0); seen[a.platform] = k + 1; }
+  return out;
+}
 
 // ---- time, in the workspace's zone ------------------------------------------
 
@@ -182,15 +193,17 @@ async function draftEntry(env, w, item, n, ctx) {
   const captions = item.captions && typeof item.captions === 'object' ? item.captions : {};
   const tt = item.tiktok && typeof item.tiktok === 'object' ? item.tiktok : {};
   const yt = item.youtube && typeof item.youtube === 'object' ? item.youtube : {};
+  const offs = staggerOffsets(targets, item.stagger !== false);
   const posts = targets.map(a => {
+    const pat = Math.max(at + offs.get(a.id), now() + MIN_LEAD_SECONDS);
     const input = { account_id: a.id, caption: typeof captions[a.platform] === 'string' ? captions[a.platform] : item.caption,
       title: String(item.title ?? ''), image_keys: video ? [] : media.map(m => m.key), video_key: video ? video.key : null, cover_index: 0,
       settings: a.platform === 'tiktok' ? { privacy_level: tt.privacy_level || '', disable_comment: !!tt.disable_comment,
         auto_add_music: true, disable_duet: !!tt.disable_duet, disable_stitch: !!tt.disable_stitch,
         brand_organic: !!tt.brand_organic, branded_content: !!tt.branded_content }
         : a.platform === 'youtube' ? { yt_privacy: yt.privacy || 'public', yt_title: yt.title || '' } : {},
-      scheduled_at: Math.max(at, now() + MIN_LEAD_SECONDS) };
-    const out = { account_id: a.id, handle: handle(a), platform: a.platform, caption: input.caption, input, error: null };
+      scheduled_at: pat };
+    const out = { account_id: a.id, handle: handle(a), platform: a.platform, caption: input.caption, input, at: pat, when: when(pat, tz), error: null };
     try {
       validatePost(input, now(), a.platform, { draft: info.review });
       if (a.platform === 'instagram' && !video && media.some(m => m.content_type !== 'image/jpeg')) bad('Instagram only accepts JPG photos');
@@ -209,7 +222,7 @@ async function draftEntry(env, w, item, n, ctx) {
 
 const shape = e => ({ index: e.index, ok: e.ok, errors: e.errors, skipped: e.skipped?.length ? e.skipped : undefined,
   folder: e.folder || undefined, brand: e.brand, when: e.when, media: e.media,
-  posts: e.posts?.map(p => ({ account_id: p.account_id, handle: p.handle, platform: p.platform, caption: p.caption, error: p.error || undefined })) });
+  posts: e.posts?.map(p => ({ account_id: p.account_id, handle: p.handle, platform: p.platform, when: p.when, caption: p.caption, error: p.error || undefined })) });
 
 export async function schedulePlan(env, tk, w, body) {
   const list = body?.posts;
@@ -233,14 +246,15 @@ export async function schedulePlan(env, tk, w, body) {
   }
   const batch = 'bat_' + randomToken('', 8), made = [], failed = [];
   for (const e of entries) {
-    const group = 'grp_' + randomToken('', 8), at = e.when.at;
+    const group = 'grp_' + randomToken('', 8);
     for (const p of e.posts) {
+      const at = p.at;
       try {
         const keys = e.video ? [] : (await copyMedia(env, w, e.keys)).media.map(m => m.key);
         const post = await createPost(env, tk, w, { ...p.input, image_keys: keys, draft: info.review, group_id: group });
         await env.DB.prepare(`UPDATE posts SET folder_id = ?, batch_id = ?, source = 'ai', scheduled_at = ?, next_attempt_at = ? WHERE id = ?`)
           .bind(e.folder?.id || null, batch, at, at, post.id).run();
-        made.push({ post_id: post.id, index: e.index, handle: p.handle, platform: p.platform, status: post.status, when: e.when });
+        made.push({ post_id: post.id, index: e.index, handle: p.handle, platform: p.platform, status: post.status, when: p.when });
       } catch (err) {
         failed.push({ index: e.index, handle: p.handle, platform: p.platform, error: err.message });
       }

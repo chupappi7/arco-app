@@ -50,6 +50,7 @@ const posts = [
   mk('p5', 'a4', 'queued', 7, 'Weekend restock: fresh sourdough'),
   mk('p6', 'a1', 'published', -26, 'Focus mode, explained in 6 slides', { stats: { views: 12400, likes: 830, comments: 41, shares: 22 } }),
   mk('p7', 'a6', 'published', -50, 'Morning routine that works', { stats: { likes: 212, comments: 17, views: 4810 } }),
+  mk('p8', 'a1', 'published', -20, 'Same clip, second account', { stats: { views: 0, likes: 0, comments: 0 }, stats_at: Math.floor(Date.now() / 1000) - 3600 }),
   mk('p8', 'a3', 'queued', 30, 'Tomorrow: new colorway'),
   mk('p9', 'a1', 'queued', 52, 'Study timer setup'),
   // One post to three accounts at the same minute: the week shows it as one card.

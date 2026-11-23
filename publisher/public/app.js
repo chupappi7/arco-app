@@ -52,13 +52,14 @@ const S = {
   slotEdit: null, queuePosts: null, detail: null,
   ai: { open: false, brief: '', tone: 'friendly', length: 'medium', emoji: true, hashtags: true, cta: '', language: '', busy: false, err: '', remaining: null },
   voiceEdit: null,
-  set: { music: false, duet: false, stitch: false, disclose: false, brand: false, branded: false },
+  set: { music: false, duet: false, stitch: false, disclose: false, brand: false, branded: false, spread: true },
   when: 'now', at: '', busy: false, status: null,
   week: 0, month: 0, calMode: 'weeks', fPlat: 'all', fAcct: 'all', posts: [], apiKey: null,
   pq: '', pickOpen: false, capTab: 'all', prevTab: null,
   login: { step: 'email', email: '', code: '', busy: false, err: '' }, members: null, invited: null,
 };
 const ORDER = ['tiktok', 'instagram', 'facebook', 'youtube'];
+const STAGGER = 3600, ZERO_AFTER = 6 * 3600;
 const platformOf = a => a?.platform || 'tiktok';
 const SAVED = 'arco-publisher.targets';
 const INVITE = 'arco-publisher.invite';
@@ -449,9 +450,14 @@ function overviewView() {
   // Problems only: failed posts and accounts that lost access.
   const failed = live.filter(p => p.status === 'failed' && p.scheduled_at > now - week);
   const reconnect = acc.filter(a => a.needs_reconnect);
+  // Published a while ago, checked since, and still nobody saw it: the platform is holding it back.
+  const zero = live.filter(p => p.status === 'published' && p.scheduled_at > now - week && p.stats?.views === 0
+    && (p.stats_at || 0) - p.scheduled_at >= ZERO_AFTER);
+  const zeroBy = Object.values(zero.reduce((m, p) => ((m[p.account_id] ||= []).push(p), m), {}));
   const probs = [...failed.slice(0, 3).map(p => `<button class="aitem" data-open="${p.id}"><b>Failed on ${who(p)}</b><span title="${esc(p.fail_reason || '')}">${esc(p.fail_reason || 'Open it to see why')}</span></button>`),
     ...(failed.length > 3 ? [`<a class="aitem" href="#calendar"><b>${failed.length - 3} more failed</b></a>`] : []),
-    ...reconnect.map(a => `<a class="aitem" href="#accounts"><b>Reconnect ${who(a)}</b><span>${PLATFORM[platformOf(a)]} access expired</span></a>`)];
+    ...reconnect.map(a => `<a class="aitem" href="#accounts"><b>Reconnect ${who(a)}</b><span>${PLATFORM[platformOf(a)]} access expired</span></a>`),
+    ...zeroBy.map(g => `<button class="aitem" data-open="${g.sort((x, y) => y.scheduled_at - x.scheduled_at)[0].id}"><b>0 views on ${who(g[0])}${g.length > 1 ? ` · ${g.length} posts` : ''}</b><span>${PLATFORM[platformOf(acct(g[0].account_id))]} isn't showing ${g.length > 1 ? 'them' : 'it'} to anyone. Often a repeat of the same clip, or a new account.</span></button>`)];
   const alert = probs.length ? `<div class="oalert" role="status"><span class="ic">${ui('x', 15)}</span><div class="aitems">${probs.join('')}</div></div>` : '';
 
   // Results, from each published post's own numbers: last 7 days against the 7 before.
@@ -880,6 +886,7 @@ function composeView() {
     ${S.when === 'later' ? `<input type="datetime-local" id="at" value="${esc(S.at)}" min="${localInput(Date.now() + 6 * 60e3)}" aria-label="Date and time">
       <span class="note">${esc(tz().replace(/_/g, ' '))}</span>` : ''}
     ${S.when === 'queue' ? `<span class="qline">${queuePreview()}</span>` : ''}
+    ${sharesPlatform() && !S.replaces ? `<label class="spread" title="Accounts on the same platform post one hour apart, so the platform does not treat them as copies"><input type="checkbox" id="spread" ${S.set.spread ? 'checked' : ''}>Space out, 1 h apart</label>` : ''}
     <span class="grow"></span>
     ${need ? `<span class="need">${esc(need)}</span>` : S.status ? `<span class="need ${S.status.kind}">${esc(S.status.text)}</span>` : ''}
     <button class="btn sec" id="savedraft" ${draftBlocker() || S.busy ? 'disabled' : ''} title="${esc(draftBlocker())}">Save draft</button>
@@ -1792,8 +1799,9 @@ async function submit() {
   S.busy = true; S.status = { kind: '', text: 'Sending…' }; render();
   const jobs = S.targets.map(id => ({ id, platform: platformOf(acct(id)) }))
     .sort((a, b) => ORDER.indexOf(a.platform) - ORDER.indexOf(b.platform));
-  const plan = S.when === 'queue' ? queuePlan() : null;
   const at = S.when === 'later' ? Math.floor(inputToMs(S.at) / 1000) : null;
+  let plan = S.when === 'queue' ? queuePlan() : Object.fromEntries(jobs.map(j => [j.id, at]));
+  if (S.set.spread && !S.replaces) plan = spreadTimes(jobs, plan);
   const made = [], errors = [];
   try {
     if (toInstagram() && !S.video) { S.status = { kind: '', text: 'Preparing photos for Instagram…' }; render(); }
@@ -1806,7 +1814,7 @@ async function submit() {
         made.push(await api('/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
           account_id: j.id, image_keys: keys[n], video_key: S.video?.key, cover_index: S.cover, title: S.video ? '' : S.title, caption: captionFor(j.platform),
           settings: settingsFor(j, t, false),
-          scheduled_at: plan ? plan[j.id] : at, folder_id: S.fromFolder || undefined,
+          scheduled_at: plan[j.id] ?? null, folder_id: S.fromFolder || undefined,
           // An edit replaces the one post it came from.
           replaces: S.replaces && S.replacesAccount === j.id ? S.replaces : undefined,
         }) }));
@@ -1996,6 +2004,22 @@ function queuePlan() {
     }
   }
   return plan;
+}
+
+// The same post on several accounts of one platform goes out an hour apart:
+// copies landing in the same minute get held back as duplicates.
+const sharesPlatform = () => { const n = {}; return S.targets.some(id => (n[platformOf(acct(id))] = (n[platformOf(acct(id))] || 0) + 1) > 1); };
+function spreadTimes(jobs, base) {
+  const out = { ...base }, nowS = Math.floor(Date.now() / 1000);
+  for (const pl of new Set(jobs.map(j => j.platform))) {
+    let prev = null;
+    for (const j of jobs.filter(x => x.platform === pl).sort((a, b) => (base[a.id] ?? nowS) - (base[b.id] ?? nowS))) {
+      const at = base[j.id] ?? null;
+      if (prev != null && (at ?? nowS) < prev + STAGGER) out[j.id] = prev + STAGGER;
+      prev = out[j.id] ?? nowS;
+    }
+  }
+  return out;
 }
 
 function queuePreview() {
@@ -2818,6 +2842,7 @@ function bind() {
   on('[data-cm]', 'change', e => { S.tt[e.target.dataset.cm].comment = e.target.checked; render(); });
   on('#bulkpriv', 'change', e => e.target.value && bulkPrivacy(e.target.value));
   on('[data-k]', 'change', e => setOpt(e.target.dataset.k, e.target.checked));
+  on('#spread', 'change', e => { S.set.spread = e.target.checked; render(); });
   on('input[name=when]', 'change', e => { S.when = e.target.value; if (S.when === 'queue') loadQueue(); render(); });
   on('[data-slotedit]', 'click', e => openSlots(e.target.dataset.slotedit));
   on('[data-slotday]', 'click', e => { const d = +e.target.dataset.slotday, x = S.slotEdit;
