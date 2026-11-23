@@ -1019,9 +1019,13 @@ a.kpi:hover,.ccard:hover,.wd:hover,.dcard:hover{transform:translateY(-1px)}
 .bacc{display:flex;flex-direction:column;gap:1px;margin:1px 0 4px 21px;padding-left:10px;border-left:1px solid var(--line)}
 .bnav .bacc button{padding:5px 8px;font-size:13px;gap:8px}
 .bnav .bacc button.on{background:var(--canvas);color:var(--graphite);font-weight:650}
-.bchips.phone{margin:0 0 14px}
-@media (min-width:640px){.bchips.phone{display:none}}
-@media (max-width:639px){.bchips.phone{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px}.bchips.phone .bchip{flex:none}}
+.bsels{display:flex;gap:8px;margin:0 0 14px;min-width:0}
+@media (min-width:640px){.bsels.phone{display:none}}
+.bsel{position:relative;display:flex;align-items:center;gap:8px;flex:1 1 0;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:0 12px;height:38px;color:var(--graphite)}
+.bsel>i{width:9px;height:9px;border-radius:50%;flex:none}
+.bsel>svg{flex:none;color:var(--mute)}
+.bsel>span{flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bsel select{position:absolute;inset:0;opacity:0;width:100%;font-size:16px}
 @media (min-width:640px) and (max-width:1023px){
   .bnav{align-items:center;gap:4px;margin-bottom:12px}
   .bnh,.bnav .lb,.bnav .bn,.bacc{display:none}
@@ -1607,10 +1611,8 @@ kbd{font:600 12px/1 var(--mono,ui-monospace,monospace);background:var(--surface)
 
   /* chip rows scroll sideways instead of wrapping into stacks */
   .pchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px}
-  .pchips::-webkit-scrollbar,.bchips.phone::-webkit-scrollbar{display:none}
+  .pchips::-webkit-scrollbar{display:none}
   .pchip{flex:none;min-height:34px}
-  .bchips.phone.acc{margin-top:-4px}
-  .bchips.phone.acc .bchip{gap:6px}
   .afilters{gap:10px;margin-bottom:12px}
   .afilters .seg{width:100%}.afilters .seg button{flex:1}
 
@@ -1637,3 +1639,4 @@ kbd{font:600 12px/1 var(--mono,ui-monospace,monospace);background:var(--surface)
   .lboard.one .lclist{grid-template-columns:1fr}
 }
 @keyframes msheet{from{transform:translateY(12px);opacity:0}}
+.ohead .bsels{flex:1 1 100%;margin:0}

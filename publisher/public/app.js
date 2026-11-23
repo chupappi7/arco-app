@@ -315,7 +315,7 @@ function render() {
   const hadDetail = !!$('overlay'), opener = S.detail && !hadDetail ? document.activeElement?.closest?.('[data-open]')?.dataset.open : null;
   if (S.anim) { $('app').classList.remove('in'); void $('app').offsetWidth; $('app').classList.add('in'); S.anim = false;
     clearTimeout(S.animT); S.animT = setTimeout(() => $('app').classList.remove('in'), 400); }
-  $('app').innerHTML = head + (['calendar', 'analytics', 'drafts', 'library'].includes(S.view) ? brandChips('phone') : '') + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '') + resultView();
+  $('app').innerHTML = head + (['calendar', 'analytics', 'drafts', 'library'].includes(S.view) ? brandChips() : '') + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '') + resultView();
   bind();
   if (S.detail && !hadDetail) { S.opener = opener; $('closedetail')?.focus(); }
   if (!S.detail && hadDetail && S.opener) { document.querySelector(`[data-open="${S.opener}"]`)?.focus(); S.opener = null; }
@@ -411,19 +411,17 @@ function brandAcctNav(k) {
   return `<div class="bacc">${list.map(a => `<button class="${on === a.id ? 'on' : ''}" data-sacct="${a.id}" aria-pressed="${on === a.id}" title="${esc(`${PLATFORM[platformOf(a)]} · ${handle(a)}`)}">
     ${appIcon(platformOf(a), 14)}<span class="lb">${esc(handle(a))}</span></button>`).join('')}</div>`;
 }
-function brandChips(cls = '') {
+// On a phone the brand (and, on pages it narrows, the account) are two
+// dropdowns in one row: the menu's list does this on a computer.
+function brandChips() {
   if (!S.me.brands.length) return '';
-  const b = curBrand();
-  return `<div class="bchips ${cls}" role="group" aria-label="Brand">${brandOpts().map(([k, l]) =>
-    `<button class="bchip ${b === k ? 'on' : ''}" data-brand="${k}" aria-pressed="${b === k}">${brandDot(k)}${esc(l)}</button>`).join('')}</div>${b !== 'all' && cls === 'phone' && ['overview', 'analytics', 'calendar'].includes(S.view) ? acctChips(b) : ''}`;
-}
-// On a phone, the chosen brand's accounts as a second row (the menu's list).
-function acctChips(b) {
-  const list = brandAccounts(b).sort((x, y) => ORDER.indexOf(platformOf(x)) - ORDER.indexOf(platformOf(y)) || String(x.username).localeCompare(String(y.username)));
-  if (list.length < 2) return '';
-  const on = sideAcct();
-  return `<div class="bchips phone acc" role="group" aria-label="Account"><button class="bchip ${on ? '' : 'on'}" data-brand="${b}" aria-pressed="${!on}">All accounts</button>${list.map(a =>
-    `<button class="bchip ${on === a.id ? 'on' : ''}" data-sacct="${a.id}" aria-pressed="${on === a.id}">${appIcon(platformOf(a), 14)}${esc(handle(a))}</button>`).join('')}</div>`;
+  const b = curBrand(), byPl = (x, y) => ORDER.indexOf(platformOf(x)) - ORDER.indexOf(platformOf(y)) || String(x.username).localeCompare(String(y.username));
+  const list = b !== 'all' && ['overview', 'analytics', 'calendar'].includes(S.view) ? brandAccounts(b).sort(byPl) : [], on = sideAcct();
+  const pill = (id, label, shown, opts, dot = '') => `<label class="bsel">${dot}<span>${esc(shown)}</span>${ui('chev', 14)}<select id="${id}" aria-label="${label}">${opts}</select></label>`;
+  return `<div class="bsels phone">${pill('pbrand', 'Brand', brandLabel(b), brandOpts().map(([k, l, n]) => `<option value="${k}" ${b === k ? 'selected' : ''}>${esc(l)}${k === 'all' ? '' : ` · ${n}`}</option>`).join(''),
+      b === 'all' ? ui('users', 15) : brandDot(b))}
+    ${list.length > 1 ? pill('pacct', 'Account', on ? handle(acct(on)) : 'All accounts', `<option value="">All accounts</option>${list.map(a => `<option value="${a.id}" ${on === a.id ? 'selected' : ''}>${PLATFORM[platformOf(a)]} · ${esc(handle(a))}</option>`).join('')}`,
+      on ? appIcon(platformOf(acct(on)), 16) : '') : ''}</div>`;
 }
 const inBrand = (a, b) => b === 'all' || (b === 'none' ? !brandName(a?.brand_id) : a?.brand_id === b);
 const engOf = s => (s.likes || 0) + (s.comments || 0) + (s.shares || 0) + (s.saves || 0);
@@ -432,7 +430,7 @@ function overviewView() {
   const all = S.me.accounts;
   if (!all.length) return firstRun();
   const brands = S.me.brands, loose = all.some(a => !brandName(a.brand_id)), b = curBrand();
-  const chips = brandChips('phone');
+  const chips = brandChips();
   if (!S.ov) return `<div class="ohead"><div><h1>${greeting()}</h1><p>${sk('260px', 14)}</p></div>${chips}</div>${skKpis(4)}
     <section class="panel"><header><h2>This week</h2></header><div class="wk">${[...Array(7)].map(() => `<div class="owd">${sk('60%', 14)}${sk('100%', 50)}</div>`).join('')}</div></section>`;
 
@@ -2830,8 +2828,10 @@ function bind() {
   on('[data-atrend]', 'click', e => { S.statsTrend = e.currentTarget.dataset.atrend; render(); });
   on('[data-asort]', 'click', e => { S.statsSort = e.currentTarget.dataset.asort; render(); });
   on('[data-aplat]', 'click', e => loadStats(undefined, e.currentTarget.dataset.aplat));
-  on('[data-sacct]', 'click', e => { const id = e.currentTarget.dataset.sacct; S.acct = S.acct === id ? '' : id; S.fAcct = S.acct || 'all';
-    if (S.view === 'analytics') loadStats(); else render(); });
+  const pickAcct = id => { S.acct = id; S.fAcct = id || 'all'; if (S.view === 'analytics') loadStats(); else render(); };
+  on('[data-sacct]', 'click', e => { const id = e.currentTarget.dataset.sacct; pickAcct(S.acct === id ? '' : id); });
+  on('#pacct', 'change', e => pickAcct(e.target.value));
+  on('#pbrand', 'change', e => setBrand(e.target.value));
   on('.chart .hit', 'mouseenter', e => { const pl = e.target.closest('.plot'), tip = pl.querySelector('.ctip'), cx = pl.querySelector('.cx'), x = e.target.dataset.x;
     tip.textContent = e.target.dataset.tip; tip.style.left = `${x}%`; tip.classList.add('on'); cx.style.left = `${x}%`; cx.classList.add('on'); });
   on('.chart .plot', 'mouseleave', e => { e.currentTarget.querySelector('.ctip').classList.remove('on'); e.currentTarget.querySelector('.cx').classList.remove('on'); });
