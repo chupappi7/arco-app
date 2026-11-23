@@ -2427,7 +2427,7 @@ function acctRow(x, brandId) {
     ${x.needs_reconnect && connectHref(pl) ? `<a class="btn sm" href="${connectHref(pl)}">Reconnect</a>` : ''}
     <label class="amenu" title="Manage ${esc(x.username || '')}">${ui('more', 16)}<select data-amenu="${x.id}" aria-label="Manage ${esc(x.username || 'account')}"><option value="" selected disabled hidden></option>
       ${others.length ? `<optgroup label="${brandId ? 'Move to' : 'Add to brand'}">${others.map(b => `<option value="b:${b.id}">${esc(b.name)}</option>`).join('')}</optgroup>` : ''}
-      ${brandId ? '<option value="out">Remove from brand</option>' : ''}<option value="disc">Disconnect…</option></select></label></div>`;
+      ${connectHref(pl) ? '<option value="re">Reconnect</option>' : ''}${brandId ? '<option value="out">Remove from brand</option>' : ''}<option value="disc">Disconnect…</option></select></label></div>`;
 }
 
 // Add buttons per brand: one app icon per platform, each connects a new
@@ -2891,7 +2891,8 @@ function bind() {
   on('[data-edit]', 'click', e => { S.detail = null; edit(e.target.dataset.edit); });
   on('[data-disc]', 'click', e => disconnectAcct(e.currentTarget.dataset.disc));
   on('[data-amenu]', 'change', e => { const id = e.target.dataset.amenu, v = e.target.value; e.target.value = '';
-    if (v === 'disc') disconnectAcct(id);
+    if (v === 're') { const h = connectHref(platformOf(acct(id))); if (h) location.href = h; }
+    else if (v === 'disc') disconnectAcct(id);
     else if (v === 'out') brandAction(() => send(`/accounts/${id}`, 'PATCH', { brand_id: null }));
     else if (v.startsWith('b:')) brandAction(() => send(`/accounts/${id}`, 'PATCH', { brand_id: v.slice(2) })); });
   on('[data-settab]', 'click', e => { S.setTab = e.currentTarget.dataset.settab; render(); });
