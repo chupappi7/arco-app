@@ -20,6 +20,7 @@ import { runCleanup, deleteWorkspace } from './cleanup.js';
 import { refreshStats, getStats, STATS_PER_TICK } from './stats.js';
 import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './brands.js';
 import { listCompetitors, addCompetitor, removeCompetitor, refreshCompetitors } from './competitors.js';
+import { listNotifications, markSeen, runNotifications } from './notifications.js';
 
 async function me(req, env, { who }) {
   const ws = who.ws;
@@ -152,6 +153,8 @@ export const ROUTES = [
   }, 'member'],
   ['GET', '/v1/stats', async (req, env, { who, url }) => json(await getStats(env, who, Number(url.searchParams.get('days') || 7),
     undefined, url.searchParams.get('platform') || 'all', url.searchParams.get('brand') || 'all', url.searchParams.get('account') || null)), 'member'],
+  ['GET', '/v1/notifications', async (req, env, { who, url }) => json(await listNotifications(env, who, url.searchParams.get('brand') || 'all')), 'member'],
+  ['POST', '/v1/notifications/seen', async (req, env, { who }) => json(await markSeen(env, who)), 'member'],
   ['GET', '/v1/competitors', async (req, env, { who, url }) => json({ competitors: await listCompetitors(env, who, url.searchParams.get('brand') || 'all') }), 'member'],
   ['POST', '/v1/competitors', async (req, env, { who }) => json(await addCompetitor(env, who, await body(req))), 'member'],
   ['DELETE', '/v1/competitors/:id', async (req, env, { who, params }) => json(await removeCompetitor(env, who, params.id)), 'member'],
@@ -225,6 +228,7 @@ export default {
       const spare = L.TICK_FETCH_BUDGET - counts.calls - 3;
       await refreshStats(env, metaFor(env), tk, now(), Math.min(STATS_PER_TICK, spare)).catch(e => console.error('stats', e));
       await refreshCompetitors(env).catch(e => console.error('competitors', e));
+      await runNotifications(env).catch(e => console.error('notifications', e));
       await runCleanup(env);
     })());
   },

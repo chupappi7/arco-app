@@ -59,7 +59,7 @@ const S = {
   login: { step: 'email', email: '', code: '', busy: false, err: '' }, members: null, invited: null,
 };
 const ORDER = ['tiktok', 'instagram', 'facebook', 'youtube'];
-const STAGGER = 3600, ZERO_AFTER = 6 * 3600;
+const STAGGER = 3600;
 const platformOf = a => a?.platform || 'tiktok';
 const SAVED = 'arco-publisher.targets';
 const INVITE = 'arco-publisher.invite';
@@ -123,7 +123,63 @@ async function loadMe() {
   if (b !== 'all') { S.targets = S.targets.filter(id => inBrand(acct(id), b));
     if (!S.targets.length) for (const a of brandAccounts(b)) if (!a.needs_reconnect) toggleTarget(a.id, true, false); }
   refreshCounts();
+  loadInbox();
+  clearInterval(S.inboxT); S.inboxT = setInterval(() => { if (!document.hidden) loadInbox(); }, 3 * 60e3);
 }
+
+// ---- inbox: wins and problems the server noticed ----------------------------
+
+async function loadInbox() {
+  try { S.inbox = await api(`/notifications?brand=${encodeURIComponent(curBrand())}`); } catch { return; }
+  if (S.me && !S.me.needs_email) drawBell();
+}
+const INBOX_ICON = { win: 'spark', bad: 'x', info: 'chart' };
+function bellHtml() {
+  const I = S.inbox, n = I?.unread || 0, open = !!S.inboxOpen;
+  const items = I?.items || [];
+  return `<div class="bell ${open ? 'open' : ''}"><button type="button" class="bellbtn" data-bell aria-expanded="${open}" aria-label="Inbox${n ? `, ${n} new` : ''}" title="Inbox">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 20a2 2 0 0 0 3.4 0"/></svg>
+      ${n ? `<span class="bn">${n > 9 ? '9+' : n}</span>` : ''}</button>
+    ${open ? `<div class="bellpop" role="dialog" aria-label="Inbox"><header><b>Inbox</b>${items.length ? `<span class="note">${items.length} in the last 30 days</span>` : ''}</header>
+      <div class="blist">${items.length ? items.map(x => `<button type="button" class="bitem ${x.tone} ${x.unread ? 'new' : ''}" data-ntf="${x.id}">
+        <span class="bic">${ui(INBOX_ICON[x.tone] || 'chart', 14)}</span><span class="btx"><b>${esc(x.title)}</b>${x.body ? `<span>${esc(x.body)}</span>` : ''}<small>${ago(x.created_at)}</small></span>
+        ${x.kind === 'breakout' && x.post_id && can('member') ? `<span class="bact" data-ntfagain="${x.post_id}">Post again</span>` : ''}</button>`).join('')
+        : '<div class="bempty">Nothing yet. Milestones, breakouts and problems with your posts show up here.</div>'}</div></div>` : ''}</div>`;
+}
+function drawBell() {
+  for (const el of document.querySelectorAll('.bellslot')) el.innerHTML = bellHtml();
+  bindBell();
+}
+function bindBell() {
+  document.querySelectorAll('[data-bell]').forEach(b => b.onclick = e => {
+    e.stopPropagation(); S.inboxOpen = !S.inboxOpen; drawBell();
+    if (S.inboxOpen && S.inbox?.unread) send('/notifications/seen', 'POST', {}).then(() => { S.inbox.unread = 0; }).catch(() => {});
+    if (!S.inboxOpen && S.inbox) { S.inbox.items.forEach(x => { x.unread = false; }); drawBell(); }
+  });
+  document.querySelectorAll('[data-ntf]').forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    const x = S.inbox.items.find(i => i.id === b.dataset.ntf), again = e.target.closest('[data-ntfagain]');
+    S.inboxOpen = false; S.inbox.items.forEach(i => { i.unread = false; }); drawBell();
+    if (!x) return;
+    if (again) return openPost(x.post_id, true);
+    if (x.url) return void window.open(x.url, '_blank', 'noopener');
+    if (x.kind === 'reconnect') { location.hash = '#accounts'; return; }
+    if (x.kind === 'empty') { location.hash = '#compose'; return; }
+    if (x.post_id) openPost(x.post_id);
+  });
+}
+// A post from the inbox: its panel, or straight into the composer to post again.
+async function openPost(id, again = false) {
+  if (!postById(id)) {
+    const t = Math.floor(Date.now() / 1000);
+    try { const r = await api(`/posts?from=${t - 40 * 86400}&to=${t + 14 * 86400}`); S.posts = r.posts; } catch {}
+  }
+  if (!postById(id)) { toast('That post is no longer here.', 'err'); return; }
+  if (again) return edit(id, true);
+  if (!['overview', 'calendar'].includes(S.view)) location.hash = '#overview';
+  S.detail = id; render();
+}
+document.addEventListener('click', e => { if (S.inboxOpen && !e.target.closest('.bell')) { S.inboxOpen = false; S.inbox?.items.forEach(i => { i.unread = false; }); drawBell(); } });
 
 // The accounts last posted to come back preselected: someone running ten
 // accounts posts to the same set most days.
@@ -309,7 +365,7 @@ function render() {
   if (!signedIn) { $('app').innerHTML = signInView(); bind(); return; }
   if (S.view === 'accounts' && !can('admin')) S.view = 'overview';
   $('side').innerHTML = menu();
-  $('mtop').innerHTML = `<img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30">${wsBox()}`;
+  $('mtop').innerHTML = `<img class="logo" src="/apple-touch-icon.png" alt="" width="30" height="30">${wsBox()}<span class="bellslot"></span>`;
   $('tabbar').innerHTML = tabbar();
   $('tabbar').classList.toggle('flat', S.view === 'compose');
   const views = { ai: aiView, library: libraryView, analytics: analyticsView, overview: overviewView, calendar: calendarView, drafts: draftsView, accounts: accountsView, settings: settingsView, compose: composeView };
@@ -318,7 +374,9 @@ function render() {
   if (S.anim) { $('app').classList.remove('in'); void $('app').offsetWidth; $('app').classList.add('in'); S.anim = false;
     clearTimeout(S.animT); S.animT = setTimeout(() => $('app').classList.remove('in'), 400); }
   $('app').innerHTML = head + (['calendar', 'analytics', 'drafts', 'library'].includes(S.view) ? brandChips() : '') + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '') + resultView();
+  $('app').insertAdjacentHTML('afterbegin', '<span class="bellslot top"></span>');
   bind();
+  drawBell();
   if (S.detail && !hadDetail) { S.opener = opener; $('closedetail')?.focus(); }
   if (!S.detail && hadDetail && S.opener) { document.querySelector(`[data-open="${S.opener}"]`)?.focus(); S.opener = null; }
 }
@@ -390,6 +448,7 @@ function setBrand(k) {
     } else for (const id of [...S.targets]) if (!inBrand(acct(id), k)) toggleTarget(id, false, false);
   }
   if (S.view === 'analytics') { S.stats = null; loadStats(); loadCompetitors(); }
+  loadInbox();
   render();
 }
 
@@ -451,14 +510,10 @@ function overviewView() {
   // Problems only: failed posts and accounts that lost access.
   const failed = live.filter(p => p.status === 'failed' && p.scheduled_at > now - week);
   const reconnect = acc.filter(a => a.needs_reconnect);
-  // Published a while ago, checked since, and still nobody saw it: the platform is holding it back.
-  const zero = live.filter(p => p.status === 'published' && p.scheduled_at > now - week && p.stats?.views === 0
-    && (p.stats_at || 0) - p.scheduled_at >= ZERO_AFTER);
-  const zeroBy = Object.values(zero.reduce((m, p) => ((m[p.account_id] ||= []).push(p), m), {}));
   const probs = [...failed.slice(0, 3).map(p => `<button class="aitem" data-open="${p.id}"><b>Failed on ${who(p)}</b><span title="${esc(p.fail_reason || '')}">${esc(p.fail_reason || 'Open it to see why')}</span></button>`),
     ...(failed.length > 3 ? [`<a class="aitem" href="#calendar"><b>${failed.length - 3} more failed</b></a>`] : []),
     ...reconnect.map(a => `<a class="aitem" href="#accounts"><b>Reconnect ${who(a)}</b><span>${PLATFORM[platformOf(a)]} access expired</span></a>`),
-    ...zeroBy.map(g => `<button class="aitem" data-open="${g.sort((x, y) => y.scheduled_at - x.scheduled_at)[0].id}"><b>0 views on ${who(g[0])}${g.length > 1 ? ` · ${g.length} posts` : ''}</b><span>${PLATFORM[platformOf(acct(g[0].account_id))]} isn't showing ${g.length > 1 ? 'them' : 'it'} to anyone. Often a repeat of the same clip, or a new account.</span></button>`)];
+  ];
   const alert = probs.length ? `<div class="oalert" role="status"><span class="ic">${ui('x', 15)}</span><div class="aitems">${probs.join('')}</div></div>` : '';
 
   // Results, from each published post's own numbers: last 7 days against the 7 before.
