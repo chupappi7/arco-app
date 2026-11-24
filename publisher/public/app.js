@@ -142,9 +142,27 @@ function bellHtml() {
       ${n ? `<span class="bn">${n > 9 ? '9+' : n}</span>` : ''}</button>
     ${open ? `<div class="bellpop" role="dialog" aria-label="Inbox"><header><b>Inbox</b>${items.length ? `<span class="note">${items.length} in the last 30 days</span>` : ''}</header>
       <div class="blist">${items.length ? items.map(x => `<button type="button" class="bitem ${x.tone} ${x.unread ? 'new' : ''}" data-ntf="${x.id}">
-        <span class="bic">${ui(INBOX_ICON[x.tone] || 'chart', 14)}</span><span class="btx"><b>${esc(x.title)}</b>${x.body ? `<span>${esc(x.body)}</span>` : ''}<small>${ago(x.created_at)}</small></span>
+        <span class="bic">${ui(INBOX_ICON[x.tone] || 'chart', 14)}</span><span class="btx">${ntfWhere(x)}<b>${esc(x.title)}</b>${x.body ? `<span>${esc(x.body)}</span>` : ''}<small>${ago(x.created_at)}</small></span>
         ${x.kind === 'breakout' && x.post_id && can('member') ? `<span class="bact" data-ntfagain="${x.post_id}">Post again</span>` : ''}</button>`).join('')
         : '<div class="bempty">Nothing yet. Milestones, breakouts and problems with your posts show up here.</div>'}</div></div>` : ''}</div>`;
+}
+// Which brand and account an item is about: the brand an item opens in Analytics.
+const ntfBrand = x => { const a = x.account_id && acct(x.account_id);
+  if (!S.me.brands.length) return 'all';
+  if (a) return brandName(a.brand_id) ? a.brand_id : 'none';
+  return x.brand_id && brandName(x.brand_id) ? x.brand_id : 'all'; };
+function ntfWhere(x) {
+  const a = x.account_id && acct(x.account_id), b = ntfBrand(x);
+  const bits = [b !== 'all' ? `${brandDot(b)}${esc(brandLabel(b))}` : '', a ? `${PLATFORM[platformOf(a)]} ${handle(a)}` : ''].filter(Boolean);
+  return bits.length ? `<em class="bwho">${bits.join('<i class="sep">·</i>')}</em>` : '';
+}
+// Open Analytics for that brand, narrowed to the account when there is one.
+function openNtf(x) {
+  const b = ntfBrand(x), a = x.account_id && acct(x.account_id);
+  if (b !== curBrand()) setBrand(b);
+  S.acct = a ? a.id : ''; S.fAcct = S.acct || 'all';
+  if (S.view === 'analytics') { loadStats(); loadCompetitors(); } else location.hash = '#analytics';
+  render();
 }
 function drawBell() {
   for (const el of document.querySelectorAll('.bellslot')) el.innerHTML = bellHtml();
@@ -162,10 +180,9 @@ function bindBell() {
     S.inboxOpen = false; S.inbox.items.forEach(i => { i.unread = false; }); drawBell();
     if (!x) return;
     if (again) return openPost(x.post_id, true);
-    if (x.url) return void window.open(x.url, '_blank', 'noopener');
     if (x.kind === 'reconnect') { location.hash = '#accounts'; return; }
-    if (x.kind === 'empty') { location.hash = '#compose'; return; }
-    if (x.post_id) openPost(x.post_id);
+    if (x.kind === 'failed' && x.post_id) return openPost(x.post_id);
+    openNtf(x);
   });
 }
 // A post from the inbox: its panel, or straight into the composer to post again.

@@ -47,12 +47,12 @@ const comp = (id, handle, title, subs, change) => ({ id, platform: 'youtube', br
   recent: [...Array(10)].map((_, i) => ({ id: id + 'v' + i, title: ['How I study 10 hours a day', 'Phone in another room: 30 days', 'My focus setup 2026', 'Stop doomscrolling (what worked)', 'Deep work for students'][i % 5], published_at: now() - (i * 3 + 1) * 86400, thumb: '', views: i === 2 ? 48000 : 3000 + ((i * 1777) % 9000), likes: 100, comments: 10 })) });
 let seenAt = 0;
 const ntfs = [
-  { id: 'n1', kind: 'breakout', tone: 'win', title: 'Breakout on @arco.app', body: '12.4K views, 4.2× the usual. Worth posting again on another account.', post_id: 'p6', created_at: now() - 1800 },
-  { id: 'n2', kind: 'views', tone: 'win', title: '10K views', body: 'Your TikTok post on @arco.app passed 10K views.', post_id: 'p6', created_at: now() - 3 * 3600 },
-  { id: 'n3', kind: 'zero', tone: 'bad', title: '0 views on @arco.app · 2 posts', body: "TikTok isn't showing them to anyone. Often a repeat of the same clip, or a new account.", post_id: 'p8', created_at: now() - 5 * 3600 },
-  { id: 'n4', kind: 'competitor', tone: 'info', title: 'Study With Jess has a breakout', body: '"My focus setup 2026" · 48K views, 5.8× their usual.', url: 'https://www.youtube.com/', created_at: now() - 26 * 3600 },
-  { id: 'n5', kind: 'reconnect', tone: 'bad', title: 'Reconnect @emilia', body: "TikTok access expired. Nothing posts there until it's reconnected.", created_at: now() - 50 * 3600 },
-  { id: 'n6', kind: 'followers', tone: 'win', title: '@arco.app hit 1K followers', body: 'TikTok · 1.1K now.', created_at: now() - 72 * 3600 },
+  { id: 'n1', kind: 'breakout', tone: 'win', title: 'Breakout: 12.4K views', body: '4.2× what this account usually gets. Post it again on another account.', post_id: 'p6', account_id: 'a1', brand_id: 'b1', created_at: now() - 1800 },
+  { id: 'n2', kind: 'views', tone: 'win', title: 'A post passed 10K views', body: null, post_id: 'p6', account_id: 'a1', brand_id: 'b1', created_at: now() - 3 * 3600 },
+  { id: 'n3', kind: 'zero', tone: 'bad', title: '2 posts with 0 views', body: "Instagram hasn't shown them to anyone yet. Common on new accounts or reused clips.", post_id: 'p8', account_id: 'a2', brand_id: 'b1', created_at: now() - 5 * 3600 },
+  { id: 'n7', kind: 'empty', tone: 'bad', title: 'Nothing scheduled in the next 24 hours', body: 'You posted this week, but the queue is empty.', brand_id: 'b2', created_at: now() - 6 * 3600 },
+  { id: 'n4', kind: 'competitor', tone: 'info', title: 'Study With Jess has a breakout', body: '"My focus setup 2026": 48K views, 5.8× their usual.', url: 'https://www.youtube.com/', brand_id: 'b1', created_at: now() - 26 * 3600 },
+  { id: 'n6', kind: 'followers', tone: 'win', title: '1K followers', body: '1.1K now.', account_id: 'a1', brand_id: 'b1', created_at: now() - 72 * 3600 },
 ];
 let comps = [comp('c1', 'studywithjess', 'Study With Jess', 412000, 3100), comp('c2', 'focusdaily', 'Focus Daily', 38500, -120)];
 const posts = [

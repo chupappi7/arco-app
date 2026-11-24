@@ -36,7 +36,7 @@ describe('notification rules', () => {
     const out = rules(f, T);
     const zero = out.filter(n => n.kind === 'zero');
     expect(zero).toHaveLength(1);
-    expect(zero[0]).toMatchObject({ key: 'zero:z2', post: 'z2', title: '0 views on @a1 · 2 posts' });
+    expect(zero[0]).toMatchObject({ key: 'zero:z2', post: 'z2', title: '2 posts with 0 views' });
     expect(out.map(n => n.key)).toEqual(expect.arrayContaining(['failed:f1', 'reconnect:a1', 'empty:b1']));
   });
 
@@ -58,7 +58,7 @@ describe('notification runs', () => {
     expect((await runNotifications(env, T + NOTIFY_EVERY + 1)).made).toBe(0);       // already there
     const who = { ws: 'ws1', userId: 'u1', role: 'owner', scope: null };
     let l = await listNotifications(env, who);
-    expect(l).toMatchObject({ unread: 1, items: [{ kind: 'reconnect', title: 'Reconnect @a1', unread: true }] });
+    expect(l).toMatchObject({ unread: 1, items: [{ kind: 'reconnect', title: 'Reconnect this account', unread: true }] });
     await markSeen(env, who, T + 10);
     l = await listNotifications(env, who);
     expect(l.unread).toBe(0);
@@ -66,5 +66,13 @@ describe('notification runs', () => {
     await env.DB.prepare('UPDATE accounts SET needs_reconnect = 0').run();
     expect((await runNotifications(env, T + 2 * NOTIFY_EVERY + 2)).removed).toBe(1);
     expect((await listNotifications(env, who)).items).toEqual([]);
+  });
+
+  it('rewrites the wording of rows that still hold', async () => {
+    await addAccount('a1', 'broken');
+    await runNotifications(env, T);
+    await env.DB.prepare("UPDATE notifications SET title = 'Old wording'").run();
+    await runNotifications(env, T + NOTIFY_EVERY + 1);
+    expect((await env.DB.prepare('SELECT title FROM notifications').first()).title).toBe('Reconnect this account');
   });
 });

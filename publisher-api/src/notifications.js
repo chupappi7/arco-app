@@ -47,7 +47,7 @@ export function rules(f, t) {
   for (const p of pub) {
     const v = p.s?.views, m = v == null ? null : top(VIEW_MILESTONES, v);
     if (m) add({ ...p, id: p.account_id }, { key: `views:${p.id}:${m}`, kind: 'views', tone: 'win', post: p.id,
-      title: `${big(m)} views`, body: `Your ${PL[p.platform]} post on ${at(p)} passed ${big(m)} views.` });
+      title: `A post passed ${big(m)} views`, body: null });
   }
   // Breakouts: far above the account's usual, in the last week.
   const byAcct = {};
@@ -55,19 +55,19 @@ export function rules(f, t) {
   for (const p of pub) {
     const all = byAcct[p.account_id] || [], u = all.length >= 5 ? median(all) : null, v = p.s?.views;
     if (u && v >= 500 && v >= BREAKOUT * u && p.scheduled_at > t - 7 * DAY) add({ ...p, id: p.account_id }, { key: `breakout:${p.id}`, kind: 'breakout', tone: 'win', post: p.id,
-      title: `Breakout on ${at(p)}`, body: `${big(v)} views, ${(v / u).toFixed(1)}× the usual. Worth posting again on another account.` });
+      title: `Breakout: ${big(v)} views`, body: `${(v / u).toFixed(1)}× what this account usually gets. Post it again on another account.` });
   }
   // Follower milestones crossed in the last week (not ones the account already had).
   for (const a of f.accounts) {
     const m = a.followers == null ? null : top(FOLLOWER_MILESTONES, a.followers), low = f.low.get(a.id);
     if (m && low != null && low < m) add(a, { key: `followers:${a.id}:${m}`, kind: 'followers', tone: 'win',
-      title: `${at(a)} hit ${big(m)} followers`, body: `${PL[a.platform]} · ${big(a.followers)} now.` });
+      title: `${big(m)} followers`, body: `${big(a.followers)} now.` });
   }
   // A new account's first post going out.
   for (const a of f.accounts) {
     const first = f.first.get(a.id);
     if (first && first > t - 2 * DAY && a.connected_at > t - 30 * DAY) add(a, { key: `first:${a.id}`, kind: 'first', tone: 'win',
-      title: `First post on ${at(a)}`, body: `${PL[a.platform]} is live. Numbers show in a few hours.` });
+      title: 'First post is live', body: 'Views show in a few hours.' });
   }
   // Problems.
   const zero = {};
@@ -76,13 +76,13 @@ export function rules(f, t) {
     const a = acc.get(id); if (!a) continue;
     const latest = list.sort((x, y) => y.scheduled_at - x.scheduled_at)[0];
     add(a, { key: `zero:${latest.id}`, kind: 'zero', tone: 'bad', post: latest.id,
-      title: `0 views on ${at(a)}${list.length > 1 ? ` · ${list.length} posts` : ''}`,
-      body: `${PL[a.platform]} isn't showing ${list.length > 1 ? 'them' : 'it'} to anyone. Often a repeat of the same clip, or a new account.` });
+      title: list.length > 1 ? `${list.length} posts with 0 views` : 'A post with 0 views',
+      body: `${PL[a.platform]} hasn't shown ${list.length > 1 ? 'them' : 'it'} to anyone yet. Common on new accounts or reused clips.` });
   }
   for (const p of f.posts) if (p.status === 'failed' && p.scheduled_at > t - 2 * DAY) add({ ...p, id: p.account_id }, { key: `failed:${p.id}`, kind: 'failed', tone: 'bad', post: p.id,
-    title: `Failed on ${at(p)}`, body: 'Open it to see why and post it again.' });
+    title: 'A post failed', body: 'Tap to see why and post it again.' });
   for (const a of f.accounts) if (a.needs_reconnect) add(a, { key: `reconnect:${a.id}`, kind: 'reconnect', tone: 'bad',
-    title: `Reconnect ${at(a)}`, body: `${PL[a.platform]} access expired. Nothing posts there until it's reconnected.` });
+    title: 'Reconnect this account', body: `${PL[a.platform]} access expired. Nothing posts here until you reconnect.` });
   // A brand that has been posting but has nothing in the next 24 hours.
   const brands = {};
   for (const a of f.accounts) if (a.brand_id) (brands[`${a.workspace_id}|${a.brand_id}`] ||= { ws: a.workspace_id, brand: a.brand_id, ids: new Set() }).ids.add(a.id);
@@ -91,14 +91,14 @@ export function rules(f, t) {
     const recent = mine.some(p => p.status === 'published' && p.scheduled_at > t - 7 * DAY);
     const next = mine.some(p => p.status === 'queued' && p.scheduled_at > t && p.scheduled_at < t + DAY);
     if (recent && !next) out.push({ ws: b.ws, brand: b.brand, account: null, key: `empty:${b.brand}`, kind: 'empty', tone: 'bad',
-      title: 'Nothing scheduled for the next 24 hours', body: 'This brand posted this week but has nothing queued. Fill a slot to keep the streak.' });
+      title: 'Nothing scheduled in the next 24 hours', body: 'You posted this week, but the queue is empty.' });
   }
   // Competitor breakouts: an idea to borrow.
   for (const c of f.comps) {
     const vids = JSON.parse(c.recent || '[]'), u = median(vids.map(v => v.views));
     for (const v of vids) if (u && v.views >= 1000 && v.views >= BREAKOUT * u && v.published_at > t - 7 * DAY)
       out.push({ ws: c.workspace_id, brand: c.brand_id, account: null, key: `cbreak:${v.id}`, kind: 'competitor', tone: 'info',
-        url: `https://www.youtube.com/watch?v=${v.id}`, title: `${c.title} has a breakout`, body: `"${v.title}" · ${big(v.views)} views, ${(v.views / u).toFixed(1)}× their usual.` });
+        url: `https://www.youtube.com/watch?v=${v.id}`, title: `${c.title} has a breakout`, body: `"${v.title}": ${big(v.views)} views, ${(v.views / u).toFixed(1)}× their usual.` });
   }
   return out;
 }
@@ -111,7 +111,7 @@ export async function runNotifications(env, t = now()) {
   await env.DB.prepare(`INSERT INTO notification_seen (workspace_id, who, seen_at) VALUES ('_cron', '_cron', ?)
       ON CONFLICT (workspace_id, who) DO UPDATE SET seen_at = excluded.seen_at`).bind(t).run();
   const want = rules(await facts(env, t), t);
-  const { results: have } = await env.DB.prepare('SELECT id, workspace_id, key, kind FROM notifications').all();
+  const { results: have } = await env.DB.prepare('SELECT id, workspace_id, key, kind, title, body FROM notifications').all();
   const haveKeys = new Set(have.map(h => `${h.workspace_id}|${h.key}`)), wantKeys = new Set(want.map(w => `${w.ws}|${w.key}`));
   // Take back problems that are no longer true.
   const gone = have.filter(h => PROBLEM.includes(h.kind) && !wantKeys.has(`${h.workspace_id}|${h.key}`));
@@ -121,7 +121,11 @@ export async function runNotifications(env, t = now()) {
     if ((perWs[w.ws] = (perWs[w.ws] || 0) + 1) > MAX_PER_RUN) continue;
     fresh.push(w); haveKeys.add(`${w.ws}|${w.key}`);
   }
+  // Keep the wording of rows that still hold up to date (a 0-view count grows).
+  const byKey = new Map(have.map(h => [`${h.workspace_id}|${h.key}`, h]));
+  const changed = want.map(w => [byKey.get(`${w.ws}|${w.key}`), w]).filter(([h, w]) => h && (h.title !== w.title || (h.body || null) !== (w.body || null)));
   const stmts = [
+    ...changed.map(([h, w]) => env.DB.prepare('UPDATE notifications SET title = ?, body = ? WHERE id = ?').bind(w.title, w.body || null, h.id)),
     ...gone.map(h => env.DB.prepare('DELETE FROM notifications WHERE id = ?').bind(h.id)),
     ...fresh.map(w => env.DB.prepare(`INSERT OR IGNORE INTO notifications (id, workspace_id, brand_id, key, kind, tone, title, body, post_id, account_id, url, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind('ntf_' + randomToken('', 8), w.ws, w.brand, w.key, w.kind, w.tone, w.title, w.body || null,
