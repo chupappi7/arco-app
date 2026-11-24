@@ -91,6 +91,30 @@ export function youtube({ clientId, clientSecret, fetch }) {
       if (!res.ok) throw await fail(res, 'upload');
       return res.json();
     },
+    // Someone else's channel, by id or @handle, with a plain API key: public numbers only.
+    publicChannel: async (key, { id, handle }) => {
+      const q = id ? `id=${encodeURIComponent(id)}` : `forHandle=${encodeURIComponent('@' + handle)}`;
+      const r = await json(`${API}/channels?part=snippet,statistics,contentDetails&${q}&key=${encodeURIComponent(key)}`, {}, 'channel');
+      const c = r.items?.[0];
+      if (!c) return null;
+      const thumbs = c.snippet?.thumbnails || {}, st = c.statistics || {};
+      return { id: c.id, title: c.snippet?.title || '', handle: String(c.snippet?.customUrl || '').replace(/^@/, ''),
+        avatar_url: (thumbs.medium || thumbs.default || thumbs.high || {}).url || '',
+        subscribers: st.hiddenSubscriberCount ? null : Number(st.subscriberCount ?? NaN), views: Number(st.viewCount ?? NaN),
+        videos: Number(st.videoCount ?? NaN), uploads: c.contentDetails?.relatedPlaylists?.uploads || null };
+    },
+    // A channel's newest uploads with their numbers, newest first.
+    publicRecent: async (key, uploads, n = 12) => {
+      const pl = await json(`${API}/playlistItems?part=contentDetails&maxResults=${n}&playlistId=${encodeURIComponent(uploads)}&key=${encodeURIComponent(key)}`, {}, 'uploads');
+      const ids = (pl.items || []).map(i => i.contentDetails?.videoId).filter(Boolean);
+      if (!ids.length) return [];
+      const v = await json(`${API}/videos?part=snippet,statistics,contentDetails&id=${ids.join(',')}&key=${encodeURIComponent(key)}`, {}, 'videos');
+      return (v.items || []).map(x => ({ id: x.id, title: x.snippet?.title || '', published_at: Math.floor(Date.parse(x.snippet?.publishedAt) / 1000) || null,
+        thumb: (x.snippet?.thumbnails?.medium || x.snippet?.thumbnails?.default || {}).url || '',
+        views: Number(x.statistics?.viewCount ?? NaN) || 0, likes: x.statistics?.likeCount == null ? null : Number(x.statistics.likeCount),
+        comments: x.statistics?.commentCount == null ? null : Number(x.statistics.commentCount), duration: x.contentDetails?.duration || '' }))
+        .sort((a, b) => (b.published_at || 0) - (a.published_at || 0));
+    },
     // Views, likes and comments for up to 50 videos.
     videoStats: async (token, ids) => {
       const r = await json(`${API}/videos?part=statistics,status&id=${ids.slice(0, 50).map(encodeURIComponent).join(',')}`,

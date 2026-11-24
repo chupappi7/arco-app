@@ -22,7 +22,7 @@ const me = {
   brands: [{ id: 'b1', name: 'ARCO', slots: null, voice: '' }, { id: 'b2', name: 'Client Bakery', slots: null, voice: '' }],
   api_key_set: false,
   limits: { accounts: 25, queued: 200, images: 35, image_bytes: 5242880, workspace_bytes: 209715200, min_lead_seconds: 300, ig_images: 10, ig_caption: 2200 },
-  facebook_enabled: true, instagram_enabled: true, youtube_enabled: true, ai_enabled: true,
+  facebook_enabled: true, instagram_enabled: true, youtube_enabled: true, ai_enabled: true, competitors_enabled: true,
 };
 const acc = id => me.accounts.find(a => a.id === id);
 // Library: a few photos already filed in folders, plus loose ones.
@@ -42,6 +42,10 @@ const mk = (id, a, st, h, cap, extra = {}) => ({ id, account_id: a, platform: ac
   images: [`/fake/${id}.svg`, `/fake/${id}b.svg`], image_keys: ['k' + id], cover_index: 0, settings: {}, scheduled_at: H(h),
   post_url: st === 'published' ? 'https://example.com/p' : null, fail_reason: st === 'failed' ? 'Instagram could not process the images: aspect ratio not supported' : null,
   group_id: null, updated_at: H(h), stats: null, ...extra });
+const comp = (id, handle, title, subs, change) => ({ id, platform: 'youtube', brand_id: null, channel_id: 'UC' + id, handle, title, avatar_url: '', subscribers: subs, views: subs * 40, videos: 120,
+  subscribers_change_7d: change, stats_at: now(), url: 'https://www.youtube.com/@' + handle,
+  recent: [...Array(10)].map((_, i) => ({ id: id + 'v' + i, title: ['How I study 10 hours a day', 'Phone in another room: 30 days', 'My focus setup 2026', 'Stop doomscrolling (what worked)', 'Deep work for students'][i % 5], published_at: now() - (i * 3 + 1) * 86400, thumb: '', views: i === 2 ? 48000 : 3000 + ((i * 1777) % 9000), likes: 100, comments: 10 })) });
+let comps = [comp('c1', 'studywithjess', 'Study With Jess', 412000, 3100), comp('c2', 'focusdaily', 'Focus Daily', 38500, -120)];
 const posts = [
   mk('p1', 'a3', 'published', -3, 'New drop: Jordan 4 Bred, sizes 40-45 in stock', { stats: { likes: 48, comments: 9, shares: 4 } }),
   mk('p2', 'a2', 'failed', -1.2, '3 apps that saved my mornings this week'),
@@ -84,6 +88,11 @@ http.createServer(async (q, r) => {
   if (/^\/api\/v1\/posts\/\w+\/retry$/.test(p)) { const x = posts.find(y => y.id === p.split('/')[4]);
     if (x) Object.assign(x, { status: 'queued', fail: false, created: Date.now(), fail_reason: null }); return j(x || {}); }
   const libStore = () => { const l = lib.reduce((n, i) => n + (i.bytes || 0), 0); return { used: l + 640e6, library: l, limit: 5 * 1024 ** 3 }; };
+  if (p === '/api/v1/competitors' && q.method === 'GET') return j({ competitors: comps });
+  if (p === '/api/v1/competitors' && q.method === 'POST') { const o = await body(q), h = String(o.channel).replace(/^.*@/, '').replace(/\/.*/, '');
+    if (comps.some(c => c.handle === h)) return j({ error: `You already follow ${h}` }, 409);
+    const c = comp('c' + comps.length, h, h.replace(/[._]/g, ' '), 800 + comps.length * 9000, 0); comps.push(c); return j(c); }
+  if (p.startsWith('/api/v1/competitors/') && q.method === 'DELETE') { comps = comps.filter(c => c.id !== p.split('/').pop()); return j({ ok: true }); }
   if (p === '/api/v1/library' && q.method === 'GET') return j({ items: lib, storage: libStore() });
   if (p === '/api/v1/folders' && q.method === 'GET') return j({ folders: folders.map(folderJson).sort((a, b) => b.created_at - a.created_at) });
   if (p === '/api/v1/folders' && q.method === 'POST') { const o = await body(q), f = { id: 'fld' + Math.random().toString(16).slice(2, 7), name: o.name, brand_id: o.brand_id || null, note: o.note || null, created_at: now() };

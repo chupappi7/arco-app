@@ -21,6 +21,7 @@ YT_REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/youtube/callback"
 # Facebook Pages; IG_APP_ID, IG_APP_SECRET (the Instagram app id/secret from
 # the app's Instagram > API setup with Instagram login) for Instagram;
 # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (a Google Cloud OAuth web client) for YouTube;
+# GOOGLE_API_KEY (YouTube Data API key) for competitor channels;
 # ANTHROPIC_API_KEY for AI writing;
 # RESEND_API_KEY and MAIL_FROM (e.g. "ARCO Publisher <login@your-domain>") for sign-in codes and invites.
 

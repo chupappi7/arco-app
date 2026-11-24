@@ -164,7 +164,7 @@ function route() {
   if (signedIn && S.view === 'calendar') { if (phone() && S.calMode !== 'week') { S.calMode = 'week'; S.week = 0; S.month = 0; } loadWeek(); }
   if (signedIn && S.view === 'ai') loadAi();
   if (signedIn && S.view === 'drafts') loadDrafts();
-  if (signedIn && S.view === 'analytics') loadStats();
+  if (signedIn && S.view === 'analytics') { loadStats(); loadCompetitors(); }
   if (signedIn && S.view === 'library') { if (S.lastView !== 'library') S.folderOpen = null; loadLibrary(); }
   S.anim = S.lastView !== S.view; S.lastView = S.view;
   render();
@@ -175,6 +175,7 @@ function route() {
 
 // UI icons: one stroke weight everywhere.
 const UI = {
+  repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',
   play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/>',
   spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
@@ -388,7 +389,7 @@ function setBrand(k) {
       for (const a of brandAccounts(k)) if (!a.needs_reconnect) toggleTarget(a.id, true, false);
     } else for (const id of [...S.targets]) if (!inBrand(acct(id), k)) toggleTarget(id, false, false);
   }
-  if (S.view === 'analytics') { S.stats = null; loadStats(); }
+  if (S.view === 'analytics') { S.stats = null; loadStats(); loadCompetitors(); }
   render();
 }
 
@@ -579,9 +580,50 @@ const postedAt = sec => { const d = Date.now() / 1000 - sec, h = Math.floor(d / 
   const rel = d < 0 ? '' : d < 3600 ? `${Math.max(1, Math.round(d / 60))} min ago` : d < 86400 ? `${h} h ago` : d < 7 * 86400 ? `${dd} day${dd === 1 ? '' : 's'} ago` : '';
   return `${date} · ${at(sec)}${rel ? ` · <em class="ago">${rel}</em>` : ''}`; };
 const ago = sec => { const m = Math.round((Date.now() / 1000 - sec) / 60);
-  return m < 60 ? `${Math.max(1, m)} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+  const d = Math.round(m / 1440);
+  return m < 60 ? `${Math.max(1, m)} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${d} day${d === 1 ? '' : 's'} ago`; };
 
 const statsCache = new Map();
+
+// ---- competitors: other YouTube channels, by their public numbers ---------
+
+async function loadCompetitors() {
+  if (!S.me.competitors_enabled) return;
+  const b = curBrand();
+  try { const r = await api(`/competitors?brand=${encodeURIComponent(b)}`); if (b === curBrand()) S.comp = r.competitors; }
+  catch (e) { S.comp = { err: e.message }; }
+  if (S.view === 'analytics') render();
+}
+const median = v => { const s = [...v].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : null; };
+
+function competitorsView(st) {
+  const head = `<header><h2>Competitors</h2><span class="note">YouTube · public numbers, updated twice a day</span></header>`;
+  if (!S.me.competitors_enabled) return `<section class="panel comp">${head}<div class="cempty2">Following other channels needs a YouTube API key on the server.${can('admin') ? ' Set GOOGLE_API_KEY on the Worker to turn it on.' : ''}</div></section>`;
+  const list = Array.isArray(S.comp) ? S.comp : [];
+  const mine = median((st?.posts || []).filter(p => p.stats?.views != null).map(p => p.stats.views));
+  const nowS = Date.now() / 1000;
+  const row = c => {
+    const vids = c.recent || [], med = median(vids.map(v => v.views)), last = vids[0]?.published_at;
+    const wk = vids.filter(v => v.published_at > nowS - 28 * 86400).length / 4;
+    const open = S.compOpen === c.id;
+    return `<div class="crow ${open ? 'open' : ''}"><button type="button" class="chead" data-comp="${c.id}" aria-expanded="${open}">
+        ${avatar(c.avatar_url, c.title)}<span class="cname"><b>${esc(c.title)}</b><span>${c.handle ? '@' + esc(c.handle) : 'YouTube'}</span></span>
+        <span class="cnum"><b>${c.subscribers == null ? '–' : num(c.subscribers)}</b><small class="${c.subscribers_change_7d > 0 ? 'up' : c.subscribers_change_7d < 0 ? 'down' : ''}">${c.subscribers_change_7d ? `${signed(c.subscribers_change_7d)} this week` : 'subscribers'}</small></span>
+        <span class="cnum"><b>${med == null ? '–' : num(med)}</b><small>usual views</small></span>
+        <span class="cnum hide-s"><b>${wk ? (wk % 1 ? wk.toFixed(1) : wk) : '0'}</b><small>uploads a week</small></span>
+        <span class="cnum hide-s"><b>${last ? ago(last).replace(' ago', '') : '–'}</b><small>last upload</small></span></button>
+      ${open ? `<div class="cvids">${vids.slice(0, 6).map(v => `<a class="cvid" href="https://www.youtube.com/watch?v=${encodeURIComponent(v.id)}" target="_blank" rel="noopener">
+          ${v.thumb ? `<img src="${esc(v.thumb)}" alt="" loading="lazy">` : '<span class="noimg"></span>'}<span class="ct">${esc(v.title)}</span>
+          <span class="cv"><b>${num(v.views)}</b> views · ${v.published_at ? ago(v.published_at) : ''}${med && v.views >= 2 * med ? ` <em class="win">${(v.views / med).toFixed(1)}× usual</em>` : ''}</span></a>`).join('') || '<div class="cempty2">No uploads yet.</div>'}
+        <div class="cfoot"><a href="${esc(c.url)}" target="_blank" rel="noopener">Open channel</a><button type="button" class="link danger" data-uncomp="${c.id}">Stop following</button></div></div>` : ''}</div>`;
+  };
+  return `<section class="panel comp">${head}
+    <form id="compadd" class="compadd"><input id="compin" placeholder="@channel or YouTube link" autocomplete="off" aria-label="YouTube channel to follow" value="${esc(S.compDraft || '')}">
+      <button class="btn sec" ${S.compBusy ? 'disabled' : ''}>${S.compBusy ? 'Adding…' : 'Follow'}</button></form>
+    ${S.comp?.err ? `<div class="status err">${esc(S.comp.err)}</div>` : ''}
+    ${list.length ? `${mine != null ? `<p class="note cmine">Your posts here get <b>${num(mine)}</b> views usually.</p>` : ''}<div class="clist">${list.map(row).join('')}</div>`
+      : `<div class="cempty2">Follow channels in your niche to see their subscribers, usual views and what's working for them.</div>`}</section>`;
+}
 // The chosen account, if it still belongs to the chosen brand and platform.
 const statsAcct = (plat = S.statsPlat || 'all') => { const a = sideAcct() && acct(sideAcct());
   return a && (plat === 'all' || platformOf(a) === plat) ? a.id : ''; };
@@ -683,8 +725,14 @@ function analyticsView() {
   const TRENDS = [['views', 'Views'], ['engagement', 'Engagement'], ['posts', 'Posts']];
   const trend = S.statsTrend || 'views';
 
+  // A winner: at least twice the account's usual (median) views in this window.
+  const usual = {};
+  for (const q of st.posts || []) if (q.stats?.views != null) (usual[q.account_id] ||= []).push(q.stats.views);
+  for (const k in usual) { const v = usual[k].sort((a, b) => a - b); usual[k] = v.length >= 4 ? v[Math.floor(v.length / 2)] : null; }
+  const lift = p => { const u = usual[p.account_id], v = p.stats?.views; return u && v >= 2 * u ? v / u : null; };
   const row = p => `<div class="rpost" data-open="${p.id}" role="button" tabindex="0">${thumb(p, 'class="thumb" alt=""') || '<span class="noimg"></span>'}
-      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}</b><span>${postedAt(p.scheduled_at)}</span></div>
+      <div class="wh"><b>${icon(p.platform || 'tiktok', 14)}${who(p)}${lift(p) ? `<span class="win" title="${lift(p).toFixed(1)}× this account's usual views">${lift(p) >= 10 ? Math.round(lift(p)) : lift(p).toFixed(1)}× usual</span>` : ''}</b><span>${postedAt(p.scheduled_at)}</span></div>
+      ${p.status === 'published' && can('member') ? `<button type="button" class="again" data-again="${p.id}" title="Post again">${ui('repeat', 15)}</button>` : ''}
       <span class="scols">${['views', 'likes', 'comments', 'shares'].map(k => `<span>${p.stats?.[k] == null ? '–' : num(p.stats[k])}</span>`).join('')}</span></div>`;
   const sort = S.statsSort || 'new';
   const SORTS = [['new', 'Newest'], ['views', 'Most views'], ['eng', 'Engagement']];
@@ -719,6 +767,7 @@ function analyticsView() {
         <section class="panel ocard"><header><h2>When posts do best</h2><span class="note">${useViews ? 'avg views' : 'avg interactions'} per post</span></header>${when}</section>
       </div>
     </div>
+    ${competitorsView(st)}
     ${notes.length ? `<div class="snotes">${notes.map(n => `<p>${n}</p>`).join('')}</div>` : ''}
     ${S.detail ? detailView() : ''}`;
 }
@@ -832,7 +881,7 @@ function composeView() {
     <div class="cmain">
       ${brandPickSection()}
       <section class="panel"><header><h2>Post to</h2>${S.targets.length ? `<span class="note">${S.targets.length} selected</span>` : ''}</header>
-        <div class="csec">${accountPicker()}</div></section>
+        <div class="csec">${accountPicker()}${alsoPost()}</div></section>
 
       <section class="panel"><header><h2>${S.video ? 'Video' : S.images.length ? 'Photos' : 'Media'}</h2>${S.images.length ? `<span class="note">${S.images.length} of ${toInstagram() ? IG_MAX : 35}</span>` : ''}</header>
         <div class="csec">${mediaView()}</div></section>
@@ -1703,6 +1752,20 @@ async function addFiles(files) {
   }
 }
 
+// Posting a winner again: the brand's other accounts on the same platform
+// that have not had this post yet, one click each.
+function alsoPost() {
+  const p = S.againOf;
+  if (!p) return '';
+  const from = acct(p.account_id), pl = platformOf(from), same = q => postGroupKey(q) === postGroupKey(p) || (p.video_key && q.video_key === p.video_key);
+  const had = new Set([...S.posts, ...(S.stats?.posts || [])].filter(q => q.status !== 'cancelled' && same(q)).map(q => q.account_id));
+  const cands = S.me.accounts.filter(a => platformOf(a) === pl && a.id !== p.account_id && !a.needs_reconnect && !had.has(a.id)
+    && (!from?.brand_id || a.brand_id === from.brand_id));
+  if (!cands.length) return '';
+  return `<div class="also"><span class="note">Not posted yet on:</span>${cands.map(a => `<button type="button" class="pchip ${S.targets.includes(a.id) ? 'on' : ''}" data-also="${a.id}" aria-pressed="${S.targets.includes(a.id)}">
+    ${withBadge(avatar(a.avatar_url, a.username || a.display_name), pl)}${who(a)}</button>`).join('')}</div>`;
+}
+
 function toggleTarget(id, on, draw = true) {
   S.targets = S.targets.filter(x => x !== id);
   if (on) S.targets.push(id);
@@ -2328,8 +2391,11 @@ const siblingsOf = p => { const k = postGroupKey(p), seen = new Set(), out = [];
   return out.sort((a, b) => ORDER.indexOf(a.platform || 'tiktok') - ORDER.indexOf(b.platform || 'tiktok') || String(a.username).localeCompare(String(b.username))); };
 const ST_LABEL = { published: 'Published', failed: 'Failed', queued: 'Scheduled', publishing: 'Posting', cancelled: 'Cancelled' };
 
+const postById = id => S.posts.find(x => x.id === id) || (S.stats?.posts || S.stats?.top)?.find(x => x.id === id)
+  || (S.ovStats?.posts || S.ovStats?.top)?.find(x => x.id === id);
+
 function detailView() {
-  const p = S.posts.find(x => x.id === S.detail) || (S.stats?.posts || S.stats?.top)?.find(x => x.id === S.detail);
+  const p = postById(S.detail);
   if (!p) return '';
   const sibs = siblingsOf(p);
   const sum = k => sibs.reduce((n, q) => n + (q.stats?.[k] || 0), 0), anyStats = sibs.some(q => q.stats);
@@ -2390,11 +2456,12 @@ async function movePost(id, dayStr) {
 // added to it. Privacy is chosen again on purpose: the options come from
 // TikTok now, not from when the post was first made.
 async function edit(id, again = false) {
-  const p = S.posts.find(x => x.id === id);
+  const p = postById(id);
   if (!p) return;
   resetComposer();
   S.replaces = !again && p.status === 'queued' ? p.id : null;
   S.replacesAccount = p.account_id;
+  S.againOf = again ? p : null;
   const images = again ? [] : p.image_keys.map((k, n) => ({ key: k, url: p.images[n] }));
   Object.assign(S, { images, cover: again ? 0 : p.cover_index, title: p.title, caption: p.caption,
     video: p.video_key ? { key: p.video_key, url: p.video } : null,
@@ -2857,6 +2924,14 @@ function bind() {
   on('#go', 'click', submit);
   on('#savedraft', 'click', saveDraft);
   on('[data-days]', 'click', e => loadStats(Number(e.currentTarget.dataset.days)));
+  on('[data-comp]', 'click', e => { const id = e.currentTarget.dataset.comp; S.compOpen = S.compOpen === id ? null : id; render(); });
+  on('#compin', 'input', e => { S.compDraft = e.target.value; });
+  on('#compadd', 'submit', async e => { e.preventDefault(); const v = $('compin').value.trim(); if (!v || S.compBusy) return;
+    S.compBusy = true; render();
+    try { const b = curBrand(); await send('/competitors', 'POST', { channel: v, brand_id: b !== 'all' && b !== 'none' ? b : undefined }); S.compDraft = ''; toast('Following it now.'); }
+    catch (x) { toast(x.message, 'err'); }
+    S.compBusy = false; loadCompetitors(); });
+  on('[data-uncomp]', 'click', async e => { try { await send(`/competitors/${e.currentTarget.dataset.uncomp}`, 'DELETE'); S.compOpen = null; } catch (x) { toast(x.message, 'err'); } loadCompetitors(); });
   on('[data-atrend]', 'click', e => { S.statsTrend = e.currentTarget.dataset.atrend; render(); });
   on('[data-asort]', 'click', e => { S.statsSort = e.currentTarget.dataset.asort; render(); });
   on('[data-aplat]', 'click', e => loadStats(undefined, e.currentTarget.dataset.aplat));
@@ -2876,7 +2951,8 @@ function bind() {
   on('#stopedit', 'click', () => { resetComposer(); location.hash = '#calendar'; });
   on('[data-fp]', 'click', e => { S.fPlat = e.target.dataset.fp; S.fAcct = 'all'; render(); });
   on('#facct', 'change', e => { S.fAcct = e.target.value; render(); });
-  on('[data-again]', 'click', e => { S.detail = null; edit(e.target.dataset.again, true); });
+  on('[data-again]', 'click', e => { e.stopPropagation(); S.detail = null; edit(e.currentTarget.dataset.again, true); });
+  on('[data-also]', 'click', e => toggleTarget(e.currentTarget.dataset.also, !S.targets.includes(e.currentTarget.dataset.also)));
   on('[data-wk]', 'click', e => { const d = Number(e.currentTarget.dataset.wk); if (S.calMode === 'month') S.month += d; else S.week += d * (S.calMode === 'weeks' ? 4 : 1); loadWeek(); });
   on('[data-open]', 'click', e => { if (e.target.closest('button,a') !== e.currentTarget && e.target.closest('button,a')) return; S.detail = e.currentTarget.dataset.open; render(); });
   on('#closedetail', 'click', () => { S.detail = null; render(); });

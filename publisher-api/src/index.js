@@ -19,6 +19,7 @@ import { writeCaptions, aiUsage } from './ai.js';
 import { runCleanup, deleteWorkspace } from './cleanup.js';
 import { refreshStats, getStats, STATS_PER_TICK } from './stats.js';
 import { listBrands, createBrand, renameBrand, deleteBrand, assign } from './brands.js';
+import { listCompetitors, addCompetitor, removeCompetitor, refreshCompetitors } from './competitors.js';
 
 async function me(req, env, { who }) {
   const ws = who.ws;
@@ -48,6 +49,7 @@ async function me(req, env, { who }) {
     instagram_enabled: !!(env.IG_APP_ID && env.IG_APP_SECRET),
     youtube_enabled: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
     ai_enabled: !!(env.ANTHROPIC_API_KEY || env.__ai),
+    competitors_enabled: !!env.GOOGLE_API_KEY,
   });
 }
 
@@ -150,6 +152,9 @@ export const ROUTES = [
   }, 'member'],
   ['GET', '/v1/stats', async (req, env, { who, url }) => json(await getStats(env, who, Number(url.searchParams.get('days') || 7),
     undefined, url.searchParams.get('platform') || 'all', url.searchParams.get('brand') || 'all', url.searchParams.get('account') || null)), 'member'],
+  ['GET', '/v1/competitors', async (req, env, { who, url }) => json({ competitors: await listCompetitors(env, who, url.searchParams.get('brand') || 'all') }), 'member'],
+  ['POST', '/v1/competitors', async (req, env, { who }) => json(await addCompetitor(env, who, await body(req))), 'member'],
+  ['DELETE', '/v1/competitors/:id', async (req, env, { who, params }) => json(await removeCompetitor(env, who, params.id)), 'member'],
   ['POST', '/v1/ai/captions', async (req, env, { who }) => json(await writeCaptions(env, who, await body(req))), 'member'],
   ['GET', '/v1/ai/usage', async (req, env, { who }) => json(await aiUsage(env, who)), 'member'],
   ['GET', '/v1/drafts', async (req, env, { who }) => json({ drafts: await listDrafts(env, who) }), 'member'],
@@ -219,6 +224,7 @@ export default {
       // Stats use only what publishing left of the per-run call allowance.
       const spare = L.TICK_FETCH_BUDGET - counts.calls - 3;
       await refreshStats(env, metaFor(env), tk, now(), Math.min(STATS_PER_TICK, spare)).catch(e => console.error('stats', e));
+      await refreshCompetitors(env).catch(e => console.error('competitors', e));
       await runCleanup(env);
     })());
   },
