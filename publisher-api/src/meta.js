@@ -8,6 +8,7 @@
 const GRAPH_FB = 'https://graph.facebook.com/v23.0';
 const GRAPH_IG = 'https://graph.instagram.com/v23.0';
 const GRAPH_FB_VIDEO = 'https://graph-video.facebook.com/v23.0';
+const GRAPH_TH = 'https://graph.threads.net/v1.0';
 
 // Graph error codes that mean "try again", not "this will never work".
 const TRANSIENT_CODES = new Set([1, 2, 4, 17, 32, 341, 613]);
@@ -22,7 +23,7 @@ export class MetaError extends Error {
   }
 }
 
-export function meta({ appId, appSecret, igAppId, igAppSecret, fetch }) {
+export function meta({ appId, appSecret, igAppId, igAppSecret, thAppId, thAppSecret, fetch }) {
   async function call(path, { method = 'GET', params = {}, label, base = GRAPH_FB }) {
     const url = new URL(base.startsWith('https://') && path.startsWith('https://') ? path : base + path);
     const init = { method, signal: AbortSignal.timeout(TIMEOUT_MS) };
@@ -89,6 +90,36 @@ export function meta({ appId, appSecret, igAppId, igAppSecret, fetch }) {
     igPermalink: (token, mediaId) => call(`/${mediaId}`, { base: GRAPH_IG, label: 'instagram permalink',
       params: { fields: 'permalink', access_token: token } }),
 
+    // Threads Login: like Instagram Login, a 60-day token renewed by the cron.
+    thExchangeCode: ({ code, redirectUri }) => call('https://graph.threads.net/oauth/access_token', {
+      method: 'POST', label: 'threads code exchange',
+      params: { client_id: thAppId, client_secret: thAppSecret, grant_type: 'authorization_code', redirect_uri: redirectUri, code } }),
+    thLongLived: token => call('https://graph.threads.net/access_token', { label: 'threads token exchange',
+      params: { grant_type: 'th_exchange_token', client_secret: thAppSecret, access_token: token } }),
+    thRefresh: token => call('https://graph.threads.net/refresh_access_token', { label: 'threads token refresh',
+      params: { grant_type: 'th_refresh_token', access_token: token } }),
+    thMe: token => call('/me', { base: GRAPH_TH, label: 'threads profile',
+      params: { fields: 'id,username,name,threads_profile_picture_url', access_token: token } }),
+
+    // Threads publishing: the same container, wait, publish steps as Instagram.
+    thItem: (token, uid, { imageUrl, videoUrl, text, carouselItem = false }) => call(`/${uid}/threads`, {
+      base: GRAPH_TH, method: 'POST', label: 'threads media',
+      params: { media_type: videoUrl ? 'VIDEO' : 'IMAGE', ...(videoUrl ? { video_url: videoUrl } : { image_url: imageUrl }),
+        access_token: token, ...(carouselItem ? { is_carousel_item: 'true' } : {}), ...(text ? { text } : {}) } }),
+    thCarousel: (token, uid, children, text) => call(`/${uid}/threads`, {
+      base: GRAPH_TH, method: 'POST', label: 'threads carousel',
+      params: { media_type: 'CAROUSEL', children: children.join(','), access_token: token, ...(text ? { text } : {}) } }),
+    thContainerStatus: (token, id) => call(`/${id}`, { base: GRAPH_TH, label: 'threads status',
+      params: { fields: 'status,error_message', access_token: token } }),
+    thPublish: (token, uid, creationId) => call(`/${uid}/threads_publish`, {
+      base: GRAPH_TH, method: 'POST', label: 'threads publish', params: { creation_id: creationId, access_token: token } }),
+    thPermalink: (token, mediaId) => call(`/${mediaId}`, { base: GRAPH_TH, label: 'threads permalink',
+      params: { fields: 'permalink', access_token: token } }),
+    thMediaStats: (token, mediaId) => call(`/${mediaId}/insights`, { base: GRAPH_TH, label: 'threads stats',
+      params: { metric: 'views,likes,replies,reposts,quotes,shares', access_token: token } }),
+    thAccountStats: (token, uid) => call(`/${uid}/threads_insights`, { base: GRAPH_TH, label: 'threads account stats',
+      params: { metric: 'followers_count', access_token: token } }),
+
     // Facebook: unpublished photos, then one feed post that attaches them.
     fbPhoto: (token, pageId, url, { published, caption } = {}) => call(`/${pageId}/photos`, {
       method: 'POST', label: 'facebook photo',
@@ -123,7 +154,7 @@ export function meta({ appId, appSecret, igAppId, igAppSecret, fetch }) {
 
 export const makeMeta = env => meta({
   appId: env.META_APP_ID, appSecret: env.META_APP_SECRET,
-  igAppId: env.IG_APP_ID, igAppSecret: env.IG_APP_SECRET, fetch: (...a) => fetch(...a),
+  igAppId: env.IG_APP_ID, igAppSecret: env.IG_APP_SECRET, thAppId: env.TH_APP_ID, thAppSecret: env.TH_APP_SECRET, fetch: (...a) => fetch(...a),
 });
 
 // Tests put a fake client on env.__meta; production builds a real one.

@@ -210,6 +210,37 @@ export async function igIntake(env, mt, { code, redirect_uri, session_id }) {
   return { session_id, workspace_id: ws, account_ids: [id] };
 }
 
+// Threads Login: the same shape as Instagram Login, with its own app id.
+export async function thIntake(env, mt, { code, redirect_uri, session_id }) {
+  if (!code) throw new HttpError(400, 'code is required');
+  if (redirect_uri !== env.TH_REDIRECT_URI) throw new HttpError(400, 'unexpected redirect_uri');
+  await connector(env, session_id);
+
+  const short = await mt.thExchangeCode({ code: String(code).replace(/#_$/, ''), redirectUri: redirect_uri });
+  const long = await mt.thLongLived(short.access_token);
+  const me = await mt.thMe(long.access_token);
+  const openId = `th:${me.id || short.user_id}`;
+  const { ws, byOpenId } = await metaWorkspace(env, { sessionId: session_id, openIds: [openId] });
+
+  const t = now();
+  const enc = await encrypt(long.access_token, env.TOKEN_KEY);
+  const expires = t + Number(long.expires_in || 60 * 86400);
+  const profile = [me.username || '', me.name || me.username || '', me.threads_profile_picture_url || ''];
+  const old = byOpenId.get(openId);
+  const id = old?.id || 'acc_' + randomToken('', 8);
+  if (old) {
+    await env.DB.prepare(`UPDATE accounts SET insights_denied_at = NULL, refresh_token_enc = ?, access_token_enc = ?, access_expires_at = ?,
+        needs_reconnect = 0, username = ?, display_name = ?, avatar_url = ?, token_updated_at = ? WHERE id = ?`)
+      .bind(enc, enc, expires, ...profile, t, id).run();
+  } else {
+    await env.DB.prepare(`INSERT INTO accounts (id, workspace_id, open_id, platform, username, display_name, avatar_url,
+        refresh_token_enc, access_token_enc, access_expires_at, connected_at, token_updated_at, can_sign_in)
+        VALUES (?, ?, ?, 'threads', ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, ws, openId, ...profile, enc, enc, expires, t, t, 0).run();
+  }
+  return { session_id, workspace_id: ws, account_ids: [id] };
+}
+
 // Google sign-in for YouTube: the channel of the signed-in Google account.
 // The refresh token only comes with a fresh consent, which the start page
 // asks for every time.

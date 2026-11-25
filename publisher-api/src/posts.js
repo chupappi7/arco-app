@@ -5,7 +5,7 @@ import { wsOf, inScope } from './scope.js';
 import { mediaUrl } from './media.js';
 import { MAX_IMAGES, MAX_QUEUED, MAX_DRAFTS, MIN_LEAD_SECONDS, KEEP_AFTER_DONE, PRIVACY,
   IG_MAX_IMAGES, IG_MAX_CAPTION, IG_MAX_HASHTAGS, FB_MAX_CAPTION, TIKTOK_VIDEO_CAPTION,
-  IG_REEL_MIN_MS, IG_REEL_MAX_MS, FB_VIDEO_MAX_MS, YT_MAX_TITLE, YT_MAX_DESCRIPTION, YT_VIDEO_MAX_MS, YT_PRIVACY } from './limits.js';
+  IG_REEL_MIN_MS, IG_REEL_MAX_MS, FB_VIDEO_MAX_MS, TH_MAX_IMAGES, TH_MAX_CAPTION, TH_VIDEO_MAX_MS, YT_MAX_TITLE, YT_MAX_DESCRIPTION, YT_VIDEO_MAX_MS, YT_PRIVACY } from './limits.js';
 
 const len = s => [...String(s ?? '')].length;
 const bad = msg => { throw new HttpError(400, msg); };
@@ -27,6 +27,7 @@ export function validatePost(input, t = now(), platform = 'tiktok', { draft = fa
     if (keys.length < 1) bad('Add at least one image or a video');
     if (keys.length > MAX_IMAGES) bad(`A photo post can have at most ${MAX_IMAGES} images`);
     if (platform === 'instagram' && keys.length > IG_MAX_IMAGES) bad(`An Instagram post can have at most ${IG_MAX_IMAGES} images`);
+    if (platform === 'threads' && keys.length > TH_MAX_IMAGES) bad(`A Threads post can have at most ${TH_MAX_IMAGES} images`);
     if (!keys.every(k => typeof k === 'string' && k)) bad('Image list is invalid');
   }
   const cover = video || i.cover_index == null ? 0 : Number(i.cover_index);
@@ -40,6 +41,7 @@ export function validatePost(input, t = now(), platform = 'tiktok', { draft = fa
     if (len(caption) > IG_MAX_CAPTION) bad(`An Instagram caption can be at most ${IG_MAX_CAPTION} characters`);
     if ((caption.match(/#[^\s#]+/g) || []).length > IG_MAX_HASHTAGS) bad(`Instagram allows at most ${IG_MAX_HASHTAGS} hashtags`);
   }
+  if (platform === 'threads' && len(caption) > TH_MAX_CAPTION) bad(`A Threads post can be at most ${TH_MAX_CAPTION} characters`);
   const at = draft ? t : scheduledAt(i, t);
   const base = { account_id: i.account_id, title, caption, image_keys: keys, video_key: video, cover_index: cover, scheduled_at: at };
   // Privacy, music and the disclosure toggles are TikTok's; Instagram and
@@ -85,6 +87,9 @@ export function checkLength(platform, ms) {
   }
   if (platform === 'youtube' && ms > YT_VIDEO_MAX_MS) {
     bad(`YouTube videos can be up to ${fmtLength(YT_VIDEO_MAX_MS)} here; this one is ${fmtLength(ms)}`);
+  }
+  if (platform === 'threads' && ms > TH_VIDEO_MAX_MS) {
+    bad(`Threads videos can be up to ${fmtLength(TH_VIDEO_MAX_MS)}; this one is ${fmtLength(ms)}`);
   }
   if (platform === 'facebook' && ms > FB_VIDEO_MAX_MS) {
     bad(`Facebook Page videos can be up to ${fmtLength(FB_VIDEO_MAX_MS)} here; this one is ${fmtLength(ms)}`);
@@ -180,6 +185,9 @@ export async function createPost(env, tk, w, input) {
     }
     if (account.platform === 'instagram' && !draft && results.some(r => r.content_type !== 'image/jpeg')) {
       bad('Instagram only accepts JPG images');
+    }
+    if (account.platform === 'threads' && !draft && results.some(r => !['image/jpeg', 'image/png'].includes(r.content_type))) {
+      bad('Threads only accepts JPG or PNG images');
     }
   }
 

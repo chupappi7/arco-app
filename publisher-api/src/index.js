@@ -1,6 +1,6 @@
 import { json, HttpError, match, readJson, now } from './http.js';
 import { tkFor, TikTokError } from './tiktok.js';
-import { oauthIntake, metaIntake, igIntake, ytIntake, rotateApiKey, revokeApiKey, revealApiKey, renameApiKey, logout } from './auth.js';
+import { oauthIntake, metaIntake, igIntake, thIntake, ytIntake, rotateApiKey, revokeApiKey, revealApiKey, renameApiKey, logout } from './auth.js';
 import { ytFor } from './youtube.js';
 import { startEmail, verifyEmail, callerFor, need, myWorkspaces, switchWorkspace, addWorkspace, updateWorkspace,
   logoutEverywhere, transferOwnership, listMembers, invite, cancelInvite, acceptInvite, updateMember, removeMember } from './users.js';
@@ -45,9 +45,11 @@ async function me(req, env, { who }) {
     limits: { accounts: L.MAX_ACCOUNTS, queued: L.MAX_QUEUED, images: L.MAX_IMAGES,
               image_bytes: L.MAX_IMAGE_BYTES, workspace_bytes: L.MAX_WORKSPACE_BYTES,
               min_lead_seconds: L.MIN_LEAD_SECONDS, ig_images: L.IG_MAX_IMAGES, ig_caption: L.IG_MAX_CAPTION,
+              th_images: L.TH_MAX_IMAGES, th_caption: L.TH_MAX_CAPTION,
               video_bytes: L.MAX_VIDEO_BYTES },
     facebook_enabled: !!(env.META_APP_ID && env.META_APP_SECRET),
     instagram_enabled: !!(env.IG_APP_ID && env.IG_APP_SECRET),
+    threads_enabled: !!(env.TH_APP_ID && env.TH_APP_SECRET),
     youtube_enabled: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
     ai_enabled: !!(env.ANTHROPIC_API_KEY || env.__ai),
     competitors_enabled: !!env.GOOGLE_API_KEY,
@@ -64,6 +66,7 @@ export const ROUTES = [
   ['POST', '/internal/oauth', async (req, env, { tk }) => json(await oauthIntake(env, tk, await body(req))), 'internal'],
   ['POST', '/internal/meta-oauth', async (req, env) => json(await metaIntake(env, metaFor(env), await body(req))), 'internal'],
   ['POST', '/internal/ig-oauth', async (req, env) => json(await igIntake(env, metaFor(env), await body(req))), 'internal'],
+  ['POST', '/internal/th-oauth', async (req, env) => json(await thIntake(env, metaFor(env), await body(req))), 'internal'],
   ['POST', '/internal/yt-oauth', async (req, env) => json(await ytIntake(env, ytFor(env), await body(req))), 'internal'],
   ['POST', '/internal/email-verify', async (req, env) => json(await verifyEmail(env, await body(req))), 'internal'],
   ['POST', '/v1/auth/email/start', async (req, env) => json(await startEmail(env, await body(req))), 'public'],

@@ -71,6 +71,15 @@ async function readInstagram(env, mt, token, post, account, t) {
 
 // Without pages_read_user_content Facebook refuses to read the post at all;
 // the account is then left alone for a week, like Instagram insights.
+// Threads: views, likes, replies, reposts, quotes and shares in one call.
+async function readThreads(env, mt, token, post) {
+  const r = await mt.thMediaStats(token, post.public_post_id);
+  const v = {};
+  for (const m of r.data || []) v[m.name] = count(m.values?.[0]?.value ?? m.total_value?.value);
+  const add = (...k) => k.some(x => v[x] != null) ? k.reduce((n, x) => n + (v[x] || 0), 0) : null;
+  return { views: v.views ?? null, likes: v.likes ?? null, comments: v.replies ?? null, shares: add('reposts', 'quotes', 'shares') };
+}
+
 async function readFacebook(env, mt, token, post, account, t) {
   if (account.insights_denied_at && account.insights_denied_at > t - INSIGHTS_RETRY) return null;
   let r;
@@ -165,6 +174,10 @@ export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TI
       } else if (a.platform === 'youtube') {
         const ch = await ytFor(env).myChannel(token);
         r = { subscribers: ch.subscribers, avatar_url: ch.avatar_url };
+      } else if (a.platform === 'threads') {
+        const [ins, me] = await Promise.all([mt.thAccountStats(token, a.open_id.slice(3)), mt.thMe(token).catch(() => ({}))]);
+        const f = (ins.data || []).find(m => m.name === 'followers_count');
+        r = { followers_count: f?.total_value?.value ?? f?.values?.[0]?.value, avatar_url: me.threads_profile_picture_url };
       } else r = a.platform === 'instagram' ? await mt.igAccountStats(token) : await mt.fbPageStats(token, a.open_id.slice(3));
       const followers = count(r.follower_count ?? r.followers_count ?? r.fan_count ?? r.subscribers);
       await env.DB.batch([
@@ -234,7 +247,8 @@ export async function refreshStats(env, mt, tk, t = now(), budget = STATS_PER_TI
   for (const p of posts.filter(x => x.platform !== 'tiktok' && x.platform !== 'youtube')) {
     try {
       const { account, token } = await load(p.account_id);
-      const s = account.platform === 'instagram' ? await readInstagram(env, mt, token, p, account, t) : await readFacebook(env, mt, token, p, account, t);
+      const s = account.platform === 'instagram' ? await readInstagram(env, mt, token, p, account, t)
+        : account.platform === 'threads' ? await readThreads(env, mt, token, p) : await readFacebook(env, mt, token, p, account, t);
       await save(p.id, s);
       if (s) done.posts++;
     } catch (err) {
@@ -255,7 +269,7 @@ const METRICS = ['views', 'reach', 'likes', 'comments', 'shares', 'saves'];
 // breakdown per platform, the top posts, and followers per account with the
 // change over the period. Limited to the caller's brands like everything else.
 export const PERIODS = [7, 30, 90];
-const PLATFORMS = ['tiktok', 'instagram', 'facebook', 'youtube'];
+const PLATFORMS = ['tiktok', 'instagram', 'facebook', 'youtube', 'threads'];
 export async function getStats(env, w, days, t = now(), platform = 'all', brand = 'all', account = null) {
   if (!PERIODS.includes(days)) throw new HttpError(400, 'days must be 7, 30 or 90');
   if (platform !== 'all' && !PLATFORMS.includes(platform)) throw new HttpError(400, 'unknown platform');

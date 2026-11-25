@@ -1,6 +1,6 @@
 import { HttpError, now } from './http.js';
 import { randomToken } from './crypto.js';
-import { MIN_LEAD_SECONDS, MAX_QUEUED, IG_MAX_IMAGES } from './limits.js';
+import { MIN_LEAD_SECONDS, MAX_QUEUED, IG_MAX_IMAGES, TH_MAX_IMAGES } from './limits.js';
 import { wsOf, inScope } from './scope.js';
 import { listAccounts, getAccount, accessTokenFor, isTikTok } from './accounts.js';
 import { listBrands } from './brands.js';
@@ -16,7 +16,7 @@ import { createPost, cancelPost, updatePost, validatePost, checkLength, loadPost
 // drafts at their planned time until a person approves them.
 
 const bad = msg => { throw new HttpError(400, msg); };
-const PLATFORMS = ['tiktok', 'instagram', 'facebook', 'youtube'];
+const PLATFORMS = ['tiktok', 'instagram', 'facebook', 'youtube', 'threads'];
 export const MAX_PLAN = 30;
 // The same post on several accounts of one platform goes out this far apart:
 // copies landing in the same minute get held back as duplicates.
@@ -208,6 +208,8 @@ async function draftEntry(env, w, item, n, ctx) {
       validatePost(input, now(), a.platform, { draft: info.review });
       if (a.platform === 'instagram' && !video && media.some(m => m.content_type !== 'image/jpeg')) bad('Instagram only accepts JPG photos');
       if (a.platform === 'instagram' && !video && media.length > IG_MAX_IMAGES) bad(`Instagram takes at most ${IG_MAX_IMAGES} photos`);
+      if (a.platform === 'threads' && !video && media.some(m => !['image/jpeg', 'image/png'].includes(m.content_type))) bad('Threads only accepts JPG or PNG photos');
+      if (a.platform === 'threads' && !video && media.length > TH_MAX_IMAGES) bad(`Threads takes at most ${TH_MAX_IMAGES} photos`);
       if (video?.duration_ms) checkLength(a.platform, video.duration_ms);
     } catch (e) { out.error = e.message; }
     return out;

@@ -114,13 +114,13 @@ const TOOLS = [
           folder_id: str('Library folder to post'),
           library_keys: { type: 'array', items: { type: 'string' }, description: 'Instead of a folder: library item keys, in order' },
           brand: str("Brand name or id. Default: the folder's brand. Posts go to all of the brand's connected accounts."),
-          platforms: { type: 'array', items: { type: 'string', enum: ['tiktok', 'instagram', 'facebook', 'youtube'] }, description: 'Only these platforms' },
+          platforms: { type: 'array', items: { type: 'string', enum: ['tiktok', 'instagram', 'facebook', 'youtube', 'threads'] }, description: 'Only these platforms' },
           account_ids: { type: 'array', items: { type: 'string' }, description: 'Exactly these accounts instead of the brand' },
           at: str('When, e.g. 2026-11-20T18:00 (workspace time). Leave out for the next free slot.'),
           after: str('With no "at": take the first free slot after this time'),
           stagger: { type: 'boolean', description: 'Default true: when several accounts on one platform get this post, each goes out an hour after the one before, so the platform does not hold them back as copies. false = all at the same time.' },
           caption: str('Caption for every platform'),
-          captions: { type: 'object', description: 'Per-platform caption overrides', properties: { tiktok: { type: 'string' }, instagram: { type: 'string' }, facebook: { type: 'string' } } },
+          captions: { type: 'object', description: 'Per-platform caption overrides', properties: { tiktok: { type: 'string' }, instagram: { type: 'string' }, facebook: { type: 'string' }, threads: { type: 'string' } } },
           title: str('TikTok title (photo posts), up to 90 characters'),
           tiktok: { type: 'object', description: 'TikTok settings. privacy_level is required when approval is off.', properties: {
             privacy_level: str('Who can view', { enum: ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'] }),
@@ -172,7 +172,7 @@ const TOOLS = [
     name: 'get_stats',
     description: 'Results for a period: totals against the previous period, per platform, followers per account, and the top posts. Use it to see what works.',
     inputSchema: { type: 'object', properties: { brand: brandArg, days: { type: 'integer', enum: PERIODS },
-      platform: str('Platform', { enum: ['all', 'tiktok', 'instagram', 'facebook', 'youtube'] }) } },
+      platform: str('Platform', { enum: ['all', 'tiktok', 'instagram', 'facebook', 'youtube', 'threads'] }) } },
     annotations: { readOnlyHint: true },
     run: async (c, a) => {
       const b = await resolveBrand(c.env, c.who, a.brand);
@@ -213,6 +213,7 @@ async function overview(c) {
       instagram: `JPG photos only, at most ${IG_MAX_IMAGES} per post, captions up to ${IG_MAX_CAPTION} characters and ${IG_MAX_HASHTAGS} hashtags; videos post as Reels (3 s to 15 min)`,
       tiktok: 'Photo posts up to 35 photos with an optional title (90 characters); videos up to the account limit. Privacy is chosen per post.',
       facebook: 'Page posts, photos or one video.',
+      threads: 'Up to 500 characters with up to 20 JPG or PNG photos, or one video up to 5 minutes. Keep it short and conversational; hashtags are not used much (Threads links one topic per post).',
       youtube: `Videos only (a vertical video up to 3 minutes is a Short); a title up to ${YT_MAX_TITLE} characters and the caption as the description. A brand's channel sits out photo posts. Until Google approves ARCO Publisher, YouTube keeps uploads private.`,
       folders: 'One folder = one post: photos in order (cover first) or one video.',
     },

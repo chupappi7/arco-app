@@ -24,7 +24,8 @@ export async function getAccount(env, w, id) {
 // rotation, and the loser looked exactly like a revoked account.
 const EARLY = 300;
 
-export const isMeta = account => account.platform === 'instagram' || account.platform === 'facebook';
+export const isMeta = account => ['instagram', 'facebook', 'threads'].includes(account.platform);
+const expiring = account => account.platform === 'instagram' || account.platform === 'threads';
 export const isYouTube = account => account.platform === 'youtube';
 export const isTikTok = account => (account.platform || 'tiktok') === 'tiktok';
 
@@ -48,7 +49,7 @@ export async function accessTokenFor(env, tk, account, retried = false) {
   // A Page token does not expire; an Instagram token is renewed by the cron
   // (refreshInstagramTokens) long before its 60 days run out.
   if (isMeta(account)) {
-    if (account.platform === 'instagram' && account.access_expires_at && account.access_expires_at <= now()) {
+    if (expiring(account) && account.access_expires_at && account.access_expires_at <= now()) {
       await env.DB.prepare('UPDATE accounts SET needs_reconnect = 1 WHERE id = ?').bind(account.id).run();
       const e = new Error('Reconnect this account'); e.code = 'needs_reconnect'; throw e;
     }
@@ -109,18 +110,19 @@ export async function disconnect(env, w, id) {
   ]);
 }
 
-// Instagram tokens last 60 days and can only be refreshed once a day old and
+// Instagram and Threads tokens last 60 days and can only be refreshed once a day old and
 // before they expire. Renew any within 20 days of expiry, a few per tick, so
 // an account nobody posts to for two months still works.
 const IG_RENEW_WITHIN = 20 * 86400;
 export async function refreshInstagramTokens(env, mt, t = now(), limit = 3) {
-  const { results } = await env.DB.prepare(`SELECT * FROM accounts WHERE platform = 'instagram' AND needs_reconnect = 0
+  const { results } = await env.DB.prepare(`SELECT * FROM accounts WHERE platform IN ('instagram', 'threads') AND needs_reconnect = 0
       AND access_expires_at IS NOT NULL AND access_expires_at < ? AND token_updated_at < ?
       ORDER BY access_expires_at LIMIT ?`).bind(t + IG_RENEW_WITHIN, t - 86400, limit).all();
   let renewed = 0;
   for (const a of results) {
     try {
-      const r = await mt.igRefresh(await decrypt(a.access_token_enc, env.TOKEN_KEY));
+      const old = await decrypt(a.access_token_enc, env.TOKEN_KEY);
+      const r = a.platform === 'threads' ? await mt.thRefresh(old) : await mt.igRefresh(old);
       const enc = await encrypt(r.access_token, env.TOKEN_KEY);
       await env.DB.prepare(`UPDATE accounts SET access_token_enc = ?, refresh_token_enc = ?, access_expires_at = ?,
           token_updated_at = ? WHERE id = ?`).bind(enc, enc, t + Number(r.expires_in || 60 * 86400), t, a.id).run();

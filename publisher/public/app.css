@@ -144,14 +144,14 @@ details.hints p{margin:6px 0}
 
 /* platform marks and avatars */
 .pi{flex:none;vertical-align:-2px}
-.pi.tiktok{fill:#000}.pi.instagram{fill:#E1306C}.pi.facebook{fill:#0866FF}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .pi.tiktok{fill:#E8ECF2}}
+.pi.tiktok{fill:#000}.pi.instagram{fill:#E1306C}.pi.facebook{fill:#0866FF}.pi.threads{fill:#000}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .pi.tiktok,:root:not([data-theme=light]) .pi.threads{fill:#E8ECF2}}
 .av{width:32px;height:32px;border-radius:50%;object-fit:cover;border:1px solid var(--line);flex:none}
 .av.ini{display:inline-flex;align-items:center;justify-content:center;background:var(--well);color:var(--mute);font-weight:700;font-size:13px}
 .avw{position:relative;display:inline-flex;flex:none}
 .badge-pl{position:absolute;right:-3px;bottom:-3px;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface)}
 .badge-pl .pi{fill:#fff}
-.badge-pl.tiktok{background:#000}.badge-pl.facebook{background:#0866FF}
+.badge-pl.tiktok,.badge-pl.threads{background:#000}.badge-pl.facebook{background:#0866FF}
 .badge-pl.instagram{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fd5949 45%,#d6249f 60%,#285AEB 90%)}
 
 /* ---------- overview ---------- */
@@ -457,7 +457,7 @@ select.move{width:auto;max-width:180px;padding:7px 10px}
 .ptabs{display:flex;gap:4px;padding:0 14px 10px}
 .ptabs button{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12.5px;font-weight:600;color:var(--mute)}
 .ptabs button.on{background:var(--graphite);border-color:var(--graphite);color:var(--on-dark)}
-.ptabs button.on .pi{fill:currentColor}
+.ptabs button.on .pi,:root .ptabs button.on .pi{fill:currentColor!important}
 #preview{padding:0 14px 16px}
 /* previews: close to each app, not a copy of it */
 .pv{border:1px solid var(--line-2);border-radius:12px;overflow:hidden;background:var(--surface);font-size:13px}
@@ -477,6 +477,11 @@ select.move{width:auto;max-width:180px;padding:7px 10px}
 .pv-acts.fb{justify-content:space-around;border-top:1px solid var(--line-2);margin-top:8px;padding:8px 6px;gap:4px;align-items:center;color:var(--mute);font-weight:600;font-size:12.5px}
 .pv-cap{margin:4px 12px 12px;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .pv.fb .pv-cap{margin:0 12px 10px}
+.pv.thr .pv-cap{margin:0 12px 8px 56px;white-space:pre-wrap}
+.pv.thr .pv-strip{display:flex;gap:6px;margin:0 12px 8px 56px;position:relative;overflow:hidden;border-radius:10px}
+.pv.thr .pv-strip>div{flex:0 0 46%;aspect-ratio:4/5;border-radius:8px;overflow:hidden;background:var(--well)}
+.pv.thr .pv-strip img,.pv.thr .pv-strip video{width:100%;height:100%;object-fit:cover}
+.pv.thr .pv-acts{margin-left:44px}
 .pv-grid{display:grid;gap:2px;position:relative;min-height:180px;background:var(--well)}
 .pv-grid.n1{grid-template-columns:1fr}.pv-grid.n2{grid-template-columns:1fr 1fr}
 .pv-grid.n3{grid-template-columns:1fr 1fr}.pv-grid.n3 div:first-child{grid-column:1/-1}

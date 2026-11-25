@@ -16,7 +16,7 @@ export const MAX_PER_RUN = 20;
 export const NOTIFY_EVERY = 15 * 60;
 const KEEP = 30 * DAY;
 
-const PL = { tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube' };
+const PL = { tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', threads: 'Threads' };
 const at = a => (a.platform === 'facebook' ? '' : '@') + (a.username || a.display_name || 'account');
 const big = n => n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${+(n / 1e3).toFixed(1)}K` : String(n);
 const top = (list, v) => list.filter(m => v >= m).pop();

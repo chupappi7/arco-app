@@ -48,3 +48,8 @@ export const YT_MAX_DESCRIPTION = 5000;
 export const YT_SHORTS_MAX_MS = 180_000;
 export const YT_VIDEO_MAX_MS = 15 * 60_000;
 export const YT_PRIVACY = ['public', 'unlisted', 'private'];
+
+// Threads: posts up to 500 characters, carousels of 2 to 20, videos up to 5 minutes.
+export const TH_MAX_IMAGES = 20;
+export const TH_MAX_CAPTION = 500;
+export const TH_VIDEO_MAX_MS = 5 * 60_000;

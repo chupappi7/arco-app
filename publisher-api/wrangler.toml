@@ -17,9 +17,11 @@ REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/callback"
 META_REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/meta/callback"
 IG_REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/instagram/callback"
 YT_REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/youtube/callback"
+TH_REDIRECT_URI = "https://arco-publisher.vercel.app/api/auth/threads/callback"
 # Secrets (npx wrangler secret put NAME): META_APP_ID, META_APP_SECRET for
 # Facebook Pages; IG_APP_ID, IG_APP_SECRET (the Instagram app id/secret from
 # the app's Instagram > API setup with Instagram login) for Instagram;
+# TH_APP_ID, TH_APP_SECRET (the Threads app id/secret from the app's Threads use case) for Threads;
 # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (a Google Cloud OAuth web client) for YouTube;
 # GOOGLE_API_KEY (YouTube Data API key) for competitor channels;
 # ANTHROPIC_API_KEY for AI writing;

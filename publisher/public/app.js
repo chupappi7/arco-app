@@ -1,9 +1,10 @@
 const PRIVACY_LABEL = { PUBLIC_TO_EVERYONE: 'Everyone', MUTUAL_FOLLOW_FRIENDS: 'Friends',
   FOLLOWER_OF_CREATOR: 'Followers', SELF_ONLY: 'Only me' };
 const MAX_SIDE_W = 1080, MAX_SIDE_H = 1920;
-const PLATFORM = { tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube' };
+const PLATFORM = { tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', threads: 'Threads' };
 // Platform marks (Simple Icons, CC0), inlined so the page loads nothing from a third party.
 const MARK = {
+  threads: 'M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a13.853 13.853 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32L7.734 7.847c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388.108.046.216.094.321.142 1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69c-.242 0-.487.007-.739.021-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221z',
   tiktok: 'M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z',
   instagram: 'M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077',
   youtube: 'M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z',
@@ -18,8 +19,9 @@ const appIcon = (pl, size = 32) => {
     ? `<g transform="translate(5.6 5.4) scale(.53)"><g fill="#25F4EE" transform="translate(-.9 -.9)">${g}</g><g fill="#FE2C55" transform="translate(.9 .9)">${g}</g><g fill="#fff">${g}</g></g>`
     : pl === 'instagram' ? `<g fill="#fff" transform="translate(5.5 5.5) scale(.54)">${g}</g>`
     : pl === 'youtube' ? `<g fill="#FF0000" transform="translate(3.6 3.6) scale(.7)">${g}</g>`
+    : pl === 'threads' ? `<g fill="#fff" transform="translate(5.5 5.5) scale(.54)">${g}</g>`
     : `<circle cx="12" cy="12" r="9.2" fill="#fff"/><g fill="#0866FF" transform="translate(1.5 1.5) scale(.875)">${g}</g>`;
-  const bg = pl === 'tiktok' ? '<rect width="24" height="24" rx="6" fill="#000"/>'
+  const bg = pl === 'tiktok' || pl === 'threads' ? '<rect width="24" height="24" rx="6" fill="#000"/>'
     : pl === 'instagram' ? `<defs><radialGradient id="igg${size}" cx="30%" cy="107%" r="150%"><stop offset="0" stop-color="#fdf497"/><stop offset=".05" stop-color="#fdf497"/><stop offset=".45" stop-color="#fd5949"/><stop offset=".6" stop-color="#d6249f"/><stop offset=".9" stop-color="#285AEB"/></radialGradient></defs><rect width="24" height="24" rx="6" fill="url(#igg${size})"/>`
     : '<rect width="24" height="24" rx="6" fill="#fff"/>';
   return `<svg class="appicon ${pl}" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${bg}${inner}</svg>`;
@@ -28,7 +30,9 @@ const appIcon = (pl, size = 32) => {
 const withBadge = (av, pl) => `<span class="avw">${av}<span class="badge-pl ${pl}">${icon(pl, 10)}</span></span>`;
 // Instagram takes JPEG between 4:5 (portrait) and 1.91:1 (landscape), 10 per post.
 const IG_MIN_RATIO = 4 / 5, IG_MAX_RATIO = 1.91, IG_MAX = 10, IG_CAPTION = 2200;
-const CAPTION_MAX = { tiktok: 4000, instagram: IG_CAPTION, facebook: 63206, youtube: 5000 };
+const CAPTION_MAX = { tiktok: 4000, instagram: IG_CAPTION, facebook: 63206, youtube: 5000, threads: 500 };
+// Threads: 500 characters, up to 20 photos (JPG or PNG), videos up to 5 minutes.
+const TH_MAX = 20;
 const YT_TITLE = 100;
 const YT_VIS = { public: 'Public', unlisted: 'Unlisted', private: 'Private' };
 const YT_PENDING = 'Until Google approves ARCO Publisher, YouTube keeps uploads private; switch them to public in YouTube Studio.';
@@ -58,7 +62,7 @@ const S = {
   pq: '', pickOpen: false, capTab: 'all', prevTab: null,
   login: { step: 'email', email: '', code: '', busy: false, err: '' }, members: null, invited: null,
 };
-const ORDER = ['tiktok', 'instagram', 'facebook', 'youtube'];
+const ORDER = ['tiktok', 'instagram', 'threads', 'facebook', 'youtube'];
 const STAGGER = 3600;
 const platformOf = a => a?.platform || 'tiktok';
 const SAVED = 'arco-publisher.targets';
@@ -319,7 +323,7 @@ const HEADS = {
   calendar: () => ['Calendar', `Everything scheduled and published, in ${tz().replace(/_/g, ' ')} time.`, `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
   analytics: () => ['Analytics', 'How your posts do, from the numbers each platform shares.'],
   drafts: () => ['Drafts', 'Posts saved for later. Open one to finish and schedule it.', `<a class="btn" href="#compose">${ui('plus', 16)}New post</a>`],
-  accounts: () => ['Brands & accounts', `Each brand holds its TikTok, Instagram, Facebook and YouTube accounts. Pick a brand when you schedule and its accounts come with it. ${S.me.accounts.length} of ${S.me.limits.accounts} accounts connected.`, `<button class="btn" id="newbrandbtn">${ui('plus', 15)}New brand</button>`],
+  accounts: () => ['Brands & accounts', `Each brand holds its TikTok, Instagram, Threads, Facebook and YouTube accounts. Pick a brand when you schedule and its accounts come with it. ${S.me.accounts.length} of ${S.me.limits.accounts} accounts connected.`, `<button class="btn" id="newbrandbtn">${ui('plus', 15)}New brand</button>`],
   settings: () => ['Settings', 'Workspace, people and your account.'],
   ai: () => ['AI connect', 'Plan and schedule posts by chatting with your AI. It connects over MCP, the standard most AI apps use.', ''],
 };
@@ -873,7 +877,7 @@ function signInView() {
     <p class="lead">${claiming
       ? 'ARCO Publisher now signs in with email. Add yours to keep this workspace, its accounts and its posts. From then on you sign in with it, and you can invite teammates.'
       : invited ? 'Sign in with the email the invite was sent to, and you will join the workspace.'
-      : 'Plan a week of photo and video posts for TikTok, Instagram, Facebook and YouTube, then see what worked. No password: we email you a code.'}</p>
+      : 'Plan a week of photo and video posts for TikTok, Instagram, Threads, Facebook and YouTube, then see what worked. No password: we email you a code.'}</p>
     ${claiming ? '' : `<div class="signplat">${ORDER.map(pl => `<span title="${PLATFORM[pl]}">${appIcon(pl, 26)}</span>`).join('')}</div>`}
     ${L.step === 'email' ? `<form id="loginemail" class="loginform">
         <label class="f" for="le">Email</label>
@@ -1576,6 +1580,10 @@ function previewView() {
       ${imgs.length > 1 ? `<div class="pv-dots">${imgs.slice(0, 10).map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}
       <div class="pv-acts">${ui('heart', 20)}${ui('comment', 20)}${ui('share', 20)}</div>
       <p class="pv-cap"><b>${esc(name)}</b> ${cap || '<span class="note">Your caption appears here.</span>'}</p></div>`;
+  if (pl === 'threads') return `<div class="pv thr"><div class="pv-h">${av}<div><b>${esc(name)}</b><small>now</small></div></div>
+      <p class="pv-cap">${cap || '<span class="note">Your post appears here.</span>'}</p>
+      ${imgs.length ? `<div class="pv-strip">${imgs.slice(0, 3).map(u => `<div>${shot(u)}</div>`).join('')}${imgs.length > 3 ? `<span class="pv-count">+${imgs.length - 3}</span>` : ''}</div>` : ''}
+      <div class="pv-acts">${ui('heart', 18)}${ui('comment', 18)}${ui('repeat', 18)}${ui('share', 18)}</div></div>`;
   if (pl === 'facebook') return `<div class="pv fb"><div class="pv-h">${av}<div><b>${esc(name)}</b><small>Just now</small></div></div>
       <p class="pv-cap">${cap || '<span class="note">Your caption appears here.</span>'}</p>
       <div class="pv-grid n${Math.min(imgs.length, 4)}">${imgs.slice(0, 4).map((u, i) => `<div>${shot(u)}${i === 3 && imgs.length > 4 ? `<span>+${imgs.length - 4}</span>` : ''}</div>`).join('') || ph}</div>
@@ -1700,12 +1708,14 @@ function missing() {
   const ms = S.video?.duration_ms;
   if (ms && toInstagram() && (ms < 3000 || ms > 15 * 60e3)) return 'Instagram Reels must be 3 seconds to 15 minutes long';
   if (ms && chosenPlatforms().includes('facebook') && ms > 20 * 60e3) return 'Facebook Page videos can be up to 20 minutes here';
+  if (ms && chosenPlatforms().includes('threads') && ms > 5 * 60e3) return 'Threads videos can be up to 5 minutes';
   for (const pl of chosenPlatforms()) {
     const c = captionFor(pl);
     if (len(c) > capMax(pl)) return `The ${PLATFORM[pl]} caption is too long (${len(c).toLocaleString()} / ${capMax(pl).toLocaleString()})`;
     if (pl === 'instagram' && hashtags(c) > IG_HASHTAGS) return `Instagram allows at most ${IG_HASHTAGS} hashtags`;
   }
   if (toInstagram() && !S.video && S.images.length > IG_MAX) return `Instagram posts can have at most ${IG_MAX} photos`;
+  if (chosenPlatforms().includes('threads') && !S.video && S.images.length > TH_MAX) return `Threads posts can have at most ${TH_MAX} photos`;
   if (ytTargets().length) {
     if (!S.video) return 'YouTube takes videos only: pick a video, or leave the YouTube channel out';
     if (len(S.yt.title) > YT_TITLE) return `The YouTube title can be at most ${YT_TITLE} characters`;
@@ -2566,11 +2576,13 @@ const PLATFORM_HINT = {
   tiktok: 'TikTok connects the account signed in on tiktok.com. For another one, switch accounts on TikTok\'s screen or sign out of tiktok.com first.',
   instagram: 'Any professional (Business or Creator) account, no Facebook Page needed. Instagram asks for the login each time, so you can add accounts one after another.',
   facebook: 'Pick every Page you manage on Facebook\'s screen. Pages connected before stay connected.',
+  threads: 'Connects the Threads profile signed in on threads.net. For another one, switch accounts on threads.net first.',
   youtube: 'Google asks which account to use each time, so you can add channels one after another. ' + YT_PENDING,
 };
 const connectHref = pl => pl === 'tiktok' ? '/api/auth/start?add=1'
   : pl === 'instagram' ? (S.me.instagram_enabled ? '/api/auth/instagram/start?add=1' : '')
   : pl === 'youtube' ? (S.me.youtube_enabled ? '/api/auth/youtube/start?add=1' : '')
+  : pl === 'threads' ? (S.me.threads_enabled ? '/api/auth/threads/start?add=1' : '')
   : (S.me.facebook_enabled ? '/api/auth/meta/start?add=1' : '');
 
 function accountCard(x) {
@@ -2963,7 +2975,7 @@ function bind() {
   on('a[href*="/api/auth/"][href*="add=1"]', 'click', e => {
     const b = e.currentTarget.dataset.cbrand || curBrand();
     if (b === 'all' || b === 'none' || !can('admin')) return;
-    const href = e.currentTarget.getAttribute('href'), pl = href.includes('/meta/') ? 'facebook' : href.includes('/instagram/') ? 'instagram' : 'tiktok';
+    const href = e.currentTarget.getAttribute('href'), pl = href.includes('/meta/') ? 'facebook' : href.includes('/instagram/') ? 'instagram' : href.includes('/threads/') ? 'threads' : href.includes('/youtube/') ? 'youtube' : 'tiktok';
     try { localStorage.setItem(PENDING_BRAND, JSON.stringify({ brand: b, pl, known: S.me.accounts.map(a => a.id), at: Date.now() })); } catch {}
   });
   on('[data-bg]', 'change', e => pickGroup(e.target.dataset.bg, e.target.checked));

@@ -111,6 +111,21 @@ async function startMeta(env, post, account, access, t) {
         .bind(IG_WAIT + container, t, post.id).run();
       return 'started';
     }
+    if (account.platform === 'threads') {
+      // One photo or video is a single post; more become a carousel. Threads
+      // waits for the container like Instagram, so it shares that path.
+      let container;
+      if (video) container = (await mt.thItem(access, target, { videoUrl: video, text: post.caption })).id;
+      else if (urls.length === 1) container = (await mt.thItem(access, target, { imageUrl: urls[0], text: post.caption })).id;
+      else {
+        const children = [];
+        for (const u of urls) children.push((await mt.thItem(access, target, { imageUrl: u, carouselItem: true })).id);
+        container = (await mt.thCarousel(access, target, children, post.caption)).id;
+      }
+      await env.DB.prepare('UPDATE posts SET publish_id = ?, fail_reason = NULL, updated_at = ? WHERE id = ?')
+        .bind(IG_WAIT + container, t, post.id).run();
+      return 'started';
+    }
     const message = post.caption;
     if (video) {
       // One call that publishes: if the answer is lost, it may have posted.
@@ -143,7 +158,8 @@ async function startMeta(env, post, account, access, t) {
 
 async function pollInstagram(env, post, access, t) {
   const mt = metaFor(env);
-  const account = await env.DB.prepare('SELECT open_id FROM accounts WHERE id = ?').bind(post.account_id).first();
+  const account = await env.DB.prepare('SELECT open_id, platform FROM accounts WHERE id = ?').bind(post.account_id).first();
+  const th = account?.platform === 'threads', name = th ? 'Threads' : 'Instagram';
   if (post.publish_id.startsWith(IG_PUBLISHING)) {
     // Another run is publishing it; if that run died, nobody knows whether it went out.
     if (t - post.updated_at > STUCK_AFTER) { await fail(env, post.id, t, UNKNOWN); return 'failed'; }
@@ -151,15 +167,16 @@ async function pollInstagram(env, post, access, t) {
   }
   const container = post.publish_id.slice(IG_WAIT.length);
   try {
-    const s = await mt.igContainerStatus(access, container);
-    if (s.status_code === 'ERROR' || s.status_code === 'EXPIRED') {
+    const s = th ? await mt.thContainerStatus(access, container) : await mt.igContainerStatus(access, container);
+    const code = th ? s.status : s.status_code, why = th ? s.error_message : s.status;
+    if (code === 'ERROR' || code === 'EXPIRED') {
       await finish(env, post.id, t, { status: 'failed', publish_id: null,
-        fail_reason: `Instagram could not process the ${post.video_key ? 'video' : 'images'}: ${s.status || s.status_code}` });
+        fail_reason: `${name} could not process the ${post.video_key ? 'video' : 'images'}: ${why || code}` });
       return 'failed';
     }
-    if (s.status_code !== 'FINISHED') {
+    if (code !== 'FINISHED') {
       if (t - post.updated_at > PUBLISH_TIMEOUT) {
-        await finish(env, post.id, t, { status: 'failed', publish_id: null, fail_reason: `Instagram did not finish processing the ${post.video_key ? 'video' : 'images'} within an hour.` });
+        await finish(env, post.id, t, { status: 'failed', publish_id: null, fail_reason: `${name} did not finish processing the ${post.video_key ? 'video' : 'images'} within an hour.` });
         return 'failed';
       }
       return 'pending';
@@ -172,16 +189,16 @@ async function pollInstagram(env, post, access, t) {
   if (!claim.meta.changes) return 'pending';
   let out;
   try {
-    out = await mt.igPublish(access, account.open_id.slice(3), container);
+    out = th ? await mt.thPublish(access, account.open_id.slice(3), container) : await mt.igPublish(access, account.open_id.slice(3), container);
   } catch (err) {
     if (err.code === 'needs_reconnect') return metaLost(env, post, t);
     if (err.code === 'network') { await fail(env, post.id, t, UNKNOWN); return 'failed'; }
-    // Instagram answered with an error, so nothing went live.
+    // The platform answered with an error, so nothing went live.
     if (err.transient) { await igMark(env, post.id, IG_PUBLISHING + container, post.publish_id, t); return 'pending'; }
     await finish(env, post.id, t, { status: 'failed', publish_id: null, fail_reason: err.message });
     return 'failed';
   }
-  const link = await mt.igPermalink(access, out.id).catch(() => ({}));
+  const link = await (th ? mt.thPermalink(access, out.id) : mt.igPermalink(access, out.id)).catch(() => ({}));
   await finish(env, post.id, t, { status: 'published', publish_id: String(out.id), public_post_id: String(out.id),
     post_url: link.permalink || null, fail_reason: null });
   return 'published';
