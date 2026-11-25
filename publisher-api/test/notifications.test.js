@@ -14,8 +14,8 @@ describe('notification rules', () => {
   it('views: only the highest milestone passed', () => {
     expect(keys(facts({ posts: [pst('p1', 'a1', T - D, { s: { views: 12000 } })] }))).toContain('views:p1:10000');
     expect(keys(facts({ posts: [pst('p1', 'a1', T - D, { s: { views: 12000 } })] }))).not.toContain('views:p1:1000');
-    expect(keys(facts({ posts: [pst('p1', 'a1', T - D, { s: { views: 999 } })] }))).toEqual(['empty:b1']);
-    expect(keys(facts({ posts: [pst('p1', 'a1', T - D, { s: { views: 999 } }), pst('q', 'a1', T + H, { status: 'queued' })] }))).toEqual([]);
+    expect(keys(facts({ posts: [pst('p1', 'a1', T - D, { s: { views: 999 } })] }))).toEqual(['tomorrow:b1:2027-01-16']);
+    expect(keys(facts({ posts: [pst('p1', 'a1', T - D, { s: { views: 999 } }), pst('q', 'a1', T + D, { status: 'queued' })] }))).toEqual([]);
   });
 
   it('breakout: 3x the account median, this week, at least 500 views', () => {
@@ -37,7 +37,21 @@ describe('notification rules', () => {
     const zero = out.filter(n => n.kind === 'zero');
     expect(zero).toHaveLength(1);
     expect(zero[0]).toMatchObject({ key: 'zero:z2', post: 'z2', title: '2 posts with 0 views' });
-    expect(out.map(n => n.key)).toEqual(expect.arrayContaining(['failed:f1', 'reconnect:a1', 'empty:b1']));
+    expect(out.map(n => n.key)).toEqual(expect.arrayContaining(['failed:f1', 'reconnect:a1']));
+  });
+
+  it('nothing scheduled tomorrow: names each account that posted this week, per brand, in the workspace day', () => {
+    const accounts = [acct('a1'), acct('a2', { platform: 'instagram' }), acct('a3'), acct('a4', { brand_id: null })];
+    const posts = ['a1', 'a2', 'a3', 'a4'].map(a => pst('p' + a, a, T - D)).concat(pst('q3', 'a3', T + D, { status: 'draft' }));
+    const out = rules(facts({ accounts, posts }), T).filter(n => n.kind === 'empty');
+    expect(out).toMatchObject([
+      { key: 'tomorrow:b1:2027-01-16', brand: 'b1', account: null, title: 'Nothing scheduled tomorrow for 2 accounts', body: expect.stringContaining('@a1 (TikTok), @a2 (Instagram)') },
+      { key: 'tomorrow:none:2027-01-16', brand: null, account: 'a4', title: 'Nothing scheduled tomorrow for @a4' }]);
+    // A post later today doesn't count; the workspace time zone decides what tomorrow is.
+    expect(keys(facts({ posts: [pst('p1', 'a1', T - D), pst('q', 'a1', T + H, { status: 'queued' })] }))).toEqual(['tomorrow:b1:2027-01-16']);
+    expect(keys(facts({ tz: new Map([['ws1', 'Pacific/Honolulu']]), posts: [pst('p1', 'a1', T - D)] }))).toEqual(['tomorrow:b1:2027-01-15']);
+    // Quiet accounts and ones that need reconnecting are left out.
+    expect(keys(facts({ posts: [pst('p1', 'a1', T - 8 * D)] }))).toEqual([]);
   });
 
   it('competitor breakouts', () => {

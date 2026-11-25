@@ -51,7 +51,7 @@ const ntfs = [
   { id: 'n1', kind: 'breakout', tone: 'win', title: 'Breakout: 12.4K views', body: '4.2× what this account usually gets. Post it again on another account.', post_id: 'p6', account_id: 'a1', brand_id: 'b1', created_at: now() - 1800 },
   { id: 'n2', kind: 'views', tone: 'win', title: 'A post passed 10K views', body: null, post_id: 'p6', account_id: 'a1', brand_id: 'b1', created_at: now() - 3 * 3600 },
   { id: 'n3', kind: 'zero', tone: 'bad', title: '2 posts with 0 views', body: "Instagram hasn't shown them to anyone yet. Common on new accounts or reused clips.", post_id: 'p8', account_id: 'a2', brand_id: 'b1', created_at: now() - 5 * 3600 },
-  { id: 'n7', kind: 'empty', tone: 'bad', title: 'Nothing scheduled in the next 24 hours', body: 'You posted this week, but the queue is empty.', brand_id: 'b2', created_at: now() - 6 * 3600 },
+  { id: 'n7', kind: 'empty', tone: 'bad', title: 'Nothing scheduled tomorrow for 2 accounts', body: '@antalanoclips (TikTok), @mariliniclips (TikTok). They posted this week. Queue something to keep the streak.', brand_id: 'b2', created_at: now() - 6 * 3600 },
   { id: 'n4', kind: 'competitor', tone: 'info', title: 'Study With Jess has a breakout', body: '"My focus setup 2026": 48K views, 5.8× their usual.', url: 'https://www.youtube.com/', brand_id: 'b1', created_at: now() - 26 * 3600 },
   { id: 'n6', kind: 'followers', tone: 'win', title: '1K followers', body: '1.1K now.', account_id: 'a1', brand_id: 'b1', created_at: now() - 72 * 3600 },
 ];

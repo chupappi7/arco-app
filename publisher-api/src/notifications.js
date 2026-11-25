@@ -23,19 +23,21 @@ const big = n => n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${+(n / 1e
 const top = (list, v) => list.filter(m => v >= m).pop();
 const median = v => { const s = [...v].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : null; };
 const dayOf = t => new Date(t * 1000).toISOString().slice(0, 10);
+const localDay = (t, tz) => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'UTC' }).format(new Date(t * 1000)); } catch { return dayOf(t); } };
 
 // Everything the rules can see, per workspace, in a few queries.
 async function facts(env, t) {
   const { results: posts } = await env.DB.prepare(`SELECT p.id, p.workspace_id, p.account_id, p.status, p.scheduled_at, p.stats, p.stats_at, p.post_url,
       a.brand_id, a.platform, a.username, a.display_name, a.connected_at
       FROM posts p JOIN accounts a ON a.id = p.account_id
-      WHERE p.scheduled_at > ? AND p.status IN ('published', 'failed', 'queued')`).bind(t - 30 * DAY).all();
+      WHERE p.scheduled_at > ? AND p.status IN ('published', 'failed', 'queued', 'draft')`).bind(t - 30 * DAY).all();
   const { results: accounts } = await env.DB.prepare(`SELECT id, workspace_id, brand_id, platform, username, display_name, followers, needs_reconnect, connected_at FROM accounts`).all();
   const { results: hist } = await env.DB.prepare(`SELECT account_id, MIN(followers) AS low FROM follower_history WHERE day >= ? GROUP BY account_id`).bind(dayOf(t - 8 * DAY)).all();
   const { results: comps } = await env.DB.prepare(`SELECT id, workspace_id, brand_id, title, handle, recent FROM competitors WHERE recent IS NOT NULL`).all().catch(() => ({ results: [] }));
   const { results: firsts } = await env.DB.prepare(`SELECT account_id, MIN(scheduled_at) AS first, COUNT(*) AS n FROM posts WHERE status = 'published' GROUP BY account_id`).all();
+  const { results: wss } = await env.DB.prepare('SELECT id, timezone FROM workspaces').all();
   for (const p of posts) p.s = p.stats ? JSON.parse(p.stats) : null;
-  return { posts, accounts, low: new Map(hist.map(h => [h.account_id, h.low])), comps, first: new Map(firsts.map(f => [f.account_id, f.first])),
+  return { tz: new Map(wss.map(w => [w.id, w.timezone])), posts, accounts, low: new Map(hist.map(h => [h.account_id, h.low])), comps, first: new Map(firsts.map(f => [f.account_id, f.first])),
     published: new Map(firsts.map(f => [f.account_id, f.n])) };
 }
 
@@ -94,15 +96,20 @@ export function rules(f, t) {
     title: 'A post failed', body: 'Tap to see why and post it again.' });
   for (const a of f.accounts) if (a.needs_reconnect) add(a, { key: `reconnect:${a.id}`, kind: 'reconnect', tone: 'bad',
     title: 'Reconnect this account', body: `${PL[a.platform]} access expired. Nothing posts here until you reconnect.` });
-  // A brand that has been posting but has nothing in the next 24 hours.
-  const brands = {};
-  for (const a of f.accounts) if (a.brand_id) (brands[`${a.workspace_id}|${a.brand_id}`] ||= { ws: a.workspace_id, brand: a.brand_id, ids: new Set() }).ids.add(a.id);
-  for (const b of Object.values(brands)) {
-    const mine = f.posts.filter(p => b.ids.has(p.account_id));
-    const recent = mine.some(p => p.status === 'published' && p.scheduled_at > t - 7 * DAY);
-    const next = mine.some(p => p.status === 'queued' && p.scheduled_at > t && p.scheduled_at < t + DAY);
-    if (recent && !next) out.push({ ws: b.ws, brand: b.brand, account: null, key: `empty:${b.brand}`, kind: 'empty', tone: 'bad',
-      title: 'Nothing scheduled in the next 24 hours', body: 'You posted this week, but the queue is empty.' });
+  // Accounts that posted this week with nothing planned for tomorrow, one alert per brand naming them.
+  const groups = {};
+  for (const a of f.accounts) {
+    if (a.needs_reconnect || !pub.some(p => p.account_id === a.id && p.scheduled_at > t - 7 * DAY)) continue;
+    const tomorrow = localDay(t + DAY, f.tz?.get(a.workspace_id));
+    if (f.posts.some(p => p.account_id === a.id && (p.status === 'queued' || p.status === 'draft') && p.scheduled_at > t
+      && localDay(p.scheduled_at, f.tz?.get(a.workspace_id)) === tomorrow)) continue;
+    (groups[`${a.workspace_id}|${a.brand_id ?? ''}`] ||= { ws: a.workspace_id, brand: a.brand_id ?? null, day: tomorrow, list: [] }).list.push(a);
+  }
+  for (const g of Object.values(groups)) {
+    const names = g.list.map(a => `${at(a)} (${PL[a.platform]})`);
+    out.push({ ws: g.ws, brand: g.brand, account: g.list.length === 1 ? g.list[0].id : null, key: `tomorrow:${g.brand ?? 'none'}:${g.day}`, kind: 'empty', tone: 'bad',
+      title: g.list.length === 1 ? `Nothing scheduled tomorrow for ${at(g.list[0])}` : `Nothing scheduled tomorrow for ${g.list.length} accounts`,
+      body: `${names.join(', ')}. ${g.list.length === 1 ? 'It' : 'They'} posted this week. Queue something to keep the streak.` });
   }
   // Competitor breakouts: an idea to borrow.
   for (const c of f.comps) {
