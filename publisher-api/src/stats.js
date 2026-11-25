@@ -12,6 +12,7 @@ import { accessTokenFor } from './accounts.js';
 import { wsOf, inScope } from './scope.js';
 import { postJson } from './posts.js';
 import { ytFor } from './youtube.js';
+import { warmup } from './warmup.js';
 
 const DAY = 86400;
 export const FOLLOW_FOR = 30 * DAY;
@@ -318,9 +319,21 @@ export async function getStats(env, w, days, t = now(), platform = 'all', brand 
   for (const r of prevRows) { const ps = JSON.parse(r.stats); for (const m of METRICS) if (ps[m] !== undefined) prev[m] += ps[m]; }
 
   const asc = inScope(w), ab = bf('brand_id');
-  const { results: all } = await env.DB.prepare(`SELECT id, username, platform, avatar_url, followers, stats_at, insights_denied_at FROM accounts
+  const { results: all } = await env.DB.prepare(`SELECT id, username, platform, avatar_url, followers, stats_at, insights_denied_at, connected_at FROM accounts
       WHERE workspace_id = ?${asc.sql}${ab.sql} ORDER BY platform, username`).bind(wsOf(w), ...asc.binds, ...ab.binds).all();
   const startDay = dayKeys[0], today = dayKeys[days - 1];
+  // Warm-up looks at each account's recent posts, whatever the period shown.
+  const ids = all.map(a => a.id), qm = ids.map(() => '?').join(',');
+  const recent = new Map(), published = new Map();
+  if (ids.length) {
+    const { results: rp } = await env.DB.prepare(`SELECT account_id, scheduled_at, stats, stats_at FROM posts
+        WHERE account_id IN (${qm}) AND status = 'published' AND scheduled_at >= ? ORDER BY scheduled_at`).bind(...ids, t - 60 * DAY).all();
+    for (const r of rp) (recent.get(r.account_id) || recent.set(r.account_id, []).get(r.account_id))
+      .push({ scheduled_at: r.scheduled_at, stats_at: r.stats_at, views: r.stats ? JSON.parse(r.stats).views : undefined });
+    const { results: pc } = await env.DB.prepare(`SELECT account_id, COUNT(*) AS n FROM posts WHERE account_id IN (${qm}) AND status = 'published'
+        GROUP BY account_id`).bind(...ids).all();
+    for (const r of pc) published.set(r.account_id, r.n);
+  }
   const accounts = [];
   for (const a of all) {
     if (platform !== 'all' && (a.platform || 'tiktok') !== platform) continue;
@@ -333,7 +346,8 @@ export async function getStats(env, w, days, t = now(), platform = 'all', brand 
     }
     accounts.push({ id: a.id, username: a.username, platform: a.platform || 'tiktok', avatar_url: a.avatar_url,
       followers: a.followers, change, updated_at: a.stats_at,
-      limited: !!a.insights_denied_at && a.insights_denied_at > t - INSIGHTS_RETRY });
+      limited: !!a.insights_denied_at && a.insights_denied_at > t - INSIGHTS_RETRY,
+      warmup: warmup({ connected_at: a.connected_at, published: published.get(a.id) || 0, posts: recent.get(a.id) || [] }, t) });
   }
   const known = accounts.filter(a => a.followers !== null);
   const changes = known.filter(a => a.change !== null);

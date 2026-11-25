@@ -1738,3 +1738,9 @@ kbd{font:600 12px/1 var(--mono,ui-monospace,monospace);background:var(--surface)
 .bact{align-self:center;flex:none;font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--graphite);background:var(--surface)}
 .bact:hover{border-color:var(--soft)}
 .bempty{padding:26px 18px;color:var(--mute);text-align:center}
+
+.wrow{padding:10px 0;border-bottom:1px solid var(--line-2)}.wrow:last-child{border-bottom:0}
+.wtop{display:flex;align-items:center;gap:8px}.wtop b{font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wrow p{margin:4px 0 0;font-size:12.5px;color:var(--mute);line-height:1.4}
+.wsp{flex:none}.wsp polyline{fill:none;stroke:var(--graphite);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+.tag:not(.warn):not(.bad):not(.ok){background:var(--line-2);color:var(--mute)}.tag.ok{background:var(--success-tint,#e3f5e9);color:var(--success)}

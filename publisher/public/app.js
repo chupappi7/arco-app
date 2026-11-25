@@ -818,6 +818,14 @@ function analyticsView() {
   const acc = a => `<div class="arow">${icon(a.platform, 14)}<b>${who(a)}</b>
       <span class="fv">${a.limited && a.platform === 'tiktok' ? `<a class="rc" href="/api/auth/start?add=1">Reconnect</a>` : a.followers == null ? '<em>Reading…</em>' : num(a.followers)}</span>
       <span class="fc ${a.change > 0 ? 'up' : a.change < 0 ? 'down' : ''}">${a.change == null || a.change === 0 ? '' : signed(a.change)}</span></div>`;
+  // Warm-up: is each account being shown to people yet.
+  const WSTAGE = { new: ['New', ''], warming: ['Warming', 'warn'], ready: ['Ready', 'ok'], stuck: ['Stuck', 'bad'] };
+  const wspark = v => { if (v.length < 2) return ''; const hi = Math.max(1, ...v), w = 72, h = 20, step = w / (v.length - 1);
+    return `<svg class="wsp" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><polyline points="${v.map((x, i) => `${(i * step).toFixed(1)},${(h - 2 - x / hi * (h - 4)).toFixed(1)}`).join(' ')}"/></svg>`; };
+  const warm = a => { const w = a.warmup; if (!w) return ''; const [l, c] = WSTAGE[w.stage];
+    return `<div class="wrow"><div class="wtop">${icon(a.platform, 14)}<b>${who(a)}</b><span class="tag ${c}">${l}</span>${wspark(w.views)}</div>
+      <p>${w.days} day${w.days === 1 ? '' : 's'} · ${w.posts} post${w.posts === 1 ? '' : 's'}${w.median != null ? ` · ${num(w.median)} median views` : ''}. ${esc(w.next)}</p></div>`; };
+  const warming = st.accounts.filter(a => a.warmup && (a.warmup.stage !== 'ready' || a.warmup.days < 60));
   const notes = [
     st.tiktok_reconnect && `TikTok accounts connected before stats were added need one reconnect.${can('admin') ? ' <a href="/api/auth/start?add=1">Reconnect TikTok</a>' : ''}`,
     st.facebook_limited && (plat === 'all' || plat === 'facebook') && `Facebook Pages connected before post numbers were added need one reconnect.${can('admin') ? ' <a href="/api/auth/meta/start?add=1">Reconnect Facebook</a>' : ''}`,
@@ -836,6 +844,8 @@ function analyticsView() {
           <div class="list">${posts.map(row).join('')}</div>` : `<div class="cempty2">No posts published in the last ${days} days.</div>`}
         ${posts.length && !st.tracked ? '<p class="note pnote">Numbers show a few hours after a post goes out.</p>' : ''}</section>
       <div class="aside">
+        ${warming.length ? `<section class="panel ocard"><header><h2>Warm-up</h2><span class="note">last 10 posts' views</span></header>
+          <div class="alist">${warming.map(warm).join('')}</div></section>` : ''}
         <section class="panel ocard"><header><h2>Followers</h2><span class="note">${st.updated_at ? `updated ${ago(st.updated_at)}` : ''}</span></header>
           <div class="ftot"><b>${F.total == null ? '–' : num(F.total)}</b>${fch}</div>
           <div class="fspark">${chart(st.series, 'followers', { kind: 'line', label: 'Followers' })}</div>

@@ -145,7 +145,11 @@ http.createServer(async (q, r) => {
       totals: plat === 'facebook' ? {} : { views: 17210, likes: 1090, comments: 67, shares: 26 }, previous: { published: 2, totals: { views: 12400, likes: 1210, comments: 50, shares: 26 } }, followers: { total: 1842, change: 37 }, series,
       by_platform: ['tiktok', 'instagram', 'facebook'].filter(pl => plat === 'all' || pl === plat).map((pl, i) => ({ platform: pl, posts: 3 - i, views: pl === 'facebook' ? null : 9000 - i * 3000, likes: pl === 'facebook' ? null : 700 - i * 200, comments: null, shares: null, followers: [412, 650, 780][i] })),
       platforms: ['tiktok', 'instagram', 'facebook'],
-      accounts: accs.map(a => ({ id: a.id, username: a.username, platform: a.platform, avatar_url: '', followers: 300 + a.id.charCodeAt(1) * 7, change: a.id === 'a2' ? 12 : 0, limited: a.id === 'a5' })),
+      accounts: accs.map(a => ({ id: a.id, username: a.username, platform: a.platform, avatar_url: '', followers: 300 + a.id.charCodeAt(1) * 7, change: a.id === 'a2' ? 12 : 0, limited: a.id === 'a5',
+        warmup: [{ stage: 'new', days: 1, posts: 1, views: [], median: null, next: 'Post once a day this first week. Scroll your niche for a few minutes before and after each post.' },
+          { stage: 'warming', days: 6, posts: 6, views: [0, 12, 30, 25, 80, 140], median: 30, next: 'Views are climbing. Keep posting daily.' },
+          { stage: 'ready', days: 21, posts: 18, views: [180, 240, 210, 400, 320, 260, 510, 300, 280, 350], median: 320, next: 'Warmed up. Post your best formats and test new hooks.' },
+          { stage: 'stuck', days: 14, posts: 12, views: [3, 0, 10, 0, 4, 0, 12, 2, 0, 5], median: 2, next: 'Last 5 posts are under 50 views. Check the account region and post fresh clips, not reposts.' }][a.id.charCodeAt(1) % 4] })),
       top, posts: [...top, ...[...Array(14)].map((_, i) => ({ ...top[i % top.length], id: `m${i}`, scheduled_at: now() - (i + 1) * 86400 * 1.7 - (i * 5 % 14) * 3600,
         stats: { views: 300 + (i * 977) % 4000, likes: 10 + (i * 131) % 300, comments: (i * 7) % 30, shares: (i * 3) % 12 } }))].filter(Boolean), tiktok_pending: false, tiktok_reconnect: true, facebook_limited: true }); }
   if (p.endsWith('/creator-info')) return j({ creator_username: 'arco.app', creator_nickname: 'ARCO', creator_avatar_url: '', comment_disabled: false, privacy_level_options: ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'SELF_ONLY'] });

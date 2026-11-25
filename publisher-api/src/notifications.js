@@ -6,6 +6,7 @@
 import { now } from './http.js';
 import { randomToken } from './crypto.js';
 import { wsOf, inScope } from './scope.js';
+import { warmup } from './warmup.js';
 
 const DAY = 86400;
 export const VIEW_MILESTONES = [1000, 10000, 100000, 1000000];
@@ -32,9 +33,10 @@ async function facts(env, t) {
   const { results: accounts } = await env.DB.prepare(`SELECT id, workspace_id, brand_id, platform, username, display_name, followers, needs_reconnect, connected_at FROM accounts`).all();
   const { results: hist } = await env.DB.prepare(`SELECT account_id, MIN(followers) AS low FROM follower_history WHERE day >= ? GROUP BY account_id`).bind(dayOf(t - 8 * DAY)).all();
   const { results: comps } = await env.DB.prepare(`SELECT id, workspace_id, brand_id, title, handle, recent FROM competitors WHERE recent IS NOT NULL`).all().catch(() => ({ results: [] }));
-  const { results: firsts } = await env.DB.prepare(`SELECT account_id, MIN(scheduled_at) AS first FROM posts WHERE status = 'published' GROUP BY account_id`).all();
+  const { results: firsts } = await env.DB.prepare(`SELECT account_id, MIN(scheduled_at) AS first, COUNT(*) AS n FROM posts WHERE status = 'published' GROUP BY account_id`).all();
   for (const p of posts) p.s = p.stats ? JSON.parse(p.stats) : null;
-  return { posts, accounts, low: new Map(hist.map(h => [h.account_id, h.low])), comps, first: new Map(firsts.map(f => [f.account_id, f.first])) };
+  return { posts, accounts, low: new Map(hist.map(h => [h.account_id, h.low])), comps, first: new Map(firsts.map(f => [f.account_id, f.first])),
+    published: new Map(firsts.map(f => [f.account_id, f.n])) };
 }
 
 // What should exist now: [{ ws, brand, key, kind, tone, title, body, post, account, url }].
@@ -68,6 +70,15 @@ export function rules(f, t) {
     const first = f.first.get(a.id);
     if (first && first > t - 2 * DAY && a.connected_at > t - 30 * DAY) add(a, { key: `first:${a.id}`, kind: 'first', tone: 'win',
       title: 'First post is live', body: 'Views show in a few hours.' });
+  }
+  // Warm-up: a new account getting shown to people, or one that isn't.
+  for (const a of f.accounts) {
+    const mine = pub.filter(p => p.account_id === a.id).map(p => ({ scheduled_at: p.scheduled_at, views: p.s?.views, stats_at: p.stats_at }));
+    const w = warmup({ connected_at: a.connected_at, published: f.published?.get(a.id) || 0, posts: mine }, t);
+    if (w.stage === 'ready' && a.connected_at > t - 60 * DAY) add(a, { key: `warmup:${a.id}:ready`, kind: 'warmup', tone: 'win',
+      title: `${at(a)} is warmed up`, body: `Last 5 posts: ${big(w.median)} views each, on the median.` });
+    if (w.stage === 'stuck') add(a, { key: `warmstuck:${a.id}`, kind: 'warmstuck', tone: 'bad',
+      title: `${at(a)} isn't getting shown yet`, body: w.next });
   }
   // Problems.
   const zero = {};
@@ -103,7 +114,7 @@ export function rules(f, t) {
   return out;
 }
 
-const PROBLEM = ['zero', 'reconnect', 'empty'];
+const PROBLEM = ['zero', 'reconnect', 'empty', 'warmstuck'];
 
 export async function runNotifications(env, t = now()) {
   const last = await env.DB.prepare(`SELECT seen_at FROM notification_seen WHERE workspace_id = '_cron' AND who = '_cron'`).first().catch(() => null);
