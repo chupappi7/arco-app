@@ -101,7 +101,7 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:v
   <li><b>Group accounts into brands.</b> Go to <b>Accounts</b>, make a brand (for example "Bakery") and add its TikTok, Instagram, Threads, Facebook and YouTube accounts. If you only have one brand, the AI simply uses all your accounts.</li>
   <li><b>Set posting times.</b> On each brand, set the days and times you like to post, such as Mon to Fri at 12:30 and 18:00. When you don't name a time, the AI fills these slots. Also check the workspace <b>time zone</b> in <b>Settings → Workspace</b>.</li>
   <li><b>Write a brand voice</b> (optional, but it pays off). A few lines on how the brand sounds, plus two or three example captions. The AI reads it before writing anything.</li>
-  <li><b>Create an API key.</b> In <b>Settings → Developer</b>, the workspace owner presses <b>Create API key</b>. Copy it somewhere safe: it is shown only once, and it starts with <code>apk_</code>.</li>
+  <li><b>Create an API key.</b> In <b>AI connect</b>, the workspace owner presses <b>Create API key</b>. It starts with <code>apk_</code>, and AI connect can copy it again later, already built into the link or command for your app.</li>
 </ol>
 
 <div class="callout" id="youtube"><b>Connecting YouTube</b>In <b>Accounts</b>, use a brand's YouTube <b>+ Add</b> (or <b>Connect an account → YouTube</b>), pick the Google account that owns the channel and allow both permissions. Google asks each time, so you can add channels one after another. YouTube takes videos only: a vertical video up to 3 minutes goes up as a Short, and the caption becomes its description. Until Google approves ARCO Publisher, YouTube keeps uploads private; switch them to public in YouTube Studio.</div>
@@ -122,53 +122,40 @@ ARCO
 </ul>
 
 <h2 id="connect">Connect your AI</h2>
-<p>Publisher's MCP server address:</p>
-<pre><code>https://arco-publisher.vercel.app/mcp</code></pre>
-<p>It signs in with your API key, sent as <code>Authorization: Bearer apk_…</code>. Choose your app:</p>
+<p><b>Easiest:</b> in Publisher, open <b>AI connect</b> and pick your app. It gives you a link or command with your API key already in it, plus the steps for that app. The rest of this section is the same thing by hand.</p>
+<p>Your connector link is the server address with your API key on the end:</p>
+<pre><code>https://arco-publisher.vercel.app/mcp/apk_…</code></pre>
+<p class="muted">Anyone with this link can use your workspace, so keep it private. Making a new key in Publisher switches the old link off.</p>
 <div class="tabs" role="tablist">
-  <button role="tab" aria-selected="true" data-tab="t-code">Claude Code</button>
-  <button role="tab" aria-selected="false" data-tab="t-desktop">Claude Desktop</button>
+  <button role="tab" aria-selected="true" data-tab="t-desktop">Claude Desktop and claude.ai</button>
+  <button role="tab" aria-selected="false" data-tab="t-code">Claude Code</button>
   <button role="tab" aria-selected="false" data-tab="t-other">Cursor and others</button>
-  <button role="tab" aria-selected="false" data-tab="t-web">claude.ai</button>
 </div>
-<div class="tab on" id="t-code" role="tabpanel">
-  <p>Run this once in a terminal. It asks for your key, so the key never shows on screen or lands in your shell history:</p>
-  <pre><code>printf 'Paste your Publisher API key: '; read -rs ARCO_KEY; echo
-claude mcp add --scope user --transport http arco-publisher https://arco-publisher.vercel.app/mcp \
-  --header "Authorization: Bearer $ARCO_KEY"; unset ARCO_KEY</code></pre>
-  <p class="muted">Then start <code>claude</code> and ask away. Type <code>/mcp</code> to check it shows as connected. Claude Code can also read photos from a folder on your computer and upload them for you.</p>
+<div class="tab on" id="t-desktop" role="tabpanel">
+  <ol>
+    <li>Go to <b>Settings → Connectors → Add custom connector</b>.</li>
+    <li>Name it <b>ARCO Publisher</b>, paste your connector link and click <b>Add</b>.</li>
+    <li>Start a new chat and ask away. The first time, Claude asks before using it: click <b>Always allow</b>.</li>
+  </ol>
+  <p class="muted">Connectors you add in Claude Desktop also show up on claude.ai and the Claude phone app.</p>
 </div>
-<div class="tab" id="t-desktop" role="tabpanel">
-  <p>Open <b>Settings → Developer → Edit Config</b> and add this to <code>claude_desktop_config.json</code> (you need Node.js installed):</p>
-  <pre><code>{
-  "mcpServers": {
-    "arco-publisher": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://arco-publisher.vercel.app/mcp",
-               "--header", "Authorization:${ARCO_AUTH}"],
-      "env": { "ARCO_AUTH": "Bearer apk_…" }
-    }
-  }
-}</code></pre>
-  <p class="muted">Restart Claude Desktop. ARCO Publisher then shows up in the tools menu of a new chat.</p>
+<div class="tab" id="t-code" role="tabpanel">
+  <p>Run this once in Terminal (Mac) or PowerShell (Windows), with your connector link at the end:</p>
+  <pre><code>claude mcp add --scope user --transport http arco-publisher https://arco-publisher.vercel.app/mcp/apk_…</code></pre>
+  <p class="muted">Then start <code>claude</code> and type <code>/mcp</code>: <b>arco-publisher</b> should say connected. Says "already exists"? Run <code>claude mcp remove -s user arco-publisher</code> first. Claude Code can also read photos from a folder on your computer and upload them for you.</p>
 </div>
 <div class="tab" id="t-other" role="tabpanel">
-  <p>Any app that supports remote MCP servers over HTTP with headers, such as Cursor, Windsurf or VS Code, takes roughly this:</p>
+  <p>Cursor and VS Code install in one click from <b>AI connect</b> in Publisher. In any other app that supports MCP, add a <b>remote</b> (HTTP) server with your connector link as its URL and no authentication. If the app wants settings instead, add this inside <code>mcpServers</code>, keeping any servers already there:</p>
   <pre><code>{
   "mcpServers": {
     "arco-publisher": {
-      "url": "https://arco-publisher.vercel.app/mcp",
-      "headers": { "Authorization": "Bearer apk_…" }
+      "url": "https://arco-publisher.vercel.app/mcp/apk_…"
     }
   }
 }</code></pre>
+  <p class="muted">Apps that can send headers can use <code>https://arco-publisher.vercel.app/mcp</code> with <code>Authorization: Bearer apk_…</code> instead.</p>
 </div>
-<div class="tab" id="t-web" role="tabpanel">
-  <p>Custom connectors on claude.ai sign in with OAuth, which Publisher doesn't offer yet. For now, use Claude Desktop or Claude Code. They use the same account and the same chats work.</p>
-</div>
-
-<p class="muted">For the config files above, put the key only in the file itself, never in a command you type, so it does not end up in your shell history.</p>
-<div class="callout warn"><b>Treat the key like a password.</b>It can do anything a workspace admin can: schedule, cancel and read stats for every brand. Don't paste it into shared documents or chats. If it leaks, create a new one in Settings → Developer, which switches the old one off immediately.</div>
+<div class="callout warn"><b>Treat the key like a password.</b>It can do anything a workspace admin can: schedule, cancel and read stats for every brand. Don't paste it into shared documents or chats. If it leaks, make a new one in AI connect, which switches the old one off immediately.</div>
 
 <h2 id="files">Giving it your photos and videos</h2>
 <p>The AI schedules what's in your library. How your files get there depends on where they are and which AI you use.</p>

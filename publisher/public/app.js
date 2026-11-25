@@ -1111,9 +1111,10 @@ const APP_TILE = {
   vscode: ['#0a66b8', '<path d="M16.5 4.5 8.5 12l8 7.5V4.5zM8.5 12 5 9.3v5.4L8.5 12" fill="none" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/>'],
   windsurf: ['#0e8f80', '<g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M4.5 9.5c2.5-2 5-2 7.5 0s5 2 7.5 0M4.5 14.5c2.5-2 5-2 7.5 0s5 2 7.5 0"/></g>'],
   chatgpt: ['#111111', '<g fill="none" stroke="#fff" stroke-width="1.5"><circle cx="12" cy="12" r="6.2"/><path d="M12 5.8v6.2l5.4 3.1M12 12l-5.4 3.1"/></g>'],
+  other: ['#6b6f76', '<g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M9 4.5v4M15 4.5v4M7 8.5h10v3a5 5 0 0 1-10 0zM12 16.5v3"/></g>'],
 };
 const appTile = (id, s = 36) => `<svg class="apptile" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="${APP_TILE[id][0]}"/>${APP_TILE[id][1]}</svg>`;
-const CLIENTS = [['desktop', 'Claude Desktop'], ['code', 'Claude Code'], ['cursor', 'Cursor'], ['vscode', 'VS Code'], ['windsurf', 'Windsurf'], ['chatgpt', 'ChatGPT']];
+const CLIENTS = [['desktop', 'Claude Desktop'], ['code', 'Claude Code'], ['cursor', 'Cursor'], ['vscode', 'VS Code'], ['windsurf', 'Windsurf'], ['chatgpt', 'ChatGPT'], ['other', 'Other app']];
 // What step 1 hands over for each app: [title, line, copy kind, copy label, one-click install kind].
 const KGET = {
   desktop: ['Your connector link', 'Your API key built into the server address. You paste it into Claude Desktop in step 2.', 'link', 'Copy link'],
@@ -1122,6 +1123,7 @@ const KGET = {
   vscode: ['Add ARCO Publisher to VS Code', 'Opens VS Code and asks to install it, with your API key built in.', 'link', 'Copy link', 'vscode'],
   windsurf: ['Your Windsurf settings', 'The settings with your API key built in. You add them to Windsurf in step 2.', 'windsurf', 'Copy settings'],
   chatgpt: ['Your connector link', 'Your API key built into the server address. You paste it into ChatGPT in step 2.', 'link', 'Copy link'],
+  other: ['Your server link', 'Your API key built into the server address. Most AI apps that support MCP take this link in step 2.', 'link', 'Copy link'],
 };
 // What a key-holding button gives: the connector link, a command or config around it, or an install link.
 const linkText = (kind, key) => { const link = `${mcpUrl()}/${key}`;
@@ -1175,6 +1177,12 @@ function clientSetup() {
       `On chatgpt.com, go to <b>Settings</b> → <b>Apps &amp; Connectors</b> → <b>Advanced settings</b> and turn on <b>Developer mode</b>.${tip("Needs a paid ChatGPT plan. It's a beta, so names can differ slightly.")}`,
       'Back in <b>Apps &amp; Connectors</b>, click <b>Create</b>. Name it <b>ARCO Publisher</b>, paste the link from step 1 as the <b>MCP server URL</b>, set <b>Authentication</b> to <b>No authentication</b>, tick the box and click <b>Create</b>.',
       `In a new chat, open <b>+</b> → <b>Developer mode</b>, pick <b>ARCO Publisher</b>, then ask something like ${ask1}`,
+    ],
+    other: [
+      'In your AI app, find where you add an MCP server. It is usually under <b>Settings</b>, called <b>Connectors</b>, <b>Tools</b> or <b>MCP</b>.',
+      'Add a <b>remote</b> (or <b>HTTP</b>) server, name it <b>ARCO Publisher</b> and paste the link from step 1 as its URL. If it asks how to sign in, pick <b>No authentication</b>: the link already holds your key.',
+      `Turn it on if needed, start a new chat and ask something like ${ask1}`,
+      `${tip(`App asks for settings (JSON) instead of a link? ${can('owner') ? `${copyBtn('', `${ui('copy', 14)}Copy settings`).replace('btn sec sm', 'btn ghost sm').replace('data-copy=""', 'data-keycopy="config"')} and add` : 'Add'} the <b>arco-publisher</b> part inside <code>mcpServers</code>. Keep any servers already there.`)}`,
     ],
   }[c];
   return `<div class="howto">${c === 'code' ? `<div class="howhead"><b>On</b>
@@ -1251,7 +1259,7 @@ function aiView() {
       : `<div class="kempty"><span>${ui('spark', 18)}</span><div><b>No API key yet</b><span class="note">Create one, then copy it for ${esc(CLIENTS.find(c => c[0] === app)[1])} right here.</span></div>
           ${owner ? `<button class="btn" id="apikey">${ui('plus', 14)}Create API key</button>` : ''}</div>`}
       ${owner ? '' : `<p class="note">Only the workspace owner can create or copy the key. Ask them for <b>${KGET[app][0].replace(/^Your /, 'the ').replace(/^Add ARCO Publisher to .*/, `the connector link`)}</b> for ${esc(CLIENTS.find(c => c[0] === app)[1])}. It holds the key, so they should send it privately.</p>`}</div>`)}
-    ${numbered(2, `Connect ${esc(CLIENTS.find(c => c[0] === app)[1])}`, 'Follow these steps.', `<div class="msetup">${clientSetup()}</div>`)}
+    ${numbered(2, app === 'other' ? 'Connect your app' : `Connect ${esc(CLIENTS.find(c => c[0] === app)[1])}`, 'Follow these steps.', `<div class="msetup">${clientSetup()}</div>`)}
     ${numbered(3, 'Ask', `Copy one into your AI. It uses the posts in your <a href="#library">Library</a>${unused ? ` (${unused} ready)` : ''}.`,
       `<div class="mprompts">${prompts.map(([ic, tag, p]) => `<button type="button" class="mprompt" data-copy="${esc(p)}" title="Copy">
           <span class="mtag">${ui(ic, 13)}${tag}</span><span class="mpt">${esc(p)}</span><span class="mcopy">${ui('copy', 14)}</span></button>`).join('')}</div>`)}
