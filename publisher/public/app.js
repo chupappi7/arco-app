@@ -94,7 +94,7 @@ async function boot() {
   await loadMe();
   // A message belongs to the page it was shown on, unless it was set for the
   // page being opened (S.keepFlash).
-  window.addEventListener('hashchange', () => { S.more = false; if (!S.keepFlash) S.flash = null; S.keepFlash = false; S.detail = null; route(); });
+  window.addEventListener('hashchange', () => { S.more = false; if (!S.keepFlash) S.flash = null; S.keepFlash = false; S.detail = S.openNext || null; S.openNext = null; route(); });
   route();
   setTimeout(prefetch, 1200);
 }
@@ -160,12 +160,15 @@ function ntfWhere(x) {
   const bits = [b !== 'all' ? `${brandDot(b)}${esc(brandLabel(b))}` : '', a ? `${PLATFORM[platformOf(a)]} ${handle(a)}` : ''].filter(Boolean);
   return bits.length ? `<em class="bwho">${bits.join('<i class="sep">·</i>')}</em>` : '';
 }
-// Open Analytics for that brand, narrowed to the account when there is one.
-function openNtf(x) {
+// Open Analytics for that brand, narrowed to the account when there is one,
+// with the post's panel open when the item is about one post.
+async function openNtf(x) {
   const b = ntfBrand(x), a = x.account_id && acct(x.account_id);
+  if (x.post_id && !await havePost(x.post_id)) toast('That post is no longer here.', 'err');
+  const id = x.post_id && postById(x.post_id) ? x.post_id : null;
   if (b !== curBrand()) setBrand(b);
   S.acct = a ? a.id : ''; S.fAcct = S.acct || 'all';
-  if (S.view === 'analytics') { loadStats(); loadCompetitors(); } else location.hash = '#analytics';
+  if (S.view === 'analytics') { S.detail = id; loadStats(); loadCompetitors(); } else { S.openNext = id; location.hash = '#analytics'; }
   render();
 }
 function drawBell() {
@@ -185,17 +188,19 @@ function bindBell() {
     if (!x) return;
     if (again) return openPost(x.post_id, true);
     if (x.kind === 'reconnect') { location.hash = '#accounts'; return; }
-    if (x.kind === 'failed' && x.post_id) return openPost(x.post_id);
     openNtf(x);
   });
 }
 // A post from the inbox: its panel, or straight into the composer to post again.
-async function openPost(id, again = false) {
+async function havePost(id) {
   if (!postById(id)) {
     const t = Math.floor(Date.now() / 1000);
     try { const r = await api(`/posts?from=${t - 40 * 86400}&to=${t + 14 * 86400}`); S.posts = r.posts; } catch {}
   }
-  if (!postById(id)) { toast('That post is no longer here.', 'err'); return; }
+  return !!postById(id);
+}
+async function openPost(id, again = false) {
+  if (!await havePost(id)) { toast('That post is no longer here.', 'err'); return; }
   if (again) return edit(id, true);
   if (!['overview', 'calendar'].includes(S.view)) location.hash = '#overview';
   S.detail = id; render();
@@ -394,7 +399,7 @@ function render() {
   const hadDetail = !!$('overlay'), opener = S.detail && !hadDetail ? document.activeElement?.closest?.('[data-open]')?.dataset.open : null;
   if (S.anim) { $('app').classList.remove('in'); void $('app').offsetWidth; $('app').classList.add('in'); S.anim = false;
     clearTimeout(S.animT); S.animT = setTimeout(() => $('app').classList.remove('in'), 400); }
-  $('app').innerHTML = head + (['calendar', 'analytics', 'drafts', 'library'].includes(S.view) ? brandChips() : '') + views[S.view]() + (['calendar', 'overview'].includes(S.view) && S.detail ? detailView() : '') + resultView();
+  $('app').innerHTML = head + (['calendar', 'analytics', 'drafts', 'library'].includes(S.view) ? brandChips() : '') + views[S.view]() + (['calendar', 'overview', 'analytics'].includes(S.view) && S.detail ? detailView() : '') + resultView();
   $('app').insertAdjacentHTML('afterbegin', '<span class="bellslot top"></span>');
   bind();
   drawBell();
