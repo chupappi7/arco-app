@@ -677,8 +677,17 @@ code.key{display:block;width:100%;user-select:all;background:var(--well);border:
 .dmedia{display:flex;gap:10px;align-items:flex-start}
 .dmedia .big{width:180px;aspect-ratio:4/5;object-fit:cover;border-radius:12px;display:block;background:var(--well);flex:none}
 .dthumbs{display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start}
-.dthumbs img{width:52px;height:64px;object-fit:cover;border-radius:7px;flex:none;opacity:.75}
-.dthumbs img.cv{opacity:1;outline:2px solid var(--graphite);outline-offset:1px}
+.dslide{position:relative;flex:none}
+.dnav{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;
+  background:rgba(0,0,0,.55);color:#fff;opacity:0;transition:opacity .15s}
+.dnav.prev{left:8px}.dnav.next{right:8px}
+.dslide:hover .dnav,.dnav:focus-visible{opacity:1}
+@media (hover:none){.dnav{opacity:1}}
+.dcount{position:absolute;right:8px;top:8px;padding:2px 8px;border-radius:99px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:600}
+.dthumbs button{padding:0;border:0;background:none;border-radius:7px;cursor:pointer;flex:none}
+.dthumbs img{width:52px;height:64px;object-fit:cover;border-radius:7px;display:block;opacity:.6;transition:opacity .15s}
+.dthumbs button:hover img{opacity:.9}
+.dthumbs button.on img{opacity:1;outline:2px solid var(--graphite);outline-offset:1px}
 .dtitle{font-weight:650;margin:0 0 10px}
 .dscroll textarea{min-height:120px}
 .df{display:flex;gap:8px;flex-wrap:wrap;padding:14px 18px;border-top:1px solid var(--line-2);background:var(--well)}

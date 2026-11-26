@@ -267,7 +267,7 @@ const UI = {
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>',
   retry: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/>',
-  chev: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>', check: '<path d="m5 12 5 5 9-10"/>',
+  chev: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>', prev: '<path d="m15 18-6-6 6-6"/>', next: '<path d="m9 18 6-6-6-6"/>', check: '<path d="m5 12 5 5 9-10"/>',
   chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>', out: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 17l-5-5 5-5M5 12h11"/>',
   heart: '<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/>',
@@ -2520,8 +2520,11 @@ function detailView() {
       ${p.fail_reason ? `<div class="dfail">${ui('x', 15)}<span>${esc(p.fail_reason)}</span></div>` : ''}
       ${p.stats ? `<div class="dstats">${STAT_KEYS.filter(k => p.stats[k] != null).map(k => `<div><b>${num(p.stats[k])}</b><span>${METRIC[k]}</span></div>`).join('')}</div>` : ''}
       ${p.video ? `<div class="dmedia"><video class="big" src="${esc(p.video)}" poster="${esc(p.video)}.jpg" controls preload="none" playsinline></video></div>`
-        : cover ? `<div class="dmedia"><img class="big" src="${esc(cover)}" alt="Cover">
-        ${p.images.length > 1 ? `<div class="dthumbs">${p.images.map((u, n) => `<img src="${esc(u)}" alt="Photo ${n + 1}" class="${n === p.cover_index ? 'cv' : ''}">`).join('')}</div>` : ''}</div>`
+        : cover ? `<div class="dmedia"><div class="dslide"><img class="big" id="dbig" src="${esc(cover)}" alt="Photo ${(p.images.indexOf(cover)) + 1}" data-i="${p.images.indexOf(cover)}">
+          ${p.images.length > 1 ? `<button type="button" class="dnav prev" data-step="-1" aria-label="Previous photo">${ui('prev', 18)}</button>
+          <button type="button" class="dnav next" data-step="1" aria-label="Next photo">${ui('next', 18)}</button>
+          <span class="dcount" id="dcount">${p.images.indexOf(cover) + 1} / ${p.images.length}</span>` : ''}</div>
+        ${p.images.length > 1 ? `<div class="dthumbs">${p.images.map((u, n) => `<button type="button" data-slide="${n}" aria-label="Photo ${n + 1}" class="${u === cover ? 'on' : ''}"><img src="${esc(u)}" alt=""></button>`).join('')}</div>` : ''}</div>`
         : `<p class="note">${['published', 'failed', 'cancelled'].includes(p.status) ? 'The photos were deleted 7 days after the post finished.' : 'No photos.'}</p>`}
       ${p.title ? `<p class="dtitle">${esc(p.title)}</p>` : ''}
       <label class="f" for="dcap">Caption</label>
@@ -2535,6 +2538,17 @@ function detailView() {
       ${p.status === 'published' || p.status === 'cancelled' ? `<button class="btn sec" data-again="${p.id}">Post again</button>` : ''}
       ${p.post_url ? `<a class="btn ${p.status === 'published' ? '' : 'sec'}" href="${esc(p.post_url)}" target="_blank" rel="noopener">View live post</a>` : ''}
     </footer></aside></div>`;
+}
+
+// Photo posts in the post drawer: show any slide, not just the cover.
+function showSlide(n) {
+  const big = $('dbig');
+  const thumbs = [...document.querySelectorAll('.dthumbs [data-slide]')];
+  if (!big || !thumbs.length) return;
+  const i = (n + thumbs.length) % thumbs.length;
+  big.src = thumbs[i].querySelector('img').src; big.dataset.i = i; big.alt = `Photo ${i + 1}`;
+  thumbs.forEach((t, k) => t.classList.toggle('on', k === i));
+  if ($('dcount')) $('dcount').textContent = `${i + 1} / ${thumbs.length}`;
 }
 
 // Dropping a post on another day keeps its time of day, in the workspace's zone.
@@ -2796,6 +2810,8 @@ document.addEventListener('keydown', e => {
     if (f.length && e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
     else if (f.length && !e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
   }
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.detail && $('dbig') && !e.target.closest?.('input,textarea,select,[contenteditable]')) {
+    e.preventDefault(); showSlide(Number($('dbig').dataset.i) + (e.key === 'ArrowLeft' ? -1 : 1)); return; }
   if (e.key !== 'Escape') return;
   if (S.result?.open) { S.result.open = false; render(); } else if (S.pickOpen) { S.pickOpen = false; render(); $('openpick')?.focus(); } else if (S.detail) { S.detail = null; render(); } });
 // The account dropdown closes when you click anywhere outside it.
@@ -3058,6 +3074,8 @@ function bind() {
   on('[data-wk]', 'click', e => { const d = Number(e.currentTarget.dataset.wk); if (S.calMode === 'month') S.month += d; else S.week += d * (S.calMode === 'weeks' ? 4 : 1); loadWeek(); });
   on('[data-open]', 'click', e => { if (e.target.closest('button,a') !== e.currentTarget && e.target.closest('button,a')) return; S.detail = e.currentTarget.dataset.open; render(); });
   on('#closedetail', 'click', () => { S.detail = null; render(); });
+  on('.dthumbs [data-slide]', 'click', e => showSlide(Number(e.currentTarget.dataset.slide)));
+  on('.dnav[data-step]', 'click', e => showSlide(Number($('dbig').dataset.i) + Number(e.currentTarget.dataset.step)));
   on('#overlay', 'click', e => { if (e.target.id === 'overlay') { S.detail = null; render(); } });
   on('#savecap', 'click', async () => {
     try { await send(`/posts/${S.detail}`, 'PATCH', { caption: $('dcap').value }); S.flash = { kind: 'ok', text: 'Caption saved.' }; }
